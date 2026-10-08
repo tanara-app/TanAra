@@ -58,6 +58,16 @@ export function rate4w(sorted, day) {
   return den ? (num / den) * 7 : null;
 }
 
+// Where the weight trend lands on a future day: the 7-day average (or last weigh-in)
+// carried forward at the 4-week rate. kg is missing when there isn't enough data.
+export function projectWeight(sorted, from, to) {
+  const base = rollingAvg(sorted, from) ?? (sorted.length ? Number(sorted[sorted.length - 1].kg) : null);
+  if (base === null) return { base: null, rate: null };
+  const rate = rate4w(sorted, from);
+  if (rate === null) return { base, rate: null };
+  return { base, rate, kg: base + rate * diffDays(to, from) / 7 };
+}
+
 export function weekSummary(entries, weights, ws) {
   const end = addDays(ws, 6);
   const inWeek = entries.filter(e => e.day >= ws && e.day <= end);

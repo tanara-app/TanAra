@@ -12,10 +12,10 @@
 */
 import { SEED_FOODS } from './seedFoods.js';
 
-export const TABLES = ['profile', 'foods', 'entries', 'weights', 'reviews'];
-export const KEY = { profile: 'user_id', foods: 'id', entries: 'id', weights: 'day', reviews: 'week_start' };
+export const TABLES = ['profile', 'foods', 'entries', 'weights', 'reviews', 'motivations'];
+export const KEY = { profile: 'user_id', foods: 'id', entries: 'id', weights: 'day', reviews: 'week_start', motivations: 'id' };
 
-const empty = () => ({ profile: null, foods: [], entries: [], weights: [], reviews: [] });
+const empty = () => ({ profile: null, foods: [], entries: [], weights: [], reviews: [], motivations: [] });
 
 let ns = 'local';
 let remote = null;
@@ -52,6 +52,7 @@ export function init(namespace, remoteAdapter) {
   remote = remoteAdapter;
   state = { ...empty(), ...lsGet('state', {}) };
   queue = lsGet('queue', []);
+  urlCache = null;
   syncStatus = { pending: queue.length, error: null, lastPull: null };
 }
 
@@ -59,7 +60,7 @@ export function clearLocal() {
   try {
     Object.keys(localStorage).filter(k => k.startsWith(`tanara:${ns}:`)).forEach(k => localStorage.removeItem(k));
   } catch { /* ignore */ }
-  state = empty(); queue = [];
+  state = empty(); queue = []; urlCache = null;
 }
 
 /* ---------------- reads ---------------- */
@@ -120,7 +121,7 @@ export async function pull() {
   const res = await remote.fetchAll();
   if (res.error) { syncStatus.error = 'دریافت داده از سرور انجام نشد.'; emit(); return; }
   if (queue.length) return; // a write slipped in while fetching — keep local, pull later
-  state = res.data;
+  state = { ...empty(), ...res.data };
   syncStatus.lastPull = now();
   syncStatus.error = null;
   persist();
@@ -235,6 +236,78 @@ export function saveReview(r) {
   commit({ op: 'upsert', table: 'reviews', row });
 }
 
+/*
+  Motivations: things that keep you going — an upcoming event, an inspiring photo, a
+  photo of yourself before, a sentence. Rows sync like everything else; photos go
+  straight to the remote's storage (they're too big for the offline queue), so adding
+  a photo needs a connection. Without a remote, the photo is kept inline as a data URL.
+*/
+export function saveMotivation(m) {
+  const old = state.motivations.find(x => x.id === m.id);
+  const row = {
+    id: m.id || uid(),
+    kind: m.kind,
+    title: (m.title || '').trim(),
+    note: (m.note || '').trim(),
+    day: m.day || null,
+    image_path: m.image_path || null,
+    created_at: old?.created_at || now(),
+    updated_at: now(),
+  };
+  put('motivations', row);
+  commit({ op: 'upsert', table: 'motivations', row });
+  if (old?.image_path && old.image_path !== row.image_path) removeImage(old.image_path);
+  return row;
+}
+
+export function deleteMotivation(id) {
+  const old = state.motivations.find(x => x.id === id);
+  drop('motivations', id);
+  commit({ op: 'delete', table: 'motivations', key: id });
+  if (old?.image_path) removeImage(old.image_path);
+}
+
+// Resolves to a value for image_path, or throws with a message fit for the user.
+export async function uploadImage(blob) {
+  if (!remote) {
+    return new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(r.result);
+      r.onerror = () => reject(new Error('عکس خوانده نشد.'));
+      r.readAsDataURL(blob);
+    });
+  }
+  if (navigator.onLine === false) throw new Error('برای افزودن عکس به اینترنت وصل شوید.');
+  const { path, error } = await remote.uploadImage(`${uid()}.jpg`, blob);
+  if (error) throw new Error('عکس آپلود نشد. دوباره امتحان کنید.');
+  return path;
+}
+
+function removeImage(path) {
+  if (remote && !path.startsWith('data:')) remote.removeImage(path).catch(() => {});
+}
+
+// Signed URLs are cached (and persisted) so photos show instantly and the browser's
+// HTTP cache keeps working across opens.
+let urlCache = null;
+const URL_TTL = 7 * 86400;
+export function imageUrl(path) {
+  if (!path) return null;
+  if (path.startsWith('data:')) return path;
+  urlCache ||= lsGet('imgurls', {});
+  const hit = urlCache[path];
+  return hit && hit.exp > Date.now() + 3600e3 ? hit.url : null;
+}
+export async function loadImageUrls(paths) {
+  const need = paths.filter(p => p && !imageUrl(p));
+  if (!need.length || !remote) return false;
+  const res = await remote.imageUrls(need, URL_TTL).catch(() => null);
+  if (!res?.length) return false;
+  res.forEach(r => { if (r.url) urlCache[r.path] = { url: r.url, exp: Date.now() + URL_TTL * 1000 }; });
+  lsSet('imgurls', urlCache);
+  return true;
+}
+
 /* ---------------- export / import ---------------- */
 export function exportData() {
   const strip = r => { const { user_id, ...rest } = r; return rest; };
@@ -248,6 +321,7 @@ export function exportData() {
       entries: state.entries.map(strip),
       weights: state.weights.map(strip),
       reviews: state.reviews.map(strip),
+      motivations: state.motivations.map(strip),
     },
   };
 }
@@ -269,6 +343,7 @@ export function importData(obj) {
     entries: d.entries.map(e => ({ ...e, food_id: foodIds.has(e.food_id) ? e.food_id : null })),
     weights: d.weights,
     reviews: d.reviews,
+    motivations: Array.isArray(d.motivations) ? d.motivations : [],
   };
   state = structuredClone(data);
   // a full replace supersedes anything still waiting to be sent

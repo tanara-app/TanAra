@@ -8,6 +8,7 @@ import { today, faDMY } from '../lib/dates.js';
 import { sheet, toast, confirmBox, icon } from './dom.js';
 import { fieldsHtml, readFields, bindChoices, validate, medicalNoteHtml, targetsHtml } from './onboarding.js';
 import { openFoodBank } from './foodBank.js';
+import { openMotivationList, openMotivationEditor } from './motivation.js';
 
 let session = { email: null, signOut: null, local: true };
 export const setSession = s => { session = s; };
@@ -27,6 +28,7 @@ export function recalcTargets() {
 }
 
 export function renderProfile(root) {
+  const s = store.get();
   const p = store.profile();
   const eff = effectiveTargets(p);
   const kg = latestWeight();
@@ -61,6 +63,15 @@ export function renderProfile(root) {
         ${p.medications ? `<div><dt>داروها</dt><dd>${esc(p.medications)}</dd></div>` : ''}
       </dl>
       <button class="btn block" data-edit>${icon.edit} ویرایش اطلاعات</button>
+    </section>
+
+    <section class="card">
+      <h2 class="card-h">انگیزه‌ها</h2>
+      <p class="muted small">${s.motivations.length ? `${fa(s.motivations.length)} انگیزه ثبت کرده‌اید؛ هر روز بالای صفحه‌ی «امروز» نشان داده می‌شوند.` : 'رویدادی که منتظرش هستید، عکس بدنی که می‌خواهید، عکسی از خودتان یا یک جمله؛ هر روز بالای صفحه‌ی «امروز» می‌بینیدشان.'}</p>
+      <div class="row gap">
+        ${s.motivations.length ? '<button class="btn grow" data-mots>مدیریت انگیزه‌ها</button>' : ''}
+        <button class="btn grow" data-mot-new>افزودن انگیزه</button>
+      </div>
     </section>
 
     <section class="card doctor-box">
@@ -102,6 +113,8 @@ export function renderProfile(root) {
   root.querySelector('[data-edit]').onclick = () => openEdit(p);
   root.querySelector('[data-export]').onclick = doExport;
   root.querySelector('[data-import]').onchange = e => doImport(e.target);
+  root.querySelector('[data-mots]')?.addEventListener('click', () => openMotivationList());
+  root.querySelector('[data-mot-new]').onclick = () => openMotivationEditor();
   root.querySelector('[data-bank]').onclick = () => openFoodBank();
   root.querySelector('[data-defaults]').onclick = () => {
     const n = store.restoreDefaultFoods();

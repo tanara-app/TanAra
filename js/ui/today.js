@@ -8,6 +8,7 @@ import { today, addDays, relLabel, faDM, weekStart } from '../lib/dates.js';
 import { icon } from './dom.js';
 import { openLogSheet, openEntrySheet } from './logFood.js';
 import { dismissed, dismiss } from './notices.js';
+import { motivationCard, bindMotivation } from './motivation.js';
 
 let day = today();
 export const setDay = d => { day = d; };
@@ -53,6 +54,8 @@ export function renderToday(root) {
       </div>
       <button class="icon-btn" data-next aria-label="روز بعد" ${isToday ? 'disabled' : ''}>${icon.chevL}</button>
     </header>
+
+    ${isToday ? motivationCard() : ''}
 
     <section class="card summary">
       <div class="ring-wrap">
@@ -108,6 +111,7 @@ export function renderToday(root) {
   root.querySelector('[data-log]').onclick = () => openLogSheet({ day });
   root.querySelectorAll('[data-add]').forEach(b => b.onclick = () => openLogSheet({ day, meal: b.dataset.add }));
   root.querySelectorAll('[data-entry]').forEach(b => b.onclick = () => openEntrySheet(s.entries.find(e => e.id === b.dataset.entry)));
+  bindMotivation(root);
   root.querySelectorAll('[data-dismiss]').forEach(b => b.onclick = () => {
     const n = b.closest('[data-notice]');
     dismiss(n.dataset.notice, n.dataset.mark);

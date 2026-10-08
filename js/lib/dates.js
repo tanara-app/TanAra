@@ -65,3 +65,22 @@ export function mealForNow() {
   if (h >= 19 || h < 2) return 'dinner';
   return 'snack';
 }
+
+// Jalali ↔ stored day. Built on Intl so there's no calendar table to maintain.
+export const J_MONTHS = ['فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور', 'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند'];
+const JP = new Intl.DateTimeFormat('fa-IR-u-ca-persian-nu-latn', { year: 'numeric', month: 'numeric', day: 'numeric' });
+export function jParts(day) {
+  const p = Object.fromEntries(JP.formatToParts(parse(day)).map(x => [x.type, x.value]));
+  return { y: Number(p.year), m: Number(p.month), d: Number(p.day) };
+}
+// Returns null for dates that don't exist (e.g. 30 Esfand in a non-leap year).
+export function fromJalali(y, m, d) {
+  const offset = (m <= 6 ? (m - 1) * 31 : 186 + (m - 7) * 30) + d - 1;
+  const guess = addDays(iso(new Date(y + 621, 2, 20)), offset);
+  for (const k of [0, 1, -1, 2, -2]) {
+    const c = addDays(guess, k);
+    const j = jParts(c);
+    if (j.y === y && j.m === m && j.d === d) return c;
+  }
+  return null;
+}
