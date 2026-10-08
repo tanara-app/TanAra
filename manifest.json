@@ -1,0 +1,14 @@
+{
+  "name": "تن‌آرا",
+  "short_name": "تن‌آرا",
+  "lang": "fa",
+  "dir": "rtl",
+  "start_url": "./#/today",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0f1315",
+  "theme_color": "#0f1315",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

@@ -1,0 +1,278 @@
+/*
+  Store: the single place the UI reads and writes data.
+
+  - State lives in memory and is cached in localStorage, so the app opens instantly and
+    logging never waits on the network.
+  - Every write is applied locally first, then queued for the remote adapter (Supabase).
+    The queue survives reloads and is flushed in order whenever we're online.
+  - A pull from the remote replaces local state, but only once the queue is empty, so
+    unsent changes are never overwritten.
+  - The remote is an adapter with fetchAll / upsert / remove / replaceAll. Cross-device sync
+    or an AI layer later plugs in here without touching the UI.
+*/
+import { SEED_FOODS } from './seedFoods.js';
+
+export const TABLES = ['profile', 'foods', 'entries', 'weights', 'reviews'];
+export const KEY = { profile: 'user_id', foods: 'id', entries: 'id', weights: 'day', reviews: 'week_start' };
+
+const empty = () => ({ profile: null, foods: [], entries: [], weights: [], reviews: [] });
+
+let ns = 'local';
+let remote = null;
+let state = empty();
+let queue = [];
+let flushing = false;
+let flushTimer = null;
+const listeners = new Set();
+export let syncStatus = { pending: 0, error: null, lastPull: null };
+
+const uid = () => (crypto.randomUUID ? crypto.randomUUID()
+  : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 3 | 8)).toString(16);
+  }));
+const now = () => new Date().toISOString();
+
+function lsGet(k, fallback) {
+  try { const v = localStorage.getItem(`tanara:${ns}:${k}`); return v ? JSON.parse(v) : fallback; }
+  catch { return fallback; }
+}
+function lsSet(k, v) {
+  try { localStorage.setItem(`tanara:${ns}:${k}`, JSON.stringify(v)); } catch { /* quota or private mode */ }
+}
+function persist() {
+  lsSet('state', state);
+  lsSet('queue', queue);
+  syncStatus = { ...syncStatus, pending: queue.length };
+}
+function emit() { listeners.forEach(fn => fn()); }
+export function subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn); }
+
+export function init(namespace, remoteAdapter) {
+  ns = namespace;
+  remote = remoteAdapter;
+  state = { ...empty(), ...lsGet('state', {}) };
+  queue = lsGet('queue', []);
+  syncStatus = { pending: queue.length, error: null, lastPull: null };
+}
+
+export function clearLocal() {
+  try {
+    Object.keys(localStorage).filter(k => k.startsWith(`tanara:${ns}:`)).forEach(k => localStorage.removeItem(k));
+  } catch { /* ignore */ }
+  state = empty(); queue = [];
+}
+
+/* ---------------- reads ---------------- */
+export const get = () => state;
+export const profile = () => state.profile?.data || null;
+
+/* ---------------- sync ---------------- */
+function enqueue(op) {
+  if (!remote) return;
+  queue.push(op);
+  persist();
+  clearTimeout(flushTimer);
+  flushTimer = setTimeout(() => flush(), 250);
+}
+
+// Postgres errors (constraint, bad input) won't succeed on retry; network errors will.
+// 42501 (permission) usually means the session lapsed, so it's retried after sign-in rather than dropped.
+const isPermanent = err => /^[0-9A-Z]{5}$/.test(err?.code || '') && !/^(08|42501)/.test(err.code);
+
+export async function flush() {
+  if (!remote || flushing || !queue.length) return true;
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) return false;
+  flushing = true;
+  try {
+    while (queue.length) {
+      const op = queue[0];
+      let res;
+      try {
+        if (op.op === 'upsert') res = await remote.upsert(op.table, op.row);
+        else if (op.op === 'delete') res = await remote.remove(op.table, op.key);
+        else if (op.op === 'replaceAll') res = await remote.replaceAll(op.data);
+      } catch (e) { res = { error: { message: String(e) } }; }
+      if (res?.error) {
+        if (isPermanent(res.error)) {
+          console.warn('dropping op', op, res.error);
+          syncStatus.error = 'یکی از تغییرها روی سرور ذخیره نشد.';
+          queue.shift(); persist();
+          continue;
+        }
+        syncStatus.error = 'فعلاً به سرور وصل نیست؛ تغییرها روی گوشی نگه داشته می‌شوند.';
+        persist(); emit();
+        return false;
+      }
+      queue.shift(); persist();
+    }
+    syncStatus.error = null;
+    return true;
+  } finally {
+    flushing = false;
+    emit();
+  }
+}
+
+export async function pull() {
+  if (!remote) return;
+  const ok = await flush();
+  if (!ok || queue.length) return;
+  const res = await remote.fetchAll();
+  if (res.error) { syncStatus.error = 'دریافت داده از سرور انجام نشد.'; emit(); return; }
+  if (queue.length) return; // a write slipped in while fetching — keep local, pull later
+  state = res.data;
+  syncStatus.lastPull = now();
+  syncStatus.error = null;
+  persist();
+  emit();
+}
+
+/* ---------------- writes ---------------- */
+function put(table, row) {
+  const k = KEY[table];
+  const list = state[table];
+  const i = list.findIndex(r => r[k] === row[k]);
+  if (i >= 0) list[i] = row; else list.push(row);
+}
+function drop(table, key) {
+  const k = KEY[table];
+  state[table] = state[table].filter(r => r[k] !== key);
+}
+function commit(op) { persist(); emit(); enqueue(op); }
+
+export function saveProfile(data) {
+  const row = { data, updated_at: now() };
+  state.profile = row;
+  commit({ op: 'upsert', table: 'profile', row });
+}
+
+export function upsertFood(food) {
+  const row = {
+    id: food.id || uid(),
+    name: food.name.trim(),
+    category: food.category || 'other',
+    unit: (food.unit || 'پرس').trim(),
+    kcal: Number(food.kcal) || 0,
+    protein: Number(food.protein) || 0,
+    is_veg: !!food.is_veg,
+    created_at: food.created_at || now(),
+    updated_at: now(),
+  };
+  put('foods', row);
+  commit({ op: 'upsert', table: 'foods', row });
+  return row;
+}
+
+export function deleteFood(id) {
+  drop('foods', id);
+  // past entries keep their own name and numbers; only the link goes (server does the same)
+  state.entries.forEach(e => { if (e.food_id === id) e.food_id = null; });
+  commit({ op: 'delete', table: 'foods', key: id });
+}
+
+// Foods are added in batches so the seed doesn't produce 100 separate requests.
+export function addFoods(list) {
+  const rows = list.map(f => ({
+    id: uid(), name: f.name, category: f.category, unit: f.unit,
+    kcal: f.kcal, protein: f.protein, is_veg: !!f.is_veg, created_at: now(), updated_at: now(),
+  }));
+  rows.forEach(r => state.foods.push(r));
+  persist(); emit();
+  if (remote) { queue.push({ op: 'upsert', table: 'foods', row: rows }); persist(); flush(); }
+  return rows;
+}
+
+export function seedFoods() {
+  return addFoods(SEED_FOODS);
+}
+
+export function restoreDefaultFoods() {
+  const have = new Set(state.foods.map(f => f.name));
+  const missing = SEED_FOODS.filter(f => !have.has(f.name));
+  if (missing.length) addFoods(missing);
+  return missing.length;
+}
+
+export function saveEntry(e) {
+  const row = {
+    id: e.id || uid(),
+    day: e.day,
+    meal: e.meal,
+    food_id: e.food_id || null,
+    name: e.name,
+    unit: e.unit || '',
+    qty: Number(e.qty) || 1,
+    kcal: Math.max(0, Math.round(Number(e.kcal) || 0)),
+    protein: Math.max(0, Math.round((Number(e.protein) || 0) * 10) / 10),
+    is_veg: !!e.is_veg,
+    created_at: e.created_at || now(),
+  };
+  put('entries', row);
+  commit({ op: 'upsert', table: 'entries', row });
+  return row;
+}
+
+export function deleteEntry(id) {
+  drop('entries', id);
+  commit({ op: 'delete', table: 'entries', key: id });
+}
+
+export function setWeight(day, kg) {
+  const existing = state.weights.find(w => w.day === day);
+  const row = { id: existing?.id || uid(), day, kg: Math.round(Number(kg) * 10) / 10, created_at: existing?.created_at || now() };
+  put('weights', row);
+  commit({ op: 'upsert', table: 'weights', row });
+}
+
+export function deleteWeight(day) {
+  drop('weights', day);
+  commit({ op: 'delete', table: 'weights', key: day });
+}
+
+export function saveReview(r) {
+  const row = { week_start: r.week_start, good: r.good || '', hard: r.hard || '', next_goal: r.next_goal || '', updated_at: now() };
+  put('reviews', row);
+  commit({ op: 'upsert', table: 'reviews', row });
+}
+
+/* ---------------- export / import ---------------- */
+export function exportData() {
+  const strip = r => { const { user_id, ...rest } = r; return rest; };
+  return {
+    app: 'tanara',
+    version: 1,
+    exported_at: now(),
+    data: {
+      profile: state.profile ? strip(state.profile) : null,
+      foods: state.foods.map(strip),
+      entries: state.entries.map(strip),
+      weights: state.weights.map(strip),
+      reviews: state.reviews.map(strip),
+    },
+  };
+}
+
+export function validateImport(obj) {
+  if (!obj || obj.app !== 'tanara' || !obj.data) return 'این فایل خروجی تن‌آرا نیست.';
+  for (const t of ['foods', 'entries', 'weights', 'reviews']) {
+    if (!Array.isArray(obj.data[t])) return 'فایل ناقص است.';
+  }
+  return null;
+}
+
+export function importData(obj) {
+  const d = obj.data;
+  const foodIds = new Set(d.foods.map(f => f.id));
+  const data = {
+    profile: d.profile || null,
+    foods: d.foods,
+    entries: d.entries.map(e => ({ ...e, food_id: foodIds.has(e.food_id) ? e.food_id : null })),
+    weights: d.weights,
+    reviews: d.reviews,
+  };
+  state = structuredClone(data);
+  // a full replace supersedes anything still waiting to be sent
+  queue = [];
+  persist(); emit();
+  if (remote) { queue.push({ op: 'replaceAll', data }); persist(); flush(); }
+}
