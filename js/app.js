@@ -111,3 +111,8 @@ if (params.has('local')) {
   // supabase-js advises against awaiting its calls inside this callback, so defer.
   sb.auth.onAuthStateChange((_e, session) => setTimeout(() => onSession(session), 0));
 }
+
+// Service worker: makes the app installable and lets it open without internet.
+if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === '127.0.0.1')) {
+  navigator.serviceWorker.register('./sw.js').catch(e => console.warn('SW register failed', e));
+}
