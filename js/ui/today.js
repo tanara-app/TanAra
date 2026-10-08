@@ -9,6 +9,7 @@ import { icon } from './dom.js';
 import { openLogSheet, openEntrySheet } from './logFood.js';
 import { dismissed, dismiss } from './notices.js';
 import { motivationCard, bindMotivation } from './motivation.js';
+import { tipCard, bindTip } from './aiCards.js';
 
 let day = today();
 export const setDay = d => { day = d; };
@@ -56,6 +57,7 @@ export function renderToday(root) {
     </header>
 
     ${isToday ? motivationCard() : ''}
+    ${isToday ? tipCard() : ''}
 
     <section class="card summary">
       <div class="ring-wrap">
@@ -117,4 +119,6 @@ export function renderToday(root) {
     dismiss(n.dataset.notice, n.dataset.mark);
     n.remove();
   });
+  // last: generating the tip redraws this screen
+  if (isToday) bindTip(() => { if (root.querySelector('[data-log]') && day === today()) renderToday(root); });
 }

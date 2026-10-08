@@ -6,6 +6,7 @@ import { fa, parseNum, norm, esc, qtyLabel } from '../lib/fa.js';
 import { mealForNow, today } from '../lib/dates.js';
 import { sheet, toast, confirmBox, icon } from './dom.js';
 import { openFoodBank } from './foodBank.js';
+import { ask, aiAvailable, sparkle } from '../ai/hooshvareh.js';
 
 const QTY_PRESETS = [0.5, 1, 1.5, 2, 3];
 
@@ -140,13 +141,14 @@ export function openLogSheet({ day = today(), meal = null } = {}) {
         ${mealSeg(curMeal)}
         <form class="stack" novalidate>
           <label class="field"><span>اسم غذا</span><input name="name" value="${esc(query)}" placeholder="مثلاً ساندویچ مرغ"></label>
+          ${aiAvailable() ? `<button type="button" class="btn ai-btn" data-ai-est>${sparkle()} تخمین کالری با هوشواره</button><p class="muted small ai-est-note" hidden></p>` : ''}
           <div class="row gap">
             <label class="field grow"><span>کالری</span><input name="kcal" inputmode="numeric" placeholder="۰"></label>
             <label class="field grow"><span>پروتئین (گرم)</span><input name="protein" inputmode="decimal" placeholder="۰"></label>
           </div>
           <label class="check"><input type="checkbox" name="veg"><span>جزو وعده‌ی سبزی حساب شود</span></label>
           <label class="check"><input type="checkbox" name="save"><span>به بانک غذا هم اضافه شود</span></label>
-          <label class="field" data-unit hidden><span>واحد</span><input name="unit" list="units-dl" value="پرس"></label>
+          <label class="field" data-unit hidden><span>واحد (اعداد بالا برای یک واحد)</span><input name="unit" list="units-dl" value="پرس"></label>
           <p class="err" hidden></p>
           <button class="btn primary block big">ثبت</button>
         </form>
@@ -155,6 +157,7 @@ export function openLogSheet({ day = today(), meal = null } = {}) {
       const form = body.querySelector('form');
       const F = form.elements;
       F.save.onchange = () => { body.querySelector('[data-unit]').hidden = !F.save.checked; };
+      bindEstimate(body, F, () => { body.querySelector('[data-unit]').hidden = false; });
       body.querySelector('[data-back]').onclick = drawList;
       form.onsubmit = e => {
         e.preventDefault();
@@ -165,7 +168,7 @@ export function openLogSheet({ day = today(), meal = null } = {}) {
         if (!name) { err.textContent = 'اسم غذا را بنویسید.'; err.hidden = false; return; }
         if (!(kcal >= 0)) { err.textContent = 'کالری را وارد کنید.'; err.hidden = false; return; }
         let food_id = null;
-        const unit = F.save.checked ? (F.unit.value.trim() || 'پرس') : 'پرس';
+        const unit = F.unit.value.trim() || 'پرس';
         if (F.save.checked) {
           food_id = store.upsertFood({ name, unit, kcal, protein, is_veg: F.veg.checked, category: F.veg.checked ? 'veg' : 'other' }).id;
         }
@@ -178,6 +181,36 @@ export function openLogSheet({ day = today(), meal = null } = {}) {
 
     drawList();
   }, { tall: true });
+}
+
+/*
+  «تخمین با هوشواره»: fills calories, protein, unit (and category / veg where the form has them)
+  from the food's name. Shared with the food bank form.
+*/
+export function bindEstimate(root, F, onFilled) {
+  const btn = root.querySelector('[data-ai-est]');
+  if (!btn) return;
+  const label = btn.innerHTML;
+  btn.onclick = async () => {
+    const name = F.name.value.trim();
+    if (!name) { toast('اول اسم غذا را بنویس'); F.name.focus(); return; }
+    btn.disabled = true;
+    btn.innerHTML = `${sparkle()} هوشواره دارد حساب می‌کند…`;
+    try {
+      const r = await ask('estimate', { name, unit: F.unit.value.trim() !== 'پرس' ? F.unit.value.trim() : '' });
+      if (!btn.isConnected) return;
+      F.kcal.value = fa(Math.round(r.kcal));
+      F.protein.value = fa(Math.round(r.protein * 10) / 10, 1);
+      if (r.unit) F.unit.value = r.unit;
+      if (F.category && r.category) F.category.value = r.category;
+      F.veg.checked = !!r.is_veg;
+      const note = root.querySelector('.ai-est-note');
+      if (note) { note.textContent = `برای هر ${r.unit}: ${r.note}`; note.hidden = false; }
+      onFilled?.();
+    } catch (x) { toast(x.message); }
+    btn.disabled = false;
+    btn.innerHTML = label;
+  };
 }
 
 // Edit or delete an existing entry.

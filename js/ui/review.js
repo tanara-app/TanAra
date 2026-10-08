@@ -4,6 +4,7 @@ import { weekSummary } from '../domain/stats.js';
 import { fa, kcal50, signed, esc } from '../lib/fa.js';
 import { today, addDays, weekStart, weekLabel } from '../lib/dates.js';
 import { icon, toast } from './dom.js';
+import { reviewCard, bindReviewCard } from './aiCards.js';
 
 let ws = null;
 
@@ -30,6 +31,8 @@ export function renderReview(root) {
       <div class="tile"><span>تغییر میانگین وزن</span><b>${sum.weightChange === null ? '—' : signed(sum.weightChange)}</b><small>${sum.weightChange === null ? 'وزن کافی ثبت نشده' : 'کیلو نسبت به هفته‌ی قبل'}</small></div>
     </section>
 
+    ${reviewCard(ws)}
+
     <form class="card stack review-form" novalidate>
       <label class="field"><span>چه چیزی خوب بود؟</span><textarea name="good" rows="3">${esc(r.good || '')}</textarea></label>
       <label class="field"><span>چه چیزی سخت بود؟</span><textarea name="hard" rows="3">${esc(r.hard || '')}</textarea></label>
@@ -53,4 +56,9 @@ export function renderReview(root) {
   form.onsubmit = e => { e.preventDefault(); save(false); };
   // also keep notes when the person just leaves the field
   form.querySelectorAll('textarea').forEach(t => t.addEventListener('change', () => save(true)));
+  const shown = ws;
+  bindReviewCard(root, ws, () => { if (root.isConnected && location.hash === '#/review' && ws === shown) renderReview(root); }, goal => {
+    form.elements.next_goal.value = goal;
+    save(false);
+  });
 }

@@ -3,6 +3,8 @@ import * as store from '../data/store.js';
 import { CATEGORIES, UNITS } from '../data/seedFoods.js';
 import { fa, parseNum, norm, esc } from '../lib/fa.js';
 import { sheet, toast, confirmBox, icon } from './dom.js';
+import { bindEstimate } from './logFood.js';
+import { aiAvailable, sparkle } from '../ai/hooshvareh.js';
 
 export function openFoodBank(onChange) {
   let query = '';
@@ -45,6 +47,7 @@ export function openFoodForm(food, onSaved) {
       <div class="sheet-head"><h2>${food ? 'ویرایش غذا' : 'غذای جدید'}</h2><button class="icon-btn" data-close aria-label="بستن">${icon.close}</button></div>
       <form class="stack" novalidate>
         <label class="field"><span>اسم</span><input name="name" value="${esc(f.name)}"></label>
+        ${aiAvailable() ? `<button type="button" class="btn ai-btn" data-ai-est>${sparkle()} تخمین کالری با هوشواره</button><p class="muted small ai-est-note" hidden></p>` : ''}
         <label class="field"><span>واحد خانگی</span><input name="unit" list="units-bank" value="${esc(f.unit)}"></label>
         <div class="row gap">
           <label class="field grow"><span>کالری هر واحد</span><input name="kcal" inputmode="numeric" value="${f.kcal === '' ? '' : fa(f.kcal)}"></label>
@@ -60,6 +63,7 @@ export function openFoodForm(food, onSaved) {
     const form = body.querySelector('form');
     const F = form.elements;
     body.querySelector('[data-close]').onclick = () => sheet.close();
+    bindEstimate(body, F);
     form.onsubmit = e => {
       e.preventDefault();
       const name = F.name.value.trim();

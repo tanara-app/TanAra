@@ -5,6 +5,7 @@ import { fa, esc } from '../lib/fa.js';
 import { today, addDays, diffDays, faDM, faDMY, jParts, fromJalali, J_MONTHS } from '../lib/dates.js';
 import { sheet, toast, confirmBox, icon } from './dom.js';
 import { dismissed, dismiss } from './notices.js';
+import { ask, aiAvailable, sparkle } from '../ai/hooshvareh.js';
 
 export const KINDS = {
   event: { label: 'رویداد', long: 'رویداد پیش رو' },
@@ -243,7 +244,8 @@ export function openMotivationEditor(existing = null, onDone = null) {
         <form class="stack" novalidate>
           ${existing ? '' : `<div class="seg small" data-kind>${Object.entries(KINDS).map(([v, x]) => `<button type="button" data-v="${v}" class="${v === k ? 'on' : ''}">${x.label}</button>`).join('')}</div>`}
           ${k === 'quote'
-            ? `<label class="field"><span>جمله</span><textarea name="title" rows="3" placeholder="مثلاً: می‌خواهم با بچه‌ها فوتبال بازی کنم و کم نیاورم">${esc(d.title)}</textarea></label>`
+            ? `<label class="field"><span>جمله</span><textarea name="title" rows="3" placeholder="مثلاً: می‌خواهم با بچه‌ها فوتبال بازی کنم و کم نیاورم">${esc(d.title)}</textarea></label>
+              ${aiAvailable() ? `<button type="button" class="btn ai-btn" data-ai-quote>${sparkle()} ${d.title ? 'هوشواره بهترش کند' : 'پیشنهاد هوشواره'}</button>` : ''}`
             : `<label class="field"><span>${k === 'event' ? 'چه رویدادی؟' : 'عنوان'} ${k === 'event' ? '' : '<em>اختیاری</em>'}</span><input name="title" value="${esc(d.title)}" placeholder="${k === 'event' ? 'مثلاً عروسی پسرخاله' : k === 'image' ? 'مثلاً بدنی که می‌خواهم' : 'مثلاً شروع راه'}" autocomplete="off"></label>`}
           ${k === 'event' || k === 'before' ? `<div class="field"><span>${k === 'event' ? 'تاریخ' : 'تاریخ عکس'}</span>${dateFields(day, years)}</div>` : ''}
           ${k !== 'quote' ? `<div class="field"><span>عکس ${NEEDS_PHOTO[k] ? '' : '<em>اختیاری</em>'}</span>
@@ -271,6 +273,23 @@ export function openMotivationEditor(existing = null, onDone = null) {
         read();
         d.kind = b.dataset.v; d.day = null;
         draw();
+      });
+      body.querySelector('[data-ai-quote]')?.addEventListener('click', async e => {
+        const btn = e.currentTarget;
+        const ta = form.elements.title;
+        btn.disabled = true;
+        btn.innerHTML = `${sparkle()} هوشواره دارد می‌نویسد…`;
+        try {
+          const r = await ask('quote', { draft: ta.value.trim() });
+          if (!ta.isConnected) return;
+          ta.value = r.text.replace(/^[«"]|[»"]$/g, '');
+          d.title = ta.value;
+          btn.innerHTML = `${sparkle()} یکی دیگر`;
+        } catch (x) {
+          toast(x.message);
+          btn.innerHTML = `${sparkle()} پیشنهاد هوشواره`;
+        }
+        btn.disabled = false;
       });
       body.querySelector('[data-nophoto]')?.addEventListener('click', () => { read(); blob = null; preview = null; removePhoto = true; draw(); });
       body.querySelector('[data-file]')?.addEventListener('change', async e => {

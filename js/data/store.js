@@ -12,10 +12,10 @@
 */
 import { SEED_FOODS } from './seedFoods.js';
 
-export const TABLES = ['profile', 'foods', 'entries', 'weights', 'reviews', 'motivations'];
-export const KEY = { profile: 'user_id', foods: 'id', entries: 'id', weights: 'day', reviews: 'week_start', motivations: 'id' };
+export const TABLES = ['profile', 'foods', 'entries', 'weights', 'reviews', 'motivations', 'chat', 'ai_notes'];
+export const KEY = { profile: 'user_id', foods: 'id', entries: 'id', weights: 'day', reviews: 'week_start', motivations: 'id', chat: 'id', ai_notes: 'key' };
 
-const empty = () => ({ profile: null, foods: [], entries: [], weights: [], reviews: [], motivations: [] });
+const empty = () => ({ profile: null, foods: [], entries: [], weights: [], reviews: [], motivations: [], chat: [], ai_notes: [] });
 
 let ns = 'local';
 let remote = null;
@@ -91,6 +91,7 @@ export async function flush() {
       try {
         if (op.op === 'upsert') res = await remote.upsert(op.table, op.row);
         else if (op.op === 'delete') res = await remote.remove(op.table, op.key);
+        else if (op.op === 'clear') res = await remote.clear(op.table);
         else if (op.op === 'replaceAll') res = await remote.replaceAll(op.data);
       } catch (e) { res = { error: { message: String(e) } }; }
       if (res?.error) {
@@ -308,6 +309,39 @@ export async function loadImageUrls(paths) {
   return true;
 }
 
+/*
+  Hooshvareh (the AI): chat history and the notes it writes elsewhere (today's tip, week
+  analysis, ...). Both sync like everything else; the AI itself never writes — the app does.
+*/
+export function saveChat(m) {
+  const old = state.chat.find(x => x.id === m.id);
+  const row = {
+    id: m.id || uid(),
+    role: m.role,
+    content: m.content || '',
+    actions: m.actions || [],
+    created_at: old?.created_at || m.created_at || now(),
+  };
+  put('chat', row);
+  commit({ op: 'upsert', table: 'chat', row });
+  return row;
+}
+
+export function clearChat() {
+  state.chat = [];
+  persist(); emit();
+  enqueue({ op: 'clear', table: 'chat' });
+}
+
+export const note = key => state.ai_notes.find(n => n.key === key) || null;
+
+export function saveNote(n) {
+  const row = { key: n.key, kind: n.kind, text: n.text || '', data: n.data || {}, created_at: now() };
+  put('ai_notes', row);
+  commit({ op: 'upsert', table: 'ai_notes', row });
+  return row;
+}
+
 /* ---------------- export / import ---------------- */
 export function exportData() {
   const strip = r => { const { user_id, ...rest } = r; return rest; };
@@ -322,6 +356,8 @@ export function exportData() {
       weights: state.weights.map(strip),
       reviews: state.reviews.map(strip),
       motivations: state.motivations.map(strip),
+      chat: state.chat.map(strip),
+      ai_notes: state.ai_notes.map(strip),
     },
   };
 }
@@ -344,6 +380,8 @@ export function importData(obj) {
     weights: d.weights,
     reviews: d.reviews,
     motivations: Array.isArray(d.motivations) ? d.motivations : [],
+    chat: Array.isArray(d.chat) ? d.chat : [],
+    ai_notes: Array.isArray(d.ai_notes) ? d.ai_notes : [],
   };
   state = structuredClone(data);
   // a full replace supersedes anything still waiting to be sent

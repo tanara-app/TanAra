@@ -10,6 +10,8 @@ import { renderProgress, resetWeighDay } from './ui/progress.js';
 import { renderReview } from './ui/review.js';
 import { renderProfile, setSession } from './ui/profile.js';
 import { renderLogin } from './ui/login.js';
+import { renderChat } from './ui/chat.js';
+import { configureAI, sparkle } from './ai/hooshvareh.js';
 
 const view = $('#view');
 const nav = $('#nav');
@@ -17,6 +19,7 @@ const nav = $('#nav');
 const ROUTES = {
   today: { label: 'امروز', icon: icon.today, render: renderToday },
   progress: { label: 'پیشرفت', icon: icon.chart, render: renderProgress },
+  ai: { label: 'هوشواره', icon: sparkle(24), render: renderChat },
   review: { label: 'مرور هفته', icon: icon.week, render: renderReview },
   profile: { label: 'نمایه', icon: icon.user, render: renderProfile },
 };
@@ -96,11 +99,13 @@ if (params.has('local')) {
     if (currentId !== undefined && (user?.id ?? null) === currentId) return;
     currentId = user?.id ?? null;
     if (!user) {
+      configureAI(null);
       started = false;
       nav.hidden = true;
       renderLogin(view, sb);
       return;
     }
+    configureAI(async () => (await sb.auth.getSession()).data.session?.access_token || null);
     setSession({
       local: false,
       email: user.email,

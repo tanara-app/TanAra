@@ -8,6 +8,7 @@ import { today, addDays, relLabel, faDMY, faFull } from '../lib/dates.js';
 import { icon, toast, confirmBox } from './dom.js';
 import { weightChart } from './chart.js';
 import { recalcTargets } from './profile.js';
+import { progressCard, bindProgressCard } from './aiCards.js';
 
 let wDay = today();
 let rangeKey = '3m';
@@ -57,6 +58,8 @@ export function renderProgress(root) {
       <div class="tile"><span>آخرین وزن</span><b>${latest ? fa(latest.kg, 1) : '—'}</b><small>${latest ? relLabel(latest.day) : ''}</small></div>
     </section>
 
+    ${progressCard()}
+
     <section class="card">
       <div class="seg small" data-range>${Object.entries(RANGES).map(([k, [l]]) => `<button data-v="${k}" class="${k === rangeKey ? 'on' : ''}">${l}</button>`).join('')}</div>
       ${weightChart(sorted, from, t)}
@@ -70,6 +73,7 @@ export function renderProgress(root) {
     </section>`;
 
   const rerender = () => renderProgress(root);
+  bindProgressCard(root, () => { if (root.isConnected && location.hash === '#/progress') rerender(); });
   root.querySelector('[data-prev]').onclick = () => { wDay = addDays(wDay, -1); rerender(); };
   root.querySelector('[data-next]').onclick = () => { if (wDay < t) { wDay = addDays(wDay, 1); rerender(); } };
   root.querySelector('.weigh-form').onsubmit = e => {
