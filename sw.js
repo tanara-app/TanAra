@@ -2,7 +2,7 @@
    Own files are network-first, so a new deploy shows up on the next online open;
    the cache is only the fallback. Pinned CDN files are cache-first.
    Supabase API calls are never touched. Bump CACHE when the shell list changes. */
-const CACHE = 'tanara-shell-v7';
+const CACHE = 'tanara-shell-v8';
 const SHELL = [
   './', './index.html', './manifest.json', './css/app.css',
   './js/app.js', './js/config.js',

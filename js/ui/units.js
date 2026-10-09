@@ -8,7 +8,7 @@
 */
 import { UNITS, UNIT_GRAMS, GRAM } from '../data/seedFoods.js';
 import { fa, parseNum, esc, qtyLabel } from '../lib/fa.js';
-import { toast, icon } from './dom.js';
+import { icon } from './dom.js';
 
 const OTHER = '__other';
 const r1 = x => Math.round(x * 10) / 10;
@@ -46,10 +46,6 @@ export function unitFields(f, { kcalLabel = 'کالری' } = {}) {
       <label class="field grow" data-gf ${per100 ? 'hidden' : ''}><span>هر واحد چند گرم؟</span><input name="grams" inputmode="decimal" placeholder="مثلاً ۱۲۰" value="${grams}"></label>
     </div>
     <label class="field" data-other hidden><span>اسم واحد</span><input name="unitOther" placeholder="مثلاً قاشق چای‌خوری"></label>
-    <div class="seg small" data-basis ${per100 ? 'hidden' : ''}>
-      <button type="button" data-v="unit" class="on">برای یک <span data-un>${esc(unit)}</span></button>
-      <button type="button" data-v="100">برای ۱۰۰ گرم</button>
-    </div>
     <div class="row gap">
       <label class="field grow"><span data-kl>${kcalLabel}</span><input name="kcal" inputmode="numeric" placeholder="۰" value="${k}"></label>
       <label class="field grow"><span data-pl>پروتئین (گرم)</span><input name="protein" inputmode="decimal" placeholder="۰" value="${p}"></label>
@@ -61,68 +57,55 @@ export function unitFields(f, { kcalLabel = 'کالری' } = {}) {
   unit (per gram for «گرم»), or { error }; set(values) fills the fields from such values.
 */
 export function bindUnitFields(root, F, onChange) {
-  let basis = F.unit.value === GRAM ? '100' : 'unit';
   let lastUnit = F.unit.value;
   const gf = root.querySelector('[data-gf]');
   const other = root.querySelector('[data-other]');
-  const seg = root.querySelector('[data-basis]');
   const unitName = () => (F.unit.value === OTHER ? F.unitOther.value.trim() || 'واحد' : F.unit.value);
-  const grams = () => (F.unit.value === GRAM ? 1 : parseNum(F.grams.value));
+  const per100 = () => F.unit.value === GRAM; // weighed foods are typed per ۱۰۰ گرم
+  const grams = () => (per100() ? 1 : parseNum(F.grams.value));
 
   const labels = () => {
-    const u = unitName();
-    const g = F.unit.value === GRAM;
-    gf.hidden = g;
-    seg.hidden = g;
+    gf.hidden = per100();
     other.hidden = F.unit.value !== OTHER;
-    root.querySelector('[data-un]').textContent = u;
-    seg.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === basis));
-    const per = basis === '100' ? '۱۰۰ گرم' : u;
+    const per = per100() ? '۱۰۰ گرم' : unitName();
     root.querySelector('[data-kl]').textContent = `کالری هر ${per}`;
     root.querySelector('[data-pl]').textContent = `پروتئین هر ${per} (گرم)`;
   };
 
   // the numbers in the boxes, as per-unit values
   const values = () => {
-    const k = parseNum(F.kcal.value), p = parseNum(F.protein.value) || 0, g = grams();
-    if (basis === 'unit') return { kcal: k, protein: p };
-    return F.unit.value === GRAM ? { kcal: k / 100, protein: p / 100 } : { kcal: k * g / 100, protein: p * g / 100 };
+    const k = parseNum(F.kcal.value), p = parseNum(F.protein.value) || 0;
+    return per100() ? { kcal: k / 100, protein: p / 100 } : { kcal: k, protein: p };
   };
   const show = (kcal, protein) => {
-    const f = basis === 'unit' ? 1 : F.unit.value === GRAM ? 100 : 100 / grams();
+    const f = per100() ? 100 : 1;
     if (Number.isFinite(kcal)) F.kcal.value = fa(Math.round(kcal * f));
     if (Number.isFinite(protein)) F.protein.value = fa(r1(protein * f), 1);
   };
-
-  seg.addEventListener('click', e => {
-    const b = e.target.closest('button[data-v]');
-    if (!b || b.dataset.v === basis) return;
-    if (!(grams() > 0)) { toast('اول بنویس هر واحد چند گرم است'); F.grams.focus(); return; }
-    const v = values();
-    basis = b.dataset.v;
-    show(v.kcal, v.protein);
-    labels(); onChange?.();
-  });
+  // rescale the typed numbers by a factor (unit ↔ ۱۰۰ گرم)
+  const scale = f => {
+    if (!F.kcal.value) return;
+    const k = parseNum(F.kcal.value), p = parseNum(F.protein.value) || 0;
+    if (k >= 0) F.kcal.value = fa(Math.round(k * f));
+    if (F.protein.value) F.protein.value = fa(r1(p * f), 1);
+  };
 
   F.unit.addEventListener('change', () => {
     const u = F.unit.value;
     const prev = lastUnit;
     lastUnit = u;
+    if (u === prev) { labels(); return; }
     if (u === OTHER) { labels(); F.unitOther.focus(); onChange?.(); return; }
+    const g = parseNum(F.grams.value);
     if (u === GRAM) {
-      // switching a per-unit food to grams: turn its numbers into per-100 g when the weight is known
-      const g = parseNum(F.grams.value);
-      if (basis === 'unit' && g > 0 && F.kcal.value) {
-        const k = parseNum(F.kcal.value), p = parseNum(F.protein.value) || 0;
-        F.kcal.value = fa(Math.round(k * 100 / g));
-        F.protein.value = fa(r1(p * 100 / g), 1);
-      }
-      basis = '100';
+      // one unit of g grams → per ۱۰۰ گرم
+      if (g > 0) scale(100 / g);
     } else {
       // a weight that was only the old unit's default follows the new unit
-      const g = parseNum(F.grams.value);
-      if (!(g > 0) || g === UNIT_GRAMS[prev]) F.grams.value = UNIT_GRAMS[u] ? fa(UNIT_GRAMS[u]) : '';
-      if (prev === GRAM) basis = '100';
+      if (prev !== GRAM && (!(g > 0) || g === UNIT_GRAMS[prev])) F.grams.value = UNIT_GRAMS[u] ? fa(UNIT_GRAMS[u]) : '';
+      // per ۱۰۰ گرم → one unit of its weight
+      const ng = parseNum(F.grams.value);
+      if (prev === GRAM && ng > 0) scale(ng / 100);
     }
     labels(); onChange?.();
   });
@@ -134,7 +117,6 @@ export function bindUnitFields(root, F, onChange) {
       const unit = unitName();
       if (F.unit.value === OTHER && !F.unitOther.value.trim()) return { error: 'اسم واحد را بنویس.' };
       const g = grams();
-      if (basis === '100' && !(g > 0)) return { error: 'بنویس هر واحد چند گرم است.' };
       const v = values();
       if (!(v.kcal >= 0)) return { error: 'کالری را وارد کنید.' };
       return { unit, grams: g > 0 ? g : null, kcal: v.kcal, protein: v.protein || 0 };
@@ -146,8 +128,7 @@ export function bindUnitFields(root, F, onChange) {
         lastUnit = unit;
         F.unit.dispatchEvent(new Event('change')); // repaint the picker; handler sees no change
       }
-      basis = F.unit.value === GRAM ? '100' : 'unit';
-      if (F.unit.value !== GRAM && g > 0) F.grams.value = fa(r1(g), 1);
+      if (!per100() && g > 0) F.grams.value = fa(r1(g), 1);
       show(kcal, protein);
       labels(); onChange?.();
     },
