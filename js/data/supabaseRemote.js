@@ -54,6 +54,11 @@ export function createSupabaseRemote(sb) {
       return sb.from(table).delete().eq(DELETE_KEY[table], key);
     },
 
+    removeWhere(table, col, val) {
+      const q = sb.from(table).delete();
+      return val === null ? q.is(col, null) : q.eq(col, val);
+    },
+
     clear(table) {
       return sb.from(table).delete().not('user_id', 'is', null);
     },

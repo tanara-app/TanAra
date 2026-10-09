@@ -7,7 +7,8 @@
     quote     a motivational sentence for the Motivation section
     review    analysis of one week + a suggested goal for next week
     progress  analysis of the weight trend
-    estimate  calories / protein for a food the bank doesn't have
+    estimate  calories / protein / weight of one unit for a food the bank doesn't have
+    title     a short name for a chat conversation
 
   The app sends its whole local state (it's the source of truth, including writes not yet
   synced), so the model always sees exactly what the user sees. The API key lives only in
@@ -44,7 +45,7 @@ Language and style
 
 Nutrition and safety
 - Give only well-established, evidence-based nutrition and behaviour advice. When something is uncertain or debated, say so briefly.
-- Calorie estimates use Iranian household units (کفگیر، کف‌دست، قاشق، لیوان، ...) as in the food bank.
+- Calorie estimates use Iranian household units (کفگیر، کف‌دست، قاشق، لیوان، ...) as in the food bank. Each bank food also has the weight in grams of one unit, so amounts can be logged in grams (unit «گرم», qty = grams).
 - Never suggest eating below the person's safety floor (given in the data), crash diets, long fasts, skipping meals as a strategy, diet pills, laxatives or supplements for weight loss.
 - If weight is dropping more than ~1.5 kg/week for several weeks, or calories have been below the floor for days, gently say so and suggest seeing a doctor.
 - You are not a doctor. If the profile lists medical conditions, medications, or a possible eating-disorder history, keep advice general and suggest checking with their doctor or a dietitian for anything specific. Warning signs that always mean "see a doctor": سرگیجه، ضعف شدید، تپش قلب، ریزش موی زیاد، any change in illness or medication.
@@ -97,7 +98,8 @@ function snapshot(c: Ctx) {
     const l = byDay.get(d)!;
     const k = l.reduce((s, e) => s + Number(e.kcal), 0);
     const p = l.reduce((s, e) => s + Number(e.protein), 0);
-    const v = l.filter(e => e.is_veg).reduce((s, e) => s + Number(e.qty), 0);
+    // a vegetable serving is ~80 g, so weighed entries count by weight (same as the app)
+    const v = l.filter(e => e.is_veg).reduce((s, e) => s + (e.unit === "گرم" ? Number(e.qty) / 80 : Number(e.qty)), 0);
     const meals = [...new Set(l.map(e => MEALS[e.meal] || e.meal))].join("، ");
     return `${d} | ${Math.round(k)} | ${Math.round(p)} | ${r1(v)} | ${meals}`;
   }).join("\n") || "nothing logged yet"}`);
@@ -114,7 +116,7 @@ function snapshot(c: Ctx) {
   const notes = [...(c.notes || [])].sort((a, b) => (a.created_at < b.created_at ? -1 : 1)).slice(-20);
   out.push(`# What you (Hooshvareh) already told them outside the chat, latest last\n${notes.map(n => `${n.key}: ${n.text}`).join("\n") || "none"}`);
 
-  out.push(`# Their food bank (food_id | name | unit | kcal per unit | protein g per unit | veg)\n${(c.foods || []).map(f => `${f.id} | ${f.name} | ${f.unit} | ${Math.round(f.kcal)} | ${r1(f.protein)}${f.is_veg ? " | veg" : ""}`).join("\n")}`);
+  out.push(`# Their food bank (food_id | name | unit | grams in one unit | kcal per unit | protein g per unit | veg)\n${(c.foods || []).map(f => `${f.id} | ${f.name} | ${f.unit} | ${f.grams ? r1(f.grams) : "?"} | ${r1(f.kcal)} | ${r1(f.protein)}${f.is_veg ? " | veg" : ""}`).join("\n")}`);
   return out.join("\n\n");
 }
 
@@ -130,8 +132,8 @@ const TOOLS: any[] = [
         day: { type: "string", description: "YYYY-MM-DD" },
         meal: { type: "string", enum: ["breakfast", "lunch", "dinner", "snack"] },
         name: { type: "string" },
-        qty: { type: "number", description: "how many units" },
-        unit: { type: "string", description: "household unit, e.g. کفگیر" },
+        qty: { type: "number", description: "how many units (or grams when unit is گرم)" },
+        unit: { type: "string", description: "household unit, e.g. کفگیر; «گرم» when they gave a weight" },
         kcal: { type: "number", description: "total for the whole quantity" },
         protein: { type: "number", description: "grams, total for the whole quantity" },
         is_veg: { type: "boolean", description: "counts as a vegetable serving" },
@@ -170,11 +172,12 @@ const TOOLS: any[] = [
       type: "object",
       properties: {
         name: { type: "string" }, unit: { type: "string" },
+        grams: { type: "number", description: "weight in grams of one unit" },
         kcal: { type: "number", description: "per one unit" }, protein: { type: "number", description: "grams per one unit" },
         category: { type: "string", enum: ["grain", "stew", "protein", "legume", "breakfast", "dairy", "fruit", "veg", "nuts", "drink", "sweet", "other"] },
         is_veg: { type: "boolean" },
       },
-      required: ["name", "unit", "kcal", "protein", "category", "is_veg"],
+      required: ["name", "unit", "grams", "kcal", "protein", "category", "is_veg"],
     },
   },
   {
@@ -231,16 +234,22 @@ const ONE_SHOT: Record<string, { effort: string; schema: any; prompt: (i: any) =
       type: "object",
       properties: {
         name: str("cleaned-up Persian name"),
-        unit: str("the most natural Iranian household unit for it"),
+        unit: str("the most natural Iranian household unit for it (or the unit given)"),
+        grams: { type: "number", description: "typical weight in grams of one such unit of this food, as served" },
         kcal: { type: "number", description: "per one unit" },
         protein: { type: "number", description: "grams per one unit" },
         category: { type: "string", enum: ["grain", "stew", "protein", "legume", "breakfast", "dairy", "fruit", "veg", "nuts", "drink", "sweet", "other"] },
         is_veg: { type: "boolean" },
         note: str("one short Persian line on what was assumed (portion size, oil, ...)"),
       },
-      required: ["name", "unit", "kcal", "protein", "category", "is_veg", "note"], additionalProperties: false,
+      required: ["name", "unit", "grams", "kcal", "protein", "category", "is_veg", "note"], additionalProperties: false,
     },
-    prompt: (i) => `Estimate calories and protein for this food, for one household unit${i.unit ? ` (unit: ${i.unit})` : ""}, the way it is usually prepared and served in Iran: «${i.name}». Be realistic, slightly conservative-high rather than low. Use their food bank for consistency with similar items.`,
+    prompt: (i) => `Estimate calories, protein and the weight in grams for this food, for one household unit${i.unit ? ` (unit: ${i.unit}${i.unit === "گرم" ? " — then grams is 1 and kcal/protein are per gram" : ""})` : ""}, the way it is usually prepared and served in Iran: «${i.name}». Be realistic, slightly conservative-high rather than low. Keep kcal consistent with grams (realistic energy density). Use their food bank for consistency with similar items.`,
+  },
+  title: {
+    effort: "low",
+    schema: { type: "object", properties: { title: str("2–5 Persian words") }, required: ["title"], additionalProperties: false },
+    prompt: (i) => `Give a short Persian title (2–5 words, no quotes, no trailing punctuation) for the chat conversation that starts like this, for a list of past conversations:\n${(i.messages || []).slice(0, 2).map((m: any) => `${m.role === "assistant" ? "Hooshvareh" : "User"}: ${String(m.content || "").slice(0, 1500)}`).join("\n")}`,
   },
 };
 

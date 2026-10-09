@@ -28,17 +28,67 @@ nav.innerHTML = Object.entries(ROUTES).map(([k, r]) => `<a href="#/${k}" data-ro
 
 const route = () => (location.hash.replace('#/', '') in ROUTES ? location.hash.replace('#/', '') : 'today');
 
+/*
+  Back button: tabs don't pile up in history. From «امروز» a tab is pushed (back returns to
+  امروز); between other tabs it's replaced; back on امروز leaves the app. Sheets add their
+  own entries on top (see sheet in dom.js), so back closes a sheet first.
+*/
+nav.addEventListener('click', e => {
+  const a = e.target.closest('a[data-route]');
+  if (!a) return;
+  e.preventDefault();
+  const to = a.dataset.route, from = route();
+  if (to === from) return;
+  if (from === 'today') { location.hash = `#/${to}`; history.replaceState({ tab: true }, ''); }
+  else if (to === 'today' && history.state?.tab) history.back();
+  else location.replace(`#/${to}`);
+});
+// Opened straight on a tab (reload, shortcut): put امروز underneath so back goes there first.
+if (route() !== 'today' && !history.state) {
+  const h = location.hash;
+  history.replaceState(null, '', '#/today');
+  history.pushState({ tab: true }, '', h);
+}
+
+/*
+  Keyboard: --app-h / --app-top follow the visible area (above the on-screen keyboard), and
+  body.kb is set while it's open so the tab bar steps aside — the chat composer then sits
+  right on the keyboard, like a messenger.
+*/
+let fullH = window.innerHeight;
+function trackViewport() {
+  const vv = window.visualViewport;
+  const h = vv ? vv.height : window.innerHeight;
+  fullH = Math.max(fullH, window.innerHeight);
+  const root = document.documentElement.style;
+  root.setProperty('--app-h', `${Math.round(h)}px`);
+  root.setProperty('--app-top', `${Math.round(vv ? vv.offsetTop : 0)}px`);
+  const typing = document.activeElement?.matches?.('input, textarea, [contenteditable]');
+  document.body.classList.toggle('kb', !!typing && h < fullH * 0.8);
+}
+window.visualViewport?.addEventListener('resize', trackViewport);
+window.visualViewport?.addEventListener('scroll', trackViewport);
+window.addEventListener('resize', trackViewport);
+window.addEventListener('orientationchange', () => { fullH = 0; setTimeout(trackViewport, 300); });
+document.addEventListener('focusin', () => setTimeout(trackViewport, 50));
+document.addEventListener('focusout', () => setTimeout(trackViewport, 50));
+trackViewport();
+
 let started = false;
 function render() {
   if (!started) return;
   const p = store.profile();
   if (!p?.onboarded) {
     nav.hidden = true;
+    document.body.classList.remove('chat-mode');
+    view.classList.remove('chat-view');
     renderOnboarding(view, () => { location.hash = '#/today'; render(); });
     return;
   }
   nav.hidden = false;
   const r = route();
+  document.body.classList.toggle('chat-mode', r === 'ai');
+  view.classList.toggle('chat-view', r === 'ai');
   nav.querySelectorAll('a').forEach(a => a.classList.toggle('on', a.dataset.route === r));
   ROUTES[r].render(view);
 }
@@ -48,6 +98,8 @@ let pending = false;
 const isField = el => el && view.contains(el) && el.matches('input, textarea, select');
 function requestRender() {
   if (!store.profile()?.onboarded && view.querySelector('.onb')) return; // questionnaire keeps its own state
+  // the chat screen only redraws its message list, so typing there is never disturbed
+  if (route() === 'ai' && view.querySelector('.chat-bar')) { render(); return; }
   if (isField(document.activeElement)) { pending = true; return; }
   render();
 }
@@ -55,7 +107,7 @@ view.addEventListener('focusout', e => {
   if (pending && !isField(e.relatedTarget)) { pending = false; setTimeout(render, 0); }
 });
 
-window.addEventListener('hashchange', () => { sheet.closeAll(); resetWeighDay(); render(); window.scrollTo(0, 0); });
+window.addEventListener('hashchange', () => { sheet.closeAll({ history: false }); resetWeighDay(); render(); window.scrollTo(0, 0); });
 store.subscribe(requestRender);
 
 async function start(ns, remote) {
@@ -102,6 +154,8 @@ if (params.has('local')) {
       configureAI(null);
       started = false;
       nav.hidden = true;
+      document.body.classList.remove('chat-mode');
+      view.classList.remove('chat-view');
       renderLogin(view, sb);
       return;
     }

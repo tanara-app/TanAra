@@ -17,10 +17,14 @@ export function totals(list) {
   for (const e of list) {
     kcal += Number(e.kcal) || 0;
     protein += Number(e.protein) || 0;
-    if (e.is_veg) veg += Number(e.qty) || 1;
+    if (e.is_veg) veg += vegServings(e);
   }
   return { kcal, protein, veg };
 }
+
+// One vegetable serving is ~80 g (the WHO / «5 a day» portion), so weighed entries count by weight.
+export const VEG_SERVING_G = 80;
+export const vegServings = e => (e.unit === 'گرم' ? (Number(e.qty) || 0) / VEG_SERVING_G : Number(e.qty) || 1);
 
 export function daysLoggedInWeek(entries, ws) {
   const end = addDays(ws, 6);
@@ -85,28 +89,41 @@ export function weekSummary(entries, weights, ws) {
   };
 }
 
-// Most-logged foods in the last 60 days, with the quantity used last time.
-export function frequentFoods(entries, foods, day, limit = 8) {
+// Most-logged foods of one meal in the last 60 days, with the amount used last time in that meal.
+export function frequentFoods(entries, foods, day, meal, limit = 6) {
   const from = addDays(day, -60);
   const byId = new Map(foods.map(f => [f.id, f]));
   const stats = new Map();
   for (const e of entries) {
-    if (!e.food_id || e.day < from || !byId.has(e.food_id)) continue;
-    const s = stats.get(e.food_id) || { n: 0, last: '', qty: 1 };
+    if (!e.food_id || e.meal !== meal || e.day < from || !byId.has(e.food_id)) continue;
+    const s = stats.get(e.food_id) || { n: 0, last: null };
     s.n++;
-    if (e.created_at >= s.last) { s.last = e.created_at; s.qty = Number(e.qty); }
+    if (!s.last || e.created_at >= s.last.created_at) s.last = e;
     stats.set(e.food_id, s);
   }
   return [...stats.entries()]
-    .sort((a, b) => b[1].n - a[1].n || (a[1].last < b[1].last ? 1 : -1))
+    .sort((a, b) => b[1].n - a[1].n || (a[1].last.created_at < b[1].last.created_at ? 1 : -1))
     .slice(0, limit)
-    .map(([id, s]) => ({ food: byId.get(id), lastQty: s.qty, n: s.n }));
+    .map(([id, s]) => ({ food: byId.get(id), last: amountOf(s.last, byId.get(id)), n: s.n }));
 }
 
-export function lastQtyFor(entries, foodId) {
-  let best = null;
-  for (const e of entries) if (e.food_id === foodId && (!best || e.created_at > best.created_at)) best = e;
-  return best ? Number(best.qty) : 1;
+// The amount to start from: { qty, grams } — grams true when it was weighed. Only amounts in
+// the food's current unit (or grams) carry over; after a unit change it starts at 1.
+function amountOf(e, food) {
+  if (!e) return { qty: 1, grams: false };
+  if (e.unit === 'گرم' && food.unit !== 'گرم') return { qty: Number(e.qty), grams: true };
+  if (e.unit === food.unit) return { qty: Number(e.qty), grams: false };
+  return { qty: 1, grams: false };
+}
+
+export function lastAmountFor(entries, food, meal) {
+  let best = null, bestMeal = null;
+  for (const e of entries) {
+    if (e.food_id !== food.id) continue;
+    if (!best || e.created_at > best.created_at) best = e;
+    if (e.meal === meal && (!bestMeal || e.created_at > bestMeal.created_at)) bestMeal = e;
+  }
+  return amountOf(bestMeal || best, food);
 }
 
 export { weekStart, range, parse };

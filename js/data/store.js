@@ -10,7 +10,8 @@
   - The remote is an adapter with fetchAll / upsert / remove / replaceAll. Cross-device sync
     or an AI layer later plugs in here without touching the UI.
 */
-import { SEED_FOODS } from './seedFoods.js';
+import { SEED_FOODS, UNIT_GRAMS, GRAM } from './seedFoods.js';
+import { parseNum } from '../lib/fa.js';
 
 export const TABLES = ['profile', 'foods', 'entries', 'weights', 'reviews', 'motivations', 'chat', 'ai_notes'];
 export const KEY = { profile: 'user_id', foods: 'id', entries: 'id', weights: 'day', reviews: 'week_start', motivations: 'id', chat: 'id', ai_notes: 'key' };
@@ -54,6 +55,7 @@ export function init(namespace, remoteAdapter) {
   queue = lsGet('queue', []);
   urlCache = null;
   syncStatus = { pending: queue.length, error: null, lastPull: null };
+  fillFoodGrams();
 }
 
 export function clearLocal() {
@@ -92,6 +94,7 @@ export async function flush() {
         if (op.op === 'upsert') res = await remote.upsert(op.table, op.row);
         else if (op.op === 'delete') res = await remote.remove(op.table, op.key);
         else if (op.op === 'clear') res = await remote.clear(op.table);
+        else if (op.op === 'deleteWhere') res = await remote.removeWhere(op.table, op.col, op.val);
         else if (op.op === 'replaceAll') res = await remote.replaceAll(op.data);
       } catch (e) { res = { error: { message: String(e) } }; }
       if (res?.error) {
@@ -127,6 +130,7 @@ export async function pull() {
   syncStatus.error = null;
   persist();
   emit();
+  fillFoodGrams();
 }
 
 /* ---------------- writes ---------------- */
@@ -154,6 +158,7 @@ export function upsertFood(food) {
     name: food.name.trim(),
     category: food.category || 'other',
     unit: (food.unit || 'پرس').trim(),
+    grams: Number(food.grams) > 0 ? Number(food.grams) : null,
     kcal: Number(food.kcal) || 0,
     protein: Number(food.protein) || 0,
     is_veg: !!food.is_veg,
@@ -175,13 +180,40 @@ export function deleteFood(id) {
 // Foods are added in batches so the seed doesn't produce 100 separate requests.
 export function addFoods(list) {
   const rows = list.map(f => ({
-    id: uid(), name: f.name, category: f.category, unit: f.unit,
+    id: uid(), name: f.name, category: f.category, unit: f.unit, grams: f.grams ?? null,
     kcal: f.kcal, protein: f.protein, is_veg: !!f.is_veg, created_at: now(), updated_at: now(),
   }));
   rows.forEach(r => state.foods.push(r));
   persist(); emit();
   if (remote) { queue.push({ op: 'upsert', table: 'foods', row: rows }); persist(); flush(); }
   return rows;
+}
+
+/*
+  Foods saved before units had a weight get one: seeded foods take it from the seed (if the
+  unit wasn't changed), a unit typed as «۱۰۰ گرم» becomes a per-gram food, and common
+  units get their typical weight. Anything else stays unknown until the person sets it.
+*/
+function fillFoodGrams() {
+  const seed = new Map(SEED_FOODS.map(f => [f.name, f]));
+  const rows = [];
+  for (const f of state.foods) {
+    if (Number(f.grams) > 0) continue;
+    let patch = null;
+    const sd = seed.get(f.name);
+    const m = String(f.unit || '').match(/^([\d۰-۹٫.,]+)\s*گرم$/);
+    if (sd && sd.unit === f.unit) patch = { grams: sd.grams };
+    else if (m && parseNum(m[1]) > 0) {
+      const n = parseNum(m[1]);
+      patch = { unit: GRAM, grams: 1, kcal: f.kcal / n, protein: f.protein / n };
+    } else if (UNIT_GRAMS[f.unit]) patch = { grams: UNIT_GRAMS[f.unit] };
+    if (!patch) continue;
+    Object.assign(f, patch, { updated_at: now() });
+    rows.push(f);
+  }
+  if (!rows.length) return;
+  persist(); emit();
+  if (remote) { queue.push({ op: 'upsert', table: 'foods', row: rows.map(r => ({ ...r })) }); persist(); flush(); }
 }
 
 export function seedFoods() {
@@ -317,6 +349,7 @@ export function saveChat(m) {
   const old = state.chat.find(x => x.id === m.id);
   const row = {
     id: m.id || uid(),
+    thread: m.thread ?? old?.thread ?? null,
     role: m.role,
     content: m.content || '',
     actions: m.actions || [],
@@ -331,6 +364,13 @@ export function clearChat() {
   state.chat = [];
   persist(); emit();
   enqueue({ op: 'clear', table: 'chat' });
+}
+
+// Deletes one conversation. thread null is the conversation from before threads existed.
+export function deleteThread(thread) {
+  state.chat = state.chat.filter(m => (m.thread ?? null) !== thread);
+  persist(); emit();
+  enqueue({ op: 'deleteWhere', table: 'chat', col: 'thread', val: thread });
 }
 
 export const note = key => state.ai_notes.find(n => n.key === key) || null;

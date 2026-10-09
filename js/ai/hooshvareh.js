@@ -26,12 +26,12 @@ function context() {
     now: `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`,
     profile: p,
     targets: p ? effectiveTargets(p) : null,
-    foods: s.foods.map(({ id, name, unit, kcal, protein, is_veg }) => ({ id, name, unit, kcal, protein, is_veg })),
+    foods: s.foods.map(({ id, name, unit, grams, kcal, protein, is_veg }) => ({ id, name, unit, grams, kcal, protein, is_veg })),
     entries: s.entries.map(({ day, meal, name, qty, unit, kcal, protein, is_veg, created_at }) => ({ day, meal, name, qty, unit, kcal, protein, is_veg, created_at })),
     weights: s.weights.map(({ day, kg }) => ({ day, kg })),
     reviews: s.reviews.map(({ week_start, good, hard, next_goal }) => ({ week_start, good, hard, next_goal })),
     motivations: s.motivations.map(({ kind, title, note, day, image_path }) => ({ kind, title, note, day, image_path: image_path ? 1 : null })),
-    notes: s.ai_notes.map(({ key, text, created_at }) => ({ key, text, created_at })),
+    notes: s.ai_notes.filter(n => n.kind !== 'thread').map(({ key, text, created_at }) => ({ key, text, created_at })),
   };
 }
 
@@ -55,7 +55,7 @@ async function post(body) {
   return res;
 }
 
-// One-shot modes: tip, quote, review, progress, estimate. Resolves to the result object.
+// One-shot modes: tip, quote, review, progress, estimate, title. Resolves to the result object.
 export async function ask(mode, input = {}) {
   const res = await post({ mode, input });
   const j = await res.json();

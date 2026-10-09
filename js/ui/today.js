@@ -4,6 +4,7 @@ import { effectiveTargets } from '../domain/targets.js';
 import { MEALS, entriesOn, totals, daysLoggedInWeek } from '../domain/stats.js';
 import { underEating, rapidLoss } from '../domain/safety.js';
 import { fa, kcal50, round50, esc, qtyLabel } from '../lib/fa.js';
+import { amountLabel } from './units.js';
 import { today, addDays, relLabel, faDM, weekStart } from '../lib/dates.js';
 import { icon } from './dom.js';
 import { openLogSheet, openEntrySheet } from './logFood.js';
@@ -98,7 +99,7 @@ export function renderToday(root) {
           ${items.map(e => `
             <button class="entry" data-entry="${e.id}">
               <span class="ename">${esc(e.name)}${e.is_veg ? ` <i class="veg">${icon.leaf}</i>` : ''}</span>
-              <span class="eqty">${qtyLabel(Number(e.qty))} ${esc(e.unit)}</span>
+              <span class="eqty">${amountLabel(Number(e.qty), e.unit)}</span>
               <span class="ekcal">${fa(Math.round(e.kcal))}</span>
             </button>`).join('')}
         </div>`;
