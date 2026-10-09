@@ -5,7 +5,7 @@ import { CATEGORIES, UNITS } from '../data/seedFoods.js';
 import { fa, parseNum, norm, esc, qtyLabel } from '../lib/fa.js';
 import { mealForNow, today } from '../lib/dates.js';
 import { sheet, toast, confirmBox, icon } from './dom.js';
-import { openFoodBank } from './foodBank.js';
+import { openFoodBank, openFoodForm } from './foodBank.js';
 import { ask, aiAvailable, sparkle } from '../ai/hooshvareh.js';
 
 const QTY_PRESETS = [0.5, 1, 1.5, 2, 3];
@@ -86,13 +86,13 @@ export function openLogSheet({ day = today(), meal = null } = {}) {
       body.querySelector('.sheet-foot [data-custom]').onclick = drawCustom;
     }
 
-    function drawQty(food) {
-      let qty = lastQtyFor(store.get().entries, food.id);
+    function drawQty(food, keepQty) {
+      let qty = keepQty || lastQtyFor(store.get().entries, food.id);
       body.innerHTML = `
         <div class="sheet-head">
           <button class="icon-btn" data-back aria-label="برگشت">${icon.chevR}</button>
           <h2>${esc(food.name)}</h2>
-          <span></span>
+          <button class="icon-btn" data-edit aria-label="ویرایش غذا">${icon.edit}</button>
         </div>
         ${mealSeg(curMeal)}
         <div class="qty-box">
@@ -103,6 +103,7 @@ export function openLogSheet({ day = today(), meal = null } = {}) {
           </div>
           <div class="chips">${QTY_PRESETS.map(q => `<button class="chip" data-q="${q}">${qtyLabel(q)}</button>`).join('')}</div>
           <div class="preview"></div>
+          <button class="link small" data-edit>کالری یا واحدش دقیق نیست؟ ویرایش</button>
         </div>
         <button class="btn primary block big" data-save>ثبت</button>`;
       bindMeal(body, () => curMeal, v => { curMeal = v; });
@@ -119,6 +120,11 @@ export function openLogSheet({ day = today(), meal = null } = {}) {
       };
       paint();
       body.querySelector('[data-back]').onclick = drawList;
+      // Every bank food — seeded ones included — can be corrected right here; the fix sticks for next time.
+      body.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => openFoodForm(food, () => {
+        const fresh = store.get().foods.find(x => x.id === food.id);
+        fresh ? drawQty(fresh, qty) : drawList();
+      }));
       body.querySelectorAll('[data-step]').forEach(b => b.onclick = () => setQty(qty + Number(b.dataset.step)));
       body.querySelectorAll('[data-q]').forEach(b => b.onclick = () => setQty(Number(b.dataset.q)));
       input.addEventListener('input', () => { const n = parseNum(input.value); if (n > 0) setQty(n, true); });
@@ -213,12 +219,14 @@ export function bindEstimate(root, F, onFilled) {
   };
 }
 
-// Edit or delete an existing entry.
+// Edit or delete an existing entry. Unit, calories and protein are always editable; when the entry
+// came from the bank, the correction can also be written back to the food.
 export function openEntrySheet(entry) {
   const food = entry.food_id ? store.get().foods.find(f => f.id === entry.food_id) : null;
   // per-unit values: from the food if still linked, else derived from the entry itself
   const perKcal = food ? food.kcal : entry.kcal / entry.qty;
   const perProt = food ? food.protein : entry.protein / entry.qty;
+  const unit0 = entry.unit || food?.unit || 'پرس';
   let meal = entry.meal;
   let qty = Number(entry.qty);
 
@@ -229,24 +237,31 @@ export function openEntrySheet(entry) {
       <div class="qty-box">
         <div class="qty-row">
           <button class="round" data-step="0.5">${icon.plus}</button>
-          <div class="qty-val"><input inputmode="decimal" value="${fa(qty, 2)}"><span>${esc(entry.unit || 'پرس')}</span></div>
+          <div class="qty-val"><input inputmode="decimal" value="${fa(qty, 2)}"><span data-unit-label>${esc(unit0)}</span></div>
           <button class="round" data-step="-0.5">${icon.minus}</button>
         </div>
-        ${food ? '' : `<div class="row gap">
-          <label class="field grow"><span>کالری هر ${esc(entry.unit || 'پرس')}</span><input name="kcal" inputmode="numeric" value="${fa(Math.round(perKcal))}"></label>
-          <label class="field grow"><span>پروتئین</span><input name="protein" inputmode="decimal" value="${fa(Math.round(perProt * 10) / 10, 1)}"></label>
-        </div>`}
+        <label class="field"><span>واحد</span><input name="unit" list="units-entry" value="${esc(unit0)}"></label>
+        <div class="row gap">
+          <label class="field grow"><span>کالری هر واحد</span><input name="kcal" inputmode="numeric" value="${fa(Math.round(perKcal))}"></label>
+          <label class="field grow"><span>پروتئین (گرم)</span><input name="protein" inputmode="decimal" value="${fa(Math.round(perProt * 10) / 10, 1)}"></label>
+        </div>
+        ${food ? '<label class="check"><input type="checkbox" name="fix" checked><span>اصلاح در بانک غذا هم ذخیره شود</span></label>' : ''}
         <div class="preview"></div>
       </div>
+      <datalist id="units-entry">${UNITS.map(u => `<option value="${u}">`).join('')}</datalist>
       <button class="btn primary block big" data-save>ذخیره</button>
       <button class="btn danger-ghost block" data-del>حذف این مورد</button>`;
     bindMeal(body, () => meal, v => { meal = v; });
     const input = body.querySelector('.qty-val input');
     const kIn = body.querySelector('[name=kcal]');
     const pIn = body.querySelector('[name=protein]');
-    const per = () => ({ k: kIn ? (parseNum(kIn.value) || 0) : perKcal, p: pIn ? (parseNum(pIn.value) || 0) : perProt });
+    const uIn = body.querySelector('[name=unit]');
+    const fix = body.querySelector('[name=fix]');
+    const per = () => ({ k: parseNum(kIn.value) || 0, p: parseNum(pIn.value) || 0, u: uIn.value.trim() || 'پرس' });
+    const changed = () => [kIn, pIn, uIn].some(i => i.value !== i.defaultValue);
     const paint = () => {
-      const { k, p } = per();
+      const { k, p, u } = per();
+      body.querySelector('[data-unit-label]').textContent = u;
       body.querySelector('.preview').innerHTML = `<b>${fa(Math.round(k * qty))}</b> کالری · <b>${fa(Math.round(p * qty * 10) / 10, 1)}</b> گرم پروتئین`;
     };
     paint();
@@ -254,14 +269,14 @@ export function openEntrySheet(entry) {
       qty = Math.max(0.25, qty + Number(b.dataset.step)); input.value = fa(qty, 2); paint();
     });
     input.addEventListener('input', () => { const n = parseNum(input.value); if (n > 0) { qty = n; paint(); } });
-    kIn?.addEventListener('input', paint);
-    pIn?.addEventListener('input', paint);
+    [kIn, pIn, uIn].forEach(i => i.addEventListener('input', paint));
     body.querySelector('[data-close]').onclick = () => sheet.close();
     body.querySelector('[data-save]').onclick = () => {
-      const { k, p } = per();
-      store.saveEntry({ ...entry, meal, qty, kcal: k * qty, protein: p * qty });
+      const { k, p, u } = per();
+      if (food && fix.checked && changed()) store.upsertFood({ ...food, unit: u, kcal: k, protein: p });
+      store.saveEntry({ ...entry, meal, qty, unit: u, kcal: k * qty, protein: p * qty });
       sheet.close();
-      toast('ذخیره شد');
+      toast(food && fix.checked && changed() ? 'ذخیره شد؛ بانک غذا هم اصلاح شد' : 'ذخیره شد');
     };
     body.querySelector('[data-del]').onclick = async () => {
       if (await confirmBox(`«${esc(entry.name)}» حذف شود؟`, 'حذف')) {
