@@ -39,6 +39,12 @@ function setThread(id) {
   current = id;
   try { localStorage.setItem(THREAD_KEY, id ?? ''); } catch { /* ignore */ }
 }
+// Opens a fresh conversation with a question already typed (used by the magazine).
+export function startChat(text) {
+  loadThread();
+  if (sorted().some(m => sameThread(m, current))) setThread(newId());
+  draft = text;
+}
 const sameThread = (m, id) => (m.thread ?? null) === (id || null);
 
 // [{ id, title, last, n }] most recent first

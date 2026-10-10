@@ -1,4 +1,4 @@
-// Weekly review: last week's numbers and three short notes.
+// Weekly review: last week's numbers and three short notes. Shown inside «پیشرفت».
 import * as store from '../data/store.js';
 import { weekSummary } from '../domain/stats.js';
 import { adherence } from '../domain/plan.js';
@@ -19,7 +19,6 @@ export function renderReview(root) {
   const plan = adherence(s.ai_notes, s.entries, ws, isCurrent ? today() : addDays(ws, 6));
 
   root.innerHTML = `
-    <header class="page-head"><h1>مرور هفته</h1></header>
     <div class="day-nav compact">
       <button class="icon-btn" data-prev aria-label="هفته‌ی قبل">${icon.chevR}</button>
       <div class="day-title"><b>${weekLabel(ws)}</b><small>${isCurrent ? 'همین هفته' : ws === addDays(thisWeek, -7) ? 'هفته‌ی گذشته' : ''}</small></div>
@@ -60,7 +59,7 @@ export function renderReview(root) {
   // also keep notes when the person just leaves the field
   form.querySelectorAll('textarea').forEach(t => t.addEventListener('change', () => save(true)));
   const shown = ws;
-  bindReviewCard(root, ws, () => { if (root.isConnected && location.hash === '#/review' && ws === shown) renderReview(root); }, goal => {
+  bindReviewCard(root, ws, () => { if (root.isConnected && ws === shown) renderReview(root); }, goal => {
     form.elements.next_goal.value = goal;
     save(false);
   });

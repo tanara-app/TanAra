@@ -12,6 +12,7 @@ import { openLogSheet, openEntrySheet } from './logFood.js';
 import { dismissed, dismiss } from './notices.js';
 import { motivationCard, bindMotivation } from './motivation.js';
 import { tipCard, bindTip } from './aiCards.js';
+import { magCard, bindMag } from './magazine.js';
 import { planHtml, bindPlan } from './plan.js';
 
 let day = today();
@@ -71,6 +72,7 @@ export function renderToday(root) {
 
     ${isToday ? motivationCard() : ''}
     ${isToday ? tipCard() : ''}
+    ${isToday ? magCard() : ''}
 
     ${counting ? `<section class="card summary">
       <div class="ring-wrap">
@@ -140,6 +142,7 @@ export function renderToday(root) {
     dismiss(n.dataset.notice, n.dataset.mark);
     n.remove();
   });
-  // last: generating the tip redraws this screen
-  if (isToday) bindTip(() => { if (root.querySelector('[data-mode]') && day === today()) renderToday(root); });
+  // last: generating the tip or today's magazine article redraws this screen
+  const redrawAi = () => { if (root.querySelector('[data-mode]') && day === today()) renderToday(root); };
+  if (isToday) { bindTip(redrawAi); bindMag(root, redrawAi); }
 }

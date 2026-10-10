@@ -1,4 +1,5 @@
-// Progress: log weight, chart, total loss, 4-week rate, safety + recalc prompts.
+// Progress: log weight, chart, total loss, 4-week rate, safety + recalc prompts — and the
+// weekly review as a second section of the same tab.
 import * as store from '../data/store.js';
 import { sortedWeights, rollingAvg, rate4w } from '../domain/stats.js';
 import { rapidLoss } from '../domain/safety.js';
@@ -9,10 +10,13 @@ import { icon, toast, confirmBox } from './dom.js';
 import { weightChart } from './chart.js';
 import { recalcTargets } from './profile.js';
 import { progressCard, bindProgressCard } from './aiCards.js';
+import { renderReview } from './review.js';
 
 let wDay = today();
 let rangeKey = '3m';
 export const resetWeighDay = () => { wDay = today(); };
+let section = 'weight'; // or 'review'
+export const showReview = () => { section = 'review'; };
 const RANGES = { '1m': ['۱ ماه', 30], '3m': ['۳ ماه', 90], all: ['همه', null] };
 
 export function renderProgress(root) {
@@ -28,8 +32,26 @@ export function renderProgress(root) {
   const from = RANGES[rangeKey][1] ? addDays(t, -RANGES[rangeKey][1]) : (first?.day || t);
   const rapid = rapidLoss(s.weights, p.startDate, t);
 
-  root.innerHTML = `
+  const head = `
     <header class="page-head"><h1>پیشرفت</h1></header>
+    <div class="seg mode-seg" data-section role="tablist" aria-label="بخش">
+      <button type="button" role="tab" data-v="weight" aria-selected="${section === 'weight'}" class="${section === 'weight' ? 'on' : ''}">وزن و روند</button>
+      <button type="button" role="tab" data-v="review" aria-selected="${section === 'review'}" class="${section === 'review' ? 'on' : ''}">مرور هفته</button>
+    </div>`;
+  const bindSection = () => {
+    root.querySelector('[data-section]').onclick = e => {
+      const b = e.target.closest('[data-v]');
+      if (b && b.dataset.v !== section) { section = b.dataset.v; renderProgress(root); window.scrollTo(0, 0); }
+    };
+  };
+  if (section === 'review') {
+    root.innerHTML = `${head}<div data-review></div>`;
+    bindSection();
+    renderReview(root.querySelector('[data-review]'));
+    return;
+  }
+
+  root.innerHTML = `${head}
 
     <section class="card weigh">
       <div class="day-nav compact">
@@ -73,7 +95,8 @@ export function renderProgress(root) {
     </section>`;
 
   const rerender = () => renderProgress(root);
-  bindProgressCard(root, () => { if (root.isConnected && location.hash === '#/progress') rerender(); });
+  bindSection();
+  bindProgressCard(root, () => { if (root.isConnected && location.hash === '#/progress' && section === 'weight') rerender(); });
   root.querySelector('[data-prev]').onclick = () => { wDay = addDays(wDay, -1); rerender(); };
   root.querySelector('[data-next]').onclick = () => { if (wDay < t) { wDay = addDays(wDay, 1); rerender(); } };
   root.querySelector('.weigh-form').onsubmit = e => {

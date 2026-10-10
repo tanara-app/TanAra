@@ -11,6 +11,8 @@
     title     a short name for a chat conversation
     plan      a two-week diet plan: options with amounts for each meal, from the food bank
     plan_option  one more option for one meal of the current plan
+    magazine  one magazine article, researched with real web search limited to trusted
+              health sources; every source link shown comes from the search results
 
   The app sends its whole local state (it's the source of truth, including writes not yet
   synced), so the model always sees exactly what the user sees. The API key lives only in
@@ -62,6 +64,7 @@ Changing their data (chat only)
 
 The two modes of the app
 - «شمارش کالری»: they log what they eat and watch calories and protein. «رژیم»: you design a two-week plan — for each of five eating occasions a list of options with set amounts, built only from their food bank — and they tick what they ate; ticking logs those foods, so both modes share one record. At the end of the two weeks they weigh in and you design the next period from the result.
+- «مجله» is a tab where you publish one researched article a day for them, with links to the sources. The data lists those articles; when they ask about one, answer from its text and sources, and do not invent studies beyond them.
 - When the data has a diet plan, answer questions about what to eat from it, and treat days that followed it as a success even if calories were not counted. You cannot change the plan from the chat: for another choice in a meal point them to «یک گزینه‌ی دیگر» under that meal, and for a whole new plan to «برنامه‌ی تازه» on the Today screen.`;
 
 type Ctx = {
@@ -69,7 +72,7 @@ type Ctx = {
   profile?: Record<string, unknown> | null;
   targets?: { kcal: number; protein: number; floor: number };
   foods?: any[]; entries?: any[]; weights?: any[]; reviews?: any[]; motivations?: any[]; notes?: any[];
-  mode?: string; plan?: any;
+  mode?: string; plan?: any; magazine?: any[];
 };
 
 const MEALS: Record<string, string> = { breakfast: "صبحانه", lunch: "ناهار", dinner: "شام", snack: "میان‌وعده" };
@@ -129,6 +132,9 @@ function snapshot(c: Ctx) {
 
   const notes = [...(c.notes || [])].sort((a, b) => (a.created_at < b.created_at ? -1 : 1)).slice(-20);
   out.push(`# What you (Hooshvareh) already told them outside the chat, latest last\n${notes.map(n => `${n.key}: ${n.text}`).join("\n") || "none"}`);
+
+  const mag = [...(c.magazine || [])].sort((a, b) => (a.day < b.day ? -1 : 1));
+  if (mag.length) out.push(`# Magazine («مجله») articles you researched and wrote for them (day | category | title — summary${mag.some(a => a.body) ? "; full text where given" : ""})\n${mag.map(a => `${a.day} | ${a.category || "-"} | ${a.title} — ${a.summary || ""}${a.read ? "" : " [not opened yet]"}${a.body ? `\n<article>\n${a.body}${a.for_you ? `\nFor them: ${a.for_you}` : ""}\nSources: ${(a.sources || []).join("، ") || "-"}\n</article>` : ""}`).join("\n")}`);
 
   out.push(`# Their food bank (food_id | name | unit | grams in one unit | kcal per unit | protein g per unit | veg)\n${(c.foods || []).map(f => `${f.id} | ${f.name} | ${f.unit} | ${f.grams ? r1(f.grams) : "?"} | ${r1(f.kcal)} | ${r1(f.protein)}${f.is_veg ? " | veg" : ""}`).join("\n")}`);
   return out.join("\n\n");
@@ -375,6 +381,109 @@ async function runOneShot(mode: string, ctx: Ctx, input: any) {
   try { return json({ result: JSON.parse(text) }); } catch { return json({ error: "پاسخ هوشواره ناقص بود؛ دوباره امتحان کن." }, 502); }
 }
 
+/* ---------------- magazine ---------------- */
+
+// The only places a magazine article may cite. Subdomains are included (nih.gov covers PubMed).
+const MAG_DOMAINS = [
+  "who.int", "nih.gov", "cdc.gov", "nhs.uk", "nice.org.uk", "cochranelibrary.com", "cochrane.org",
+  "health.harvard.edu", "hsph.harvard.edu", "mayoclinic.org", "bmj.com", "thelancet.com", "jamanetwork.com",
+  "nejm.org", "nature.com", "ajcn.nutrition.org", "eatright.org", "heart.org", "diabetes.org", "efsa.europa.eu",
+];
+const MAG_CATEGORIES: Record<string, string> = {
+  nutrition: "nutrition and food composition (protein, fibre, energy density, satiety, specific food groups)",
+  activity: "physical activity for weight loss and health (walking, resistance training, NEAT, muscle retention)",
+  sleep_stress: "sleep, stress and appetite",
+  habits: "the psychology of eating and habit change (cravings, emotional eating, self-monitoring, relapse)",
+  myths: "a common weight-loss belief, checked against the evidence",
+  body: "how the body works during weight loss (metabolism, plateaus, water weight, hormones, weight maintenance)",
+  practical: "practical everyday eating (eating out, gatherings, shopping, cooking methods, drinks)",
+};
+
+const PUBLISH_TOOL = {
+  name: "publish_article",
+  description: "Publish the finished magazine article to the app. Call exactly once, after researching.",
+  strict: true,
+  input_schema: {
+    type: "object",
+    properties: {
+      topic: str("short English slug of the subject, e.g. protein-and-satiety"),
+      category: { type: "string", enum: Object.keys(MAG_CATEGORIES) },
+      title: str("Persian headline, max ~9 words, accurate, not clickbait"),
+      summary: str("Persian, 1–2 sentences: what the reader will learn"),
+      minutes: { type: "integer", description: "reading time in minutes" },
+      body: str("the article in Persian Markdown: paragraphs, 2–4 «## » subheadings, **bold**, «- » bullets. 350–550 words."),
+      key_points: { type: "array", items: str("one short Persian sentence"), description: "exactly 3 takeaways" },
+      for_you: str("Persian, 2–3 sentences tying the article to this person's own recent numbers and one concrete thing to try"),
+      evidence: { type: "string", enum: ["strong", "moderate", "limited"], description: "how solid the evidence behind the main claim is" },
+      sources: {
+        type: "array",
+        description: "2–5 pages you actually opened in search results and relied on",
+        items: {
+          type: "object",
+          properties: { title: str("page or paper title, in its original language"), publisher: str("e.g. WHO, NIH, Cochrane, Harvard Health"), url: str("exact URL from the search results") },
+          required: ["title", "publisher", "url"], additionalProperties: false,
+        },
+      },
+    },
+    required: ["topic", "category", "title", "summary", "minutes", "body", "key_points", "for_you", "evidence", "sources"],
+    additionalProperties: false,
+  },
+};
+
+const hostOf = (u: string) => { try { return new URL(u).hostname.toLowerCase(); } catch { return ""; } };
+const trusted = (u: string) => { const h = hostOf(u); return /^https:/.test(u) && MAG_DOMAINS.some(d => h === d || h.endsWith("." + d)); };
+const normUrl = (u: string) => u.replace(/[#?].*$/, "").replace(/\/+$/, "").toLowerCase();
+
+function magazinePrompt(i: any) {
+  const cat = MAG_CATEGORIES[i.category] ? i.category : "nutrition";
+  const asked = String(i.topic || "").slice(0, 300).trim();
+  return `Write one article for their personal magazine («مجله») inside the app. For this task the "be brief, no headings" style rules do not apply to the article body; everything else (Persian, «تو», safety rules) does.
+
+${asked ? `They asked for an article about: «${asked}». If that is not about weight, nutrition, activity, sleep, habits or health around them, pick the closest topic that is and say so in the summary.` : `Today's section: ${MAG_CATEGORIES[cat]}. Within it, choose the single topic most useful to this person right now, judging from their data (what they eat and skip, protein and vegetables vs target, weight trend, plan adherence, what they wrote in reviews, their conditions).`}
+Do not repeat a subject already covered: ${(i.previous || []).slice(0, 80).map((t: string) => `«${String(t).slice(0, 80)}»`).join("، ") || "nothing yet"}.
+
+Research first, with web_search. Results are limited to major health bodies, systematic-review publishers and leading journals. Prefer guidelines, systematic reviews and meta-analyses over single studies, and recent over old. Base every factual claim on what you actually read in the results; if the evidence is mixed or weak, say so plainly and set "evidence" accordingly. Do not cite anything from memory. Numbers (effect sizes, amounts) only when a source gives them.
+
+Then call publish_article once. Write it like a good science journalist writing to one reader: a concrete opening, what the evidence shows, what it means in an Iranian everyday kitchen and routine, and what is still uncertain. No medical diagnosis, nothing below their safety floor, no supplements or drugs as weight-loss advice (an article may explain what the evidence says about them, including that it is weak). Name the source body in the text where it matters (e.g. «مرور کاکرین در ۲۰۲۳»), and list in "sources" only pages that appeared in your search results, with their exact URLs. Do not write the article as plain text.`;
+}
+
+async function runMagazine(ctx: Ctx, input: any) {
+  const messages: any[] = [{ role: "user", content: magazinePrompt(input || {}) }];
+  const seen = new Set<string>(); // every URL the search really returned
+  for (let turn = 0; turn < 5; turn++) {
+    const msg: any = await (anthropic.beta.messages.stream({
+      model: MODEL,
+      max_tokens: 16000,
+      betas: BETAS,
+      fallbacks: "default",
+      system: systemBlocks(ctx),
+      tools: [{ type: "web_search_20260209", name: "web_search", max_uses: 5, allowed_domains: MAG_DOMAINS }, PUBLISH_TOOL],
+      output_config: { effort: "medium" },
+      messages,
+    } as any) as any).finalMessage();
+    if (msg.stop_reason === "refusal") return json({ error: refusalText() }, 422);
+
+    // Collect URLs from server-tool results and citations — never from the model's own prose.
+    for (const b of msg.content) {
+      if (b.type === "tool_use" || b.type === "thinking") continue;
+      const raw = JSON.stringify(b.type === "text" ? (b.citations || []) : b);
+      for (const u of raw.match(/https:\/\/[^\s"\\<>)]+/g) || []) seen.add(normUrl(u));
+    }
+
+    const call = msg.content.find((b: any) => b.type === "tool_use" && b.name === "publish_article");
+    if (call) {
+      const a = call.input || {};
+      const sources = (a.sources || []).filter((s: any) => s?.url && trusted(s.url) && (!seen.size || seen.has(normUrl(s.url))));
+      if (!sources.length || !a.title || !a.body) return json({ error: "برای این موضوع منبع معتبری پیدا نشد؛ دوباره امتحان کن." }, 502);
+      return json({ result: { ...a, sources } });
+    }
+    messages.push({ role: "assistant", content: msg.content });
+    // pause_turn: the server-side search loop wants to go on; resending continues it.
+    if (msg.stop_reason !== "pause_turn") messages.push({ role: "user", content: "Now call publish_article with the finished article." });
+  }
+  return json({ error: "مقاله آماده نشد؛ دوباره امتحان کن." }, 502);
+}
+
 function runChat(ctx: Ctx, history: any[]) {
   const messages: any[] = cleanHistory(history);
   if (!messages.length || messages[messages.length - 1].role !== "user") return json({ error: "پیامی نیست." }, 400);
@@ -458,6 +567,7 @@ Deno.serve(async (req) => {
 
   try {
     if (body.mode === "chat") return runChat(ctx, body.messages);
+    if (body.mode === "magazine") return await runMagazine(ctx, body.input);
     if (ONE_SHOT[body.mode]) return await runOneShot(body.mode, ctx, body.input);
     return json({ error: "unknown mode" }, 400);
   } catch (e) {

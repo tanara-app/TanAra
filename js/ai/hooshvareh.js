@@ -35,6 +35,19 @@ function planContext(s, t) {
   };
 }
 
+// The magazine as Hooshvareh sees it: every article by title, and the full text of the latest
+// few plus the one the person is asking about (see focusArticle).
+let focusKey = null;
+export function focusArticle(key) { focusKey = key; }
+function magazineContext(s) {
+  const all = s.ai_notes.filter(n => n.kind === 'mag' && n.data?.title).sort((a, b) => (a.key < b.key ? 1 : -1));
+  return all.slice(0, 60).map((n, i) => {
+    const d = n.data;
+    const brief = { day: n.key.slice(4, 14), category: d.category, title: d.title, summary: d.summary, read: !!d.read };
+    return i < 2 || n.key === focusKey ? { ...brief, body: d.body, for_you: d.for_you, sources: (d.sources || []).map(x => `${x.publisher}: ${x.title}`) } : brief;
+  });
+}
+
 function context() {
   const s = store.get();
   const p = store.profile();
@@ -53,7 +66,8 @@ function context() {
     motivations: s.motivations.map(({ kind, title, note, day, image_path }) => ({ kind, title, note, day, image_path: image_path ? 1 : null })),
     mode: p?.mode === 'plan' ? 'plan' : 'count',
     plan: planContext(s, t),
-    notes: s.ai_notes.filter(n => !['thread', 'plan', 'pick'].includes(n.kind)).map(({ key, text, created_at }) => ({ key, text, created_at })),
+    magazine: magazineContext(s),
+    notes: s.ai_notes.filter(n => !['thread', 'plan', 'pick', 'mag'].includes(n.kind)).map(({ key, text, created_at }) => ({ key, text, created_at })),
   };
 }
 
@@ -77,7 +91,7 @@ async function post(body) {
   return res;
 }
 
-// One-shot modes: tip, quote, review, progress, estimate, title, plan, plan_option. Resolves to the result object.
+// One-shot modes: tip, quote, review, progress, estimate, title, plan, plan_option, magazine. Resolves to the result object.
 export async function ask(mode, input = {}) {
   const res = await post({ mode, input });
   const j = await res.json();
@@ -115,8 +129,9 @@ export async function chat(messages, { onText, onAction }) {
 
 /* ---------------- shared bits for the screens ---------------- */
 
-// Small, safe Markdown: **bold**, "- " bullets, numbered lines, paragraphs.
-export function md(text) {
+// Small, safe Markdown: **bold**, "- " bullets, numbered lines, paragraphs; "## " lines
+// become subheadings only where asked (magazine articles).
+export function md(text, { headings = false } = {}) {
   const esc = s => s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const inline = s => esc(s).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
   const out = [];
@@ -126,7 +141,11 @@ export function md(text) {
     const line = raw.trim();
     const b = line.match(/^[-•*]\s+(.*)$/);
     const n = line.match(/^[\d۰-۹]+[.)]\s+(.*)$/);
-    if (b || n) {
+    const h = headings && line.match(/^#+\s+(.*)$/);
+    if (h) {
+      close();
+      out.push(`<h3>${inline(h[1])}</h3>`);
+    } else if (b || n) {
       const want = b ? 'ul' : 'ol';
       if (list !== want) { close(); out.push(`<${want}>`); list = want; }
       out.push(`<li>${inline((b || n)[1])}</li>`);

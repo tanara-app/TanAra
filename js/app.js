@@ -6,11 +6,11 @@ import { $, icon, sheet } from './ui/dom.js';
 import { today } from './lib/dates.js';
 import { renderOnboarding } from './ui/onboarding.js';
 import { renderToday, setDay } from './ui/today.js';
-import { renderProgress, resetWeighDay } from './ui/progress.js';
-import { renderReview } from './ui/review.js';
+import { renderProgress, resetWeighDay, showReview } from './ui/progress.js';
 import { renderProfile, setSession } from './ui/profile.js';
 import { renderLogin } from './ui/login.js';
 import { renderChat } from './ui/chat.js';
+import { renderMagazine } from './ui/magazine.js';
 import { configureAI, sparkle } from './ai/hooshvareh.js';
 
 const view = $('#view');
@@ -20,11 +20,14 @@ const ROUTES = {
   today: { label: 'امروز', icon: icon.today, render: renderToday },
   progress: { label: 'پیشرفت', icon: icon.chart, render: renderProgress },
   ai: { label: 'هوشواره', icon: sparkle(24), render: renderChat },
-  review: { label: 'مرور هفته', icon: icon.week, render: renderReview },
+  mag: { label: 'مجله', icon: icon.book, render: renderMagazine },
   profile: { label: 'نمایه', icon: icon.user, render: renderProfile },
 };
 
 nav.innerHTML = Object.entries(ROUTES).map(([k, r]) => `<a href="#/${k}" data-route="${k}" aria-label="${r.label}">${r.icon}<span>${r.label}</span></a>`).join('');
+
+// «مرور هفته» used to be a tab; it now lives inside «پیشرفت».
+if (location.hash === '#/review') { showReview(); history.replaceState(history.state, '', '#/progress'); }
 
 const route = () => (location.hash.replace('#/', '') in ROUTES ? location.hash.replace('#/', '') : 'today');
 
