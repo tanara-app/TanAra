@@ -1,6 +1,7 @@
 // Weekly review: last week's numbers and three short notes.
 import * as store from '../data/store.js';
 import { weekSummary } from '../domain/stats.js';
+import { adherence } from '../domain/plan.js';
 import { fa, kcal50, signed, esc } from '../lib/fa.js';
 import { today, addDays, weekStart, weekLabel } from '../lib/dates.js';
 import { icon, toast } from './dom.js';
@@ -15,6 +16,7 @@ export function renderReview(root) {
   const sum = weekSummary(s.entries, s.weights, ws);
   const r = s.reviews.find(x => x.week_start === ws) || {};
   const isCurrent = ws === thisWeek;
+  const plan = adherence(s.ai_notes, s.entries, ws, isCurrent ? today() : addDays(ws, 6));
 
   root.innerHTML = `
     <header class="page-head"><h1>مرور هفته</h1></header>
@@ -29,6 +31,7 @@ export function renderReview(root) {
       <div class="tile"><span>میانگین کالری</span><b>${sum.avgKcal === null ? '—' : kcal50(sum.avgKcal)}</b><small>در روزهای ثبت‌شده</small></div>
       <div class="tile"><span>میانگین پروتئین</span><b>${sum.avgProtein === null ? '—' : fa(Math.round(sum.avgProtein))}</b><small>گرم در روز</small></div>
       <div class="tile"><span>تغییر میانگین وزن</span><b>${sum.weightChange === null ? '—' : signed(sum.weightChange)}</b><small>${sum.weightChange === null ? 'وزن کافی ثبت نشده' : 'کیلو نسبت به هفته‌ی قبل'}</small></div>
+      ${plan.of ? `<div class="tile wide"><span>پایبندی به رژیم</span><b>${fa(plan.done)} <small>از ${fa(plan.of)} وعده طبق برنامه</small></b></div>` : ''}
     </section>
 
     ${reviewCard(ws)}

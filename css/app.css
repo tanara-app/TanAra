@@ -460,6 +460,42 @@ body.kb .chat-bar { padding-bottom: 8px; }
 .send { width: 46px; height: 46px; flex: none; border-radius: 50%; border: 0; background: var(--ai); color: #1a1430; display: grid; place-items: center; cursor: pointer; }
 .send:disabled { opacity: .4; }
 
+/* diet-plan mode */
+.mode-seg { margin-bottom: 12px; }
+.tile.wide { grid-column: 1 / -1; }
+.plan-card .bar { margin: 6px 0 8px; }
+.plan-bar i { background: var(--accent); transition: width .3s; }
+.plan-links { display: flex; justify-content: space-between; gap: 12px; margin-top: 8px; }
+.plan-note summary { list-style: none; cursor: pointer; display: inline-block; }
+.plan-note summary::-webkit-details-marker { display: none; }
+.plan-note .ai-text { margin-top: 4px; color: var(--muted); }
+.slot .meal-head .muted svg { color: var(--accent); display: block; }
+.slot .list-h { margin-top: 12px; }
+.popt {
+  width: 100%; display: flex; align-items: flex-start; gap: 12px; margin-top: 8px; padding: 12px;
+  border: 1.5px solid var(--line); border-radius: 14px; background: transparent; text-align: right; cursor: pointer;
+  transition: border-color .15s, background .15s, opacity .15s;
+}
+.popt:active { background: var(--surface-2); }
+.popt.on { border-color: var(--accent); background: var(--accent-soft); }
+.slot.full .popt:not(.on) { opacity: .5; }
+.tick {
+  flex: none; width: 26px; height: 26px; margin-top: 1px; border-radius: 50%; border: 2px solid var(--line);
+  display: grid; place-items: center; color: var(--accent-ink);
+}
+.popt.on .tick { background: var(--accent); border-color: var(--accent); }
+.tick svg { width: 16px; height: 16px; }
+.popt-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.popt-body strong { font-size: .95rem; }
+.popt-body ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.popt-body li { display: flex; justify-content: space-between; gap: 12px; font-size: .9rem; }
+.popt-body li span { color: var(--muted); min-width: 0; }
+.popt-body li b { font-weight: 600; white-space: nowrap; }
+.popt-body li small { color: var(--muted); font-weight: 400; }
+.ai-more { display: inline-flex; align-items: center; gap: 4px; margin-top: 12px; color: var(--ai); }
+.pills.free { margin: 8px 0 0; }
+.pills.free .pill { background: var(--surface-2); }
+
 /* left+right+fit-content: centred, as wide as its text, never squeezed into half the screen */
 .toast {
   position: fixed; z-index: 80; left: 16px; right: 16px; margin: 0 auto; width: fit-content; max-width: 440px;

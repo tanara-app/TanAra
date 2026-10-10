@@ -7,13 +7,33 @@
 import * as store from '../data/store.js';
 import { SUPABASE_URL, SUPABASE_KEY } from '../config.js';
 import { effectiveTargets } from '../domain/targets.js';
-import { today, parse } from '../lib/dates.js';
+import { SLOTS, planOn, planEnd, previousPlan, adherence, optionText } from '../domain/plan.js';
+import { today, parse, addDays } from '../lib/dates.js';
 
 const URL_ = `${SUPABASE_URL}/functions/v1/hooshvareh`;
 let getToken = null; // async () => access token, or null when signed out / local mode
 export function configureAI(fn) { getToken = fn; }
 export const aiAvailable = () => !!getToken;
 export const aiOnline = () => !!getToken && navigator.onLine !== false;
+
+// The diet plan as Hooshvareh sees it: every option in plain words, plus how closely each
+// recent day followed it.
+function planContext(s, t) {
+  const plan = planOn(s.ai_notes, t);
+  if (!plan) return null;
+  const brief = pl => ({
+    start: pl.start, end: planEnd(pl), kcal: pl.kcal,
+    slots: Object.keys(SLOTS).map(k => ({ slot: SLOTS[k].label, pick: pl.slots[k].pick, options: pl.slots[k].options.map(o => `${o.title ? `${o.title}: ` : ''}${optionText(o)} (${o.kcal} kcal, ${o.protein} g protein)`) })),
+    free: (pl.free || []).map(f => f.name),
+  });
+  const prev = previousPlan(s.ai_notes, plan);
+  const from = addDays(t, -27);
+  return {
+    ...brief(plan), note: plan.note,
+    previous: prev ? { start: prev.start, kcal: prev.kcal, adherence: (({ done, of }) => ({ done, of }))(adherence(s.ai_notes, s.entries, prev.start, addDays(plan.start, -1))) } : null,
+    days: adherence(s.ai_notes, s.entries, from, t).days,
+  };
+}
 
 function context() {
   const s = store.get();
@@ -31,7 +51,9 @@ function context() {
     weights: s.weights.map(({ day, kg }) => ({ day, kg })),
     reviews: s.reviews.map(({ week_start, good, hard, next_goal }) => ({ week_start, good, hard, next_goal })),
     motivations: s.motivations.map(({ kind, title, note, day, image_path }) => ({ kind, title, note, day, image_path: image_path ? 1 : null })),
-    notes: s.ai_notes.filter(n => n.kind !== 'thread').map(({ key, text, created_at }) => ({ key, text, created_at })),
+    mode: p?.mode === 'plan' ? 'plan' : 'count',
+    plan: planContext(s, t),
+    notes: s.ai_notes.filter(n => !['thread', 'plan', 'pick'].includes(n.kind)).map(({ key, text, created_at }) => ({ key, text, created_at })),
   };
 }
 
@@ -55,7 +77,7 @@ async function post(body) {
   return res;
 }
 
-// One-shot modes: tip, quote, review, progress, estimate, title. Resolves to the result object.
+// One-shot modes: tip, quote, review, progress, estimate, title, plan, plan_option. Resolves to the result object.
 export async function ask(mode, input = {}) {
   const res = await post({ mode, input });
   const j = await res.json();

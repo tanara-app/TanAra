@@ -1,4 +1,5 @@
-// Today screen: remaining calories/protein, meals, veg counter, big log button.
+// Today screen, in one of two modes over the same entries: calorie counting (remaining
+// calories/protein, meals, veg counter) or the diet plan (Hooshvareh's options per meal).
 import * as store from '../data/store.js';
 import { effectiveTargets } from '../domain/targets.js';
 import { MEALS, entriesOn, totals, daysLoggedInWeek } from '../domain/stats.js';
@@ -11,6 +12,7 @@ import { openLogSheet, openEntrySheet } from './logFood.js';
 import { dismissed, dismiss } from './notices.js';
 import { motivationCard, bindMotivation } from './motivation.js';
 import { tipCard, bindTip } from './aiCards.js';
+import { planHtml, bindPlan } from './plan.js';
 
 let day = today();
 export const setDay = d => { day = d; };
@@ -33,6 +35,11 @@ export function renderToday(root) {
   const isToday = day === today();
   const remaining = round50(t.kcal) - round50(tot.kcal);
   const logged = daysLoggedInWeek(s.entries, weekStart(today()));
+  const planMode = p.mode === 'plan';
+  // '' when no plan covers this day: the ordinary meal list is shown instead
+  const plan = planMode ? planHtml(day) : '';
+  const counting = !planMode || !!p.planKcal;
+  const mealList = !planMode || !plan || !plan.includes('class="meals"');
 
   // Safety notices only on today's view.
   const notices = [];
@@ -57,10 +64,15 @@ export function renderToday(root) {
       <button class="icon-btn" data-next aria-label="روز بعد" ${isToday ? 'disabled' : ''}>${icon.chevL}</button>
     </header>
 
+    <div class="seg mode-seg" data-mode role="tablist" aria-label="حالت">
+      <button type="button" role="tab" data-v="count" aria-selected="${!planMode}" class="${planMode ? '' : 'on'}">شمارش کالری</button>
+      <button type="button" role="tab" data-v="plan" aria-selected="${planMode}" class="${planMode ? 'on' : ''}">رژیم</button>
+    </div>
+
     ${isToday ? motivationCard() : ''}
     ${isToday ? tipCard() : ''}
 
-    <section class="card summary">
+    ${counting ? `<section class="card summary">
       <div class="ring-wrap">
         ${ring(tot.kcal, t.kcal)}
         <div class="ring-center">
@@ -77,7 +89,7 @@ export function renderToday(root) {
           <div class="bar"><i style="width:${t.protein ? Math.min(100, tot.protein / t.protein * 100) : 0}%"></i></div>
         </div>
       </div>
-    </section>
+    </section>` : ''}
 
     <div class="pills">
       <div class="pill">${icon.leaf}<span>سبزی ${isToday ? 'امروز' : ''}: <b>${qtyLabel(Math.round(tot.veg * 2) / 2)}</b> وعده</span></div>
@@ -86,7 +98,9 @@ export function renderToday(root) {
 
     ${notices.map(n => `<div class="note ${n.cls || 'soft'}" data-notice="${n.key}" data-mark="${n.mark}">${n.html}<button class="link small" data-dismiss>باشه</button></div>`).join('')}
 
-    <section class="meals">
+    ${plan}
+
+    ${mealList ? `<section class="meals">
       ${Object.entries(MEALS).map(([k, label]) => {
         const items = list.filter(e => e.meal === k).sort((a, b) => (a.created_at < b.created_at ? -1 : 1));
         const mt = totals(items);
@@ -104,16 +118,22 @@ export function renderToday(root) {
             </button>`).join('')}
         </div>`;
       }).join('')}
-    </section>
-    <div class="fab-space"></div>
-    <button class="fab" data-log>${icon.plus}<span>ثبت غذا</span></button>`;
+    </section>` : ''}
+    ${mealList ? `<div class="fab-space"></div>
+    <button class="fab" data-log>${icon.plus}<span>ثبت غذا</span></button>` : ''}`;
 
   root.querySelector('[data-prev]').onclick = () => { day = addDays(day, -1); renderToday(root); };
   root.querySelector('[data-next]').onclick = () => { if (!isToday) { day = addDays(day, 1); renderToday(root); } };
   root.querySelector('[data-today]')?.addEventListener('click', () => { day = today(); renderToday(root); });
-  root.querySelector('[data-log]').onclick = () => openLogSheet({ day });
+  root.querySelector('[data-log]')?.addEventListener('click', () => openLogSheet({ day }));
   root.querySelectorAll('[data-add]').forEach(b => b.onclick = () => openLogSheet({ day, meal: b.dataset.add }));
   root.querySelectorAll('[data-entry]').forEach(b => b.onclick = () => openEntrySheet(s.entries.find(e => e.id === b.dataset.entry)));
+  root.querySelector('[data-mode]').onclick = e => {
+    const v = e.target.closest('button[data-v]')?.dataset.v;
+    if (v && v !== (planMode ? 'plan' : 'count')) store.saveProfile({ ...p, mode: v });
+  };
+  const redraw = () => { if (root.querySelector('[data-mode]')) renderToday(root); };
+  if (planMode) bindPlan(root, day, redraw);
   bindMotivation(root);
   root.querySelectorAll('[data-dismiss]').forEach(b => b.onclick = () => {
     const n = b.closest('[data-notice]');
@@ -121,5 +141,5 @@ export function renderToday(root) {
     n.remove();
   });
   // last: generating the tip redraws this screen
-  if (isToday) bindTip(() => { if (root.querySelector('[data-log]') && day === today()) renderToday(root); });
+  if (isToday) bindTip(() => { if (root.querySelector('[data-mode]') && day === today()) renderToday(root); });
 }

@@ -9,6 +9,8 @@
     progress  analysis of the weight trend
     estimate  calories / protein / weight of one unit for a food the bank doesn't have
     title     a short name for a chat conversation
+    plan      a two-week diet plan: options with amounts for each meal, from the food bank
+    plan_option  one more option for one meal of the current plan
 
   The app sends its whole local state (it's the source of truth, including writes not yet
   synced), so the model always sees exactly what the user sees. The API key lives only in
@@ -56,13 +58,18 @@ Changing their data (chat only)
 - When they tell you they ate something, weighed themselves, want a motivation saved, or want a food added to the bank, call the matching tool (one call per item). Prefer an item from their food bank (pass its food_id) and scale its numbers by quantity; otherwise estimate.
 - kcal and protein in propose_log_food are totals for the whole quantity eaten.
 - After proposing, tell them briefly that it is waiting for their confirmation. Never say it has been saved.
-- Use get_entries when you need individual foods from days older than the detailed window.`;
+- Use get_entries when you need individual foods from days older than the detailed window.
+
+The two modes of the app
+- «شمارش کالری»: they log what they eat and watch calories and protein. «رژیم»: you design a two-week plan — for each of five eating occasions a list of options with set amounts, built only from their food bank — and they tick what they ate; ticking logs those foods, so both modes share one record. At the end of the two weeks they weigh in and you design the next period from the result.
+- When the data has a diet plan, answer questions about what to eat from it, and treat days that followed it as a success even if calories were not counted. You cannot change the plan from the chat: for another choice in a meal point them to «یک گزینه‌ی دیگر» under that meal, and for a whole new plan to «برنامه‌ی تازه» on the Today screen.`;
 
 type Ctx = {
   today: string; todayFa?: string; now?: string;
   profile?: Record<string, unknown> | null;
   targets?: { kcal: number; protein: number; floor: number };
   foods?: any[]; entries?: any[]; weights?: any[]; reviews?: any[]; motivations?: any[]; notes?: any[];
+  mode?: string; plan?: any;
 };
 
 const MEALS: Record<string, string> = { breakfast: "صبحانه", lunch: "ناهار", dinner: "شام", snack: "میان‌وعده" };
@@ -90,6 +97,13 @@ function snapshot(c: Ctx) {
   out.push(`# Now\ntoday: ${c.today}${c.todayFa ? ` (${c.todayFa})` : ""}${c.now ? `, local time ${c.now}` : ""}`);
   out.push(`# Profile (from the onboarding questionnaire)\n${JSON.stringify(c.profile || {})}`);
   if (c.targets) out.push(`# Daily targets\ncalories: ${c.targets.kcal} kcal, protein: ${c.targets.protein} g, safety floor (never go below): ${c.targets.floor} kcal`);
+
+  out.push(`# Mode they are using now\n${c.mode === "plan" ? "رژیم (diet plan)" : "شمارش کالری (calorie counting)"}`);
+  if (c.plan) {
+    const pl = c.plan;
+    out.push(`# Current diet plan (you designed it), ${pl.start} to ${pl.end}, for ${pl.kcal} kcal/day\n${(pl.slots || []).map((s: any) => `## ${s.slot} — they pick ${s.pick}\n${s.options.map((o: string) => `- ${o}`).join("\n")}`).join("\n")}\nFree when hungry: ${(pl.free || []).join("، ") || "-"}\nWhat you told them about it: ${pl.note || "-"}${pl.previous ? `\nPlan before it: from ${pl.previous.start}, ${pl.previous.kcal} kcal/day, ${pl.previous.adherence.done} of ${pl.previous.adherence.of} occasions eaten as planned` : ""}`);
+    out.push(`# Following the plan, last 4 weeks (day | occasions eaten as planned of 5)\n${(pl.days || []).map((d: any) => `${d.day} | ${d.done}/${d.of}`).join("\n") || "none"}`);
+  }
 
   const weights = [...(c.weights || [])].sort((a, b) => (a.day < b.day ? -1 : 1));
   out.push(`# Weigh-ins (day | kg), all\n${weights.map(w => `${w.day} | ${r1(w.kg)}`).join("\n") || "none yet"}`);
@@ -203,7 +217,67 @@ const TOOLS: any[] = [
 /* ---------------- one-shot modes ---------------- */
 
 const str = (d = "") => ({ type: "string", description: d });
-const ONE_SHOT: Record<string, { effort: string; schema: any; prompt: (i: any) => string }> = {
+const planItems = {
+  type: "array",
+  items: {
+    type: "object",
+    properties: { food_id: str("exact id from the food bank"), qty: { type: "number", description: "in that food's own unit, a multiple of 0.5; grams when its unit is گرم" } },
+    required: ["food_id", "qty"], additionalProperties: false,
+  },
+};
+const planOption = {
+  type: "object",
+  properties: { title: str("2–4 Persian words naming the option"), items: planItems },
+  required: ["title", "items"], additionalProperties: false,
+};
+const planSlot = {
+  type: "object",
+  properties: { pick: { type: "integer", enum: [1, 2], description: "how many of the options they eat at this occasion" }, options: { type: "array", items: planOption } },
+  required: ["pick", "options"], additionalProperties: false,
+};
+const PLAN_RULES = `Rules for every option:
+- Use ONLY foods from their food bank, by exact food_id. Quantity is in that food's own unit (as listed in the bank), in multiples of 0.5 — or in grams (multiples of 10) for foods whose unit is «گرم».
+- Work out the calories from the bank (kcal per unit × qty) and land within ±10% of the budget. The app recomputes every number and drops options that miss, so do the arithmetic.
+- Realistic Iranian combinations and household amounts a person can measure without a scale; 1–4 foods per option.
+- Respect profile.planPrefs (dislikes, allergies, notes) strictly, and medical conditions in the profile in the general, well-established way (e.g. diabetes: no sugary items or juice, prefer whole grains and legumes; blood pressure / heart: avoid salty and fried; kidney disease: do not push protein above the target). Prefer foods they actually log and like over foods they never eat.`;
+
+const ONE_SHOT: Record<string, { effort: string; max_tokens?: number; schema: any; prompt: (i: any) => string }> = {
+  plan: {
+    effort: "medium",
+    max_tokens: 20000,
+    schema: {
+      type: "object",
+      properties: {
+        note: str("2–3 short Persian sentences for the person"),
+        slots: {
+          type: "object",
+          properties: { breakfast: planSlot, snack1: planSlot, lunch: planSlot, snack2: planSlot, dinner: planSlot },
+          required: ["breakfast", "snack1", "lunch", "snack2", "dinner"], additionalProperties: false,
+        },
+        free: { type: "array", items: { type: "object", properties: { food_id: str() }, required: ["food_id"], additionalProperties: false } },
+      },
+      required: ["note", "slots", "free"], additionalProperties: false,
+    },
+    prompt: (i) => `Design their diet plan for the next ${Number(i.days) || 14} days, the way a dietitian's choice list works: not a day-by-day menu, but one fixed pattern — for each of five eating occasions a list of interchangeable options, each with exact amounts. They choose among the options every day, so the options of one occasion must be nutritionally equivalent.
+
+Daily target: ${i.kcal} kcal, protein at least ${i.protein} g. Calorie budget per occasion: breakfast ${i.budgets?.breakfast}, snack1 (morning) ${i.budgets?.snack1}, lunch ${i.budgets?.lunch}, snack2 (afternoon) ${i.budgets?.snack2}, dinner ${i.budgets?.dinner}.
+
+For each occasion:
+- pick: 1 means they eat one option, and each option equals the whole budget. 2 means they eat any two, and each option equals HALF the budget (use this where mixing two small things is natural, e.g. snacks, or a breakfast of two parts). Decide per occasion.
+- options: 5–6 for breakfast, lunch and dinner; 4–5 for each snack. Make them genuinely different from each other (different protein source, different base), so two weeks don't get boring.
+- Breakfast, lunch and dinner options each contain a real protein source, and lunch and dinner options include a vegetable or salad from the bank, so that any combination they choose reaches the protein target and at least 3 vegetable servings a day. Snacks: fruit, dairy, nuts and the like; one modest treat option is fine.
+
+${PLAN_RULES}
+
+free: up to 8 foods from the bank that are so low in calories they can be eaten freely when hungry (raw or cooked non-starchy vegetables, salad without dressing, unsweetened tea, ...). Nothing above roughly 40 kcal per unit.
+
+note: 2–3 short Persian sentences to them: the idea behind this plan. ${i.include?.length ? `They just added these foods to the bank and want them in the plan: ${i.include.map((n: string) => `«${n}»`).join("، ")} — work each into at least one suitable option and say so. Keep the rest close to the current plan in the data.` : "If the data has an earlier plan, look at the weight change over it and how closely it was followed (the adherence table and what they logged), keep what worked, change what they skipped, and say in the note what you changed and why."}`,
+  },
+  plan_option: {
+    effort: "low",
+    schema: planOption,
+    prompt: (i) => `They have none of the current options for «${i.slot}» at hand or don't feel like them. Give ONE more option for that occasion of their diet plan, worth about ${i.kcal} kcal, clearly different from these existing ones:\n${(i.existing || []).map((o: string) => `- ${o}`).join("\n")}\n\n${PLAN_RULES}`,
+  },
   tip: {
     effort: "low",
     schema: { type: "object", properties: { text: str() }, required: ["text"], additionalProperties: false },
@@ -289,7 +363,7 @@ async function runOneShot(mode: string, ctx: Ctx, input: any) {
   const m = ONE_SHOT[mode];
   const res: any = await anthropic.beta.messages.create({
     model: MODEL,
-    max_tokens: 8000,
+    max_tokens: m.max_tokens || 8000,
     betas: BETAS,
     fallbacks: "default",
     system: systemBlocks(ctx),
