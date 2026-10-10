@@ -1,8 +1,9 @@
 /*
   Hooshvareh client: talks to the `hooshvareh` Supabase Edge Function, which holds the
   Claude API key. Every request carries the app's full local state (see context()), so the
-  AI sees exactly what the person sees. When the app gains a new kind of data, add it to
-  context() and to snapshot() in the function, and update HOOSHVAREH.md.
+  AI sees exactly what the person sees; the function decides which parts each mode needs, to
+  keep token use low. When the app gains a new kind of data, add it to context() and to
+  sections() in the function (and only to the modes that need it), and update HOOSHVAREH.md.
 */
 import * as store from '../data/store.js';
 import { SUPABASE_URL, SUPABASE_KEY } from '../config.js';
@@ -35,16 +36,17 @@ function planContext(s, t) {
   };
 }
 
-// The magazine as Hooshvareh sees it: every article by title, and the full text of the latest
-// few plus the one the person is asking about (see focusArticle).
+// The magazine as Hooshvareh sees it: every article by title. The full text of the latest few
+// goes along too, but the function only shows it to the model when it asks (get_article) or
+// for the one the person is asking about (see focusArticle).
 let focusKey = null;
 export function focusArticle(key) { focusKey = key; }
 function magazineContext(s) {
   const all = s.ai_notes.filter(n => n.kind === 'mag' && n.data?.title).sort((a, b) => (a.key < b.key ? 1 : -1));
   return all.slice(0, 60).map((n, i) => {
     const d = n.data;
-    const brief = { day: n.key.slice(4, 14), category: d.category, title: d.title, summary: d.summary, read: !!d.read };
-    return i < 2 || n.key === focusKey ? { ...brief, body: d.body, for_you: d.for_you, sources: (d.sources || []).map(x => `${x.publisher}: ${x.title}`) } : brief;
+    const brief = { key: n.key, day: n.key.slice(4, 14), category: d.category, title: d.title, summary: d.summary, read: !!d.read };
+    return i < 10 || n.key === focusKey ? { ...brief, body: d.body, for_you: d.for_you, sources: (d.sources || []).map(x => `${x.publisher}: ${x.title}`) } : brief;
   });
 }
 
@@ -59,7 +61,7 @@ function context() {
     now: `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`,
     profile: p,
     targets: p ? effectiveTargets(p) : null,
-    foods: s.foods.map(({ id, name, unit, grams, kcal, protein, is_veg }) => ({ id, name, unit, grams, kcal, protein, is_veg })),
+    foods: s.foods.map(({ id, name, unit, grams, kcal, protein, is_veg, created_at }) => ({ id, name, unit, grams, kcal, protein, is_veg, created_at })),
     entries: s.entries.map(({ day, meal, name, qty, unit, kcal, protein, is_veg, created_at }) => ({ day, meal, name, qty, unit, kcal, protein, is_veg, created_at })),
     weights: s.weights.map(({ day, kg }) => ({ day, kg })),
     reviews: s.reviews.map(({ week_start, good, hard, next_goal }) => ({ week_start, good, hard, next_goal })),
@@ -67,6 +69,7 @@ function context() {
     mode: p?.mode === 'plan' ? 'plan' : 'count',
     plan: planContext(s, t),
     magazine: magazineContext(s),
+    focus: focusKey,
     notes: s.ai_notes.filter(n => !['thread', 'plan', 'pick', 'mag'].includes(n.kind)).map(({ key, text, created_at }) => ({ key, text, created_at })),
   };
 }

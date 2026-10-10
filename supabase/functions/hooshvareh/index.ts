@@ -17,6 +17,14 @@
   The app sends its whole local state (it's the source of truth, including writes not yet
   synced), so the model always sees exactly what the user sees. The API key lives only in
   this function's secrets (ANTHROPIC_API_KEY). Every capability here is listed in HOOSHVAREH.md.
+
+  Keeping it cheap (input tokens are most of the bill — see «مصرف» in HOOSHVAREH.md):
+    - each mode gets only the sections of the data it needs (ONE_SHOT[mode].data);
+    - in chat, everything that rarely changes is a cached prefix, and what changes by the
+      minute (the clock, today's log) goes in a message at the end, after the cache;
+    - food ids are sent as short aliases, long history as weekly averages, and article
+      texts only on request (get_article).
+  Each call logs its token usage (console) so the effect of a change can be checked.
 */
 import Anthropic from "npm:@anthropic-ai/sdk@0.132.1";
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
@@ -38,7 +46,7 @@ const json = (body: unknown, status = 200) =>
 /* ---------------- prompt ---------------- */
 
 // Frozen, so it stays a cacheable prefix. Anything that changes goes in the data block.
-const SYSTEM = `You are «هوشواره» (Hooshvareh), the assistant inside تن‌آرا (TanAra), a Persian weight-loss and food-logging app used by one person. You can see everything they have recorded in the app (below). Speak to them directly.
+const SYSTEM = `You are «هوشواره» (Hooshvareh), the assistant inside تن‌آرا (TanAra), a Persian weight-loss and food-logging app used by one person. You can see what they have recorded in the app (in <user_data> below; in a chat, the part that changes during the day — the time, what they logged today — comes in <live_data> at the end of the conversation, added by the app, not written by them). Speak to them directly.
 
 Language and style
 - Always answer in natural, warm, everyday Persian (Farsi). Use informal «تو». Never switch to English unless asked.
@@ -60,7 +68,7 @@ Changing their data (chat only)
 - When they tell you they ate something, weighed themselves, want a motivation saved, or want a food added to the bank, call the matching tool (one call per item). Prefer an item from their food bank (pass its food_id) and scale its numbers by quantity; otherwise estimate.
 - kcal and protein in propose_log_food are totals for the whole quantity eaten.
 - After proposing, tell them briefly that it is waiting for their confirmation. Never say it has been saved.
-- Use get_entries when you need individual foods from days older than the detailed window.
+- Use get_entries when you need individual foods from days older than the detailed window, and get_article for the full text of a magazine article before discussing its content, unless that text is already in the data.
 
 The two modes of the app
 - «شمارش کالری»: they log what they eat and watch calories and protein. «رژیم»: you design a two-week plan — for each of five eating occasions a list of options with set amounts, built only from their food bank — and they tick what they ate; ticking logs those foods, so both modes share one record. At the end of the two weeks they weigh in and you design the next period from the result.
@@ -72,7 +80,7 @@ type Ctx = {
   profile?: Record<string, unknown> | null;
   targets?: { kcal: number; protein: number; floor: number };
   foods?: any[]; entries?: any[]; weights?: any[]; reviews?: any[]; motivations?: any[]; notes?: any[];
-  mode?: string; plan?: any; magazine?: any[];
+  mode?: string; plan?: any; magazine?: any[]; focus?: string;
 };
 
 const MEALS: Record<string, string> = { breakfast: "صبحانه", lunch: "ناهار", dinner: "شام", snack: "میان‌وعده" };
@@ -88,57 +96,108 @@ function entryLine(e: any) {
   return `${e.day} | ${MEALS[e.meal] || e.meal} | ${e.name} | ${r1(e.qty)} ${e.unit || ""} | ${Math.round(e.kcal)} kcal | ${r1(e.protein)} g protein${e.is_veg ? " | veg" : ""}`;
 }
 
-// Everything the app knows, as compact text. Add new data types here when the app grows.
-function snapshot(c: Ctx) {
+const weekStart = (day: string) => addDays(day, -((new Date(day + "T12:00:00Z").getUTCDay() + 1) % 7)); // Saturday
+const TOTALS_DAYS = 90;   // older days are sent as weekly averages
+const MAG_SUMMARIES = 10; // older articles are listed by title only
+
+// Food ids are UUIDs (~20 tokens each, on every food, in every request), so the model sees
+// short aliases instead. Numbered in creation order: a new food never renumbers the others,
+// which would break the cached prefix.
+function foodAliases(c: Ctx) {
+  const foods = [...(c.foods || [])].sort((a, b) => {
+    const x = String(a.created_at || ""), y = String(b.created_at || "");
+    return x < y ? -1 : x > y ? 1 : a.id < b.id ? -1 : 1;
+  });
+  const toId = new Map<string, string>();
+  const rows = foods.map((f, i) => { toId.set(`f${i + 1}`, f.id); return { ...f, alias: `f${i + 1}` }; });
+  return { rows, toId };
+}
+// Puts the real ids back wherever the model named a food (an unknown alias becomes "").
+function realIds(v: any, toId: Map<string, string>): any {
+  if (Array.isArray(v)) return v.map(x => realIds(x, toId));
+  if (!v || typeof v !== "object") return v;
+  return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, k === "food_id" ? (toId.get(String(x)) ?? "") : realIds(x, toId)]));
+}
+
+const articleText = (a: any) => `${a.day} | ${a.title}\n<article>\n${a.body}${a.for_you ? `\nFor them: ${a.for_you}` : ""}\nSources: ${(a.sources || []).join("، ") || "-"}\n</article>`;
+
+// Everything the app knows, as compact text, one function per section so each mode can take
+// only what it needs. Add new data types here when the app grows.
+function sections(c: Ctx) {
   const entries = c.entries || [];
   const byDay = new Map<string, any[]>();
   for (const e of entries) (byDay.get(e.day) || byDay.set(e.day, []).get(e.day)!).push(e);
   const days = [...byDay.keys()].sort();
-  const from = addDays(c.today, -(DETAIL_DAYS - 1));
-  const out: string[] = [];
-
-  out.push(`# Now\ntoday: ${c.today}${c.todayFa ? ` (${c.todayFa})` : ""}${c.now ? `, local time ${c.now}` : ""}`);
-  out.push(`# Profile (from the onboarding questionnaire)\n${JSON.stringify(c.profile || {})}`);
-  if (c.targets) out.push(`# Daily targets\ncalories: ${c.targets.kcal} kcal, protein: ${c.targets.protein} g, safety floor (never go below): ${c.targets.floor} kcal`);
-
-  out.push(`# Mode they are using now\n${c.mode === "plan" ? "رژیم (diet plan)" : "شمارش کالری (calorie counting)"}`);
-  if (c.plan) {
-    const pl = c.plan;
-    out.push(`# Current diet plan (you designed it), ${pl.start} to ${pl.end}, for ${pl.kcal} kcal/day\n${(pl.slots || []).map((s: any) => `## ${s.slot} — they pick ${s.pick}\n${s.options.map((o: string) => `- ${o}`).join("\n")}`).join("\n")}\nFree when hungry: ${(pl.free || []).join("، ") || "-"}\nWhat you told them about it: ${pl.note || "-"}${pl.previous ? `\nPlan before it: from ${pl.previous.start}, ${pl.previous.kcal} kcal/day, ${pl.previous.adherence.done} of ${pl.previous.adherence.of} occasions eaten as planned` : ""}`);
-    out.push(`# Following the plan, last 4 weeks (day | occasions eaten as planned of 5)\n${(pl.days || []).map((d: any) => `${d.day} | ${d.done}/${d.of}`).join("\n") || "none"}`);
-  }
-
-  const weights = [...(c.weights || [])].sort((a, b) => (a.day < b.day ? -1 : 1));
-  out.push(`# Weigh-ins (day | kg), all\n${weights.map(w => `${w.day} | ${r1(w.kg)}`).join("\n") || "none yet"}`);
-
-  out.push(`# Daily totals, every logged day (day | kcal | protein g | veg servings | meals logged)\n${days.map(d => {
-    const l = byDay.get(d)!;
-    const k = l.reduce((s, e) => s + Number(e.kcal), 0);
-    const p = l.reduce((s, e) => s + Number(e.protein), 0);
-    // a vegetable serving is ~80 g, so weighed entries count by weight (same as the app)
-    const v = l.filter(e => e.is_veg).reduce((s, e) => s + (e.unit === "گرم" ? Number(e.qty) / 80 : Number(e.qty)), 0);
-    const meals = [...new Set(l.map(e => MEALS[e.meal] || e.meal))].join("، ");
-    return `${d} | ${Math.round(k)} | ${Math.round(p)} | ${r1(v)} | ${meals}`;
-  }).join("\n") || "nothing logged yet"}`);
-
-  const recent = entries.filter(e => e.day >= from).sort((a, b) => (a.day + a.created_at < b.day + b.created_at ? -1 : 1));
-  out.push(`# Every food logged in the last ${DETAIL_DAYS} days (day | meal | food | qty unit | kcal | protein)\n${recent.map(entryLine).join("\n") || "none"}`);
-
-  const reviews = [...(c.reviews || [])].sort((a, b) => (a.week_start < b.week_start ? -1 : 1));
-  out.push(`# Weekly reviews they wrote (weeks start Saturday)\n${reviews.map(r => `week of ${r.week_start}: good: ${r.good || "-"} / hard: ${r.hard || "-"} / next goal: ${r.next_goal || "-"}`).join("\n") || "none"}`);
-
+  const stats = (d: string) => {
+    const l = byDay.get(d) || [];
+    return {
+      n: l.length,
+      k: l.reduce((s, e) => s + Number(e.kcal), 0),
+      p: l.reduce((s, e) => s + Number(e.protein), 0),
+      // a vegetable serving is ~80 g, so weighed entries count by weight (same as the app)
+      v: l.filter(e => e.is_veg).reduce((s, e) => s + (e.unit === "گرم" ? Number(e.qty) / 80 : Number(e.qty)), 0),
+      meals: [...new Set(l.map(e => MEALS[e.meal] || e.meal))].join("، "),
+    };
+  };
+  const { rows: foods, toId } = foodAliases(c);
   const kinds: Record<string, string> = { event: "upcoming event", image: "inspiring photo", before: "photo of themselves before", quote: "motivational sentence" };
-  out.push(`# Motivations they saved\n${(c.motivations || []).map(m => `${kinds[m.kind] || m.kind}${m.day ? ` (${m.day})` : ""}: ${m.title || "(no title)"}${m.note ? ` — ${m.note}` : ""}${m.image_path ? " [has photo]" : ""}`).join("\n") || "none"}`);
+  const pl = c.plan;
+  const detailFrom = addDays(c.today, -(DETAIL_DAYS - 1));
+  const between = (from: string, to: string) => `# Every food logged from ${from} to ${to} (day | meal | food | qty unit | kcal | protein)\n${entries.filter(e => e.day >= from && e.day <= to).sort((a, b) => (a.day + a.created_at < b.day + b.created_at ? -1 : 1)).map(entryLine).join("\n") || "none"}`;
 
-  const notes = [...(c.notes || [])].sort((a, b) => (a.created_at < b.created_at ? -1 : 1)).slice(-20);
-  out.push(`# What you (Hooshvareh) already told them outside the chat, latest last\n${notes.map(n => `${n.key}: ${n.text}`).join("\n") || "none"}`);
+  return {
+    toId,
+    yesterday: addDays(c.today, -1),
+    detailFrom,
+    now: () => `# Now\ntoday: ${c.today}${c.todayFa ? ` (${c.todayFa})` : ""}${c.now ? `, local time ${c.now}` : ""}`,
+    profile: () => `# Profile (from the onboarding questionnaire)\n${JSON.stringify(c.profile || {})}`,
+    targets: () => c.targets ? `# Daily targets\ncalories: ${c.targets.kcal} kcal, protein: ${c.targets.protein} g, safety floor (never go below): ${c.targets.floor} kcal` : "",
+    mode: () => `# Mode they are using now\n${c.mode === "plan" ? "رژیم (diet plan)" : "شمارش کالری (calorie counting)"}`,
+    plan: () => pl ? `# Current diet plan (you designed it), ${pl.start} to ${pl.end}, for ${pl.kcal} kcal/day\n${(pl.slots || []).map((s: any) => `## ${s.slot} — they pick ${s.pick}\n${s.options.map((o: string) => `- ${o}`).join("\n")}`).join("\n")}\nFree when hungry: ${(pl.free || []).join("، ") || "-"}\nWhat you told them about it: ${pl.note || "-"}${pl.previous ? `\nPlan before it: from ${pl.previous.start}, ${pl.previous.kcal} kcal/day, ${pl.previous.adherence.done} of ${pl.previous.adherence.of} occasions eaten as planned` : ""}` : "",
+    adherence: () => pl ? `# Following the plan, last 4 weeks (day | occasions eaten as planned of 5)\n${(pl.days || []).map((d: any) => `${d.day} | ${d.done}/${d.of}`).join("\n") || "none"}` : "",
+    weights: () => `# Weigh-ins (day | kg), all\n${[...(c.weights || [])].sort((a, b) => (a.day < b.day ? -1 : 1)).map(w => `${w.day} | ${r1(w.kg)}`).join("\n") || "none yet"}`,
 
-  const mag = [...(c.magazine || [])].sort((a, b) => (a.day < b.day ? -1 : 1));
-  if (mag.length) out.push(`# Magazine («مجله») articles you researched and wrote for them (day | category | title — summary${mag.some(a => a.body) ? "; full text where given" : ""})\n${mag.map(a => `${a.day} | ${a.category || "-"} | ${a.title} — ${a.summary || ""}${a.read ? "" : " [not opened yet]"}${a.body ? `\n<article>\n${a.body}${a.for_you ? `\nFor them: ${a.for_you}` : ""}\nSources: ${(a.sources || []).join("، ") || "-"}\n</article>` : ""}`).join("\n")}`);
-
-  out.push(`# Their food bank (food_id | name | unit | grams in one unit | kcal per unit | protein g per unit | veg)\n${(c.foods || []).map(f => `${f.id} | ${f.name} | ${f.unit} | ${f.grams ? r1(f.grams) : "?"} | ${r1(f.kcal)} | ${r1(f.protein)}${f.is_veg ? " | veg" : ""}`).join("\n")}`);
-  return out.join("\n\n");
+    // Logged days up to `to`: one line per day for the last TOTALS_DAYS, weekly averages before.
+    totals: (to = c.today) => {
+      const cut = addDays(c.today, -TOTALS_DAYS);
+      const list = days.filter(d => d <= to);
+      const weeks = new Map<string, string[]>();
+      for (const d of list.filter(d => d < cut)) { const w = weekStart(d); (weeks.get(w) || weeks.set(w, []).get(w)!).push(d); }
+      const out: string[] = [];
+      if (weeks.size) out.push(`# Weekly averages of the logged days older than ${TOTALS_DAYS} days (week starting Saturday | days logged | avg kcal | avg protein g | avg veg servings)\n${[...weeks].map(([w, ds]) => {
+        const t = ds.map(stats);
+        const avg = (f: (x: any) => number) => t.reduce((s, x) => s + f(x), 0) / t.length;
+        return `${w} | ${ds.length} | ${Math.round(avg(x => x.k))} | ${Math.round(avg(x => x.p))} | ${r1(avg(x => x.v))}`;
+      }).join("\n")}`);
+      out.push(`# Daily totals, every logged day${weeks.size ? ` of the last ${TOTALS_DAYS} days` : ""}${to < c.today ? " before today" : ""} (day | kcal | protein g | veg servings | meals logged)\n${list.filter(d => d >= cut).map(d => {
+        const t = stats(d);
+        return `${d} | ${Math.round(t.k)} | ${Math.round(t.p)} | ${r1(t.v)} | ${t.meals}`;
+      }).join("\n") || "nothing logged yet"}`);
+      return out.join("\n\n");
+    },
+    entries: between,
+    recent: () => between(detailFrom, c.today),
+    today: () => {
+      const t = stats(c.today);
+      return `# Today so far (${c.today})\n${t.n ? `totals: ${Math.round(t.k)} kcal, ${Math.round(t.p)} g protein, ${r1(t.v)} veg servings\n${(byDay.get(c.today) || []).sort((a, b) => (a.created_at < b.created_at ? -1 : 1)).map(entryLine).join("\n")}` : "nothing logged yet today"}`;
+    },
+    reviews: () => `# Weekly reviews they wrote (weeks start Saturday)\n${[...(c.reviews || [])].sort((a, b) => (a.week_start < b.week_start ? -1 : 1)).map(r => `week of ${r.week_start}: good: ${r.good || "-"} / hard: ${r.hard || "-"} / next goal: ${r.next_goal || "-"}`).join("\n") || "none"}`,
+    motivations: () => `# Motivations they saved\n${(c.motivations || []).map(m => `${kinds[m.kind] || m.kind}${m.day ? ` (${m.day})` : ""}: ${m.title || "(no title)"}${m.note ? ` — ${m.note}` : ""}${m.image_path ? " [has photo]" : ""}`).join("\n") || "none"}`,
+    notes: () => `# What you (Hooshvareh) already told them outside the chat, latest last\n${[...(c.notes || [])].sort((a, b) => (a.created_at < b.created_at ? -1 : 1)).slice(-20).map(n => `${n.key}: ${n.text}`).join("\n") || "none"}`,
+    magazine: () => {
+      const mag = [...(c.magazine || [])].sort((a, b) => (a.day < b.day ? -1 : 1));
+      return mag.length ? `# Magazine («مجله») articles you researched and wrote for them, latest last (day | category | title — summary of the latest ones). Full text: get_article.\n${mag.map((a, i) => `${a.day} | ${a.category || "-"} | ${a.title}${i >= mag.length - MAG_SUMMARIES && a.summary ? ` — ${a.summary}` : ""}${a.read ? "" : " [not opened yet]"}`).join("\n")}` : "";
+    },
+    // the article they opened «درباره‌ی این مقاله از هوشواره بپرس» on
+    focus: () => {
+      const a = c.focus && (c.magazine || []).find(x => x.key === c.focus && x.body);
+      return a ? `# The magazine article they are asking about (full text)\n${articleText(a)}` : "";
+    },
+    foods: () => `# Their food bank (food_id | name | unit | grams in one unit | kcal per unit | protein g per unit | veg)\n${foods.map(f => `${f.alias} | ${f.name} | ${f.unit} | ${f.grams ? r1(f.grams) : "?"} | ${r1(f.kcal)} | ${r1(f.protein)}${f.is_veg ? " | veg" : ""}`).join("\n")}`,
+  };
 }
+type Sections = ReturnType<typeof sections>;
+const block = (list: string[]) => list.filter(Boolean).join("\n\n");
 
 /* ---------------- tools (chat) ---------------- */
 
@@ -218,6 +277,15 @@ const TOOLS: any[] = [
       required: ["from", "to"],
     },
   },
+  {
+    name: "get_article",
+    description: "Full text and sources of the magazine article(s) published on one day.",
+    input_schema: {
+      type: "object",
+      properties: { day: { type: "string", description: "YYYY-MM-DD, as listed in the magazine section" } },
+      required: ["day"],
+    },
+  },
 ];
 
 /* ---------------- one-shot modes ---------------- */
@@ -247,10 +315,17 @@ const PLAN_RULES = `Rules for every option:
 - Realistic Iranian combinations and household amounts a person can measure without a scale; 1–4 foods per option.
 - Respect profile.planPrefs (dislikes, allergies, notes) strictly, and medical conditions in the profile in the general, well-established way (e.g. diabetes: no sugary items or juice, prefer whole grains and legumes; blood pressure / heart: avoid salty and fried; kidney disease: do not push protein above the target). Prefer foods they actually log and like over foods they never eat.`;
 
-const ONE_SHOT: Record<string, { effort: string; max_tokens?: number; schema: any; prompt: (i: any) => string }> = {
+// `data`: the sections this mode needs — nothing else is sent. `shared`: sections that stay
+// the same between calls made in a row (the food bank); only those are worth caching.
+type OneShot = {
+  effort: string; max_tokens?: number; schema: any; prompt: (i: any) => string;
+  system?: string; shared?: (S: Sections) => string[]; data?: (S: Sections, i: any) => string[];
+};
+const ONE_SHOT: Record<string, OneShot> = {
   plan: {
     effort: "medium",
     max_tokens: 20000,
+    data: (S) => [S.now(), S.profile(), S.targets(), S.mode(), S.foods(), S.plan(), S.adherence(), S.weights(), S.totals(), S.recent(), S.reviews()],
     schema: {
       type: "object",
       properties: {
@@ -281,21 +356,26 @@ note: 2–3 short Persian sentences to them: the idea behind this plan. ${i.incl
   },
   plan_option: {
     effort: "low",
+    shared: (S) => [S.profile(), S.targets(), S.foods()],
+    data: (S) => [S.plan()],
     schema: planOption,
     prompt: (i) => `They have none of the current options for «${i.slot}» at hand or don't feel like them. Give ONE more option for that occasion of their diet plan, worth about ${i.kcal} kcal, clearly different from these existing ones:\n${(i.existing || []).map((o: string) => `- ${o}`).join("\n")}\n\n${PLAN_RULES}`,
   },
   tip: {
     effort: "low",
+    data: (S) => [S.now(), S.profile(), S.targets(), S.mode(), S.plan(), S.adherence(), S.weights(), S.totals(), S.recent(), S.reviews(), S.motivations(), S.notes()],
     schema: { type: "object", properties: { text: str() }, required: ["text"], additionalProperties: false },
     prompt: () => `Write today's tip for the top of the Today screen: one or two short sentences (max ~35 words), one practical, evidence-based nutrition or habit tip tailored to what their recent data shows (e.g. protein below target, few vegetables, late-night snacking, gaps in logging, weight trend, an upcoming event). If there is little data, give a good general tip for starting out. Different in topic from your earlier tips. No greeting.`,
   },
   quote: {
     effort: "low",
+    data: (S) => [S.now(), S.profile(), S.targets(), S.weights(), S.totals(), S.reviews(), S.motivations()],
     schema: { type: "object", properties: { text: str() }, required: ["text"], additionalProperties: false },
     prompt: (i) => `Write one motivational sentence for their Motivation section, in the first person as if they wrote it to themselves (max ~22 words), personal to their goals, events and progress. Not a cliché, not one they already have.${i?.draft ? ` They started writing: «${i.draft}» — build on it.` : ""} Only the sentence, without quotation marks.`,
   },
   review: {
     effort: "medium",
+    data: (S, i) => [S.now(), S.profile(), S.targets(), S.mode(), S.plan(), S.adherence(), S.weights(), S.totals(), S.entries(String(i.week_start), addDays(String(i.week_start), 6)), S.reviews()],
     schema: {
       type: "object",
       properties: { analysis: str("Persian, simple Markdown, max ~110 words"), next_goal: str("one small, concrete goal, max ~14 words") },
@@ -305,11 +385,13 @@ note: 2–3 short Persian sentences to them: the idea behind this plan. ${i.incl
   },
   progress: {
     effort: "medium",
+    data: (S) => [S.now(), S.profile(), S.targets(), S.mode(), S.adherence(), S.weights(), S.totals(), S.reviews()],
     schema: { type: "object", properties: { text: str("Persian, simple Markdown, max ~110 words") }, required: ["text"], additionalProperties: false },
     prompt: () => `Analyse their weight trend for the Progress screen: the overall direction and pace (use weekly averages, not single weigh-ins — daily water swings are normal), how it relates to their eating, whether the pace is healthy (0.25–1 kg/week is a good range), and one encouraging, practical next step. If there are too few weigh-ins, say what's needed.`,
   },
   estimate: {
     effort: "low",
+    shared: (S) => [S.foods()],
     schema: {
       type: "object",
       properties: {
@@ -328,6 +410,7 @@ note: 2–3 short Persian sentences to them: the idea behind this plan. ${i.incl
   },
   title: {
     effort: "low",
+    system: "You name chat conversations for the list of past conversations in تن‌آرا, a Persian weight-loss and food-logging app.",
     schema: { type: "object", properties: { title: str("2–5 Persian words") }, required: ["title"], additionalProperties: false },
     prompt: (i) => `Give a short Persian title (2–5 words, no quotes, no trailing punctuation) for the chat conversation that starts like this, for a list of past conversations:\n${(i.messages || []).slice(0, 2).map((m: any) => `${m.role === "assistant" ? "Hooshvareh" : "User"}: ${String(m.content || "").slice(0, 1500)}`).join("\n")}`,
   },
@@ -337,19 +420,30 @@ note: 2–3 short Persian sentences to them: the idea behind this plan. ${i.incl
 
 const anthropic = new Anthropic({ apiKey: Deno.env.get("ANTHROPIC_API_KEY") });
 
-function systemBlocks(ctx: Ctx) {
-  return [
-    { type: "text", text: SYSTEM },
-    // The data changes whenever they log something; cached between chat turns.
-    { type: "text", text: `<user_data>\n${snapshot(ctx)}\n</user_data>`, cache_control: { type: "ephemeral" } },
-  ];
+const CACHE = { type: "ephemeral" };
+const NOTE = "Only the parts of their data that this task needs are included.";
+
+// The frozen prompt, then data that is the same between calls close together (cached), then
+// data that isn't (not cached: writing a cache entry nobody reads costs 25% extra).
+function systemBlocks(stable: string, rest = "", note = "") {
+  const out: any[] = [{ type: "text", text: SYSTEM }];
+  if (stable) out.push({ type: "text", text: `<user_data>\n${note ? note + "\n\n" : ""}${stable}\n</user_data>`, cache_control: CACHE });
+  if (rest) out.push({ type: "text", text: `<user_data>\n${note && !stable ? note + "\n\n" : ""}${rest}\n</user_data>` });
+  return out;
 }
 
+const logUsage = (mode: string, msg: any) => console.log(JSON.stringify({ mode, stop: msg?.stop_reason, usage: msg?.usage }));
+
 // Chat history from the app: plain text turns, oldest first. Keep it valid: starts with
-// the user, alternates, ends with the user.
+// the user, alternates, ends with the user. Long conversations drop their oldest turns
+// HISTORY_STEP at a time (not one per message), so the start — and the cached prefix —
+// stays the same for many turns in a row.
+const HISTORY_MAX = 40, HISTORY_STEP = 20;
 function cleanHistory(list: any[]) {
+  const all = list || [];
+  const start = all.length > HISTORY_MAX ? Math.ceil((all.length - HISTORY_MAX) / HISTORY_STEP) * HISTORY_STEP : 0;
   const out: { role: "user" | "assistant"; content: string }[] = [];
-  for (const m of (list || []).slice(-40)) {
+  for (const m of all.slice(start)) {
     const role = m?.role === "assistant" ? "assistant" : "user";
     const text = String(m?.content ?? "").slice(0, 8000).trim();
     if (!text) continue;
@@ -367,18 +461,20 @@ function refusalText() {
 
 async function runOneShot(mode: string, ctx: Ctx, input: any) {
   const m = ONE_SHOT[mode];
+  const S = sections(ctx);
   const res: any = await anthropic.beta.messages.create({
     model: MODEL,
     max_tokens: m.max_tokens || 8000,
     betas: BETAS,
     fallbacks: "default",
-    system: systemBlocks(ctx),
+    system: m.system || systemBlocks(block(m.shared?.(S) || []), block(m.data?.(S, input || {}) || []), NOTE),
     output_config: { effort: m.effort, format: { type: "json_schema", schema: m.schema } },
     messages: [{ role: "user", content: m.prompt(input || {}) }],
   } as any);
+  logUsage(mode, res);
   if (res.stop_reason === "refusal") return json({ error: refusalText() }, 422);
   const text = res.content.filter((b: any) => b.type === "text").map((b: any) => b.text).join("");
-  try { return json({ result: JSON.parse(text) }); } catch { return json({ error: "پاسخ هوشواره ناقص بود؛ دوباره امتحان کن." }, 502); }
+  try { return json({ result: realIds(JSON.parse(text), S.toId) }); } catch { return json({ error: "پاسخ هوشواره ناقص بود؛ دوباره امتحان کن." }, 502); }
 }
 
 /* ---------------- magazine ---------------- */
@@ -442,13 +538,17 @@ function magazinePrompt(i: any) {
 ${asked ? `They asked for an article about: «${asked}». If that is not about weight, nutrition, activity, sleep, habits or health around them, pick the closest topic that is and say so in the summary.` : `Today's section: ${MAG_CATEGORIES[cat]}. Within it, choose the single topic most useful to this person right now, judging from their data (what they eat and skip, protein and vegetables vs target, weight trend, plan adherence, what they wrote in reviews, their conditions).`}
 Do not repeat a subject already covered: ${(i.previous || []).slice(0, 80).map((t: string) => `«${String(t).slice(0, 80)}»`).join("، ") || "nothing yet"}.
 
-Research first, with web_search. Results are limited to major health bodies, systematic-review publishers and leading journals. Prefer guidelines, systematic reviews and meta-analyses over single studies, and recent over old. Base every factual claim on what you actually read in the results; if the evidence is mixed or weak, say so plainly and set "evidence" accordingly. Do not cite anything from memory. Numbers (effect sizes, amounts) only when a source gives them.
+Research first, with web_search. Two or three focused searches are usually enough: stop once you have 2–4 solid sources. Results are limited to major health bodies, systematic-review publishers and leading journals. Prefer guidelines, systematic reviews and meta-analyses over single studies, and recent over old. Base every factual claim on what you actually read in the results; if the evidence is mixed or weak, say so plainly and set "evidence" accordingly. Do not cite anything from memory. Numbers (effect sizes, amounts) only when a source gives them.
 
 Then call publish_article once. Write it like a good science journalist writing to one reader: a concrete opening, what the evidence shows, what it means in an Iranian everyday kitchen and routine, and what is still uncertain. No medical diagnosis, nothing below their safety floor, no supplements or drugs as weight-loss advice (an article may explain what the evidence says about them, including that it is weak). Name the source body in the text where it matters (e.g. «مرور کاکرین در ۲۰۲۳»), and list in "sources" only pages that appeared in your search results, with their exact URLs. Do not write the article as plain text.`;
 }
 
 async function runMagazine(ctx: Ctx, input: any) {
   const messages: any[] = [{ role: "user", content: magazinePrompt(input || {}) }];
+  const S = sections(ctx);
+  // No food bank and no article list (the prompt already names the earlier titles). Cached:
+  // the search loop re-reads this prefix on every step.
+  const system = systemBlocks(block([S.now(), S.profile(), S.targets(), S.mode(), S.plan(), S.adherence(), S.weights(), S.totals(), S.recent(), S.reviews()]), "", NOTE);
   const seen = new Set<string>(); // every URL the search really returned
   for (let turn = 0; turn < 5; turn++) {
     const msg: any = await (anthropic.beta.messages.stream({
@@ -456,11 +556,14 @@ async function runMagazine(ctx: Ctx, input: any) {
       max_tokens: 16000,
       betas: BETAS,
       fallbacks: "default",
-      system: systemBlocks(ctx),
-      tools: [{ type: "web_search_20260209", name: "web_search", max_uses: 5, allowed_domains: MAG_DOMAINS }, PUBLISH_TOOL],
+      system,
+      tools: [{ type: "web_search_20260209", name: "web_search", max_uses: 4, allowed_domains: MAG_DOMAINS }, PUBLISH_TOOL],
       output_config: { effort: "medium" },
+      // a follow-up turn re-sends the search results: read them from the cache
+      ...(turn ? { cache_control: CACHE } : {}),
       messages,
     } as any) as any).finalMessage();
+    logUsage("magazine", msg);
     if (msg.stop_reason === "refusal") return json({ error: refusalText() }, 422);
 
     // Collect URLs from server-tool results and citations — never from the model's own prose.
@@ -485,28 +588,54 @@ async function runMagazine(ctx: Ctx, input: any) {
 }
 
 function runChat(ctx: Ctx, history: any[]) {
-  const messages: any[] = cleanHistory(history);
-  if (!messages.length || messages[messages.length - 1].role !== "user") return json({ error: "پیامی نیست." }, 400);
+  const turns = cleanHistory(history);
+  if (!turns.length || turns[turns.length - 1].role !== "user") return json({ error: "پیامی نیست." }, 400);
   const enc = new TextEncoder();
+  const S = sections(ctx);
+
+  // Cached prefix: tools, prompt, and everything that doesn't change while they chat.
+  const system = systemBlocks(block([S.profile(), S.targets(), S.mode(), S.foods(), S.magazine(), S.motivations(), S.reviews(), S.notes(), S.plan(), S.weights(), S.totals(S.yesterday), S.entries(S.detailFrom, S.yesterday)]));
+  // What changes by the minute goes after the conversation, so it never breaks the cache:
+  // the next message finds everything up to this one already cached.
+  const live = `<live_data>\n${block([S.now(), S.today(), S.adherence(), S.focus()])}\n</live_data>`;
+  const base: any[] = turns.map((m, i) => ({ role: m.role, content: [{ type: "text", text: m.content, ...(i === turns.length - 1 ? { cache_control: CACHE } : {}) }] }));
+  const withLive = (asSystem: boolean) => asSystem
+    ? [...base, { role: "system", content: live }]
+    : [...base.slice(0, -1), { role: "user", content: [...base[base.length - 1].content, { type: "text", text: live }] }];
+  let messages = withLive(true);
 
   const body = new ReadableStream({
     async start(controller) {
       const send = (o: unknown) => controller.enqueue(enc.encode(JSON.stringify(o) + "\n"));
+      const ask = () => {
+        const stream: any = anthropic.beta.messages.stream({
+          model: MODEL,
+          max_tokens: 16000,
+          betas: BETAS,
+          fallbacks: "default",
+          system,
+          tools: TOOLS,
+          output_config: { effort: "medium" },
+          // inside a tool loop, also cache the growing tail (the first request marks the
+          // last user message itself)
+          ...(messages.length > base.length + 1 ? { cache_control: CACHE } : {}),
+          messages,
+        } as any);
+        stream.on("text", (d: string) => send({ t: "text", v: d }));
+        return stream.finalMessage();
+      };
       try {
         for (let turn = 0; turn < 6; turn++) {
-          const stream: any = anthropic.beta.messages.stream({
-            model: MODEL,
-            max_tokens: 16000,
-            betas: BETAS,
-            fallbacks: "default",
-            system: systemBlocks(ctx),
-            tools: TOOLS,
-            output_config: { effort: "medium" },
-            cache_control: { type: "ephemeral" },
-            messages,
-          } as any);
-          stream.on("text", (d: string) => send({ t: "text", v: d }));
-          const msg: any = await stream.finalMessage();
+          let msg: any;
+          try { msg = await ask(); } catch (e) {
+            // A system message inside the conversation is rejected: send the live data as
+            // part of the user's message instead (same caching, nothing has streamed yet).
+            if (turn || !(e instanceof Anthropic.BadRequestError)) throw e;
+            console.error("chat: retrying with live data in the user turn", e);
+            messages = withLive(false);
+            msg = await ask();
+          }
+          logUsage("chat", msg);
           if (msg.stop_reason === "refusal") { send({ t: "text", v: "\n\n" + refusalText() }); break; }
           if (msg.stop_reason !== "tool_use") break;
 
@@ -520,8 +649,12 @@ function runChat(ctx: Ctx, history: any[]) {
               const ok = /^\d{4}-\d{2}-\d{2}$/.test(from) && /^\d{4}-\d{2}-\d{2}$/.test(to) && from <= to && to <= addDays(from, 61);
               const rows = ok ? (ctx.entries || []).filter(e => e.day >= from && e.day <= to).sort((a, c) => (a.day < c.day ? -1 : 1)) : [];
               results.push({ type: "tool_result", tool_use_id: b.id, is_error: !ok, content: ok ? (rows.map(entryLine).join("\n") || "nothing logged in that range") : "Invalid range: use YYYY-MM-DD, from <= to, at most 62 days." });
+            } else if (b.name === "get_article") {
+              const found = (ctx.magazine || []).filter(a => a.day === b.input?.day);
+              const full = found.filter(a => a.body);
+              results.push({ type: "tool_result", tool_use_id: b.id, is_error: !found.length, content: full.length ? full.map(articleText).join("\n\n") : found.length ? "The full text of this older article is not loaded here; you only have its title and summary. They can open it in «مجله» and tap «درباره‌ی این مقاله از هوشواره بپرس»." : "No article on that day." });
             } else if (b.name.startsWith("propose_")) {
-              send({ t: "action", v: { id: b.id, type: b.name.slice(8), ...b.input } });
+              send({ t: "action", v: { id: b.id, type: b.name.slice(8), ...realIds(b.input, S.toId) } });
               results.push({ type: "tool_result", tool_use_id: b.id, content: "Shown to the user as a card. Nothing is saved until they tap «ثبت»." });
             } else {
               results.push({ type: "tool_result", tool_use_id: b.id, is_error: true, content: "Unknown tool." });

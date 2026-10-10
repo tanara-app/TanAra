@@ -165,8 +165,8 @@ function openArticle(key) {
       </article>`;
     body.querySelector('[data-close]').onclick = () => sheet.close();
     body.querySelector('[data-ask]').onclick = () => {
-      focusArticle(key);
       startChat(`درباره‌ی مقاله‌ی «${d.title}»: `);
+      focusArticle(key); // after startChat: opening a conversation clears the previous focus
       // once the sheet's history entry is gone, so back from the chat isn't a dead step
       window.addEventListener('popstate', () => location.replace('#/ai'), { once: true });
       sheet.close();

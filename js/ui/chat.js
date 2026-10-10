@@ -1,7 +1,7 @@
 // Hooshvareh chat: talk to the AI about everything recorded in the app. It can propose
 // changes (log a food, a weight, ...) as cards; nothing is written until «ثبت» is tapped.
 import * as store from '../data/store.js';
-import { chat, ask, aiAvailable, md, sparkle } from '../ai/hooshvareh.js';
+import { chat, ask, aiAvailable, md, sparkle, focusArticle } from '../ai/hooshvareh.js';
 import { MEALS } from '../domain/stats.js';
 import { fa, esc, qtyLabel } from '../lib/fa.js';
 import { today, relLabel, faDMY, weekLabel } from '../lib/dates.js';
@@ -37,6 +37,7 @@ function loadThread() {
 }
 function setThread(id) {
   current = id;
+  focusArticle(null); // an article's full text only rides along in the conversation opened for it
   try { localStorage.setItem(THREAD_KEY, id ?? ''); } catch { /* ignore */ }
 }
 // Opens a fresh conversation with a question already typed (used by the magazine).
