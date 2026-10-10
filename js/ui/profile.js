@@ -9,6 +9,7 @@ import { sheet, toast, confirmBox, icon } from './dom.js';
 import { fieldsHtml, readFields, bindChoices, validate, medicalNoteHtml, targetsHtml } from './onboarding.js';
 import { openFoodBank } from './foodBank.js';
 import { openMotivationList, openMotivationEditor } from './motivation.js';
+import { bindVault } from './vault.js';
 
 let session = { email: null, signOut: null, local: true };
 export const setSession = s => { session = s; };
@@ -72,6 +73,8 @@ export function renderProfile(root) {
         ${s.motivations.length ? '<button class="btn grow" data-mots>مدیریت انگیزه‌ها</button>' : ''}
         <button class="btn grow" data-mot-new>افزودن انگیزه</button>
       </div>
+      <button class="btn block vault-entry" data-vault-open>${icon.lock} صندوقچه‌ی خصوصی${s.vault?.length ? ` · ${fa(s.vault.length)} مورد` : ''}</button>
+      <p class="muted small">عکس‌ها و ویدیوهای شخصی‌ای که انگیزه می‌دهند؛ با رمز شش‌رقمی باز می‌شود.</p>
     </section>
 
     <section class="card doctor-box">
@@ -115,6 +118,7 @@ export function renderProfile(root) {
   root.querySelector('[data-import]').onchange = e => doImport(e.target);
   root.querySelector('[data-mots]')?.addEventListener('click', () => openMotivationList());
   root.querySelector('[data-mot-new]').onclick = () => openMotivationEditor();
+  bindVault(root);
   root.querySelector('[data-bank]').onclick = () => openFoodBank();
   root.querySelector('[data-defaults]').onclick = () => {
     const n = store.restoreDefaultFoods();

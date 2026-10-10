@@ -69,6 +69,7 @@ Changing their data (chat only)
 - kcal and protein in propose_log_food are totals for the whole quantity eaten.
 - After proposing, tell them briefly that it is waiting for their confirmation. Never say it has been saved.
 - Use get_entries when you need individual foods from days older than the detailed window, and get_article for the full text of a magazine article before discussing its content, unless that text is already in the data.
+- «صندوقچه» is their private, PIN-locked collection of motivating photos and videos (opened from the motivation card on Today, or from «نمایه»). You only know how many items it holds and when it was last opened. When they sound discouraged, tempted to quit, or it has not been opened for a week or more, you may suggest a look inside; otherwise do not bring it up, and never guess what is in it.
 
 The two modes of the app
 - «شمارش کالری»: they log what they eat and watch calories and protein. «رژیم»: you design a two-week plan — for each of five eating occasions a list of options with set amounts, built only from their food bank — and they tick what they ate; ticking logs those foods, so both modes share one record. At the end of the two weeks they weigh in and you design the next period from the result.
@@ -80,6 +81,7 @@ type Ctx = {
   profile?: Record<string, unknown> | null;
   targets?: { kcal: number; protein: number; floor: number };
   foods?: any[]; entries?: any[]; weights?: any[]; reviews?: any[]; motivations?: any[]; notes?: any[];
+  vault?: { photos: number; videos: number; links: number; lastOpened: string | null } | null;
   mode?: string; plan?: any; magazine?: any[]; focus?: string;
 };
 
@@ -182,7 +184,7 @@ function sections(c: Ctx) {
       return `# Today so far (${c.today})\n${t.n ? `totals: ${Math.round(t.k)} kcal, ${Math.round(t.p)} g protein, ${r1(t.v)} veg servings\n${(byDay.get(c.today) || []).sort((a, b) => (a.created_at < b.created_at ? -1 : 1)).map(entryLine).join("\n")}` : "nothing logged yet today"}`;
     },
     reviews: () => `# Weekly reviews they wrote (weeks start Saturday)\n${[...(c.reviews || [])].sort((a, b) => (a.week_start < b.week_start ? -1 : 1)).map(r => `week of ${r.week_start}: good: ${r.good || "-"} / hard: ${r.hard || "-"} / next goal: ${r.next_goal || "-"}`).join("\n") || "none"}`,
-    motivations: () => `# Motivations they saved\n${(c.motivations || []).map(m => `${kinds[m.kind] || m.kind}${m.day ? ` (${m.day})` : ""}: ${m.title || "(no title)"}${m.note ? ` — ${m.note}` : ""}${m.image_path ? " [has photo]" : ""}`).join("\n") || "none"}`,
+    motivations: () => `# Motivations they saved\n${(c.motivations || []).map(m => `${kinds[m.kind] || m.kind}${m.day ? ` (${m.day})` : ""}: ${m.title || "(no title)"}${m.note ? ` — ${m.note}` : ""}${m.image_path ? " [has photo]" : ""}`).join("\n") || "none"}${c.vault ? `\nPrivate «صندوقچه» (PIN-locked; you cannot see inside): ${c.vault.photos} photos, ${c.vault.videos} videos, ${c.vault.links} links; last opened ${c.vault.lastOpened || "never on this phone"}` : ""}`,
     notes: () => `# What you (Hooshvareh) already told them outside the chat, latest last\n${[...(c.notes || [])].sort((a, b) => (a.created_at < b.created_at ? -1 : 1)).slice(-20).map(n => `${n.key}: ${n.text}`).join("\n") || "none"}`,
     magazine: () => {
       const mag = [...(c.magazine || [])].sort((a, b) => (a.day < b.day ? -1 : 1));

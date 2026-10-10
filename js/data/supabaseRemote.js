@@ -1,9 +1,10 @@
 // Supabase adapter for the store. Every table is RLS-locked to the signed-in owner and
 // fills user_id from the JWT, so the client never sends it.
 
-const CONFLICT = { profile: 'user_id', reviews: 'user_id,week_start', weights: 'user_id,day', foods: 'id', entries: 'id', motivations: 'id', chat: 'id', ai_notes: 'user_id,key' };
-const DELETE_KEY = { profile: 'user_id', foods: 'id', entries: 'id', weights: 'day', reviews: 'week_start', motivations: 'id', chat: 'id', ai_notes: 'key' };
+const CONFLICT = { profile: 'user_id', reviews: 'user_id,week_start', weights: 'user_id,day', foods: 'id', entries: 'id', motivations: 'id', chat: 'id', ai_notes: 'user_id,key', vault: 'id' };
+const DELETE_KEY = { profile: 'user_id', foods: 'id', entries: 'id', weights: 'day', reviews: 'week_start', motivations: 'id', chat: 'id', ai_notes: 'key', vault: 'id' };
 const BUCKET = 'motivation'; // private; files live under <user id>/
+const VAULT = 'vault';       // private too; the PIN-locked «صندوقچه»
 const strip = rows => rows.map(({ user_id, ...r }) => r);
 
 export function createSupabaseRemote(sb) {
@@ -31,15 +32,15 @@ export function createSupabaseRemote(sb) {
   return {
     async fetchAll() {
       try {
-        const [profile, foods, entries, weights, reviews, motivations, chat, aiNotes] = await Promise.all([
+        const [profile, foods, entries, weights, reviews, motivations, chat, aiNotes, vault] = await Promise.all([
           all('profile'), all('foods', 'created_at'), all('entries', 'created_at'), all('weights', 'day'), all('reviews', 'week_start'),
-          all('motivations', 'created_at'), all('chat', 'created_at'), all('ai_notes', 'created_at'),
+          all('motivations', 'created_at'), all('chat', 'created_at'), all('ai_notes', 'created_at'), all('vault', 'created_at'),
         ]);
         return {
           data: {
             profile: profile[0] ? strip(profile)[0] : null,
             foods: strip(foods), entries: strip(entries), weights: strip(weights), reviews: strip(reviews),
-            motivations: strip(motivations), chat: strip(chat), ai_notes: strip(aiNotes),
+            motivations: strip(motivations), chat: strip(chat), ai_notes: strip(aiNotes), vault: strip(vault),
           },
         };
       } catch (error) { return { error }; }
@@ -64,6 +65,7 @@ export function createSupabaseRemote(sb) {
     },
 
     // Used by import: wipe this user's rows, then insert the file's rows. Children first on delete.
+    // The vault is left alone: its files aren't in an export, so its rows stay with them.
     async replaceAll(data) {
       for (const t of ['entries', 'weights', 'reviews', 'motivations', 'chat', 'ai_notes', 'foods', 'profile']) {
         const { error } = await sb.from(t).delete().not('user_id', 'is', null);
@@ -97,6 +99,23 @@ export function createSupabaseRemote(sb) {
       const { data, error } = await sb.storage.from(BUCKET).createSignedUrls(paths, ttl);
       if (error) throw error;
       return data.map(d => ({ path: d.path, url: d.error ? null : d.signedUrl }));
+    },
+
+    async uploadVault(name, blob) {
+      const { data: { session } } = await sb.auth.getSession();
+      if (!session) return { error: { message: 'no session' } };
+      const path = `${session.user.id}/${name}`;
+      const { error } = await sb.storage.from(VAULT).upload(path, blob, { contentType: blob.type });
+      return error ? { error } : { path };
+    },
+
+    removeVault(paths) {
+      return sb.storage.from(VAULT).remove(paths);
+    },
+
+    // { data: Blob } or { error }
+    downloadVault(path) {
+      return sb.storage.from(VAULT).download(path);
     },
   };
 }

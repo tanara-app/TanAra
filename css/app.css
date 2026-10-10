@@ -539,6 +539,53 @@ body.kb .chat-bar { padding-bottom: 8px; }
 .toast.show { opacity: 1; transform: none; }
 body.kb .toast, body.chat-mode .toast { bottom: calc(var(--nav-h) + var(--safe-b) + 80px); }
 
+/* «صندوقچه»: PIN pad, grid, viewer */
+.mot-links { display: flex; align-items: center; gap: 16px; }
+.mot-links .link, .vault-nudge strong { display: inline-flex; align-items: center; gap: 5px; }
+.mot-links .link svg { width: 14px; height: 14px; }
+.vault-entry { margin-top: 10px; }
+.vault-nudge .row { align-items: center; margin-top: 8px; }
+.vault-nudge strong svg { color: var(--accent); }
+.pin { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 4px; padding-top: 8px; }
+.pin-lock { width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); margin-bottom: 8px; }
+.pin-lock svg { width: 24px; height: 24px; }
+.pin-hint { min-height: 1.4em; max-width: 30ch; }
+.pin-dots { display: flex; gap: 14px; direction: ltr; margin: 14px 0 6px; }
+.pin-dots i { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--line); transition: background .12s, border-color .12s; }
+.pin-dots i.on { background: var(--accent); border-color: var(--accent); }
+.pin-err { min-height: 1.5em; }
+.pin-keys { display: grid; grid-template-columns: repeat(3, 72px); gap: 14px 22px; direction: ltr; margin-top: 6px; }
+.pin-keys button {
+  height: 72px; border-radius: 50%; border: 0; background: var(--surface-2); cursor: pointer;
+  font-size: 1.6rem; font-weight: 700; display: grid; place-items: center;
+}
+.pin-keys button:active { background: var(--line); }
+.pin-keys .pin-back, .pin-keys .pin-forgot { background: none; color: var(--muted); }
+.pin-keys .pin-forgot { font-size: .78rem; font-weight: 600; line-height: 1.4; }
+.pin.shake .pin-dots { animation: pin-shake .35s; }
+@keyframes pin-shake { 25% { transform: translateX(-8px); } 50% { transform: translateX(8px); } 75% { transform: translateX(-5px); } }
+@media (max-height: 640px) { .pin-keys { grid-template-columns: repeat(3, 62px); gap: 10px 22px; } .pin-keys button { height: 62px; } }
+@media (prefers-reduced-motion: reduce) { .pin.shake .pin-dots { animation: none; } }
+
+.vault-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.vault-tile {
+  position: relative; aspect-ratio: 1; border: 0; padding: 0; border-radius: 12px; overflow: hidden;
+  background: var(--surface-2); cursor: pointer; display: grid; place-items: center;
+}
+.vault-tile img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.vault-tile img:not([src]) { visibility: hidden; }
+.vault-play { position: relative; width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: rgba(0, 0, 0, .55); color: #fff; }
+.vault-tile.k-link { align-content: center; gap: 6px; padding: 8px; color: var(--doctor); background: var(--doctor-soft); }
+.vault-tile.k-link span { color: var(--text); font-size: .78rem; line-height: 1.5; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
+.vault-empty strong { display: block; color: var(--text); margin-bottom: 4px; }
+.vault-use { display: flex; flex-direction: column; gap: 6px; margin-top: auto; }
+.vault-bar { height: 5px; border-radius: 5px; background: var(--surface-2); overflow: hidden; }
+.vault-bar i { display: block; height: 100%; border-radius: 5px; background: var(--accent); }
+.vault-busy { text-align: center; color: var(--muted); margin: 0; min-height: 48px; display: grid; place-items: center; }
+.vault-stage { display: grid; place-items: center; min-height: 200px; border-radius: 14px; background: var(--surface-2); overflow: hidden; }
+.vault-media { display: block; width: 100%; max-height: 66dvh; object-fit: contain; background: #000; }
+.vault-url { font-size: .85rem; overflow-wrap: anywhere; text-align: left; }
+
 @media (min-width: 560px) {
   .sheet { border-radius: 22px 22px 0 0; }
 }

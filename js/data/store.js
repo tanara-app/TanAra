@@ -13,10 +13,10 @@
 import { SEED_FOODS, UNIT_GRAMS, GRAM } from './seedFoods.js';
 import { parseNum } from '../lib/fa.js';
 
-export const TABLES = ['profile', 'foods', 'entries', 'weights', 'reviews', 'motivations', 'chat', 'ai_notes'];
-export const KEY = { profile: 'user_id', foods: 'id', entries: 'id', weights: 'day', reviews: 'week_start', motivations: 'id', chat: 'id', ai_notes: 'key' };
+export const TABLES = ['profile', 'foods', 'entries', 'weights', 'reviews', 'motivations', 'chat', 'ai_notes', 'vault'];
+export const KEY = { profile: 'user_id', foods: 'id', entries: 'id', weights: 'day', reviews: 'week_start', motivations: 'id', chat: 'id', ai_notes: 'key', vault: 'id' };
 
-const empty = () => ({ profile: null, foods: [], entries: [], weights: [], reviews: [], motivations: [], chat: [], ai_notes: [] });
+const empty = () => ({ profile: null, foods: [], entries: [], weights: [], reviews: [], motivations: [], chat: [], ai_notes: [], vault: [] });
 
 let ns = 'local';
 let remote = null;
@@ -63,6 +63,8 @@ export function clearLocal() {
     Object.keys(localStorage).filter(k => k.startsWith(`tanara:${ns}:`)).forEach(k => localStorage.removeItem(k));
   } catch { /* ignore */ }
   state = empty(); queue = []; urlCache = null;
+  forgetVaultFiles();
+  try { caches.delete(VAULT_CACHE); } catch { /* no Cache API */ }
 }
 
 /* ---------------- reads ---------------- */
@@ -342,6 +344,85 @@ export async function loadImageUrls(paths) {
 }
 
 /*
+  «صندوقچه»: private photos, videos and links behind a PIN (see ui/vault.js). Rows sync like
+  everything else. Files go to their own private bucket and are downloaded once per device
+  into the Cache API: a video then plays offline and doesn't use the monthly transfer again.
+  Without a remote (?local) the files live only in that cache.
+*/
+export const VAULT_MAX_FILE = 30 * 1024 * 1024; // the bucket's limit
+export const VAULT_QUOTA = 1024 ** 3;           // total storage on the free plan
+const VAULT_CACHE = 'tanara-vault';
+const vaultKey = path => `/__vault/${encodeURIComponent(path)}`;
+const vaultUrls = new Map(); // path → object URL, for as long as the vault is unlocked
+
+export const vaultUsed = () => state.vault.reduce((s, v) => s + (Number(v.size) || 0), 0);
+
+async function cacheVaultFile(path, blob) {
+  try { await (await caches.open(VAULT_CACHE)).put(vaultKey(path), new Response(blob, { headers: { 'Content-Type': blob.type } })); } catch { /* no Cache API, or the device is full */ }
+}
+
+// Resolves to the file's path, or throws with a message fit for the user.
+export async function uploadVaultFile(blob, ext) {
+  const name = `${uid()}.${ext}`;
+  let path = `local/${name}`;
+  if (remote) {
+    if (navigator.onLine === false) throw new Error('برای افزودن به صندوقچه به اینترنت وصل شوید.');
+    const res = await remote.uploadVault(name, blob).catch(e => ({ error: e }));
+    if (res.error) throw new Error(/exceed|too large|413/i.test(String(res.error.message || res.error.statusCode)) ? 'حجم این فایل بیشتر از حد مجاز است.' : 'آپلود نشد. اینترنت را بررسی کنید و دوباره امتحان کنید.');
+    path = res.path;
+  }
+  await cacheVaultFile(path, blob);
+  vaultUrls.set(path, URL.createObjectURL(blob));
+  return path;
+}
+
+// An object URL for a vault file: from memory, this device's cache, or the server (once).
+export async function vaultFileUrl(path) {
+  if (vaultUrls.has(path)) return vaultUrls.get(path);
+  let blob = null;
+  try { blob = await (await (await caches.open(VAULT_CACHE)).match(vaultKey(path)))?.blob() || null; } catch { /* no Cache API */ }
+  if (!blob) {
+    if (!remote || path.startsWith('local/')) throw new Error('این فایل روی این دستگاه نیست.');
+    const res = await remote.downloadVault(path).catch(e => ({ error: e }));
+    if (res.error || !res.data) throw new Error('دریافت نشد. اینترنت را بررسی کنید.');
+    blob = res.data;
+    cacheVaultFile(path, blob);
+  }
+  if (!vaultUrls.has(path)) vaultUrls.set(path, URL.createObjectURL(blob));
+  return vaultUrls.get(path);
+}
+
+export const vaultUrlCached = path => vaultUrls.get(path) || null;
+
+// Called when the vault locks: nothing decoded stays reachable in the page.
+export function forgetVaultFiles() {
+  vaultUrls.forEach(u => URL.revokeObjectURL(u));
+  vaultUrls.clear();
+}
+
+export function saveVaultItem(v) {
+  const row = {
+    id: uid(), kind: v.kind, path: v.path || null, thumb_path: v.thumb_path || null,
+    url: v.url || null, title: (v.title || '').trim(), size: v.size || 0, created_at: now(),
+  };
+  put('vault', row);
+  commit({ op: 'upsert', table: 'vault', row });
+  return row;
+}
+
+export function deleteVaultItem(id) {
+  const old = state.vault.find(x => x.id === id);
+  if (!old) return;
+  drop('vault', id);
+  commit({ op: 'delete', table: 'vault', key: id });
+  const paths = [old.path, old.thumb_path].filter(Boolean);
+  paths.forEach(p => { const u = vaultUrls.get(p); if (u) URL.revokeObjectURL(u); vaultUrls.delete(p); });
+  try { caches.open(VAULT_CACHE).then(c => paths.forEach(p => c.delete(vaultKey(p)))).catch(() => {}); } catch { /* no Cache API */ }
+  const stored = paths.filter(p => !p.startsWith('local/'));
+  if (remote && stored.length) remote.removeVault(stored).catch(() => {});
+}
+
+/*
   Hooshvareh (the AI): chat history and the notes it writes elsewhere (today's tip, week
   analysis, ...). Both sync like everything else; the AI itself never writes — the app does.
 */
@@ -423,7 +504,8 @@ export function importData(obj) {
     chat: Array.isArray(d.chat) ? d.chat : [],
     ai_notes: Array.isArray(d.ai_notes) ? d.ai_notes : [],
   };
-  state = structuredClone(data);
+  // the vault isn't part of an export (its files can't be), so it stays as it is
+  state = { ...structuredClone(data), vault: state.vault };
   // a full replace supersedes anything still waiting to be sent
   queue = [];
   persist(); emit();

@@ -11,6 +11,7 @@ import { icon } from './dom.js';
 import { openLogSheet, openEntrySheet } from './logFood.js';
 import { dismissed, dismiss } from './notices.js';
 import { motivationCard, bindMotivation } from './motivation.js';
+import { vaultNudge, bindVault } from './vault.js';
 import { tipCard, bindTip } from './aiCards.js';
 import { magCard, bindMag } from './magazine.js';
 import { planHtml, bindPlan } from './plan.js';
@@ -71,6 +72,7 @@ export function renderToday(root) {
     </div>
 
     ${isToday ? motivationCard() : ''}
+    ${isToday ? vaultNudge() : ''}
     ${isToday ? tipCard() : ''}
     ${isToday ? magCard() : ''}
 
@@ -137,6 +139,7 @@ export function renderToday(root) {
   const redraw = () => { if (root.querySelector('[data-mode]')) renderToday(root); };
   if (planMode) bindPlan(root, day, redraw);
   bindMotivation(root);
+  bindVault(root);
   root.querySelectorAll('[data-dismiss]').forEach(b => b.onclick = () => {
     const n = b.closest('[data-notice]');
     dismiss(n.dataset.notice, n.dataset.mark);

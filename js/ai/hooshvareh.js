@@ -10,6 +10,7 @@ import { SUPABASE_URL, SUPABASE_KEY } from '../config.js';
 import { effectiveTargets } from '../domain/targets.js';
 import { SLOTS, planOn, planEnd, previousPlan, adherence, optionText } from '../domain/plan.js';
 import { today, parse, addDays } from '../lib/dates.js';
+import { vaultSummary } from '../ui/vault.js';
 
 const URL_ = `${SUPABASE_URL}/functions/v1/hooshvareh`;
 let getToken = null; // async () => access token, or null when signed out / local mode
@@ -59,13 +60,14 @@ function context() {
     today: t,
     todayFa: new Intl.DateTimeFormat('fa-IR-u-ca-persian', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(parse(t)),
     now: `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`,
-    profile: p,
+    profile: p && (({ vault, ...rest }) => rest)(p), // the vault's PIN hash is nobody's business
     targets: p ? effectiveTargets(p) : null,
     foods: s.foods.map(({ id, name, unit, grams, kcal, protein, is_veg, created_at }) => ({ id, name, unit, grams, kcal, protein, is_veg, created_at })),
     entries: s.entries.map(({ day, meal, name, qty, unit, kcal, protein, is_veg, created_at }) => ({ day, meal, name, qty, unit, kcal, protein, is_veg, created_at })),
     weights: s.weights.map(({ day, kg }) => ({ day, kg })),
     reviews: s.reviews.map(({ week_start, good, hard, next_goal }) => ({ week_start, good, hard, next_goal })),
     motivations: s.motivations.map(({ kind, title, note, day, image_path }) => ({ kind, title, note, day, image_path: image_path ? 1 : null })),
+    vault: vaultSummary(),
     mode: p?.mode === 'plan' ? 'plan' : 'count',
     plan: planContext(s, t),
     magazine: magazineContext(s),
