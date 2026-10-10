@@ -536,6 +536,9 @@ export const removePush = endpoint => (remote ? remote.removePush(endpoint) : Pr
 // Rows of ai_usage since an ISO time, or null when they can't be read.
 export async function aiUsage(since) {
   if (!remote) return null;
-  const res = await remote.usage(since).catch(() => null);
-  return res && !res.error ? res.data : null;
+  // a Supabase query is awaitable but is not a real Promise (it has no .catch)
+  try {
+    const res = await remote.usage(since);
+    return res && !res.error ? res.data : null;
+  } catch { return null; }
 }
