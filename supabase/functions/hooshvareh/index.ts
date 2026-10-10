@@ -8,6 +8,7 @@
     review    analysis of one week + a suggested goal for next week
     progress  analysis of the weight trend
     estimate  calories / protein / weight of one unit for a food the bank doesn't have
+    photo     the foods on a photographed plate, with amounts, ready to be logged
     title     a short name for a chat conversation
     plan      a two-week diet plan: options with amounts for each meal, from the food bank
     plan_option  one more option for one meal of the current plan
@@ -24,7 +25,8 @@
       minute (the clock, today's log) goes in a message at the end, after the cache;
     - food ids are sent as short aliases, long history as weekly averages, and article
       texts only on request (get_article).
-  Each call logs its token usage (console) so the effect of a change can be checked.
+  Each call logs its token usage (console) and saves it to ai_usage, so the effect of a
+  change can be checked and the app can show what Hooshvareh costs.
 */
 import Anthropic from "npm:@anthropic-ai/sdk@0.132.1";
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
@@ -68,8 +70,15 @@ Changing their data (chat only)
 - When they tell you they ate something, weighed themselves, want a motivation saved, or want a food added to the bank, call the matching tool (one call per item). Prefer an item from their food bank (pass its food_id) and scale its numbers by quantity; otherwise estimate.
 - kcal and protein in propose_log_food are totals for the whole quantity eaten.
 - After proposing, tell them briefly that it is waiting for their confirmation. Never say it has been saved.
+- When a message comes with a photo of food, work out what is on the plate and how much (household units, or grams when a bank food is weighed), and call propose_log_food once per food, for the meal that fits the time unless they say otherwise. Say in one line what you assumed (portion size, oil); a photo hides oil, sugar and depth, so call it an estimate. If the photo is not food, say so and propose nothing. «[عکس غذا]» at the start of an earlier message of theirs means it came with a photo that you can no longer see.
 - Use get_entries when you need individual foods from days older than the detailed window, and get_article for the full text of a magazine article before discussing its content, unless that text is already in the data.
 - «صندوقچه» is their private, PIN-locked collection of motivating photos and videos (opened from the motivation card on Today, or from «نمایه»). You only know how many items it holds and when it was last opened. When they sound discouraged, tempted to quit, or it has not been opened for a week or more, you may suggest a look inside; otherwise do not bring it up, and never guess what is in it.
+
+Where they are on the road
+- The data says which phase they are in. «کاهش وزن»: the calorie target is what their body uses minus about 500. «نگهداری» (maintenance, after reaching the goal weight) and «استراحت از رژیم» (a planned two-week break in the middle of losing): the calorie target in the data is already their maintenance level, so do not push a deficit; eating at target and holding weight is the success. A diet break is optional: the evidence that it speeds up fat loss is mixed, its real use is making a long diet easier to keep up. When the goal weight is reached, congratulate them and point them to «نمایه» ← «مرحله» to switch to «نگهداری». You cannot change the phase, the goal weight or the targets yourself.
+- "Measured energy use", when the data has it, is worked out from their own log (what they ate against how their weight moved) and is more accurate for them than any formula; use it when talking about how much they burn. If the app's suggestion based on it has not been applied, they can do so in «پیشرفت».
+- Waist: they can record their waist (cm, at the navel) in «پیشرفت» every week or two. Weight standing still while the waist shrinks is real progress; say so when you see it. Waist divided by height under 0.5 is the widely used healthy mark.
+- Reminders: the app can send push reminders to log food and to weigh in (profile.reminders; set in «نمایه» ← «یادآورها»). If they keep forgetting to log or weigh, suggest turning them on.
 
 The two modes of the app
 - «شمارش کالری»: they log what they eat and watch calories and protein. «رژیم»: you design a two-week plan — for each of five eating occasions a list of options with set amounts, built only from their food bank — and they tick what they ate; ticking logs those foods, so both modes share one record. At the end of the two weeks they weigh in and you design the next period from the result.
@@ -80,7 +89,9 @@ type Ctx = {
   today: string; todayFa?: string; now?: string;
   profile?: Record<string, unknown> | null;
   targets?: { kcal: number; protein: number; floor: number };
-  foods?: any[]; entries?: any[]; weights?: any[]; reviews?: any[]; motivations?: any[]; notes?: any[];
+  foods?: any[]; entries?: any[]; weights?: any[]; waists?: any[]; reviews?: any[]; motivations?: any[]; notes?: any[];
+  phase?: { phase: string; goalKg?: number | null; breakUntil?: string | null; maintainFrom?: { day: string; kg: number } | null; lossWeeks?: number | null; maintenance?: number | null } | null;
+  energy?: any;
   vault?: { photos: number; videos: number; links: number; lastOpened: string | null } | null;
   mode?: string; plan?: any; magazine?: any[]; focus?: string;
 };
@@ -157,7 +168,21 @@ function sections(c: Ctx) {
     mode: () => `# Mode they are using now\n${c.mode === "plan" ? "رژیم (diet plan)" : "شمارش کالری (calorie counting)"}`,
     plan: () => pl ? `# Current diet plan (you designed it), ${pl.start} to ${pl.end}, for ${pl.kcal} kcal/day\n${(pl.slots || []).map((s: any) => `## ${s.slot} — they pick ${s.pick}\n${s.options.map((o: string) => `- ${o}`).join("\n")}`).join("\n")}\nFree when hungry: ${(pl.free || []).join("، ") || "-"}\nWhat you told them about it: ${pl.note || "-"}${pl.previous ? `\nPlan before it: from ${pl.previous.start}, ${pl.previous.kcal} kcal/day, ${pl.previous.adherence.done} of ${pl.previous.adherence.of} occasions eaten as planned` : ""}` : "",
     adherence: () => pl ? `# Following the plan, last 4 weeks (day | occasions eaten as planned of 5)\n${(pl.days || []).map((d: any) => `${d.day} | ${d.done}/${d.of}`).join("\n") || "none"}` : "",
-    weights: () => `# Weigh-ins (day | kg), all\n${[...(c.weights || [])].sort((a, b) => (a.day < b.day ? -1 : 1)).map(w => `${w.day} | ${r1(w.kg)}`).join("\n") || "none yet"}`,
+    weights: () => `# Weigh-ins (day | kg), all\n${[...(c.weights || [])].sort((a, b) => (a.day < b.day ? -1 : 1)).map(w => `${w.day} | ${r1(w.kg)}`).join("\n") || "none yet"}${(c.waists || []).length ? `\n\n# Waist measurements (day | cm)${(c.profile as any)?.heightCm ? `; height ${(c.profile as any).heightCm} cm` : ""}\n${[...c.waists!].sort((a, b) => (a.day < b.day ? -1 : 1)).map(w => `${w.day} | ${r1(w.cm)}`).join("\n")}` : ""}`,
+    phase: () => {
+      const ph = c.phase;
+      if (!ph) return "";
+      const goal = ph.goalKg ? `goal weight ${r1(ph.goalKg)} kg` : "no goal weight set";
+      if (ph.phase === "maintain") return `# Phase\nنگهداری (maintenance)${ph.maintainFrom ? ` since ${ph.maintainFrom.day}, holding about ${r1(ph.maintainFrom.kg)} kg` : ""}; ${goal}. The calorie target is their maintenance level.`;
+      if (ph.phase === "break") return `# Phase\nاستراحت از رژیم (diet break) until ${ph.breakUntil}: the calorie target is their maintenance level${ph.maintenance ? ` (${ph.maintenance} kcal)` : ""}; after it they go back to losing. ${goal}.`;
+      return `# Phase\nکاهش وزن (losing weight)${ph.lossWeeks != null ? `, ${ph.lossWeeks} weeks in a row so far` : ""}; ${goal}.${ph.maintenance ? ` Their maintenance level is about ${ph.maintenance} kcal.` : ""}`;
+    },
+    energy: () => {
+      const m = c.energy;
+      if (!m) return "";
+      if (!m.ready) return `# Measured energy use\nNot enough data yet: it needs ${m.needDays || 0} more fully logged days (at least two meals each) and ${m.needWeighs || 0} more weigh-ins, over three to four weeks. Until then the targets come from a formula${m.formula ? ` (about ${m.formula} kcal/day)` : ""}.`;
+      return `# Measured energy use (from their own log, ${m.from} to ${m.to})\nabout ${m.tdee} kcal/day: they ate ${m.intake} kcal/day on ${m.days} fully logged days while their weight changed ${r1(m.perWeek)} kg/week (${m.weighs} weigh-ins).${m.formula ? ` The formula had estimated ${m.formula}.` : ""}${m.clamped ? " The raw figure was further from the formula than is plausible (probably gaps in logging), so it is held within 25% of it." : ""} Their current target is based on: ${m.source || "formula"}.`;
+    },
 
     // Logged days up to `to`: one line per day for the last TOTALS_DAYS, weekly averages before.
     totals: (to = c.today) => {
@@ -230,6 +255,15 @@ const TOOLS: any[] = [
       type: "object",
       properties: { day: { type: "string", description: "YYYY-MM-DD" }, kg: { type: "number" } },
       required: ["day", "kg"],
+    },
+  },
+  {
+    name: "propose_waist",
+    description: "Propose recording a waist measurement (cm, at the level of the navel).",
+    input_schema: {
+      type: "object",
+      properties: { day: { type: "string", description: "YYYY-MM-DD" }, cm: { type: "number" } },
+      required: ["day", "cm"],
     },
   },
   {
@@ -319,15 +353,16 @@ const PLAN_RULES = `Rules for every option:
 
 // `data`: the sections this mode needs — nothing else is sent. `shared`: sections that stay
 // the same between calls made in a row (the food bank); only those are worth caching.
+// `image`: the request carries a photo (input.image, base64 JPEG) for the model to look at.
 type OneShot = {
-  effort: string; max_tokens?: number; schema: any; prompt: (i: any) => string;
+  effort: string; max_tokens?: number; schema: any; prompt: (i: any) => string; image?: boolean;
   system?: string; shared?: (S: Sections) => string[]; data?: (S: Sections, i: any) => string[];
 };
 const ONE_SHOT: Record<string, OneShot> = {
   plan: {
     effort: "medium",
     max_tokens: 20000,
-    data: (S) => [S.now(), S.profile(), S.targets(), S.mode(), S.foods(), S.plan(), S.adherence(), S.weights(), S.totals(), S.recent(), S.reviews()],
+    data: (S) => [S.now(), S.profile(), S.targets(), S.phase(), S.energy(), S.mode(), S.foods(), S.plan(), S.adherence(), S.weights(), S.totals(), S.recent(), S.reviews()],
     schema: {
       type: "object",
       properties: {
@@ -365,9 +400,9 @@ note: 2–3 short Persian sentences to them: the idea behind this plan. ${i.incl
   },
   tip: {
     effort: "low",
-    data: (S) => [S.now(), S.profile(), S.targets(), S.mode(), S.plan(), S.adherence(), S.weights(), S.totals(), S.recent(), S.reviews(), S.motivations(), S.notes()],
+    data: (S) => [S.now(), S.profile(), S.targets(), S.phase(), S.energy(), S.mode(), S.plan(), S.adherence(), S.weights(), S.totals(), S.recent(), S.reviews(), S.motivations(), S.notes()],
     schema: { type: "object", properties: { text: str() }, required: ["text"], additionalProperties: false },
-    prompt: () => `Write today's tip for the top of the Today screen: one or two short sentences (max ~35 words), one practical, evidence-based nutrition or habit tip tailored to what their recent data shows (e.g. protein below target, few vegetables, late-night snacking, gaps in logging, weight trend, an upcoming event). If there is little data, give a good general tip for starting out. Different in topic from your earlier tips. No greeting.`,
+    prompt: () => `Write today's tip for the top of the Today screen: one or two short sentences (max ~35 words), one practical, evidence-based nutrition or habit tip tailored to what their recent data shows (e.g. protein below target, few vegetables, late-night snacking, gaps in logging, weight trend, a waist that shrinks while the weight stands still, the phase they are in, an upcoming event). If there is little data, give a good general tip for starting out. Different in topic from your earlier tips. No greeting.`,
   },
   quote: {
     effort: "low",
@@ -377,7 +412,7 @@ note: 2–3 short Persian sentences to them: the idea behind this plan. ${i.incl
   },
   review: {
     effort: "medium",
-    data: (S, i) => [S.now(), S.profile(), S.targets(), S.mode(), S.plan(), S.adherence(), S.weights(), S.totals(), S.entries(String(i.week_start), addDays(String(i.week_start), 6)), S.reviews()],
+    data: (S, i) => [S.now(), S.profile(), S.targets(), S.phase(), S.mode(), S.plan(), S.adherence(), S.weights(), S.totals(), S.entries(String(i.week_start), addDays(String(i.week_start), 6)), S.reviews()],
     schema: {
       type: "object",
       properties: { analysis: str("Persian, simple Markdown, max ~110 words"), next_goal: str("one small, concrete goal, max ~14 words") },
@@ -387,9 +422,9 @@ note: 2–3 short Persian sentences to them: the idea behind this plan. ${i.incl
   },
   progress: {
     effort: "medium",
-    data: (S) => [S.now(), S.profile(), S.targets(), S.mode(), S.adherence(), S.weights(), S.totals(), S.reviews()],
+    data: (S) => [S.now(), S.profile(), S.targets(), S.phase(), S.energy(), S.mode(), S.adherence(), S.weights(), S.totals(), S.reviews()],
     schema: { type: "object", properties: { text: str("Persian, simple Markdown, max ~110 words") }, required: ["text"], additionalProperties: false },
-    prompt: () => `Analyse their weight trend for the Progress screen: the overall direction and pace (use weekly averages, not single weigh-ins — daily water swings are normal), how it relates to their eating, whether the pace is healthy (0.25–1 kg/week is a good range), and one encouraging, practical next step. If there are too few weigh-ins, say what's needed.`,
+    prompt: () => `Analyse their weight trend for the Progress screen: the overall direction and pace (use weekly averages, not single weigh-ins — daily water swings are normal), how it relates to their eating, whether the pace is healthy (0.25–1 kg/week is a good range while losing; in maintenance or on a diet break, holding steady is the aim), and one encouraging, practical next step. If there are waist measurements, read them together with the weight: a shrinking waist with a flat weight is progress. If measured energy use is in the data and differs from the formula by more than about 150 kcal, say in one sentence what that means for their target. If there are too few weigh-ins, say what's needed.`,
   },
   estimate: {
     effort: "low",
@@ -409,6 +444,40 @@ note: 2–3 short Persian sentences to them: the idea behind this plan. ${i.incl
       required: ["name", "unit", "grams", "kcal", "protein", "category", "is_veg", "note"], additionalProperties: false,
     },
     prompt: (i) => `Estimate calories, protein and the weight in grams for this food, for one household unit${i.unit ? ` (unit: ${i.unit}${i.unit === "گرم" ? " — then grams is 1 and kcal/protein are per gram" : ""})` : ""}, the way it is usually prepared and served in Iran: «${i.name}». Be realistic, slightly conservative-high rather than low. Keep kcal consistent with grams (realistic energy density). Use their food bank for consistency with similar items.`,
+  },
+  photo: {
+    effort: "medium",
+    image: true,
+    shared: (S) => [S.foods()],
+    schema: {
+      type: "object",
+      properties: {
+        items: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              name: str("Persian name of the food (the bank's name when food_id is set)"),
+              food_id: str("id from the food bank when it clearly matches, otherwise an empty string"),
+              qty: { type: "number", description: "amount in `unit`: a multiple of 0.5, or grams when unit is گرم" },
+              unit: str("the bank food's own unit, or «گرم»; for foods not in the bank, a natural Iranian household unit"),
+              kcal: { type: "number", description: "total for the whole amount" },
+              protein: { type: "number", description: "grams, total for the whole amount" },
+              is_veg: { type: "boolean", description: "counts as a vegetable serving" },
+            },
+            required: ["name", "food_id", "qty", "unit", "kcal", "protein", "is_veg"], additionalProperties: false,
+          },
+        },
+        note: str("one or two short Persian sentences: what was assumed (portion sizes, oil), or why nothing could be listed"),
+      },
+      required: ["items", "note"], additionalProperties: false,
+    },
+    prompt: (i) => `This is a photo of what they are eating${MEALS[i.meal] ? ` for ${MEALS[i.meal]}` : ""}. List each distinct food on it with a realistic estimate of how much is there, so the app can log it.${i.hint ? ` They added: «${String(i.hint).slice(0, 300)}» — trust this over what you see.` : ""}
+
+- Judge portions from the plate, cutlery, hands and other objects of known size. When a food is in their food bank, use its food_id, its exact name and its own unit (qty in multiples of 0.5), or unit «گرم» with qty in grams if weight is the more natural estimate; the app then takes the calories from the bank. For anything not in the bank leave food_id empty, pick a natural Iranian household unit and estimate kcal and protein yourself for the whole amount, the way it is usually cooked in Iran.
+- A photo hides oil, butter, sugar and how deep a dish is: be realistic, slightly on the high side rather than low. Mixed dishes (e.g. rice with stew) are separate items when the bank has them separately.
+- Do not list things that are not being eaten (cutlery, garnish, an empty dish), and do not guess at foods you cannot make out.
+- If the photo does not show food or drink, return an empty list and say so in the note.`,
   },
   title: {
     effort: "low",
@@ -434,7 +503,33 @@ function systemBlocks(stable: string, rest = "", note = "") {
   return out;
 }
 
-const logUsage = (mode: string, msg: any) => console.log(JSON.stringify({ mode, stop: msg?.stop_reason, usage: msg?.usage }));
+// Token use of one request to this function: logged per API call, and saved in one go as rows
+// of ai_usage (through the caller's own client, so RLS files them under the right person).
+type Use = { add: (mode: string, msg: any) => void; save: () => Promise<void> };
+function usageLog(sb: any): Use {
+  const rows: any[] = [];
+  return {
+    add(mode, msg) {
+      console.log(JSON.stringify({ mode, stop: msg?.stop_reason, usage: msg?.usage }));
+      const u = msg?.usage;
+      if (u) rows.push({
+        mode, input: u.input_tokens || 0, cache_read: u.cache_read_input_tokens || 0, cache_write: u.cache_creation_input_tokens || 0,
+        output: u.output_tokens || 0, searches: u.server_tool_use?.web_search_requests || 0,
+      });
+    },
+    async save() {
+      if (!rows.length) return;
+      try {
+        const { error } = await sb.from("ai_usage").insert(rows.splice(0));
+        if (error) console.error("usage not saved:", error.message);
+      } catch (e) { console.error("usage not saved", e); }
+    },
+  };
+}
+
+// A photo from the app: base64 JPEG, already shrunk on the phone.
+const okImage = (v: unknown) => typeof v === "string" && v.length > 200 && v.length < 3_000_000 && /^[A-Za-z0-9+/]+=*$/.test(v);
+const imageBlock = (data: string) => ({ type: "image", source: { type: "base64", media_type: "image/jpeg", data } });
 
 // Chat history from the app: plain text turns, oldest first. Keep it valid: starts with
 // the user, alternates, ends with the user. Long conversations drop their oldest turns
@@ -461,9 +556,11 @@ function refusalText() {
   return "متأسفم، نمی‌توانم به این یکی جواب بدهم. می‌توانی سؤالت را جور دیگری بپرسی؟";
 }
 
-async function runOneShot(mode: string, ctx: Ctx, input: any) {
+async function runOneShot(mode: string, ctx: Ctx, input: any, use: Use) {
   const m = ONE_SHOT[mode];
+  if (m.image && !okImage(input?.image)) return json({ error: "عکس درست نرسید؛ دوباره امتحان کن." }, 400);
   const S = sections(ctx);
+  const prompt = m.prompt(input || {});
   const res: any = await anthropic.beta.messages.create({
     model: MODEL,
     max_tokens: m.max_tokens || 8000,
@@ -471,9 +568,9 @@ async function runOneShot(mode: string, ctx: Ctx, input: any) {
     fallbacks: "default",
     system: m.system || systemBlocks(block(m.shared?.(S) || []), block(m.data?.(S, input || {}) || []), NOTE),
     output_config: { effort: m.effort, format: { type: "json_schema", schema: m.schema } },
-    messages: [{ role: "user", content: m.prompt(input || {}) }],
+    messages: [{ role: "user", content: m.image ? [imageBlock(input.image), { type: "text", text: prompt }] : prompt }],
   } as any);
-  logUsage(mode, res);
+  use.add(mode, res);
   if (res.stop_reason === "refusal") return json({ error: refusalText() }, 422);
   const text = res.content.filter((b: any) => b.type === "text").map((b: any) => b.text).join("");
   try { return json({ result: realIds(JSON.parse(text), S.toId) }); } catch { return json({ error: "پاسخ هوشواره ناقص بود؛ دوباره امتحان کن." }, 502); }
@@ -545,12 +642,12 @@ Research first, with web_search. Two or three focused searches are usually enoug
 Then call publish_article once. Write it like a good science journalist writing to one reader: a concrete opening, what the evidence shows, what it means in an Iranian everyday kitchen and routine, and what is still uncertain. No medical diagnosis, nothing below their safety floor, no supplements or drugs as weight-loss advice (an article may explain what the evidence says about them, including that it is weak). Name the source body in the text where it matters (e.g. «مرور کاکرین در ۲۰۲۳»), and list in "sources" only pages that appeared in your search results, with their exact URLs. Do not write the article as plain text.`;
 }
 
-async function runMagazine(ctx: Ctx, input: any) {
+async function runMagazine(ctx: Ctx, input: any, use: Use) {
   const messages: any[] = [{ role: "user", content: magazinePrompt(input || {}) }];
   const S = sections(ctx);
   // No food bank and no article list (the prompt already names the earlier titles). Cached:
   // the search loop re-reads this prefix on every step.
-  const system = systemBlocks(block([S.now(), S.profile(), S.targets(), S.mode(), S.plan(), S.adherence(), S.weights(), S.totals(), S.recent(), S.reviews()]), "", NOTE);
+  const system = systemBlocks(block([S.now(), S.profile(), S.targets(), S.phase(), S.energy(), S.mode(), S.plan(), S.adherence(), S.weights(), S.totals(), S.recent(), S.reviews()]), "", NOTE);
   const seen = new Set<string>(); // every URL the search really returned
   for (let turn = 0; turn < 5; turn++) {
     const msg: any = await (anthropic.beta.messages.stream({
@@ -565,7 +662,7 @@ async function runMagazine(ctx: Ctx, input: any) {
       ...(turn ? { cache_control: CACHE } : {}),
       messages,
     } as any) as any).finalMessage();
-    logUsage("magazine", msg);
+    use.add("magazine", msg);
     if (msg.stop_reason === "refusal") return json({ error: refusalText() }, 422);
 
     // Collect URLs from server-tool results and citations — never from the model's own prose.
@@ -589,18 +686,20 @@ async function runMagazine(ctx: Ctx, input: any) {
   return json({ error: "مقاله آماده نشد؛ دوباره امتحان کن." }, 502);
 }
 
-function runChat(ctx: Ctx, history: any[]) {
+function runChat(ctx: Ctx, history: any[], image: unknown, use: Use) {
   const turns = cleanHistory(history);
   if (!turns.length || turns[turns.length - 1].role !== "user") return json({ error: "پیامی نیست." }, 400);
   const enc = new TextEncoder();
   const S = sections(ctx);
 
   // Cached prefix: tools, prompt, and everything that doesn't change while they chat.
-  const system = systemBlocks(block([S.profile(), S.targets(), S.mode(), S.foods(), S.magazine(), S.motivations(), S.reviews(), S.notes(), S.plan(), S.weights(), S.totals(S.yesterday), S.entries(S.detailFrom, S.yesterday)]));
+  const system = systemBlocks(block([S.profile(), S.targets(), S.phase(), S.energy(), S.mode(), S.foods(), S.magazine(), S.motivations(), S.reviews(), S.notes(), S.plan(), S.weights(), S.totals(S.yesterday), S.entries(S.detailFrom, S.yesterday)]));
   // What changes by the minute goes after the conversation, so it never breaks the cache:
   // the next message finds everything up to this one already cached.
   const live = `<live_data>\n${block([S.now(), S.today(), S.adherence(), S.focus()])}\n</live_data>`;
-  const base: any[] = turns.map((m, i) => ({ role: m.role, content: [{ type: "text", text: m.content, ...(i === turns.length - 1 ? { cache_control: CACHE } : {}) }] }));
+  // A photo rides only on the message it was sent with; later turns see the «[عکس غذا]» mark.
+  const photo = okImage(image) ? [imageBlock(image as string)] : [];
+  const base: any[] = turns.map((m, i) => ({ role: m.role, content: i === turns.length - 1 ? [...photo, { type: "text", text: m.content, cache_control: CACHE }] : [{ type: "text", text: m.content }] }));
   const withLive = (asSystem: boolean) => asSystem
     ? [...base, { role: "system", content: live }]
     : [...base.slice(0, -1), { role: "user", content: [...base[base.length - 1].content, { type: "text", text: live }] }];
@@ -637,7 +736,7 @@ function runChat(ctx: Ctx, history: any[]) {
             messages = withLive(false);
             msg = await ask();
           }
-          logUsage("chat", msg);
+          use.add("chat", msg);
           if (msg.stop_reason === "refusal") { send({ t: "text", v: "\n\n" + refusalText() }); break; }
           if (msg.stop_reason !== "tool_use") break;
 
@@ -669,6 +768,7 @@ function runChat(ctx: Ctx, history: any[]) {
         console.error("chat failed", e);
         send({ t: "error", v: errorText(e) });
       } finally {
+        await use.save();
         controller.close();
       }
     },
@@ -700,13 +800,17 @@ Deno.serve(async (req) => {
   const ctx: Ctx = body?.ctx;
   if (!ctx?.today || !/^\d{4}-\d{2}-\d{2}$/.test(ctx.today)) return json({ error: "bad ctx" }, 400);
 
+  const use = usageLog(sb);
   try {
-    if (body.mode === "chat") return runChat(ctx, body.messages);
-    if (body.mode === "magazine") return await runMagazine(ctx, body.input);
-    if (ONE_SHOT[body.mode]) return await runOneShot(body.mode, ctx, body.input);
-    return json({ error: "unknown mode" }, 400);
+    if (body.mode === "chat") return runChat(ctx, body.messages, body.image, use); // saves its usage when the stream ends
+    const res = body.mode === "magazine" ? await runMagazine(ctx, body.input, use)
+      : ONE_SHOT[body.mode] ? await runOneShot(body.mode, ctx, body.input, use)
+      : json({ error: "unknown mode" }, 400);
+    await use.save();
+    return res;
   } catch (e) {
     console.error(body.mode, "failed", e);
+    await use.save();
     return json({ error: errorText(e) }, 502);
   }
 });
