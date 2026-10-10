@@ -44,10 +44,19 @@ async function generate(key, topic, refresh, quiet = false) {
   }
 }
 
+// An article is the costliest thing Hooshvareh does (web searches and a long text), so the
+// daily one stops writing itself while the last two daily articles sit unread; it starts
+// again once one of them is opened, and the button writes today's at any time.
+const UNREAD_PAUSE = 2;
+function paused() {
+  const daily = articles().filter(n => n.key.length === 14).slice(0, UNREAD_PAUSE);
+  return daily.length === UNREAD_PAUSE && daily.every(n => !n.data.read);
+}
+
 // Writes today's article once, after the first pull (so another device's isn't duplicated).
 function autoDaily(refresh) {
   const key = dailyKey();
-  if (store.note(key) || busy.has(key) || failed.has(key) || !aiOnline() || !store.syncStatus.lastPull) return;
+  if (store.note(key) || busy.has(key) || failed.has(key) || !aiOnline() || !store.syncStatus.lastPull || paused()) return;
   generate(key, '', refresh, true);
 }
 
@@ -104,7 +113,7 @@ export function renderMagazine(root) {
     ${!ok ? '<div class="note soft"><p>مجله فقط وقتی وارد حساب شده‌ای ساخته می‌شود.</p></div>' : ''}
     ${[...busy].map(([, topic]) => waiting(topic)).join('')}
     ${ok && dailyMissing ? `<section class="card">
-      <p class="muted small">${failed.get(key) ? esc(failed.get(key)) : navigator.onLine === false ? 'برای مقاله‌ی امروز به اینترنت وصل شو.' : 'مقاله‌ی امروز هنوز آماده نشده.'}</p>
+      <p class="muted small">${failed.get(key) ? esc(failed.get(key)) : navigator.onLine === false ? 'برای مقاله‌ی امروز به اینترنت وصل شو.' : paused() ? 'دو مقاله‌ی آخر را هنوز نخوانده‌ای، برای همین مقاله‌ی امروز خودکار نوشته نشد. هر وقت خواستی با این دکمه بنویسش.' : 'مقاله‌ی امروز هنوز آماده نشده.'}</p>
       <button class="btn block" data-daily>مقاله‌ی امروز را بنویس</button>
     </section>` : ''}
 

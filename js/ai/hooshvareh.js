@@ -7,9 +7,12 @@
 */
 import * as store from '../data/store.js';
 import { SUPABASE_URL, SUPABASE_KEY } from '../config.js';
-import { effectiveTargets } from '../domain/targets.js';
+import { effectiveTargets, computeTargets, phaseOn, maintenanceKcal } from '../domain/targets.js';
 import { SLOTS, planOn, planEnd, previousPlan, adherence, optionText } from '../domain/plan.js';
-import { today, parse, addDays } from '../lib/dates.js';
+import { measuredTdee } from '../domain/energy.js';
+import { lossStart } from '../domain/phase.js';
+import { sortedWeights } from '../domain/stats.js';
+import { today, parse, addDays, diffDays } from '../lib/dates.js';
 import { vaultSummary } from '../ui/vault.js';
 
 const URL_ = `${SUPABASE_URL}/functions/v1/hooshvareh`;
@@ -17,6 +20,8 @@ let getToken = null; // async () => access token, or null when signed out / loca
 export function configureAI(fn) { getToken = fn; }
 export const aiAvailable = () => !!getToken;
 export const aiOnline = () => !!getToken && navigator.onLine !== false;
+// The signed-in person's access token, for the app's other Edge Function (reminders).
+export const authToken = async () => (getToken ? getToken() : null);
 
 // The diet plan as Hooshvareh sees it: every option in plain words, plus how closely each
 // recent day followed it.
@@ -51,6 +56,28 @@ function magazineContext(s) {
   });
 }
 
+// Where they are on the road: the phase, the goal, how long they have been losing.
+function phaseContext(p, t) {
+  if (!p) return null;
+  const phase = phaseOn(p, t);
+  const since = lossStart(p);
+  return {
+    phase, goalKg: Number(p.goalKg) || null, breakUntil: phase === 'break' ? p.breakUntil : null,
+    maintainFrom: phase === 'maintain' ? p.maintainFrom || null : null,
+    lossWeeks: phase === 'loss' && since ? Math.floor(diffDays(t, since) / 7) : null,
+    maintenance: maintenanceKcal(p) || null,
+  };
+}
+
+// What the body really uses, measured from the log (or what is still missing for that).
+function energyContext(s, p, t) {
+  if (!p?.startDate) return null;
+  const w = sortedWeights(s.weights);
+  const formula = computeTargets({ ...p, weightKg: w.length ? Number(w[w.length - 1].kg) : p.targets?.baseWeight }).tdee;
+  const m = measuredTdee(s.entries, s.weights, { day: t, startDate: p.startDate, formula });
+  return { ...m, formula: Number.isFinite(formula) ? formula : null, source: p.targets?.manualKcal ? 'manual' : p.targets?.source || 'formula' };
+}
+
 function context() {
   const s = store.get();
   const p = store.profile();
@@ -65,6 +92,9 @@ function context() {
     foods: s.foods.map(({ id, name, unit, grams, kcal, protein, is_veg, created_at }) => ({ id, name, unit, grams, kcal, protein, is_veg, created_at })),
     entries: s.entries.map(({ day, meal, name, qty, unit, kcal, protein, is_veg, created_at }) => ({ day, meal, name, qty, unit, kcal, protein, is_veg, created_at })),
     weights: s.weights.map(({ day, kg }) => ({ day, kg })),
+    waists: s.waists.map(({ day, cm }) => ({ day, cm })),
+    phase: phaseContext(p, t),
+    energy: energyContext(s, p, t),
     reviews: s.reviews.map(({ week_start, good, hard, next_goal }) => ({ week_start, good, hard, next_goal })),
     motivations: s.motivations.map(({ kind, title, note, day, image_path }) => ({ kind, title, note, day, image_path: image_path ? 1 : null })),
     vault: vaultSummary(),
@@ -96,7 +126,7 @@ async function post(body) {
   return res;
 }
 
-// One-shot modes: tip, quote, review, progress, estimate, title, plan, plan_option, magazine. Resolves to the result object.
+// One-shot modes: tip, quote, review, progress, estimate, photo, title, plan, plan_option, magazine. Resolves to the result object.
 export async function ask(mode, input = {}) {
   const res = await post({ mode, input });
   const j = await res.json();
@@ -107,9 +137,10 @@ export async function ask(mode, input = {}) {
 /*
   Chat: messages are [{ role, content }] oldest first. Calls onText(delta) as the reply
   streams and onAction(proposal) for each proposed change. Resolves when the reply ends.
+  `image` (base64 JPEG) is a photo sent with the last message.
 */
-export async function chat(messages, { onText, onAction }) {
-  const res = await post({ mode: 'chat', messages });
+export async function chat(messages, { onText, onAction, image = null }) {
+  const res = await post({ mode: 'chat', messages, ...(image ? { image } : {}) });
   const reader = res.body.getReader();
   const dec = new TextDecoder();
   let buf = '';

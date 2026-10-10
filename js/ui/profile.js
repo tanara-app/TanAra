@@ -1,7 +1,8 @@
 // Profile & settings: targets, questionnaire edit, data export/import, doctor guidance, account.
 import * as store from '../data/store.js';
-import { computeTargets, effectiveTargets, clampKcal, safeFloor, hasMedicalFlag, ACTIVITY, CONDITIONS } from '../domain/targets.js';
-import { sortedWeights } from '../domain/stats.js';
+import { effectiveTargets, clampKcal, safeFloor, hasMedicalFlag, ACTIVITY, CONDITIONS } from '../domain/targets.js';
+import { sortedWeights, waistSeries } from '../domain/stats.js';
+import { nextTargets } from '../domain/energy.js';
 import { DOCTOR_SIGNS } from '../domain/safety.js';
 import { fa, kcal50, parseNum, esc } from '../lib/fa.js';
 import { today, faDMY } from '../lib/dates.js';
@@ -10,6 +11,10 @@ import { fieldsHtml, readFields, bindChoices, validate, medicalNoteHtml, targets
 import { openFoodBank } from './foodBank.js';
 import { openMotivationList, openMotivationEditor } from './motivation.js';
 import { bindVault } from './vault.js';
+import { phaseCard, bindPhase } from './phase.js';
+import { remindersCard, bindReminders } from './reminders.js';
+import { openUsage } from './usage.js';
+import { aiAvailable } from '../ai/hooshvareh.js';
 
 let session = { email: null, signOut: null, local: true };
 export const setSession = s => { session = s; };
@@ -19,12 +24,14 @@ function latestWeight() {
   return w.length ? Number(w[w.length - 1].kg) : null;
 }
 
-// Recompute from the latest logged weight. Manual overrides are cleared.
+// Recompute from the latest logged weight — and from the measured energy use once the log
+// is long enough for one (see energy.js). Manual overrides are cleared.
 export function recalcTargets() {
   const p = store.profile();
+  const s = store.get();
   const kg = latestWeight() ?? p.targets?.baseWeight;
-  const t = computeTargets({ ...p, weightKg: kg });
-  store.saveProfile({ ...p, targets: { kcal: t.kcal, protein: t.protein, baseWeight: kg, computedAt: today() } });
+  const { t } = nextTargets(p, s.entries, s.weights, kg, today());
+  store.saveProfile({ ...p, targets: { kcal: t.kcal, protein: t.protein, baseWeight: kg, computedAt: today(), tdee: t.tdee, source: t.measured ? 'measured' : 'formula' } });
   return t;
 }
 
@@ -34,6 +41,7 @@ export function renderProfile(root) {
   const eff = effectiveTargets(p);
   const kg = latestWeight();
   const st = store.syncStatus;
+  const waist = waistSeries(s.waists, p).pop()?.cm || null;
 
   root.innerHTML = `
     <header class="page-head"><h1>نمایه</h1></header>
@@ -41,7 +49,7 @@ export function renderProfile(root) {
     <section class="card">
       <h2 class="card-h">هدف‌های روزانه</h2>
       <div class="targets">
-        <div class="tile big"><span>کالری</span><b>${kcal50(eff.kcal)}</b><small>${p.targets?.manualKcal ? 'دستی' : 'محاسبه‌شده'}</small></div>
+        <div class="tile big"><span>کالری</span><b>${kcal50(eff.kcal)}</b><small>${eff.phase !== 'loss' ? 'سطح نگهداری' : p.targets?.manualKcal ? 'دستی' : p.targets?.source === 'measured' ? 'از مصرف واقعی بدنت' : 'محاسبه‌شده'}</small></div>
         <div class="tile big"><span>پروتئین</span><b>${fa(eff.protein)}</b><small>گرم${p.targets?.manualProtein ? ' · دستی' : ''}</small></div>
       </div>
       <p class="muted small">آخرین محاسبه با وزن ${fa(p.targets?.baseWeight, 1)} کیلو${p.targets?.computedAt ? `، ${faDMY(p.targets.computedAt)}` : ''}.</p>
@@ -58,13 +66,17 @@ export function renderProfile(root) {
         <div><dt>جنس</dt><dd>${p.sex === 'male' ? 'مرد' : 'زن'}</dd></div>
         <div><dt>قد</dt><dd>${fa(p.heightCm, 1)} سانتی‌متر</dd></div>
         <div><dt>آخرین وزن</dt><dd>${kg ? `${fa(kg, 1)} کیلو` : '—'}</dd></div>
-        ${p.waistCm ? `<div><dt>دور کمر</dt><dd>${fa(p.waistCm, 1)} سانتی‌متر</dd></div>` : ''}
+        ${waist ? `<div><dt>دور کمر</dt><dd>${fa(waist, 1)} سانتی‌متر</dd></div>` : ''}
         <div><dt>فعالیت</dt><dd>${ACTIVITY[p.activity]?.label || '—'}</dd></div>
         <div><dt>بیماری‌ها</dt><dd>${p.conditions?.length ? p.conditions.map(c => CONDITIONS[c]).join('، ') : 'ندارم'}</dd></div>
         ${p.medications ? `<div><dt>داروها</dt><dd>${esc(p.medications)}</dd></div>` : ''}
       </dl>
       <button class="btn block" data-edit>${icon.edit} ویرایش اطلاعات</button>
     </section>
+
+    ${phaseCard()}
+
+    ${remindersCard()}
 
     <section class="card">
       <h2 class="card-h">انگیزه‌ها</h2>
@@ -83,6 +95,12 @@ export function renderProfile(root) {
       <ul>${DOCTOR_SIGNS.map(s => `<li>${s}</li>`).join('')}</ul>
       ${hasMedicalFlag(p) ? '<p class="small muted">چون بیماری زمینه‌ای یا دارو را ثبت کرده‌اید، بهتر است پزشک‌تان در جریان رژیم باشد.</p>' : ''}
     </section>
+
+    ${aiAvailable() ? `<section class="card">
+      <h2 class="card-h">هوشواره</h2>
+      <p class="muted small">هر کاری که هوشواره می‌کند (گفت‌وگو، مجله، رژیم، تخمین غذا…) توکن مصرف می‌کند. این‌جا می‌بینی هر کدام چقدر هزینه داشته.</p>
+      <button class="btn block" data-usage>مصرف هوشواره</button>
+    </section>` : ''}
 
     <section class="card">
       <h2 class="card-h">داده‌ها</h2>
@@ -119,6 +137,9 @@ export function renderProfile(root) {
   root.querySelector('[data-mots]')?.addEventListener('click', () => openMotivationList());
   root.querySelector('[data-mot-new]').onclick = () => openMotivationEditor();
   bindVault(root);
+  bindPhase(root);
+  bindReminders(root);
+  root.querySelector('[data-usage]')?.addEventListener('click', openUsage);
   root.querySelector('[data-bank]').onclick = () => openFoodBank();
   root.querySelector('[data-defaults]').onclick = () => {
     const n = store.restoreDefaultFoods();

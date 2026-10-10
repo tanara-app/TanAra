@@ -160,7 +160,7 @@ export function renderOnboarding(root, onDone) {
         sex: d.sex, age: d.age, heightCm: d.heightCm, waistCm: d.waistCm || null,
         activity: d.activity, conditions: d.conditions, medications: (d.medications || '').trim(), edHistory: d.edHistory,
         startDate: start, onboarded: true,
-        targets: { kcal: t.kcal, protein: t.protein, baseWeight: d.weightKg, computedAt: start },
+        targets: { kcal: t.kcal, protein: t.protein, baseWeight: d.weightKg, computedAt: start, tdee: t.tdee, source: 'formula' },
       });
       store.setWeight(start, d.weightKg);
       if (!store.get().foods.length) store.seedFoods();

@@ -89,6 +89,21 @@ export function weekSummary(entries, weights, ws) {
   };
 }
 
+/*
+  Waist: measured now and then (every week or two), in cm at the level of the navel. The
+  value from the questionnaire counts as the first point, on the start day, unless that day
+  was measured again. Weight can stand still for weeks while the waist keeps shrinking.
+*/
+export function waistSeries(waists, p) {
+  const list = [...(waists || [])].map(w => ({ day: w.day, cm: Number(w.cm) }));
+  if (Number(p?.waistCm) > 0 && p.startDate && !list.some(w => w.day === p.startDate)) list.push({ day: p.startDate, cm: Number(p.waistCm) });
+  return list.sort((a, b) => (a.day < b.day ? -1 : 1));
+}
+
+// Waist ÷ height. Under 0.5 is the widely used healthy mark (e.g. NICE, 2022).
+export const WHTR_GOAL = 0.5;
+export const waistToHeight = (cm, heightCm) => (cm > 0 && heightCm > 0 ? cm / heightCm : null);
+
 // Most-logged foods of one meal in the last 60 days, with the amount used last time in that meal.
 export function frequentFoods(entries, foods, day, meal, limit = 6) {
   const from = addDays(day, -60);

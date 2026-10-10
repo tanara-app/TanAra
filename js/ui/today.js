@@ -2,6 +2,7 @@
 // calories/protein, meals, veg counter) or the diet plan (Hooshvareh's options per meal).
 import * as store from '../data/store.js';
 import { effectiveTargets } from '../domain/targets.js';
+import { phaseNotes, bindPhase, phaseLabel } from './phase.js';
 import { MEALS, entriesOn, totals, daysLoggedInWeek } from '../domain/stats.js';
 import { underEating, rapidLoss } from '../domain/safety.js';
 import { fa, kcal50, round50, esc, qtyLabel } from '../lib/fa.js';
@@ -31,7 +32,7 @@ function ring(consumed, target) {
 export function renderToday(root) {
   const s = store.get();
   const p = store.profile();
-  const t = effectiveTargets(p);
+  const t = effectiveTargets(p, day);
   const list = entriesOn(s.entries, day);
   const tot = totals(list);
   const isToday = day === today();
@@ -75,6 +76,7 @@ export function renderToday(root) {
     ${isToday ? vaultNudge() : ''}
     ${isToday ? tipCard() : ''}
     ${isToday ? magCard() : ''}
+    ${isToday ? phaseNotes() : ''}
 
     ${counting ? `<section class="card summary">
       <div class="ring-wrap">
@@ -98,6 +100,7 @@ export function renderToday(root) {
     <div class="pills">
       <div class="pill">${icon.leaf}<span>سبزی ${isToday ? 'امروز' : ''}: <b>${qtyLabel(Math.round(tot.veg * 2) / 2)}</b> وعده</span></div>
       <div class="pill"><span>این هفته <b>${fa(logged)}</b> روز ثبت کرده‌اید</span></div>
+      ${t.phase !== 'loss' ? `<div class="pill"><span>مرحله: <b>${phaseLabel(p, day)}</b></span></div>` : ''}
     </div>
 
     ${notices.map(n => `<div class="note ${n.cls || 'soft'}" data-notice="${n.key}" data-mark="${n.mark}">${n.html}<button class="link small" data-dismiss>باشه</button></div>`).join('')}
@@ -140,6 +143,7 @@ export function renderToday(root) {
   if (planMode) bindPlan(root, day, redraw);
   bindMotivation(root);
   bindVault(root);
+  bindPhase(root);
   root.querySelectorAll('[data-dismiss]').forEach(b => b.onclick = () => {
     const n = b.closest('[data-notice]');
     dismiss(n.dataset.notice, n.dataset.mark);

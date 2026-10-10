@@ -6,6 +6,7 @@ import { MEALS } from '../domain/stats.js';
 import { fa, esc, qtyLabel } from '../lib/fa.js';
 import { today, relLabel, faDMY, weekLabel } from '../lib/dates.js';
 import { toast, confirmBox, sheet, icon } from './dom.js';
+import { pickPhoto, foodPhoto, cameraIcon } from './photo.js';
 
 const SUGGESTIONS = [
   'امروز تا الان چطور پیش رفتم؟',
@@ -14,7 +15,12 @@ const SUGGESTIONS = [
   'ناهار دو کفگیر برنج با یک کفگیر قیمه خوردم',
 ];
 
+// A message sent with a photo starts with this mark, so later turns (which no longer carry
+// the photo) still say there was one. The Edge Function's prompt knows it.
+const PHOTO_MARK = '[عکس غذا]';
+
 let draft = '';
+let shot = null; // a food photo waiting to go with the next message: { b64, url }
 let live = null; // the reply being streamed: { text, actions, error, thread }
 let viewRoot = null;
 
@@ -90,6 +96,8 @@ function describe(a) {
       return `ثبت در ${MEALS[a.meal] || 'وعده'}ِ ${isISO(a.day) ? relLabel(a.day) : ''}: <b>${esc(a.name)}</b><br><small>${qtyLabel(Number(a.qty) || 1)} ${esc(a.unit || '')} · ${fa(Math.round(a.kcal))} کالری · ${fa(Math.round(a.protein * 10) / 10, 1)} گرم پروتئین</small>`;
     case 'weight':
       return `ثبت وزن <b>${fa(a.kg, 1)}</b> کیلو برای ${isISO(a.day) ? relLabel(a.day) : ''}`;
+    case 'waist':
+      return `ثبت دور کمر <b>${fa(a.cm, 1)}</b> سانتی‌متر برای ${isISO(a.day) ? relLabel(a.day) : ''}`;
     case 'motivation':
       return a.kind === 'event'
         ? `افزودن رویداد به انگیزه‌ها: <b>${esc(a.title)}</b>${isISO(a.day) ? `<br><small>${faDMY(a.day)}</small>` : ''}`
@@ -127,6 +135,10 @@ function apply(a) {
     case 'weight':
       if (!isISO(a.day) || a.day > t || !num(a.kg, 35, 350)) return 'این وزن درست نیست.';
       store.setWeight(a.day, Number(a.kg));
+      return null;
+    case 'waist':
+      if (!isISO(a.day) || a.day > t || !num(a.cm, 40, 250)) return 'این اندازه درست نیست.';
+      store.setWaist(a.day, Number(a.cm));
       return null;
     case 'motivation':
       if (!a.title) return 'متنی ندارد.';
@@ -166,7 +178,10 @@ function actionsHtml(msgId, actions) {
 }
 
 function bubble(m) {
-  if (m.role === 'user') return `<div class="msg me"><p>${esc(m.content).replace(/\n/g, '<br>')}</p></div>`;
+  if (m.role === 'user') {
+    const photo = m.content.startsWith(PHOTO_MARK);
+    return `<div class="msg me">${photo ? `<span class="shot-tag">${cameraIcon} عکس غذا</span>` : ''}<p>${esc(photo ? m.content.slice(PHOTO_MARK.length).trim() : m.content).replace(/\n/g, '<br>')}</p></div>`;
+  }
   return `<div class="msg ai">${md(m.content)}${actionsHtml(m.id, m.actions || [])}</div>`;
 }
 
@@ -199,7 +214,9 @@ function buildShell(root) {
       <button class="icon-btn" data-new aria-label="گفت‌وگوی تازه">${icon.compose}</button>
     </header>
     <div class="chat" data-scroll></div>
+    <div class="chat-shot" data-shot hidden></div>
     <form class="chat-bar" novalidate>
+      ${ok ? `<button type="button" class="attach" data-attach aria-label="فرستادن عکس غذا">${cameraIcon}</button>` : ''}
       <textarea rows="1" enterkeyhint="enter" placeholder="${ok ? 'از هوشواره بپرس…' : 'هوشواره فقط با ورود به حساب کار می‌کند'}" ${ok ? '' : 'disabled'}>${esc(draft)}</textarea>
       <button class="send" aria-label="فرستادن">${sendIcon}</button>
     </form>`;
@@ -231,6 +248,13 @@ function buildShell(root) {
   stuck = true;
   box.addEventListener('scroll', () => { stuck = nearBottom(box, 40); }, { passive: true });
 
+  root.querySelector('[data-attach]')?.addEventListener('click', async () => {
+    const file = await pickPhoto();
+    if (!file) return;
+    try { setShot(await foodPhoto(file)); } catch { toast('عکس خوانده نشد'); }
+  });
+  paintShot();
+
   root.querySelector('[data-new]').onclick = () => {
     if (!sorted().some(m => sameThread(m, current))) { ta.focus(); return; } // already a fresh one
     setThread(newId());
@@ -260,7 +284,22 @@ const nearBottom = (box, slack = 120) => box.scrollTop + box.clientHeight >= box
 
 function paintSend() {
   const b = viewRoot?.querySelector('.send');
-  if (b) b.disabled = !aiAvailable() || !!live || !draft.trim();
+  if (b) b.disabled = !aiAvailable() || !!live || !(draft.trim() || shot);
+}
+
+function setShot(next) {
+  if (shot) URL.revokeObjectURL(shot.url);
+  shot = next;
+  paintShot();
+  paintSend();
+}
+function paintShot() {
+  const box = viewRoot?.querySelector('[data-shot]');
+  if (!box) return;
+  box.hidden = !shot;
+  box.innerHTML = shot ? `<img src="${shot.url}" alt=""><span class="muted small">با پیام بعدی فرستاده می‌شود؛ هوشواره غذاها را پیدا می‌کند و برای ثبت پیشنهاد می‌دهد.</span><button type="button" class="icon-btn sm" data-shot-x aria-label="برداشتن عکس">${icon.close}</button>` : '';
+  box.querySelector('[data-shot-x]')?.addEventListener('click', () => setShot(null));
+  keepBottom();
 }
 
 function paint(forceBottom = false) {
@@ -339,9 +378,11 @@ function paintLive() {
 }
 
 async function send() {
-  const text = draft.trim();
+  const image = shot?.b64 || null;
+  const text = image ? `${PHOTO_MARK} ${draft.trim() || 'این را خوردم؛ برایم ثبتش کن.'}` : draft.trim();
   if (!text || live || !aiAvailable()) return;
   draft = '';
+  setShot(null);
   const thread = current || null;
   // History for the model: this conversation, plus what became of each proposal.
   const history = sorted().filter(m => sameThread(m, thread)).map(m => ({
@@ -358,6 +399,7 @@ async function send() {
     await chat(history, {
       onText: d => { live.text += d; cancelAnimationFrame(raf); raf = requestAnimationFrame(paintLive); },
       onAction: a => { live.actions.push(a); paintLive(); },
+      image,
     });
   } catch (e) {
     live.error = e.message;

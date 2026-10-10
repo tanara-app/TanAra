@@ -13,10 +13,10 @@
 import { SEED_FOODS, UNIT_GRAMS, GRAM } from './seedFoods.js';
 import { parseNum } from '../lib/fa.js';
 
-export const TABLES = ['profile', 'foods', 'entries', 'weights', 'reviews', 'motivations', 'chat', 'ai_notes', 'vault'];
-export const KEY = { profile: 'user_id', foods: 'id', entries: 'id', weights: 'day', reviews: 'week_start', motivations: 'id', chat: 'id', ai_notes: 'key', vault: 'id' };
+export const TABLES = ['profile', 'foods', 'entries', 'weights', 'waists', 'reviews', 'motivations', 'chat', 'ai_notes', 'vault'];
+export const KEY = { profile: 'user_id', foods: 'id', entries: 'id', weights: 'day', waists: 'day', reviews: 'week_start', motivations: 'id', chat: 'id', ai_notes: 'key', vault: 'id' };
 
-const empty = () => ({ profile: null, foods: [], entries: [], weights: [], reviews: [], motivations: [], chat: [], ai_notes: [], vault: [] });
+const empty = () => ({ profile: null, foods: [], entries: [], weights: [], waists: [], reviews: [], motivations: [], chat: [], ai_notes: [], vault: [] });
 
 let ns = 'local';
 let remote = null;
@@ -265,6 +265,19 @@ export function deleteWeight(day) {
   commit({ op: 'delete', table: 'weights', key: day });
 }
 
+// Waist in cm, at most one per day (see waistSeries in stats.js).
+export function setWaist(day, cm) {
+  const existing = state.waists.find(w => w.day === day);
+  const row = { id: existing?.id || uid(), day, cm: Math.round(Number(cm) * 10) / 10, created_at: existing?.created_at || now() };
+  put('waists', row);
+  commit({ op: 'upsert', table: 'waists', row });
+}
+
+export function deleteWaist(day) {
+  drop('waists', day);
+  commit({ op: 'delete', table: 'waists', key: day });
+}
+
 export function saveReview(r) {
   const row = { week_start: r.week_start, good: r.good || '', hard: r.hard || '', next_goal: r.next_goal || '', updated_at: now() };
   put('reviews', row);
@@ -475,6 +488,7 @@ export function exportData() {
       foods: state.foods.map(strip),
       entries: state.entries.map(strip),
       weights: state.weights.map(strip),
+      waists: state.waists.map(strip),
       reviews: state.reviews.map(strip),
       motivations: state.motivations.map(strip),
       chat: state.chat.map(strip),
@@ -499,6 +513,7 @@ export function importData(obj) {
     foods: d.foods,
     entries: d.entries.map(e => ({ ...e, food_id: foodIds.has(e.food_id) ? e.food_id : null })),
     weights: d.weights,
+    waists: Array.isArray(d.waists) ? d.waists : [], // files from before waist was tracked have none
     reviews: d.reviews,
     motivations: Array.isArray(d.motivations) ? d.motivations : [],
     chat: Array.isArray(d.chat) ? d.chat : [],
@@ -510,4 +525,17 @@ export function importData(obj) {
   queue = [];
   persist(); emit();
   if (remote) { queue.push({ op: 'replaceAll', data }); persist(); flush(); }
+}
+
+/* ---------------- this device's push subscription, and the AI's token use ---------------- */
+// Neither is part of the synced state: a subscription belongs to one browser, and the usage
+// rows are written by the Edge Function and only read here when the person asks.
+export const canPush = () => !!remote;
+export const savePush = sub => (remote ? remote.savePush(sub) : Promise.resolve({ error: { message: 'local' } }));
+export const removePush = endpoint => (remote ? remote.removePush(endpoint) : Promise.resolve({}));
+// Rows of ai_usage since an ISO time, or null when they can't be read.
+export async function aiUsage(since) {
+  if (!remote) return null;
+  const res = await remote.usage(since).catch(() => null);
+  return res && !res.error ? res.data : null;
 }

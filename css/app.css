@@ -589,3 +589,34 @@ body.kb .toast, body.chat-mode .toast { bottom: calc(var(--nav-h) + var(--safe-b
 @media (min-width: 560px) {
   .sheet { border-radius: 22px 22px 0 0; }
 }
+
+/* phase, measured energy use, waist */
+.goal-bar { margin-top: 6px; }
+.tiles.mt { margin-top: 12px; }
+.card > .tiles:last-child { margin-bottom: 0; }
+
+/* food photo: the log sheet and the chat */
+.photo-prev.shot { width: 100%; height: auto; max-height: 240px; margin: 4px 0 8px; }
+.shot-list { display: grid; gap: 4px; margin: 6px 0; }
+.shot-item { align-items: flex-start; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.shot-item:last-child { border-bottom: 0; }
+.shot-item span { display: grid; gap: 2px; }
+.shot-item small { font-size: .82rem; }
+.shot-hint { align-items: flex-end; margin: 10px 0; }
+.shot-hint .btn { flex: none; }
+.sheet-foot .ai-btn { margin-bottom: 8px; }
+.ai-btn svg, .shot-tag svg { vertical-align: -5px; }
+.attach { width: 46px; height: 46px; flex: none; border-radius: 50%; border: 1.5px solid var(--line); background: var(--surface); color: var(--muted); display: grid; place-items: center; cursor: pointer; }
+.attach:active { color: var(--ai); border-color: var(--ai); }
+.chat-shot { flex: none; width: 100%; max-width: 520px; margin: 0 auto; padding: 8px 16px 0; display: flex; align-items: center; gap: 10px; background: var(--bg); }
+.chat-shot img { width: 56px; height: 56px; border-radius: 12px; object-fit: cover; flex: none; }
+.chat-shot span { flex: 1; }
+.shot-tag { display: inline-flex; align-items: center; gap: 4px; font-size: .78rem; opacity: .8; }
+.shot-tag svg { width: 15px; height: 15px; }
+
+/* reminders and AI usage */
+.check small { display: block; font-size: .8rem; }
+.usage-list .wrow { cursor: default; }
+.usage-list .wrow span { display: grid; }
+.usage-bar { height: 4px; margin: 0 0 8px; }
+.usage-bar i { background: var(--ai); }

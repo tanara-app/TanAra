@@ -1,13 +1,16 @@
 // The food-logging sheet: frequents → search → quantity → save. Built for 2–3 taps.
+// Or one photo: Hooshvareh lists what is on the plate and it is logged after a look.
 import * as store from '../data/store.js';
 import { MEALS, frequentFoods, lastAmountFor } from '../domain/stats.js';
 import { CATEGORIES, GRAM } from '../data/seedFoods.js';
-import { norm, esc } from '../lib/fa.js';
+import { norm, esc, fa } from '../lib/fa.js';
 import { mealForNow, today } from '../lib/dates.js';
 import { sheet, toast, confirmBox, icon } from './dom.js';
 import { openFoodBank, openFoodForm } from './foodBank.js';
 import { foodMeta, amountLabel, unitFields, bindUnitFields, mountAmount } from './units.js';
 import { ask, aiAvailable, sparkle } from '../ai/hooshvareh.js';
+import { photoItems } from '../domain/photo.js';
+import { pickPhoto, foodPhoto, cameraIcon } from './photo.js';
 
 const mealSeg = meal => `<div class="seg meal-seg" data-meal>
   ${Object.entries(MEALS).map(([k, l]) => `<button type="button" data-v="${k}" class="${k === meal ? 'on' : ''}">${l}</button>`).join('')}
@@ -44,9 +47,12 @@ export function openLogSheet({ day = today(), meal = null } = {}) {
         ${mealSeg(curMeal)}
         <div class="search">${icon.search}<input type="search" placeholder="جست‌وجو در بانک غذا" value="${esc(query)}" autocomplete="off"></div>
         <div class="food-list"></div>
-        <div class="row gap sheet-foot">
-          <button class="btn grow" data-custom>غذای دلخواه</button>
-          <button class="btn grow" data-bank>بانک غذا</button>
+        <div class="sheet-foot">
+          ${aiAvailable() ? `<button class="btn block ai-btn" data-photo>${cameraIcon} عکس بگیر؛ هوشواره ثبتش می‌کند</button>` : ''}
+          <div class="row gap">
+            <button class="btn grow" data-custom>غذای دلخواه</button>
+            <button class="btn grow" data-bank>بانک غذا</button>
+          </div>
         </div>`;
       const list = body.querySelector('.food-list');
       const input = body.querySelector('input[type=search]');
@@ -86,6 +92,80 @@ export function openLogSheet({ day = today(), meal = null } = {}) {
         if (e.target.closest('[data-custom]')) drawCustom();
       });
       body.querySelector('.sheet-foot [data-custom]').onclick = drawCustom;
+      body.querySelector('[data-photo]')?.addEventListener('click', takePhoto);
+    }
+
+    /*
+      Photo → list of foods → log. The amounts come from Hooshvareh's look at the plate;
+      calories of bank foods come from the bank (photoItems). Nothing is saved before «ثبت».
+    */
+    async function takePhoto() {
+      const file = await pickPhoto();
+      if (!file || !body.isConnected) return;
+      let shot;
+      try { shot = await foodPhoto(file); } catch { return toast('عکس خوانده نشد'); }
+      readPhoto(shot, '');
+    }
+
+    async function readPhoto(shot, hint) {
+      body.innerHTML = `
+        <div class="sheet-head"><button class="icon-btn" data-back aria-label="برگشت">${icon.chevR}</button><h2>از روی عکس</h2><span></span></div>
+        <img class="photo-prev shot" src="${shot.url}" alt="">
+        <p class="muted small ai-wait"><span class="typing"><i></i><i></i><i></i></span> هوشواره دارد بشقابت را نگاه می‌کند…</p>`;
+      body.querySelector('[data-back]').onclick = drawList;
+      try {
+        const r = await ask('photo', { image: shot.b64, meal: curMeal, hint });
+        if (body.isConnected && body.querySelector('.shot')) drawPhoto(shot, r, hint);
+      } catch (e) {
+        toast(e.message);
+        if (body.isConnected && body.querySelector('.shot')) drawList();
+      }
+    }
+
+    function drawPhoto(shot, result, hint) {
+      const items = photoItems(result, store.get().foods);
+      const off = new Set();
+      body.innerHTML = `
+        <div class="sheet-head"><button class="icon-btn" data-back aria-label="برگشت">${icon.chevR}</button><h2>از روی عکس</h2><span></span></div>
+        ${mealSeg(curMeal)}
+        <img class="photo-prev shot" src="${shot.url}" alt="">
+        ${result.note ? `<p class="small ai-est-note">${sparkle(14)} ${esc(result.note)}</p>` : ''}
+        ${items.length ? `<div class="shot-list">${items.map((it, n) => `
+          <label class="check shot-item"><input type="checkbox" data-i="${n}" checked>
+            <span><b>${esc(it.name)}</b><small class="muted">${amountLabel(it.qty, it.unit)} · ${fa(it.kcal)} کالری · ${fa(it.protein, 1)} گرم پروتئین${it.bank ? '' : ' · تخمینی'}</small></span>
+          </label>`).join('')}</div>
+          <div class="preview" data-total></div>` : '<div class="empty">غذایی در این عکس پیدا نشد.</div>'}
+        <form class="row gap shot-hint" novalidate>
+          <label class="field grow"><span>چیزی اشتباه است؟ بنویس تا دوباره ببیند</span><input name="hint" value="${esc(hint)}" placeholder="مثلاً برنج دو کفگیر بود، مرغ سرخ‌شده است"></label>
+          <button class="btn">دوباره</button>
+        </form>
+        ${items.length ? '<button class="btn primary block big" data-save></button>' : ''}
+        <p class="muted small">تخمین از روی عکس تقریبی است: روغن، شکر و عمق ظرف در عکس دیده نمی‌شود. بعد از ثبت هم می‌توانی هر مورد را باز و اصلاح کنی.</p>`;
+      bindMeal(body, v => { curMeal = v; });
+      body.querySelector('[data-back]').onclick = drawList;
+      const paint = () => {
+        const on = items.filter((_, n) => !off.has(n));
+        const save = body.querySelector('[data-save]');
+        if (!save) return;
+        save.textContent = on.length ? `ثبت ${fa(on.length)} مورد` : 'موردی انتخاب نشده';
+        save.disabled = !on.length;
+        body.querySelector('[data-total]').innerHTML = `<b>${fa(on.reduce((s, i) => s + i.kcal, 0))}</b> کالری · ${fa(Math.round(on.reduce((s, i) => s + i.protein, 0)))} گرم پروتئین`;
+      };
+      paint();
+      body.querySelectorAll('.shot-item input').forEach(c => c.onchange = () => { c.checked ? off.delete(Number(c.dataset.i)) : off.add(Number(c.dataset.i)); paint(); });
+      body.querySelector('.shot-hint').onsubmit = e => {
+        e.preventDefault();
+        const h = e.target.elements.hint.value.trim();
+        if (!h) return toast('بنویس چه چیزی را درست کند');
+        readPhoto(shot, h);
+      };
+      body.querySelector('[data-save]')?.addEventListener('click', () => {
+        const on = items.filter((_, n) => !off.has(n));
+        on.forEach(({ bank, ...it }) => store.saveEntry({ day, meal: curMeal, ...it }));
+        URL.revokeObjectURL(shot.url);
+        sheet.close();
+        toast(`${fa(on.length)} مورد ثبت شد`);
+      });
     }
 
     function drawQty(food) {

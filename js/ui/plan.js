@@ -218,6 +218,11 @@ export function planHtml(day) {
       <p>وزنت را ثبت کن تا هوشواره برنامه‌ی دوره‌ی بعد را با نتیجه‌ی این دو هفته تنظیم کند. تا آن موقع همین برنامه سر جایش است.</p>
       <div class="row gap"><button class="btn primary sm" data-plan-new>برنامه‌ی دوره‌ی بعد</button><a class="btn sm" href="#/progress">ثبت وزن</a></div>
     </div>` : ''}
+    ${isToday && !over && !busy && Math.abs(plan.kcal - effectiveTargets(p, day).kcal) >= 100 ? `<div class="note soft">
+      <strong>هدف کالری‌ات عوض شده</strong>
+      <p>این برنامه برای ${fa(plan.kcal)} کالری چیده شده، ولی هدف الانت ${fa(effectiveTargets(p, day).kcal)} است. هوشواره می‌تواند برنامه‌ای با هدف تازه بچیند.</p>
+      ${aiAvailable() ? '<button class="btn sm" data-plan-new>برنامه با هدف تازه</button>' : ''}
+    </div>` : ''}
     ${fresh.length && !busy ? `<div class="note soft" data-fresh>
       <strong>غذای تازه در بانک غذا</strong>
       <p>${fresh.slice(0, 4).map(f => `«${esc(f.name)}»`).join('، ')}${fresh.length > 4 ? ' و…' : ''} را اضافه کرده‌ای. هوشواره برنامه را با ${fresh.length > 1 ? 'این‌ها' : 'این'} به‌روز کند؟</p>
