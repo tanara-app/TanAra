@@ -113,6 +113,67 @@ export function buildPlan(raw, foods, kcal, start) {
 
 export const optionBudget = (plan, key) => budgets(plan.kcal)[key] / plan.slots[key].pick;
 
+/* ---------------- swapping one food of an option ---------------- */
+
+// The option with one item put in place of another: totals redone, the title following the food.
+function withItem(option, index, it) {
+  const old = option.items[index];
+  const items = option.items.map((i, n) => (n === index ? it : i));
+  const title = option.title?.includes(old.name) ? option.title.replace(old.name, it.name).slice(0, 60) : option.title;
+  return { ...option, title, items, kcal: sum(items, 'kcal'), protein: r1(sum(items, 'protein')) };
+}
+
+/*
+  The option with its food at `index` replaced by `food`, the rest untouched. The amount is
+  worked out here: as many measurable steps of the new food as come closest to `kcal` (the
+  calories of the food it replaces). Greens that barely count keep a plain serving instead.
+  The replaced food's name stays on the item as `was`. Returns null when there is no such item.
+*/
+export function swapItem(option, index, food, kcal = option?.items?.[index]?.kcal) {
+  const old = option?.items?.[index];
+  if (!old || !food) return null;
+  const per = Number(food.kcal);
+  const plain = food.unit === old.unit ? old.qty : food.unit === GRAM ? 100 : 1;
+  const qty = isFixed(food) || !(per > 0) || !(kcal > 0) ? plain : Math.min(kcal / per, food.unit === GRAM ? 1000 : 10);
+  const it = { ...item(food, qty), was: old.was || old.name };
+  if (it.was === food.name) delete it.was;
+  return withItem(option, index, it);
+}
+
+// Undoes a swap: the item at `index` as `original` (the stored option) has it.
+export const restoreItem = (option, index, original) => (option?.items?.[index] && original?.items?.[index] ? withItem(option, index, original.items[index]) : null);
+
+export const sameItems = (a, b) => a.items.length === b.items.length && a.items.every((i, n) => i.food_id === b.items[n].food_id && i.qty === b.items[n].qty);
+
+/*
+  Bank foods worth offering in place of the option's food at `index`, without asking
+  Hooshvareh: same category and not already in the option; first the ones that share a word
+  of the name («نان سنگک» → the other breads), then the ones logged most often.
+*/
+export function swapSuggestions(option, index, foods, entries, max = 5) {
+  const old = foods.find(f => f.id === option?.items?.[index]?.food_id);
+  if (!old) return [];
+  const used = new Set(option.items.map(i => i.food_id));
+  const count = new Map();
+  for (const e of entries) if (e.food_id) count.set(e.food_id, (count.get(e.food_id) || 0) + 1);
+  const words = f => String(f.name).split(/[\s\u200c()،]+/).filter(w => w.length > 1);
+  const mine = new Set(words(old));
+  const kin = f => (words(f).some(w => mine.has(w)) ? 1 : 0);
+  return foods.filter(f => f.category === old.category && !used.has(f.id) && f.kcal > 0)
+    .sort((a, b) => kin(b) - kin(a) || (count.get(b.id) || 0) - (count.get(a.id) || 0) || a.name.localeCompare(b.name, 'fa'))
+    .slice(0, max);
+}
+
+// A day's own versions of options («فقط امروز» swaps), kept with that day's picks: { [option id]: option }.
+export const swapsOn = (notes, day) => notes.find(n => n.key === `pick:${day}`)?.data?.swaps || {};
+
+// The plan as it reads on a day: options swapped for that day only replace the stored ones.
+export function dayPlan(plan, swaps) {
+  if (!plan || !Object.keys(swaps || {}).length) return plan;
+  const slots = Object.fromEntries(Object.entries(plan.slots).map(([k, s]) => [k, { ...s, options: s.options.map(o => swaps[o.id] || o) }]));
+  return { ...plan, slots };
+}
+
 /* ---------------- reading stored plans and picks ---------------- */
 
 const plans = notes => notes.filter(n => n.kind === 'plan' && n.data?.slots).sort((a, b) => (a.data.start < b.data.start ? -1 : 1));

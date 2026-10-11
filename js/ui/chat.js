@@ -3,10 +3,13 @@
 import * as store from '../data/store.js';
 import { chat, ask, aiAvailable, md, sparkle, focusArticle } from '../ai/hooshvareh.js';
 import { MEALS } from '../domain/stats.js';
-import { fa, esc, qtyLabel } from '../lib/fa.js';
+import { SLOTS, planOn, swapsOn, swapItem } from '../domain/plan.js';
+import { fa, esc, qtyLabel, norm } from '../lib/fa.js';
 import { today, relLabel, faDMY, weekLabel } from '../lib/dates.js';
 import { toast, confirmBox, sheet, icon } from './dom.js';
 import { pickPhoto, foodPhoto, cameraIcon } from './photo.js';
+import { applySwap } from './plan.js';
+import { amountLabel } from './units.js';
 
 const SUGGESTIONS = [
   'امروز تا الان چطور پیش رفتم؟',
@@ -90,6 +93,26 @@ const isISO = d => typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d);
 
 /* ---------------- proposals ---------------- */
 
+// Where a proposed swap lands in today's plan as it is now (null when it no longer fits):
+// the option by its number, the food to replace by its name.
+function swapTarget(a) {
+  const s = store.get();
+  const stored = planOn(s.ai_notes, today())?.slots[a.slot]?.options[Number(a.option) - 1];
+  const food = s.foods.find(f => f.id === a.food_id);
+  if (!stored || !food) return null;
+  const shown = swapsOn(s.ai_notes, today())[stored.id] || stored;
+  const is = i => norm(i.name) === norm(a.from);
+  const index = stored.items.findIndex(is) >= 0 ? stored.items.findIndex(is) : shown.items.findIndex(is);
+  if (index < 0 || shown.items.some(i => i.food_id === food.id)) return null;
+  return { opt: stored.id, index, food, item: swapItem(shown, index, food, stored.items[index].kcal).items[index] };
+}
+
+// A proposal as it arrives: a swap gets the amount the app worked out, so the card can show it.
+function arrived(a) {
+  const t = a.type === 'plan_swap' && swapTarget(a);
+  return t ? { ...a, name: t.food.name, qty: t.item.qty, unit: t.item.unit } : a;
+}
+
 function describe(a) {
   switch (a.type) {
     case 'log_food':
@@ -104,6 +127,8 @@ function describe(a) {
         : `افزودن جمله به انگیزه‌ها:<br><b>«${esc(a.title)}»</b>`;
     case 'food':
       return `افزودن به بانک غذا: <b>${esc(a.name)}</b><br><small>هر ${esc(a.unit)}${a.grams && a.unit !== 'گرم' ? ` (${fa(Math.round(a.grams))} گرم)` : ''} · ${fa(Math.round(a.kcal))} کالری · ${fa(Math.round(a.protein * 10) / 10, 1)} گرم پروتئین</small>`;
+    case 'plan_swap':
+      return `جایگزینی در ${SLOTS[a.slot]?.label || 'رژیم'}: <b>${esc(a.name)}</b> به‌جای ${esc(a.from)}<br><small>${a.qty ? `${amountLabel(a.qty, a.unit)} · ` : ''}${a.scope === 'plan' ? 'از این به بعد در رژیم' : 'فقط امروز'}</small>`;
     case 'review_goal':
       return `هدف هفته‌ی بعد${isISO(a.week_start) ? ` (${weekLabel(a.week_start)})` : ''}:<br><b>${esc(a.next_goal)}</b>`;
     default:
@@ -151,6 +176,12 @@ function apply(a) {
       if (!a.name || !num(a.kcal, 0, 10000)) return 'این پیشنهاد کامل نیست.';
       store.upsertFood({ name: a.name, unit: a.unit, grams: a.grams, kcal: Number(a.kcal), protein: Number(a.protein) || 0, category: a.category, is_veg: !!a.is_veg });
       return null;
+    case 'plan_swap': {
+      const at = swapTarget(a);
+      if (!at) return 'این جایگزینی دیگر با برنامه‌ات جور نیست.';
+      applySwap({ day: t, slot: a.slot, opt: at.opt, index: at.index, food: at.food, scope: a.scope === 'plan' ? 'plan' : 'day' });
+      return null;
+    }
     case 'review_goal': {
       if (!isISO(a.week_start) || !a.next_goal) return 'این پیشنهاد کامل نیست.';
       const r = store.get().reviews.find(x => x.week_start === a.week_start) || { week_start: a.week_start };
@@ -398,7 +429,7 @@ async function send() {
   try {
     await chat(history, {
       onText: d => { live.text += d; cancelAnimationFrame(raf); raf = requestAnimationFrame(paintLive); },
-      onAction: a => { live.actions.push(a); paintLive(); },
+      onAction: a => { live.actions.push(arrived(a)); paintLive(); },
       image,
     });
   } catch (e) {

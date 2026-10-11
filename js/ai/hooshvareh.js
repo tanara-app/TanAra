@@ -126,7 +126,7 @@ async function post(body) {
   return res;
 }
 
-// One-shot modes: tip, quote, review, progress, estimate, photo, title, plan, plan_option, magazine. Resolves to the result object.
+// One-shot modes: tip, quote, review, progress, estimate, photo, title, plan, plan_option, plan_swap, magazine. Resolves to the result object.
 export async function ask(mode, input = {}) {
   const res = await post({ mode, input });
   const j = await res.json();

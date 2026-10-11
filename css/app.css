@@ -514,6 +514,7 @@ body.kb .chat-bar { padding-bottom: 8px; }
   display: grid; place-items: center; color: var(--accent-ink);
 }
 .popt.on .tick { background: var(--accent); border-color: var(--accent); }
+button.tick { padding: 0; background: transparent; cursor: pointer; }
 .tick svg { width: 16px; height: 16px; }
 .popt-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
 .popt-body strong { font-size: .95rem; }
@@ -522,6 +523,19 @@ body.kb .chat-bar { padding-bottom: 8px; }
 .popt-body li span { color: var(--muted); min-width: 0; }
 .popt-body li b { font-weight: 600; white-space: nowrap; }
 .popt-body li small { color: var(--muted); font-weight: 400; }
+.popt-body li { align-items: center; }
+.popt-body li span { flex: 1; }
+.popt-body li .was { display: block; font-size: .76rem; color: var(--ai); }
+.popt-body li.new span, .popt-body li.new b { color: var(--accent); font-weight: 700; }
+.swap-btn {
+  flex: none; width: 32px; height: 32px; margin: -3px 0; margin-inline-end: -6px; border: 0; border-radius: 50%; background: transparent;
+  color: var(--muted); display: grid; place-items: center; cursor: pointer;
+}
+.swap-btn:active { background: var(--surface-2); color: var(--text); }
+.swap-prev { cursor: default; margin: 4px 0 12px; }
+.swap-hint { margin-top: 12px; text-align: center; }
+.swap-go { margin-top: 14px; }
+.food-list .ai-btn { margin-top: 12px; }
 .ai-more { display: inline-flex; align-items: center; gap: 4px; margin-top: 12px; color: var(--ai); }
 .pills.free { margin: 8px 0 0; }
 .pills.free .pill { background: var(--surface-2); }

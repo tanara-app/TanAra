@@ -1,5 +1,5 @@
 import { suite, test, eq, ok, near } from './harness.js';
-import { budgets, fitOption, buildPlan, optionBudget, planOn, previousPlan, planEnd, planDayNo, planOver, picksOn, dayAdherence, adherence, newFoods, optionText, SLOTS } from '../js/domain/plan.js';
+import { budgets, fitOption, buildPlan, optionBudget, planOn, previousPlan, planEnd, planDayNo, planOver, picksOn, dayAdherence, adherence, newFoods, optionText, swapItem, restoreItem, sameItems, swapSuggestions, swapsOn, dayPlan, SLOTS } from '../js/domain/plan.js';
 
 const food = (id, unit, kcal, protein = 0, extra = {}) => ({ id, name: id, unit, kcal, protein, grams: 100, is_veg: false, created_at: '2026-01-01T00:00:00Z', ...extra });
 const FOODS = [
@@ -111,5 +111,66 @@ suite('plan', () => {
 
   test('plain text of an option', () => {
     eq(optionText(plan.slots.lunch.options[0]), '3 کفگیر rice + 2 کفگیر stew');
+  });
+
+  test('swapping one food keeps the rest and matches the calories in measurable steps', () => {
+    const o = fitOption(opt(['bread', 3], ['egg', 2], ['salad', 1]), byId, 420, 'b');
+    const barley = food('barley', 'برش', 60, 2);
+    const n = swapItem(o, 0, barley); // 240 kcal of bread → 4 slices
+    eq(n.items.map(i => [i.name, i.qty]), [['barley', 4], ['egg', 2], ['salad', 1]]);
+    eq([n.id, n.kcal, n.protein, n.items[0].was], ['b', 420, 21, 'bread']);
+    eq(o.items[0].name, 'bread'); // the original is not touched
+    eq(swapItem(o, 0, food('odd', 'عدد', 70)).items[0].qty, 3.5); // 240 / 70 = 3.4 → nearest half
+    eq(swapItem(o, 1, byId.get('cheese')).items[1].qty, 60); // weighed foods in 5 g steps
+    eq(swapItem(o, 0, byId.get('cake')).items[0].qty, 1); // 240 / 300 → one slice (never below half)
+    eq(swapItem(o, 5, barley), null);
+  });
+
+  test('a swap of a swap aims at the original calories and forgets itself when undone', () => {
+    const o = fitOption(opt(['bread', 3], ['egg', 2]), byId, 390, 'b');
+    const cake = swapItem(o, 0, byId.get('cake')); // 300 kcal now
+    const rice = swapItem(cake, 0, byId.get('rice'), o.items[0].kcal);
+    eq([rice.items[0].qty, rice.items[0].was], [2.5, 'bread']);
+    const back = swapItem(rice, 0, byId.get('bread'), o.items[0].kcal);
+    eq([back.items[0].qty, back.items[0].was, back.kcal], [3, undefined, o.kcal]);
+    ok(sameItems(back, o) && !sameItems(rice, o));
+    eq(restoreItem(rice, 0, o), o);
+    eq(restoreItem(rice, 4, o), null);
+  });
+
+  test('greens get a plain serving, not their weight in calories; the title follows the food', () => {
+    const o = { ...fitOption(opt(['bread', 3], ['salad', 2]), byId, 300, 'b'), title: 'bread و سالاد' };
+    const leaf = food('leaf', 'گرم', 0.2, 0, { is_veg: true, grams: 1 });
+    eq(swapItem(o, 0, leaf).items[0].qty, 100);
+    eq(swapItem(o, 1, food('herbs', 'کاسه', 20, 1, { is_veg: true })).items[1].qty, 2);
+    eq(swapItem(o, 0, byId.get('rice')).title, 'rice و سالاد');
+  });
+
+  test('suggestions: same category, not already in the option, most eaten first', () => {
+    const bank = [
+      food('sangak', 'کف‌دست', 80, 3, { category: 'grain' }), food('barley', 'برش', 60, 2, { category: 'grain' }),
+      food('lavash', 'کف‌دست', 50, 2, { category: 'grain' }), food('rice', 'کفگیر', 100, 2, { category: 'grain' }),
+      food('feta', 'گرم', 2.5, 0.2, { category: 'dairy' }),
+    ];
+    const o = fitOption(opt(['sangak', 2], ['feta', 40], ['rice', 1]), new Map(bank.map(f => [f.id, f])), 360, 'b');
+    const log = [{ food_id: 'lavash' }, { food_id: 'lavash' }, { food_id: 'barley' }, { food_id: null }];
+    eq(swapSuggestions(o, 0, bank, log).map(f => f.id), ['lavash', 'barley']);
+    eq(swapSuggestions(o, 1, bank, log), []);
+    eq(swapSuggestions(o, 0, bank.slice(1), log), []); // the food is no longer in the bank
+    const breads = [food('نان سنگک', 'کف‌دست', 80, 3, { category: 'grain' }), food('برنج', 'کفگیر', 100, 2, { category: 'grain' }), food('نان جو', 'برش', 60, 2, { category: 'grain' })];
+    const b = fitOption(opt(['نان سنگک', 2]), new Map(breads.map(f => [f.id, f])), 160, 'b');
+    eq(swapSuggestions(b, 0, breads, [{ food_id: 'برنج' }]).map(f => f.id), ['نان جو', 'برنج']); // a namesake comes before a habit
+  });
+
+  test('a swap for one day changes that day only', () => {
+    const o = plan.slots.lunch.options[0];
+    const mine = swapItem(o, 0, byId.get('bread'));
+    const day = [...notes, { key: 'pick:2026-02-03', kind: 'pick', data: { slots: {}, swaps: { [o.id]: mine, gone: mine } } }];
+    eq(swapsOn(day, '2026-02-02'), {});
+    eq(dayPlan(plan, swapsOn(day, '2026-02-02')), plan);
+    const p = dayPlan(plan, swapsOn(day, '2026-02-03'));
+    eq(p.slots.lunch.options[0].items[0].name, 'bread');
+    eq(p.slots.lunch.options.length, plan.slots.lunch.options.length);
+    eq(plan.slots.lunch.options[0].items[0].name, 'rice');
   });
 });

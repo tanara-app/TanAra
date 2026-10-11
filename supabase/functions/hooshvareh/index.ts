@@ -12,6 +12,7 @@
     title     a short name for a chat conversation
     plan      a two-week diet plan: options with amounts for each meal, from the food bank
     plan_option  one more option for one meal of the current plan
+    plan_swap    foods that can replace one food inside an option of the plan
     magazine  one magazine article, researched with real web search limited to trusted
               health sources; every source link shown comes from the search results
 
@@ -83,7 +84,7 @@ Where they are on the road
 The two modes of the app
 - «شمارش کالری»: they log what they eat and watch calories and protein. «رژیم»: you design a two-week plan — for each of five eating occasions a list of options with set amounts, built only from their food bank — and they tick what they ate; ticking logs those foods, so both modes share one record. At the end of the two weeks they weigh in and you design the next period from the result.
 - «مجله» is a tab where you publish one researched article a day for them, with links to the sources. The data lists those articles; when they ask about one, answer from its text and sources, and do not invent studies beyond them.
-- When the data has a diet plan, answer questions about what to eat from it, and treat days that followed it as a success even if calories were not counted. You cannot change the plan from the chat: for another choice in a meal point them to «یک گزینه‌ی دیگر» under that meal, and for a whole new plan to «برنامه‌ی تازه» on the Today screen.`;
+- When the data has a diet plan, answer questions about what to eat from it, and treat days that followed it as a success even if calories were not counted. You cannot rewrite the plan from the chat, with one exception: when they like an option but don't have or don't want ONE food in it, propose a replacement with propose_plan_swap — a food from their bank that plays the same role in the meal (bread for bread, a protein source for a protein source) — and say in a few words why it fits. The app works out the amount itself so the calories stay the same; don't promise an exact amount. If they didn't say whether it is just for today or for good, propose it for today. They can do the same themselves with the swap button beside each food of an option. For a whole different choice in a meal point them to «یک گزینه‌ی دیگر» under that meal, and for a whole new plan to «برنامه‌ی تازه» on the Today screen.`;
 
 type Ctx = {
   today: string; todayFa?: string; now?: string;
@@ -166,7 +167,7 @@ function sections(c: Ctx) {
     profile: () => `# Profile (from the onboarding questionnaire)\n${JSON.stringify(c.profile || {})}`,
     targets: () => c.targets ? `# Daily targets\ncalories: ${c.targets.kcal} kcal, protein: ${c.targets.protein} g, safety floor (never go below): ${c.targets.floor} kcal` : "",
     mode: () => `# Mode they are using now\n${c.mode === "plan" ? "رژیم (diet plan)" : "شمارش کالری (calorie counting)"}`,
-    plan: () => pl ? `# Current diet plan (you designed it), ${pl.start} to ${pl.end}, for ${pl.kcal} kcal/day\n${(pl.slots || []).map((s: any) => `## ${s.slot} — they pick ${s.pick}\n${s.options.map((o: string) => `- ${o}`).join("\n")}`).join("\n")}\nFree when hungry: ${(pl.free || []).join("، ") || "-"}\nWhat you told them about it: ${pl.note || "-"}${pl.previous ? `\nPlan before it: from ${pl.previous.start}, ${pl.previous.kcal} kcal/day, ${pl.previous.adherence.done} of ${pl.previous.adherence.of} occasions eaten as planned` : ""}` : "",
+    plan: () => pl ? `# Current diet plan (you designed it), ${pl.start} to ${pl.end}, for ${pl.kcal} kcal/day\n${(pl.slots || []).map((s: any) => `## ${s.slot} — they pick ${s.pick}\n${s.options.map((o: string, n: number) => `${n + 1}. ${o}`).join("\n")}`).join("\n")}\nFree when hungry: ${(pl.free || []).join("، ") || "-"}\nWhat you told them about it: ${pl.note || "-"}${pl.previous ? `\nPlan before it: from ${pl.previous.start}, ${pl.previous.kcal} kcal/day, ${pl.previous.adherence.done} of ${pl.previous.adherence.of} occasions eaten as planned` : ""}` : "",
     adherence: () => pl ? `# Following the plan, last 4 weeks (day | occasions eaten as planned of 5)\n${(pl.days || []).map((d: any) => `${d.day} | ${d.done}/${d.of}`).join("\n") || "none"}` : "",
     weights: () => `# Weigh-ins (day | kg), all\n${[...(c.weights || [])].sort((a, b) => (a.day < b.day ? -1 : 1)).map(w => `${w.day} | ${r1(w.kg)}`).join("\n") || "none yet"}${(c.waists || []).length ? `\n\n# Waist measurements (day | cm)${(c.profile as any)?.heightCm ? `; height ${(c.profile as any).heightCm} cm` : ""}\n${[...c.waists!].sort((a, b) => (a.day < b.day ? -1 : 1)).map(w => `${w.day} | ${r1(w.cm)}`).join("\n")}` : ""}`,
     phase: () => {
@@ -305,6 +306,22 @@ const TOOLS: any[] = [
     },
   },
   {
+    name: "propose_plan_swap",
+    description: "Propose replacing ONE food inside one option of their current diet plan with another food from their food bank; the rest of the option stays. The app sets the amount itself (same calories as the food it replaces). Shown as a card; applied only if they confirm.",
+    input_schema: {
+      type: "object",
+      properties: {
+        slot: { type: "string", enum: ["breakfast", "snack1", "lunch", "snack2", "dinner"], description: "the eating occasion; snack1 is میان‌وعده‌ی صبح, snack2 is میان‌وعده‌ی عصر" },
+        option: { type: "integer", description: "the option's number in that occasion, as listed in the plan" },
+        from: { type: "string", description: "name of the food to replace, exactly as written in the option" },
+        food_id: { type: "string", description: "id of the replacement, from the food bank" },
+        name: { type: "string", description: "the replacement's name, as in the food bank" },
+        scope: { type: "string", enum: ["today", "plan"], description: "today: only today's version of the option; plan: the option changes for the rest of the plan" },
+      },
+      required: ["slot", "option", "from", "food_id", "name", "scope"],
+    },
+  },
+  {
     name: "get_entries",
     description: "Every food logged between two days (inclusive), for days older than the detailed window. At most 62 days per call.",
     input_schema: {
@@ -397,6 +414,21 @@ note: 2–3 short Persian sentences to them: the idea behind this plan. ${i.incl
     data: (S) => [S.plan()],
     schema: planOption,
     prompt: (i) => `They have none of the current options for «${i.slot}» at hand or don't feel like them. Give ONE more option for that occasion of their diet plan, worth about ${i.kcal} kcal, clearly different from these existing ones:\n${(i.existing || []).map((o: string) => `- ${o}`).join("\n")}\n\n${PLAN_RULES}`,
+  },
+  plan_swap: {
+    effort: "low",
+    shared: (S) => [S.profile(), S.targets(), S.foods()],
+    schema: {
+      type: "object",
+      properties: {
+        foods: {
+          type: "array",
+          items: { type: "object", properties: { food_id: str("exact id from the food bank"), why: str("2–5 Persian words: why it fits") }, required: ["food_id", "why"], additionalProperties: false },
+        },
+      },
+      required: ["foods"], additionalProperties: false,
+    },
+    prompt: (i) => `In their diet plan, one option for «${i.slot}» is: ${i.option}. They like it but don't have «${i.food}» or don't want it, and want to replace only that food (about ${Math.round(Number(i.kcal)) || "?"} kcal of it); the rest stays. Suggest up to 3 foods from their food bank that can take its place: the same role in the meal (bread for bread, a protein source for a protein source, fruit for fruit), a natural fit with the rest of the option, and not already in it. Best first. The app sets the amounts itself (same calories), so give only the foods. Respect profile.planPrefs (dislikes, allergies, notes) and medical conditions in the profile strictly. If nothing in the bank fits, return an empty list.`,
   },
   tip: {
     effort: "low",
