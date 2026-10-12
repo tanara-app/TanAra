@@ -2,7 +2,8 @@
   هوشواره — TanAra's AI. One endpoint, several modes:
 
     chat      streamed reply (NDJSON lines) with tools that *propose* changes; the app
-              shows each proposal as a card and only writes it after the user taps «ثبت».
+              shows each proposal as a card and only writes it after the user confirms. It can
+              propose new records and also corrections (edit / delete) of existing ones.
     tip       today's short tip for the Today screen
     quote     a motivational sentence for the Motivation section
     review    analysis of one week + a suggested goal for next week
@@ -67,10 +68,13 @@ Nutrition and safety
 - Be kind about slips. No guilt, no moralising about food.
 
 Changing their data (chat only)
-- You cannot write anything yourself. You can only propose, with the propose_* tools; the app shows each proposal as a card and saves it only if the person taps «ثبت».
+- You cannot write anything yourself. You can only propose, with the propose_* tools; the app shows each proposal as a card and applies it only if the person confirms it there.
 - When they tell you they ate something, weighed themselves, want a motivation saved, or want a food added to the bank, call the matching tool (one call per item). Prefer an item from their food bank (pass its food_id) and scale its numbers by quantity; otherwise estimate.
 - kcal and protein in propose_log_food are totals for the whole quantity eaten.
 - After proposing, tell them briefly that it is waiting for their confirmation. Never say it has been saved.
+- You can also correct what is already recorded. A logged food: propose_edit_entry or propose_delete_entry (name it by its day, meal and name exactly as logged; in "to" give only what changes; a new qty alone keeps the same calories per unit). A food in the bank with a wrong number, unit weight or vegetable flag: propose_edit_food (fix_logged also corrects the name and vegetable flag on everything already logged from it; the calories of past entries stay as they were). A wrong weigh-in or waist: propose_delete_measurement, or to change the value just propose it again for the same day. Foods ticked from the diet plan are ordinary entries and can be corrected the same way.
+- When you notice a mistake in the record yourself (a food wrongly counted as a vegetable, an obvious duplicate, an impossible amount, a meal on the wrong day), say what you see and propose the fix in the same reply instead of only mentioning it. Never tell them you cannot edit past records. If a mistake comes from the food bank, fix it there (with fix_logged) so it does not come back.
+- What you still cannot change: the profile, the targets, the phase and goal weight, the reminders, the text of their weekly reviews, saved motivations, and the plan beyond a single swap. Say where in the app they can do it.
 - When a message comes with a photo of food, work out what is on the plate and how much (household units, or grams when a bank food is weighed), and call propose_log_food once per food, for the meal that fits the time unless they say otherwise. Say in one line what you assumed (portion size, oil); a photo hides oil, sugar and depth, so call it an estimate. If the photo is not food, say so and propose nothing. «[عکس غذا]» at the start of an earlier message of theirs means it came with a photo that you can no longer see.
 - Use get_entries when you need individual foods from days older than the detailed window, and get_article for the full text of a magazine article before discussing its content, unless that text is already in the data.
 - «صندوقچه» is their private, PIN-locked collection of motivating photos and videos (opened from the motivation card on Today, or from «نمایه»). You only know how many items it holds and when it was last opened. When they sound discouraged, tempted to quit, or it has not been opened for a week or more, you may suggest a look inside; otherwise do not bring it up, and never guess what is in it.
@@ -322,6 +326,80 @@ const TOOLS: any[] = [
     },
   },
   {
+    name: "propose_edit_entry",
+    description: "Propose correcting one food that is already logged: its amount, calories, protein, vegetable flag, meal, day or name. Shown as a card with before and after; applied only if they confirm.",
+    input_schema: {
+      type: "object",
+      properties: {
+        day: { type: "string", description: "the day it is logged on now, YYYY-MM-DD" },
+        meal: { type: "string", enum: ["breakfast", "lunch", "dinner", "snack"], description: "the meal it is logged in now" },
+        name: { type: "string", description: "its name exactly as logged" },
+        qty: { type: "number", description: "its current qty; only needed when the same food is logged more than once in that meal" },
+        to: {
+          type: "object",
+          description: "only the fields that change",
+          properties: {
+            day: { type: "string", description: "YYYY-MM-DD" },
+            meal: { type: "string", enum: ["breakfast", "lunch", "dinner", "snack"] },
+            name: { type: "string" },
+            qty: { type: "number" },
+            unit: { type: "string" },
+            kcal: { type: "number", description: "total for the whole quantity; leave out to scale with qty" },
+            protein: { type: "number", description: "grams, total for the whole quantity; leave out to scale with qty" },
+            is_veg: { type: "boolean" },
+          },
+        },
+      },
+      required: ["day", "meal", "name", "to"],
+    },
+  },
+  {
+    name: "propose_delete_entry",
+    description: "Propose deleting one logged food (a duplicate, or something they did not eat). Shown as a card; deleted only if they confirm.",
+    input_schema: {
+      type: "object",
+      properties: {
+        day: { type: "string", description: "YYYY-MM-DD" },
+        meal: { type: "string", enum: ["breakfast", "lunch", "dinner", "snack"] },
+        name: { type: "string", description: "its name exactly as logged" },
+        qty: { type: "number", description: "its qty; only needed when the same food is logged more than once in that meal" },
+      },
+      required: ["day", "meal", "name"],
+    },
+  },
+  {
+    name: "propose_edit_food",
+    description: "Propose correcting a food in their food bank (values are for one unit). Shown as a card with before and after; applied only if they confirm.",
+    input_schema: {
+      type: "object",
+      properties: {
+        food_id: { type: "string", description: "id from the food bank" },
+        to: {
+          type: "object",
+          description: "only the fields that change",
+          properties: {
+            name: { type: "string" }, unit: { type: "string" },
+            grams: { type: "number", description: "weight in grams of one unit" },
+            kcal: { type: "number", description: "per one unit" }, protein: { type: "number", description: "grams per one unit" },
+            category: { type: "string", enum: ["grain", "stew", "protein", "legume", "breakfast", "dairy", "fruit", "veg", "nuts", "drink", "sweet", "other"] },
+            is_veg: { type: "boolean", description: "counts as a vegetable serving" },
+          },
+        },
+        fix_logged: { type: "boolean", description: "also apply a changed name or vegetable flag to everything already logged from this food" },
+      },
+      required: ["food_id", "to", "fix_logged"],
+    },
+  },
+  {
+    name: "propose_delete_measurement",
+    description: "Propose deleting a wrong weigh-in or waist measurement. To change its value instead, call propose_weight / propose_waist for the same day.",
+    input_schema: {
+      type: "object",
+      properties: { kind: { type: "string", enum: ["weight", "waist"] }, day: { type: "string", description: "YYYY-MM-DD" } },
+      required: ["kind", "day"],
+    },
+  },
+  {
     name: "get_entries",
     description: "Every food logged between two days (inclusive), for days older than the detailed window. At most 62 days per call.",
     input_schema: {
@@ -340,6 +418,62 @@ const TOOLS: any[] = [
     },
   },
 ];
+
+// Corrections name an existing record the way the model sees it (day, meal, name; a bank
+// alias; a day). Each is resolved here against what the app sent, so the card carries the
+// real id and the values before the change, and a miss goes back to the model as an error
+// it can fix. Returns null for any other tool.
+const ISO = /^\d{4}-\d{2}-\d{2}$/;
+// same folding as the app's search (norm in js/lib/fa.js), so a retyped name still matches
+const fold = (s: unknown) => String(s ?? "").replace(/ي/g, "ی").replace(/ك/g, "ک").replace(/[ۀة]/g, "ه").replace(/[أإآ]/g, "ا").replace(/[\u064B-\u0652\u200C\s-]/g, "").toLowerCase();
+const ENTRY_FIELDS = ["day", "meal", "name", "qty", "unit", "kcal", "protein", "is_veg"];
+const FOOD_FIELDS = ["name", "unit", "grams", "kcal", "protein", "category", "is_veg"];
+const pick = (o: any, fields: string[]) => Object.fromEntries(fields.map(f => [f, o[f] ?? null]));
+// the fields of `to` that really differ from the record
+function changed(was: any, to: any, fields: string[]) {
+  const same = (a: any, b: any) => typeof b === "number" ? Math.abs(Number(a) - b) < 0.05 : typeof b === "boolean" ? !!a === b : String(a ?? "").trim() === String(b).trim();
+  return Object.fromEntries(fields.filter(f => to?.[f] != null && !same(was[f], to[f])).map(f => [f, typeof to[f] === "string" ? to[f].trim() : to[f]]));
+}
+function findEntry(c: Ctx, q: any) {
+  const named = (c.entries || []).filter(e => e.id && e.day === q?.day && fold(e.name) === fold(q?.name));
+  const pool = named.some(e => e.meal === q?.meal) ? named.filter(e => e.meal === q.meal) : named;
+  return pool.find(e => Number(e.qty) === Number(q?.qty)) || pool[0] || null;
+}
+function correction(tool: string, input: any, c: Ctx, toId: Map<string, string>): { action?: any; error?: string } | null {
+  if (tool === "propose_edit_entry" || tool === "propose_delete_entry") {
+    const e = findEntry(c, input);
+    if (!e) {
+      const that = (c.entries || []).filter(x => x.day === input?.day);
+      return { error: `No logged food with that name on ${input?.day}. Logged on that day:\n${that.map(entryLine).join("\n") || "nothing"}` };
+    }
+    const was = pick(e, ENTRY_FIELDS);
+    if (tool === "propose_delete_entry") return { action: { type: "delete_entry", entry_id: e.id, was } };
+    const to = { ...(input.to || {}) };
+    // a new amount on its own keeps the same calories and protein per unit
+    const k = to.qty != null && (to.unit == null || to.unit === e.unit) && Number(e.qty) > 0 ? Number(to.qty) / Number(e.qty) : null;
+    if (k != null && to.kcal == null) to.kcal = Math.round(Number(e.kcal) * k);
+    if (k != null && to.protein == null) to.protein = r1(Number(e.protein) * k);
+    const set = changed(e, to, ENTRY_FIELDS);
+    if (!Object.keys(set).length) return { error: "Nothing would change: the entry already has these values." };
+    if (set.day && (!ISO.test(set.day) || set.day > c.today)) return { error: "day must be YYYY-MM-DD and not in the future." };
+    if (set.meal && !MEALS[set.meal]) return { error: "Unknown meal." };
+    return { action: { type: "edit_entry", entry_id: e.id, was, set } };
+  }
+  if (tool === "propose_edit_food") {
+    const f = (c.foods || []).find(x => x.id === toId.get(String(input?.food_id)));
+    if (!f) return { error: "No food with that id in the food bank." };
+    const set = changed(f, input.to, FOOD_FIELDS);
+    if (!Object.keys(set).length) return { error: "Nothing would change: the food already has these values." };
+    return { action: { type: "edit_food", food_id: f.id, was: pick(f, FOOD_FIELDS), set, fix_logged: !!input.fix_logged && ("is_veg" in set || "name" in set) } };
+  }
+  if (tool === "propose_delete_measurement") {
+    const waist = input?.kind === "waist";
+    const row = ((waist ? c.waists : c.weights) || []).find(w => w.day === input?.day);
+    if (!row) return { error: `No ${waist ? "waist measurement" : "weigh-in"} on ${input?.day}.` };
+    return { action: waist ? { type: "delete_waist", day: row.day, cm: row.cm } : { type: "delete_weight", day: row.day, kg: row.kg } };
+  }
+  return null;
+}
 
 /* ---------------- one-shot modes ---------------- */
 
@@ -787,8 +921,10 @@ function runChat(ctx: Ctx, history: any[], image: unknown, use: Use) {
               const full = found.filter(a => a.body);
               results.push({ type: "tool_result", tool_use_id: b.id, is_error: !found.length, content: full.length ? full.map(articleText).join("\n\n") : found.length ? "The full text of this older article is not loaded here; you only have its title and summary. They can open it in «مجله» and tap «درباره‌ی این مقاله از هوشواره بپرس»." : "No article on that day." });
             } else if (b.name.startsWith("propose_")) {
-              send({ t: "action", v: { id: b.id, type: b.name.slice(8), ...realIds(b.input, S.toId) } });
-              results.push({ type: "tool_result", tool_use_id: b.id, content: "Shown to the user as a card. Nothing is saved until they tap «ثبت»." });
+              const fix = correction(b.name, b.input, ctx, S.toId);
+              if (fix?.error) { results.push({ type: "tool_result", tool_use_id: b.id, is_error: true, content: fix.error }); continue; }
+              send({ t: "action", v: fix ? { id: b.id, ...fix.action } : { id: b.id, type: b.name.slice(8), ...realIds(b.input, S.toId) } });
+              results.push({ type: "tool_result", tool_use_id: b.id, content: "Shown to the user as a card. Nothing changes until they confirm it there." });
             } else {
               results.push({ type: "tool_result", tool_use_id: b.id, is_error: true, content: "Unknown tool." });
             }

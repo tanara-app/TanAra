@@ -89,8 +89,9 @@ function context() {
     now: `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`,
     profile: p && (({ vault, ...rest }) => rest)(p), // the vault's PIN hash is nobody's business
     targets: p ? effectiveTargets(p) : null,
-    foods: s.foods.map(({ id, name, unit, grams, kcal, protein, is_veg, created_at }) => ({ id, name, unit, grams, kcal, protein, is_veg, created_at })),
-    entries: s.entries.map(({ day, meal, name, qty, unit, kcal, protein, is_veg, created_at }) => ({ day, meal, name, qty, unit, kcal, protein, is_veg, created_at })),
+    foods: s.foods.map(({ id, name, category, unit, grams, kcal, protein, is_veg, created_at }) => ({ id, name, category, unit, grams, kcal, protein, is_veg, created_at })),
+    // ids are not shown to the model; the Edge Function needs them to point a correction at a record
+    entries: s.entries.map(({ id, day, meal, name, qty, unit, kcal, protein, is_veg, created_at }) => ({ id, day, meal, name, qty, unit, kcal, protein, is_veg, created_at })),
     weights: s.weights.map(({ day, kg }) => ({ day, kg })),
     waists: s.waists.map(({ day, cm }) => ({ day, cm })),
     phase: phaseContext(p, t),

@@ -1,8 +1,10 @@
 // Hooshvareh chat: talk to the AI about everything recorded in the app. It can propose
-// changes (log a food, a weight, ...) as cards; nothing is written until «ثبت» is tapped.
+// changes (log a food, a weight, correct or delete a record, ...) as cards; nothing is
+// written until the card is confirmed.
 import * as store from '../data/store.js';
 import { chat, ask, aiAvailable, md, sparkle, focusArticle } from '../ai/hooshvareh.js';
 import { MEALS } from '../domain/stats.js';
+import { CATEGORIES } from '../data/seedFoods.js';
 import { SLOTS, planOn, swapsOn, swapItem } from '../domain/plan.js';
 import { fa, esc, qtyLabel, norm } from '../lib/fa.js';
 import { today, relLabel, faDMY, weekLabel } from '../lib/dates.js';
@@ -113,8 +115,44 @@ function arrived(a) {
   return t ? { ...a, name: t.food.name, qty: t.item.qty, unit: t.item.unit } : a;
 }
 
+// What a correction changes, as «قبل ← بعد». `was` is the record when it was proposed.
+function changesText(was = {}, set = {}, { food = false } = {}) {
+  const next = { ...was, ...set };
+  const out = [];
+  if ('name' in set) out.push(`نام: ${esc(set.name)}`);
+  if ('day' in set && isISO(set.day)) out.push(`روز: ${relLabel(set.day)}`);
+  if ('meal' in set) out.push(`وعده: ${MEALS[set.meal] || ''}`);
+  if (food) {
+    if ('unit' in set) out.push(`واحد: ${esc(was.unit || '')} ← ${esc(set.unit)}`);
+    if ('grams' in set) out.push(`وزن هر ${esc(next.unit || 'واحد')}: ${was.grams ? `${fa(Math.round(was.grams))} ← ` : ''}${fa(Math.round(set.grams))} گرم`);
+    if ('category' in set) out.push(`دسته: ${CATEGORIES[set.category] || ''}`);
+  } else if ('qty' in set || 'unit' in set) out.push(`مقدار: ${amountLabel(Number(was.qty) || 1, was.unit || '')} ← ${amountLabel(Number(next.qty) || 1, next.unit || '')}`);
+  if ('kcal' in set) out.push(`کالری: ${fa(Math.round(was.kcal))} ← ${fa(Math.round(set.kcal))}`);
+  if ('protein' in set) out.push(`پروتئین: ${fa(Number(was.protein) || 0, 1)} ← ${fa(Number(set.protein) || 0, 1)} گرم`);
+  if ('is_veg' in set) out.push(set.is_veg ? 'سبزی حساب شود' : 'سبزی حساب نشود');
+  return out.join(' · ');
+}
+// «ناهارِ دیروز: برنج»
+const entryLabel = e => `${MEALS[e?.meal] || 'وعده'}ِ ${isISO(e?.day) ? relLabel(e.day) : ''}: <b>${esc(e?.name || '')}</b>`;
+// entries logged from a bank food that a changed name / veg flag would also correct
+const loggedFrom = a => store.get().entries.filter(e => e.food_id === a.food_id && (('is_veg' in a.set && !!e.is_veg !== !!a.set.is_veg) || ('name' in a.set && e.name !== a.set.name)));
+
+const KIND = t => (/^delete_/.test(t) ? 'delete' : /^edit_/.test(t) ? 'edit' : 'add');
+
 function describe(a) {
   switch (a.type) {
+    case 'edit_entry':
+      return `ویرایش ثبتِ ${entryLabel(a.was)}<br><small>${changesText(a.was, a.set)}</small>`;
+    case 'delete_entry':
+      return `حذف ثبتِ ${entryLabel(a.was)}<br><small>${amountLabel(Number(a.was?.qty) || 1, a.was?.unit || '')} · ${fa(Math.round(a.was?.kcal || 0))} کالری</small>`;
+    case 'edit_food': {
+      const n = a.fix_logged && !a.status ? loggedFrom(a).length : 0;
+      return `ویرایش در بانک غذا: <b>${esc(a.was?.name || '')}</b><br><small>${changesText(a.was, a.set, { food: true })}${a.fix_logged ? ` · ${n ? `${fa(n)} ثبت قبلی هم اصلاح می‌شود` : 'همراه با ثبت‌های قبلی'}` : ''}</small>`;
+    }
+    case 'delete_weight':
+      return `حذف وزن <b>${fa(a.kg, 1)}</b> کیلو از ${isISO(a.day) ? relLabel(a.day) : ''}`;
+    case 'delete_waist':
+      return `حذف دور کمر <b>${fa(a.cm, 1)}</b> سانتی‌متر از ${isISO(a.day) ? relLabel(a.day) : ''}`;
     case 'log_food':
       return `ثبت در ${MEALS[a.meal] || 'وعده'}ِ ${isISO(a.day) ? relLabel(a.day) : ''}: <b>${esc(a.name)}</b><br><small>${qtyLabel(Number(a.qty) || 1)} ${esc(a.unit || '')} · ${fa(Math.round(a.kcal))} کالری · ${fa(Math.round(a.protein * 10) / 10, 1)} گرم پروتئین</small>`;
     case 'weight':
@@ -138,7 +176,7 @@ function describe(a) {
 
 // Plain-text version for the history sent back to the AI, so it knows what happened.
 function historyLine(a) {
-  const st = a.status === 'done' ? 'ثبت شد' : a.status === 'declined' ? 'رد شد' : 'هنوز بی‌جواب';
+  const st = a.status === 'done' ? (KIND(a.type) === 'add' ? 'ثبت شد' : 'انجام شد') : a.status === 'declined' ? 'رد شد' : 'هنوز بی‌جواب';
   const what = describe(a).replace(/<br>/g, ' — ').replace(/<[^>]+>/g, '');
   return `[پیشنهاد هوشواره: ${what} → ${st}]`;
 }
@@ -157,6 +195,36 @@ function apply(a) {
       });
       return null;
     }
+    case 'edit_entry': {
+      const e = store.get().entries.find(x => x.id === a.entry_id);
+      if (!e) return 'این ثبت دیگر وجود ندارد.';
+      const next = { ...e, ...a.set };
+      if (!isISO(next.day) || next.day > t || !MEALS[next.meal] || !next.name || !num(next.kcal, 0, 10000) || !num(next.protein, 0, 1000) || !num(next.qty, 0.01, next.unit === 'گرم' ? 5000 : 100)) return 'این ویرایش درست نیست.';
+      store.saveEntry(next);
+      return null;
+    }
+    case 'delete_entry':
+      if (!store.get().entries.some(x => x.id === a.entry_id)) return 'این ثبت دیگر وجود ندارد.';
+      store.deleteEntry(a.entry_id);
+      return null;
+    case 'edit_food': {
+      const f = store.get().foods.find(x => x.id === a.food_id);
+      if (!f) return 'این غذا دیگر در بانک غذا نیست.';
+      const next = { ...f, ...a.set };
+      if (!String(next.name || '').trim() || !num(next.kcal, 0, 10000) || !num(next.protein, 0, 1000) || (next.grams != null && !num(next.grams, 0.1, 5000))) return 'این ویرایش درست نیست.';
+      // past entries keep their own numbers; only the name and the vegetable flag follow
+      if (a.fix_logged) loggedFrom(a).forEach(e => store.saveEntry({ ...e, ...('name' in a.set ? { name: next.name } : {}), ...('is_veg' in a.set ? { is_veg: next.is_veg } : {}) }));
+      store.upsertFood(next);
+      return null;
+    }
+    case 'delete_weight':
+      if (!store.get().weights.some(w => w.day === a.day)) return 'وزنی برای آن روز ثبت نشده.';
+      store.deleteWeight(a.day);
+      return null;
+    case 'delete_waist':
+      if (!store.get().waists.some(w => w.day === a.day)) return 'اندازه‌ای برای آن روز ثبت نشده.';
+      store.deleteWaist(a.day);
+      return null;
     case 'weight':
       if (!isISO(a.day) || a.day > t || !num(a.kg, 35, 350)) return 'این وزن درست نیست.';
       store.setWeight(a.day, Number(a.kg));
@@ -197,13 +265,15 @@ function apply(a) {
 
 const sorted = () => [...store.get().chat].sort((a, b) => (a.created_at < b.created_at ? -1 : 1));
 
+const YES = { add: 'ثبت', edit: 'اعمال کن', delete: 'حذف کن' };
+const DONE = { add: 'ثبت شد', edit: 'انجام شد', delete: 'حذف شد' };
 function actionsHtml(msgId, actions) {
   return actions.map((a, i) => `
     <div class="ai-act ${a.status || 'pending'}" data-msg="${msgId}" data-i="${i}">
       <p>${describe(a)}</p>
-      ${a.status === 'done' ? '<span class="ai-act-st">✓ ثبت شد</span>'
+      ${a.status === 'done' ? `<span class="ai-act-st">✓ ${DONE[KIND(a.type)]}</span>`
         : a.status === 'declined' ? '<span class="ai-act-st">رد شد</span>'
-        : msgId ? '<div class="row gap"><button class="btn primary sm" data-yes>ثبت</button><button class="btn ghost sm" data-no>نه</button></div>'
+        : msgId ? `<div class="row gap"><button class="btn primary sm" data-yes>${YES[KIND(a.type)]}</button><button class="btn ghost sm" data-no>نه</button></div>`
         : ''}
     </div>`).join('');
 }
@@ -394,7 +464,7 @@ function decide(btn) {
     const err = apply(a);
     if (err) { toast(err); return; }
     a.status = 'done';
-    toast('ثبت شد');
+    toast(DONE[KIND(a.type)]);
   } else a.status = 'declined';
   store.saveChat({ ...m, actions });
 }
