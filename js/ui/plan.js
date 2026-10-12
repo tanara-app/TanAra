@@ -16,6 +16,8 @@ import { today, diffDays, relLabel } from '../lib/dates.js';
 import { amountLabel } from './units.js';
 import { icon, sheet, toast, confirmBox } from './dom.js';
 import { openLogSheet, openEntrySheet } from './logFood.js';
+import { shopList, neededFoods } from '../domain/shopping.js';
+import { addToShopping } from './shopping.js';
 
 let busy = false;        // a plan is being made
 const busySlots = new Set(); // slots waiting for one more option
@@ -222,6 +224,9 @@ function openSwap(day, key, optId, index) {
         <div class="sheet-head"><h2>به‌جای «${esc(old.name)}»</h2>${close}</div>
         <p class="muted small">${rest.length ? `${rest.map(esc).join('، ')} سر جایش می‌ماند. ` : ''}مقدار جایگزین را خود اپ هم‌کالری با ${amount(base)} ${esc(base.name)} حساب می‌کند.</p>
         ${old.was ? `<button class="btn block" data-back>برگرداندن به «${esc(old.was)}»</button>` : ''}
+        ${neededFoods(shopList(notes())).has(old.food_id)
+          ? `<p class="small shop-note">${icon.cart} «${esc(old.name)}» در لیست خریدت هست.</p>`
+          : `<button class="btn block" data-shop-add>${icon.cart} «${esc(old.name)}» را به لیست خرید اضافه کن</button>`}
         <div class="search">${icon.search}<input type="search" placeholder="جست‌وجو در بانک غذا" value="${esc(query)}" autocomplete="off"></div>
         <div class="food-list"></div>`;
       const list = body.querySelector('.food-list');
@@ -248,6 +253,12 @@ function openSwap(day, key, optId, index) {
       input.addEventListener('input', () => { query = input.value; drawResults(); });
       body.querySelector('[data-close]').onclick = () => sheet.close();
       body.querySelector('[data-back]')?.addEventListener('click', () => done(null, 'day'));
+      // they still need something for today, so the sheet stays open
+      body.querySelector('[data-shop-add]')?.addEventListener('click', () => {
+        addToShopping([{ name: old.name, food_id: old.food_id }]);
+        toast('به لیست خرید اضافه شد');
+        drawList();
+      });
       list.onclick = async e => {
         const f = e.target.closest('[data-food]');
         if (f) return drawConfirm(store.get().foods.find(x => x.id === f.dataset.food));
@@ -313,14 +324,15 @@ function openSwap(day, key, optId, index) {
 
 /* ---------------- drawing ---------------- */
 
-// One food of an option; the button beside it swaps just that food for another.
-const itemLine = only => (i, n) => `<li>
-  <span>${esc(i.name)}${i.was ? `<small class="was">به‌جای ${esc(i.was)} · ${only}</small>` : ''}</span>
+// One food of an option; the button beside it swaps just that food for another. `need`: bank
+// foods on the shopping list, marked so it is clear which options have to wait for the shop.
+const itemLine = (only, need) => (i, n) => `<li>
+  <span>${esc(i.name)}${i.was ? `<small class="was">به‌جای ${esc(i.was)} · ${only}</small>` : ''}${need.has(i.food_id) ? '<small class="was">در لیست خرید</small>' : ''}</span>
   <b>${amountLabel(i.qty, i.unit)}${i.grams ? ` <small>(${fa(i.grams)} گرم)</small>` : ''}</b>
   <button class="swap-btn" data-swap="${n}" aria-label="جایگزین کردن ${esc(i.name)}">${icon.swap}</button>
 </li>`;
 
-function slotCard(plan, key, picks, extras, showKcal, only) {
+function slotCard(plan, key, picks, extras, showKcal, only, need) {
   const slot = plan.slots[key];
   const mine = picks[key] || [];
   const full = mine.length >= slot.pick;
@@ -338,7 +350,7 @@ function slotCard(plan, key, picks, extras, showKcal, only) {
       // a div, not a button: the swap buttons sit inside it. The tick is the real control.
       return `<div class="popt${on ? ' on' : ''}" data-slot="${key}" data-opt="${o.id}">
         <button class="tick" aria-pressed="${on}" aria-label="${esc(o.title || optionText(o))}">${on ? icon.check : ''}</button>
-        <div class="popt-body">${o.title ? `<strong>${esc(o.title)}</strong>` : ''}<ul>${o.items.map(itemLine(only)).join('')}</ul>${showKcal ? `<small class="muted">${fa(o.kcal)} کالری · ${fa(Math.round(o.protein))} گرم پروتئین</small>` : ''}</div>
+        <div class="popt-body">${o.title ? `<strong>${esc(o.title)}</strong>` : ''}<ul>${o.items.map(itemLine(only, need)).join('')}</ul>${showKcal ? `<small class="muted">${fa(o.kcal)} کالری · ${fa(Math.round(o.protein))} گرم پروتئین</small>` : ''}</div>
       </div>`;
     }).join('')}
     ${orphans.map(p => `<button class="popt on" data-slot="${key}" data-opt="${esc(p.o)}" aria-pressed="true">
@@ -383,6 +395,7 @@ export function planHtml(day) {
   const fresh = isToday && !over ? newFoods(plan, s.foods) : [];
   const dayNo = planDayNo(plan, day);
   const keys = Object.keys(SLOTS);
+  const need = neededFoods(shopList(s.ai_notes)); // foods of the plan waiting on the shopping list
   // off-plan entries are listed under the last occasion of their meal (both snacks log as «میان‌وعده»)
   const lastOf = {};
   keys.forEach(k => { lastOf[SLOTS[k].meal] = k; });
@@ -419,7 +432,7 @@ export function planHtml(day) {
       </div>
     </section>
 
-    <section class="meals">${keys.map(k => slotCard(plan, k, picks, extrasFor(k), showKcal, onlyWord(day))).join('')}</section>
+    <section class="meals">${keys.map(k => slotCard(plan, k, picks, extrasFor(k), showKcal, onlyWord(day), need)).join('')}</section>
 
     ${plan.free?.length ? `<section class="card">
       <h2 class="card-h">هر وقت گرسنه شدی</h2>

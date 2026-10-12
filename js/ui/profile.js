@@ -1,5 +1,5 @@
 // Profile & settings: the targets and the phase up front; everything else (my details,
-// reminders, motivations, food bank, AI use, data, account) is one list of rows that open sheets.
+// reminders, motivations, food bank, shopping list, AI use, data, account) is one list of rows that open sheets.
 import * as store from '../data/store.js';
 import { effectiveTargets, clampKcal, safeFloor, hasMedicalFlag, ACTIVITY, CONDITIONS } from '../domain/targets.js';
 import { sortedWeights } from '../domain/stats.js';
@@ -14,6 +14,7 @@ import { bindVault } from './vault.js';
 import { phaseCard, bindPhase } from './phase.js';
 import { remindersLine, bindReminders } from './reminders.js';
 import { openUsage } from './usage.js';
+import { openShopping, shoppingLine } from './shopping.js';
 import { aiAvailable } from '../ai/hooshvareh.js';
 
 let session = { email: null, signOut: null, local: true };
@@ -67,6 +68,7 @@ export function renderProfile(root) {
       ${row('data-mots', 'انگیزه‌ها', s.motivations.length ? `${fa(s.motivations.length)} مورد؛ بالای صفحه‌ی «امروز»` : 'هنوز چیزی اضافه نکرده‌ای')}
       ${row('data-vault-open', 'صندوقچه‌ی خصوصی', `${s.vault?.length ? `${fa(s.vault.length)} مورد · ` : ''}با رمز شش‌رقمی`)}
       ${row('data-bank', 'بانک غذا', `${fa(s.foods.length)} غذا`)}
+      ${row('data-shopping', 'لیست خرید', shoppingLine())}
       ${aiAvailable() ? row('data-usage', 'مصرف هوشواره', 'هر کار هوشواره چقدر هزینه داشته') : ''}
       ${row('data-data', 'داده‌ها و پشتیبان', 'خروجی گرفتن، برگرداندن، غذاهای پیش‌فرض')}
       ${row('data-account', 'حساب', session.local ? 'حالت آزمایشی محلی' : `${esc(session.email || '')}${st.pending ? ` · ${fa(st.pending)} تغییر در صف` : ''}`)}
@@ -86,6 +88,7 @@ export function renderProfile(root) {
   bindReminders(root);
   root.querySelector('[data-usage]')?.addEventListener('click', openUsage);
   root.querySelector('[data-bank]').onclick = () => openFoodBank();
+  root.querySelector('[data-shopping]').onclick = () => openShopping();
   root.querySelector('[data-data]').onclick = openData;
   root.querySelector('[data-account]').onclick = openAccount;
 }

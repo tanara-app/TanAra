@@ -9,6 +9,7 @@ import './safety.test.js';
 import './plan.test.js';
 import './photo.test.js';
 import './recipe.test.js';
+import './shopping.test.js';
 
 const results = await run();
 const failed = results.filter(r => !r.ok);

@@ -22,6 +22,7 @@ import { foodMeta, mountAmount } from './units.js';
 import { mealSeg, bindMeal } from './logFood.js';
 import { pickPhoto, foodPhoto, cameraIcon } from './photo.js';
 import { ask, aiAvailable, sparkle } from '../ai/hooshvareh.js';
+import { pickForShopping } from './shopping.js';
 
 const newId = () => (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()));
 const bankFood = r => (r?.food_id && store.get().foods.find(f => f.id === r.food_id)) || null;
@@ -106,6 +107,7 @@ export function openRecipe(recipe, { draft = false, another = null, base = null,
         ${r.note ? `<p class="small ai-est-note">${sparkle(14)} ${esc(r.note)}</p>` : ''}
         <h3 class="list-h">مواد (برای کل قابلمه)</h3>
         <ul class="recipe-items">${r.items.map(i => `<li><span>${esc(i.name)}</span><small class="muted">${fa(Math.round(i.grams))} گرم · ${fa(itemTotals(i).kcal)} کالری${i.food_id ? '' : ' · تخمینی'}</small></li>`).join('')}</ul>
+        <button class="link small shop-link" data-shop-items>${icon.cart} چیزی را نداری؟ به لیست خرید اضافه کن</button>
         ${r.steps?.length ? `<h3 class="list-h">روش پخت</h3><ol class="recipe-steps">${r.steps.map(s => `<li>${esc(s)}</li>`).join('')}</ol>` : ''}
         <div class="stack recipe-acts">${draft ? `
           <label class="check"><input type="checkbox" data-bank checked><span>در بانک غذا هم باشد<small class="muted">تا در ثبت غذا و رژیم بیاید</small></span></label>
@@ -135,6 +137,7 @@ export function openRecipe(recipe, { draft = false, another = null, base = null,
       });
       on('[data-cooked]', () => openCooked(r, () => { r = recipes().find(x => x.id === r.id) || r; draw(); onChange?.(); }));
       on('[data-light]', () => lighten(r, onChange));
+      on('[data-shop-items]', () => pickForShopping(`مواد ${r.name}`, r.items.map(i => ({ name: i.name, amount: `${fa(Math.round(i.grams))} گرم`, food_id: i.food_id })), { checked: false, hint: 'هر چه را در خانه نداری تیک بزن. وزن‌ها برای کل قابلمه است.' }));
       on('[data-to-bank]', () => { r = saveRecipe(r, { toBank: true }); toast('به بانک غذا اضافه شد'); draw(); onChange?.(); });
       on('[data-del]', async () => {
         const food = bankFood(r);

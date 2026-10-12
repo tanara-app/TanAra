@@ -680,3 +680,26 @@ body.kb .toast, body.chat-mode .toast { bottom: calc(var(--nav-h) + var(--safe-b
 .set-row b { display: block; font-weight: 600; }
 .set-row small { display: block; font-size: .8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .set-row svg { flex: none; color: var(--muted); }
+
+/* shopping list */
+.pill-btn { border: 0; cursor: pointer; font-family: inherit; }
+.pill-btn:active { background: var(--surface-2); }
+.shop-add { display: flex; align-items: flex-end; gap: 8px; }
+.shop-amt { width: 6.2rem; flex: none; }
+.shop-plus { flex: none; width: 48px; height: 48px; border-radius: 14px; background: var(--accent); color: var(--accent-ink); }
+.shop-sugg { margin-top: 8px; }
+.shop-list { margin-top: 10px; }
+.shop-row { display: flex; align-items: center; gap: 4px; border-bottom: 1px solid var(--line); }
+.shop-main { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; min-height: 54px; padding: 8px 2px; border: 0; background: none; text-align: start; cursor: pointer; }
+.shop-name { display: grid; min-width: 0; font-weight: 600; overflow-wrap: anywhere; }
+.shop-name small { color: var(--muted); font-size: .8rem; font-weight: 400; }
+.shop-row .tick { margin: 0; }
+.shop-row.done .tick { background: var(--accent); border-color: var(--accent); }
+.shop-row.done .shop-name { color: var(--muted); font-weight: 400; text-decoration: line-through; }
+.shop-row .icon-btn { flex: none; background: none; color: var(--muted); }
+.shop-got-h { display: flex; align-items: baseline; justify-content: space-between; margin-top: 6px; }
+.shop-acts { margin-top: 16px; gap: 8px; }
+.shop-note, .shop-link { display: flex; align-items: center; gap: 6px; }
+.shop-note { color: var(--muted); margin: 0 0 8px; }
+.shop-note svg, .shop-link svg { flex: none; }
+.shop-link { margin-top: 10px; }

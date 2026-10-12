@@ -14,6 +14,8 @@ import { applySwap } from './plan.js';
 import { amountLabel, foodMeta } from './units.js';
 import { saveRecipe } from './recipes.js';
 import { recipeFrom, perUnit } from '../domain/recipe.js';
+import { shopAdd, shopMatch } from '../domain/shopping.js';
+import { shopping, addToShopping, markBought } from './shopping.js';
 
 const SUGGESTIONS = [
   'امروز تا الان چطور پیش رفتم؟',
@@ -171,6 +173,13 @@ function describe(a) {
       const r = recipeFrom(a, store.get().foods);
       return r ? `ذخیره در رسپی‌ها: <b>${esc(r.name)}</b><br><small>هر ${foodMeta(perUnit(r))} · ${fa(r.items.length)} ماده</small>` : 'رسپی ناقص';
     }
+    case 'shopping': {
+      // a card already decided keeps what it said; a waiting one shows what it would do now
+      const names = l => l.map(i => `<b>${esc(i.name)}</b>${i.amount ? ` (${esc(i.amount)})` : ''}`).join('، ');
+      const add = a.status ? (a.add || []) : shopAdd(shopping(), a.add, store.get().foods);
+      const got = a.status ? (a.bought || []).map(name => ({ name })) : shopMatch(shopping(), a.bought);
+      return [add.length ? `افزودن به لیست خرید: ${names(add)}` : '', got.length ? `خریده‌شده در لیست خرید: ${names(got)}` : ''].filter(Boolean).join('<br>') || 'لیست خرید همین حالا همین‌طور است';
+    }
     case 'plan_swap':
       return `جایگزینی در ${SLOTS[a.slot]?.label || 'رژیم'}: <b>${esc(a.name)}</b> به‌جای ${esc(a.from)}<br><small>${a.qty ? `${amountLabel(a.qty, a.unit)} · ` : ''}${a.scope === 'plan' ? 'از این به بعد در رژیم' : 'فقط امروز'}</small>`;
     case 'review_goal':
@@ -256,6 +265,10 @@ function apply(a) {
       saveRecipe(r);
       return null;
     }
+    case 'shopping':
+      if (!Array.isArray(a.add) || !Array.isArray(a.bought)) return 'این پیشنهاد کامل نیست.';
+      if (addToShopping(a.add) + markBought(a.bought) === 0) return 'لیست خرید همین حالا همین‌طور است.';
+      return null;
     case 'plan_swap': {
       const at = swapTarget(a);
       if (!at) return 'این جایگزینی دیگر با برنامه‌ات جور نیست.';

@@ -17,6 +17,7 @@ import { tipCard, bindTip } from './aiCards.js';
 import { magCard, bindMag } from './magazine.js';
 import { planHtml, bindPlan } from './plan.js';
 import { measureNote, bindMeasureNote } from './measure.js';
+import { shoppingPill, bindShopping } from './shopping.js';
 
 let day = today();
 export const setDay = d => { day = d; };
@@ -103,6 +104,7 @@ export function renderToday(root) {
       <div class="pill">${icon.leaf}<span>سبزی ${isToday ? 'امروز' : ''}: <b>${qtyLabel(Math.round(tot.veg * 2) / 2)}</b> وعده</span></div>
       <div class="pill"><span>این هفته <b>${fa(logged)}</b> روز ثبت کرده‌اید</span></div>
       ${t.phase !== 'loss' ? `<div class="pill"><span>مرحله: <b>${phaseLabel(p, day)}</b></span></div>` : ''}
+      ${shoppingPill()}
     </div>
 
     ${notices.map(n => `<div class="note ${n.cls || 'soft'}" data-notice="${n.key}" data-mark="${n.mark}">${n.html}<button class="link small" data-dismiss>باشه</button></div>`).join('')}
@@ -147,6 +149,7 @@ export function renderToday(root) {
   bindVault(root);
   bindPhase(root);
   bindMeasureNote(root);
+  bindShopping(root);
   root.querySelectorAll('[data-dismiss]').forEach(b => b.onclick = () => {
     const n = b.closest('[data-notice]');
     dismiss(n.dataset.notice, n.dataset.mark);
