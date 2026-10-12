@@ -241,6 +241,9 @@ const block = (list: string[]) => list.filter(Boolean).join("\n\n");
 
 // A recipe as the model writes it: ingredients and grams. Shared by the chat tool and the
 // `recipe` mode; the app turns it into numbers (js/domain/recipe.js).
+// What the «جزو وعده‌ی سبزی» flag means, spelled out wherever the model sets it: left to
+// itself it ticks it for anything with a vegetable somewhere in it.
+const VEG = { type: "boolean", description: "true ONLY when the food itself is mainly non-starchy vegetables or herbs (salad, سبزی خوردن, raw / cooked / grilled vegetables, a soup that is mostly vegetables), so that one unit holds about 80 g of them. false for everything else, and false when in doubt: mixed dishes where vegetables are a side ingredient (stews, rice dishes, کوکو, omelettes, sandwiches, pizza, pasta, آش), potato, corn, legumes, fruit, juices, pickles, sauces, bread, dairy, meat, sweets and drinks" };
 const FOOD_CATS = ["grain", "stew", "protein", "legume", "breakfast", "dairy", "fruit", "veg", "nuts", "drink", "sweet", "other"];
 const RECIPE_PROPS = {
   name: { type: "string", description: "Persian name of the dish" },
@@ -264,7 +267,7 @@ const RECIPE_PROPS = {
   servings: { type: "number", description: "how many of that unit the whole pot gives" },
   cooked_grams: { type: "number", description: "realistic weight in grams of the whole finished dish" },
   category: { type: "string", enum: FOOD_CATS },
-  is_veg: { type: "boolean", description: "one unit of it counts as a vegetable serving" },
+  is_veg: VEG,
 };
 const RECIPE_RULES = `How to write the recipe down:
 - items: every ingredient that carries calories, with the weight in grams that goes into the WHOLE pot, as it is weighed going in (raw meat, dry rice and legumes, ...). Oil, butter and sugar are never left out. Convert household amounts to grams (1 قاشق غذاخوری oil ≈ 14 g, 1 لیوان dry rice ≈ 190 g, 1 medium onion ≈ 110 g, 1 egg ≈ 50 g, ...). Leave out water, salt and spices; mention them in the steps.
@@ -301,7 +304,7 @@ const TOOLS: any[] = [
         unit: { type: "string", description: "household unit, e.g. کفگیر; «گرم» when they gave a weight" },
         kcal: { type: "number", description: "total for the whole quantity" },
         protein: { type: "number", description: "grams, total for the whole quantity" },
-        is_veg: { type: "boolean", description: "counts as a vegetable serving" },
+        is_veg: VEG,
         food_id: { type: "string", description: "id from the food bank when it matches" },
       },
       required: ["day", "meal", "name", "qty", "unit", "kcal", "protein", "is_veg"],
@@ -349,7 +352,7 @@ const TOOLS: any[] = [
         grams: { type: "number", description: "weight in grams of one unit" },
         kcal: { type: "number", description: "per one unit" }, protein: { type: "number", description: "grams per one unit" },
         category: { type: "string", enum: ["grain", "stew", "protein", "legume", "breakfast", "dairy", "fruit", "veg", "nuts", "drink", "sweet", "other"] },
-        is_veg: { type: "boolean" },
+        is_veg: VEG,
       },
       required: ["name", "unit", "grams", "kcal", "protein", "category", "is_veg"],
     },
@@ -405,7 +408,7 @@ const TOOLS: any[] = [
             unit: { type: "string" },
             kcal: { type: "number", description: "total for the whole quantity; leave out to scale with qty" },
             protein: { type: "number", description: "grams, total for the whole quantity; leave out to scale with qty" },
-            is_veg: { type: "boolean" },
+            is_veg: VEG,
           },
         },
       },
@@ -441,7 +444,7 @@ const TOOLS: any[] = [
             grams: { type: "number", description: "weight in grams of one unit" },
             kcal: { type: "number", description: "per one unit" }, protein: { type: "number", description: "grams per one unit" },
             category: { type: "string", enum: ["grain", "stew", "protein", "legume", "breakfast", "dairy", "fruit", "veg", "nuts", "drink", "sweet", "other"] },
-            is_veg: { type: "boolean", description: "counts as a vegetable serving" },
+            is_veg: VEG,
           },
         },
         fix_logged: { type: "boolean", description: "also apply a changed name or vegetable flag to everything already logged from this food" },
@@ -664,12 +667,12 @@ note: 2–3 short Persian sentences to them: the idea behind this plan. ${i.incl
         kcal: { type: "number", description: "per one unit" },
         protein: { type: "number", description: "grams per one unit" },
         category: { type: "string", enum: ["grain", "stew", "protein", "legume", "breakfast", "dairy", "fruit", "veg", "nuts", "drink", "sweet", "other"] },
-        is_veg: { type: "boolean" },
+        is_veg: VEG,
         note: str("one short Persian line on what was assumed (portion size, oil, ...)"),
       },
       required: ["name", "unit", "grams", "kcal", "protein", "category", "is_veg", "note"], additionalProperties: false,
     },
-    prompt: (i) => `Estimate calories, protein and the weight in grams for this food, for one household unit${i.unit ? ` (unit: ${i.unit}${i.unit === "گرم" ? " — then grams is 1 and kcal/protein are per gram" : ""})` : ""}, the way it is usually prepared and served in Iran: «${i.name}». Be realistic, slightly conservative-high rather than low. Keep kcal consistent with grams (realistic energy density). Use their food bank for consistency with similar items.`,
+    prompt: (i) => `Estimate calories, protein and the weight in grams for this food, for one household unit${i.unit ? ` (unit: ${i.unit}${i.unit === "گرم" ? " — then grams is 1 and kcal/protein are per gram" : ""})` : ""}, the way it is usually prepared and served in Iran: «${i.name}». Be realistic, slightly conservative-high rather than low. Keep kcal consistent with grams (realistic energy density). Use their food bank for consistency with similar items. is_veg is false unless the food is itself mainly non-starchy vegetables.`,
   },
   photo: {
     effort: "medium",
@@ -689,7 +692,7 @@ note: 2–3 short Persian sentences to them: the idea behind this plan. ${i.incl
               unit: str("the bank food's own unit, or «گرم»; for foods not in the bank, a natural Iranian household unit"),
               kcal: { type: "number", description: "total for the whole amount" },
               protein: { type: "number", description: "grams, total for the whole amount" },
-              is_veg: { type: "boolean", description: "counts as a vegetable serving" },
+              is_veg: VEG,
             },
             required: ["name", "food_id", "qty", "unit", "kcal", "protein", "is_veg"], additionalProperties: false,
           },
