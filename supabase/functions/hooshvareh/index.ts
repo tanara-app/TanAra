@@ -10,6 +10,9 @@
     progress  analysis of the weight trend
     estimate  calories / protein / weight of one unit for a food the bank doesn't have
     photo     the foods on a photographed plate, with amounts, ready to be logged
+    recipe    a home recipe as ingredients by weight (the app adds it up): theirs written
+              down from text or a photo, a lighter version of one, or a new and simple
+              dish to try that fits what is left of the day
     title     a short name for a chat conversation
     plan      a two-week diet plan: options with amounts for each meal, from the food bank
     plan_option  one more option for one meal of the current plan
@@ -76,6 +79,7 @@ Changing their data (chat only)
 - When you notice a mistake in the record yourself (a food wrongly counted as a vegetable, an obvious duplicate, an impossible amount, a meal on the wrong day), say what you see and propose the fix in the same reply instead of only mentioning it. Never tell them you cannot edit past records. If a mistake comes from the food bank, fix it there (with fix_logged) so it does not come back.
 - What you still cannot change: the profile, the targets, the phase and goal weight, the reminders, the text of their weekly reviews, saved motivations, and the plan beyond a single swap. Say where in the app they can do it.
 - When a message comes with a photo of food, work out what is on the plate and how much (household units, or grams when a bank food is weighed), and call propose_log_food once per food, for the meal that fits the time unless they say otherwise. Say in one line what you assumed (portion size, oil); a photo hides oil, sugar and depth, so call it an estimate. If the photo is not food, say so and propose nothing. «[عکس غذا]» at the start of an earlier message of theirs means it came with a photo that you can no longer see.
+- «رسپی‌ها» (a tab inside «بانک غذا») holds their own home dishes as ingredients by weight; the app adds the pot up, so the calories of one کفگیر are those of their pot, and a saved recipe can also be a food in the bank. When you give them a recipe in the chat, or they tell you how they cook something and its numbers matter, call propose_recipe so they can keep it: every ingredient that carries calories (oil included) in grams for the whole pot. The app does the arithmetic and shows the result on the card, so in your text call per-serving numbers approximate («حدود»). In that tab they can also have you write a recipe down from text or a photo, make one lighter, or — the main use — get a new, simple dish to try («غذای تازه») sized to what is left of their day. When they ask you for a recipe in the chat, keep to the same spirit unless they ask otherwise: few ingredients, few steps, ordinary supermarket items.
 - Use get_entries when you need individual foods from days older than the detailed window, and get_article for the full text of a magazine article before discussing its content, unless that text is already in the data.
 - «صندوقچه» is their private, PIN-locked collection of motivating photos and videos (opened from the motivation card on Today, or from «نمایه»). You only know how many items it holds and when it was last opened. When they sound discouraged, tempted to quit, or it has not been opened for a week or more, you may suggest a look inside; otherwise do not bring it up, and never guess what is in it.
 
@@ -98,7 +102,7 @@ type Ctx = {
   phase?: { phase: string; goalKg?: number | null; breakUntil?: string | null; maintainFrom?: { day: string; kg: number } | null; lossWeeks?: number | null; maintenance?: number | null } | null;
   energy?: any;
   vault?: { photos: number; videos: number; links: number; lastOpened: string | null } | null;
-  mode?: string; plan?: any; magazine?: any[]; focus?: string;
+  mode?: string; plan?: any; magazine?: any[]; focus?: string; recipes?: any[];
 };
 
 const MEALS: Record<string, string> = { breakfast: "صبحانه", lunch: "ناهار", dinner: "شام", snack: "میان‌وعده" };
@@ -225,11 +229,60 @@ function sections(c: Ctx) {
       const a = c.focus && (c.magazine || []).find(x => x.key === c.focus && x.body);
       return a ? `# The magazine article they are asking about (full text)\n${articleText(a)}` : "";
     },
+    recipes: () => (c.recipes || []).length ? `# Their own recipes, in «بانک غذا» ← «رسپی‌ها» (name | one unit, grams | kcal | protein g | what goes into the whole pot)\n${c.recipes!.map(r => `${r.name} | ${r.unit}${r.grams ? `, ${Math.round(r.grams)} g` : ""} | ${Math.round(r.kcal)} | ${r1(r.protein)}${r.in_bank ? " | in the bank" : ""} | ${(r.items || []).join("، ")}`).join("\n")}` : "",
     foods: () => `# Their food bank (food_id | name | unit | grams in one unit | kcal per unit | protein g per unit | veg)\n${foods.map(f => `${f.alias} | ${f.name} | ${f.unit} | ${f.grams ? r1(f.grams) : "?"} | ${r1(f.kcal)} | ${r1(f.protein)}${f.is_veg ? " | veg" : ""}`).join("\n")}`,
   };
 }
 type Sections = ReturnType<typeof sections>;
 const block = (list: string[]) => list.filter(Boolean).join("\n\n");
+
+/* ---------------- recipes ---------------- */
+
+// A recipe as the model writes it: ingredients and grams. Shared by the chat tool and the
+// `recipe` mode; the app turns it into numbers (js/domain/recipe.js).
+const FOOD_CATS = ["grain", "stew", "protein", "legume", "breakfast", "dairy", "fruit", "veg", "nuts", "drink", "sweet", "other"];
+const RECIPE_PROPS = {
+  name: { type: "string", description: "Persian name of the dish" },
+  items: {
+    type: "array",
+    description: "every ingredient that carries calories, oil, butter and sugar included; not water, salt or spices",
+    items: {
+      type: "object",
+      properties: {
+        name: { type: "string", description: "Persian name of the ingredient, with its state where it matters (خام، خشک، پخته)" },
+        food_id: { type: "string", description: "id from the food bank ONLY when that bank food is this same ingredient in the same state as it is weighed here; otherwise an empty string" },
+        grams: { type: "number", description: "grams of it that go into the WHOLE pot, as weighed going in" },
+        kcal100: { type: "number", description: "kcal per 100 g of the ingredient in that state" },
+        protein100: { type: "number", description: "grams of protein per 100 g of the ingredient in that state" },
+      },
+      required: ["name", "food_id", "grams", "kcal100", "protein100"], additionalProperties: false,
+    },
+  },
+  steps: { type: "array", items: { type: "string", description: "one short Persian step" } },
+  unit: { type: "string", description: "the household unit the finished dish is served by (کفگیر، پرس، کاسه، عدد، برش، لیوان، ...); never گرم" },
+  servings: { type: "number", description: "how many of that unit the whole pot gives" },
+  cooked_grams: { type: "number", description: "realistic weight in grams of the whole finished dish" },
+  category: { type: "string", enum: FOOD_CATS },
+  is_veg: { type: "boolean", description: "one unit of it counts as a vegetable serving" },
+};
+const RECIPE_RULES = `How to write the recipe down:
+- items: every ingredient that carries calories, with the weight in grams that goes into the WHOLE pot, as it is weighed going in (raw meat, dry rice and legumes, ...). Oil, butter and sugar are never left out. Convert household amounts to grams (1 قاشق غذاخوری oil ≈ 14 g, 1 لیوان dry rice ≈ 190 g, 1 medium onion ≈ 110 g, 1 egg ≈ 50 g, ...). Leave out water, salt and spices; mention them in the steps.
+- kcal100 and protein100: standard food-composition values per 100 g of the ingredient in that same state. The app multiplies and adds everything up itself, so give honest per-100 g values, not totals.
+- food_id: only when a food in their bank is this same ingredient in the same state as weighed here (bread, cheese, yoghurt, something already cooked that goes in cooked); the app then uses the bank's numbers. The bank's rice, stews, legumes and meats are cooked portions: never link a raw ingredient to them. When in doubt leave it empty.
+- unit and servings: the household unit the finished dish is served by and how many of them the whole pot gives. cooked_grams: a realistic weight of the whole finished dish (rice and legumes take up water, stews cook down).
+- steps: 3–7 short Persian steps a home cook can follow.
+- note: one or two short Persian sentences to them, as described above.`;
+// what they can ask of a suggested dish (the chips in «غذای تازه»)
+const RECIPE_WANTS: Record<string, string> = {
+  quick: "on the plate in 15 minutes or less",
+  protein: "as high in protein as a normal dish can be",
+  nomeat: "no meat, chicken or fish (eggs, dairy and legumes are fine)",
+  nocook: "no cooking at all, or only a kettle or a toaster",
+};
+const recipeText = (b: any) => `«${String(b?.name || "").slice(0, 100)}» — the whole pot gives ${Number(b?.servings) || 1} ${String(b?.unit || "پرس").slice(0, 30)}${Number(b?.cooked_grams) > 0 ? `, about ${Math.round(Number(b.cooked_grams))} g cooked` : ""}
+Ingredients (name | grams | kcal per 100 g | protein per 100 g):
+${(b?.items || []).slice(0, 40).map((x: any) => `${String(x.name).slice(0, 80)} | ${r1(x.grams)} | ${r1(x.kcal100)} | ${r1(x.protein100)}`).join("\n")}
+Steps: ${(b?.steps || []).slice(0, 15).map((x: any) => String(x).slice(0, 300)).join(" / ") || "-"}`;
 
 /* ---------------- tools (chat) ---------------- */
 
@@ -299,6 +352,11 @@ const TOOLS: any[] = [
       },
       required: ["name", "unit", "grams", "kcal", "protein", "category", "is_veg"],
     },
+  },
+  {
+    name: "propose_recipe",
+    description: "Propose saving a recipe to their «رسپی‌ها»: the dish as its ingredients by weight for the whole pot. The app computes the calories and protein of the pot and of one unit itself. Shown as a card; saved only if they confirm.",
+    input_schema: { type: "object", properties: RECIPE_PROPS, required: Object.keys(RECIPE_PROPS) },
   },
   {
     name: "propose_review_goal",
@@ -504,9 +562,10 @@ const PLAN_RULES = `Rules for every option:
 
 // `data`: the sections this mode needs — nothing else is sent. `shared`: sections that stay
 // the same between calls made in a row (the food bank); only those are worth caching.
-// `image`: the request carries a photo (input.image, base64 JPEG) for the model to look at.
+// `image`: the request carries a photo (input.image, base64 JPEG) for the model to look at;
+// "optional" when the mode also works without one.
 type OneShot = {
-  effort: string; max_tokens?: number; schema: any; prompt: (i: any) => string; image?: boolean;
+  effort: string; max_tokens?: number; schema: any; prompt: (i: any) => string; image?: boolean | "optional";
   system?: string; shared?: (S: Sections) => string[]; data?: (S: Sections, i: any) => string[];
 };
 const ONE_SHOT: Record<string, OneShot> = {
@@ -645,6 +704,47 @@ note: 2–3 short Persian sentences to them: the idea behind this plan. ${i.incl
 - Do not list things that are not being eaten (cutlery, garnish, an empty dish), and do not guess at foods you cannot make out.
 - If the photo does not show food or drink, return an empty list and say so in the note.`,
   },
+  recipe: {
+    effort: "medium",
+    image: "optional",
+    shared: (S) => [S.foods()],
+    data: (S, i) => i.base ? [S.profile(), S.targets()] : i.have != null ? [S.recipes(), S.now(), S.profile(), S.targets(), S.phase(), S.today()] : [],
+    schema: {
+      type: "object",
+      properties: {
+        ...RECIPE_PROPS,
+        note: str("one or two short Persian sentences to them"),
+        minutes: { type: "integer", description: "total time from start to plate, in minutes" },
+        changes: { type: "array", items: str("one change, a short Persian line"), description: "only for a lighter / higher-protein version; otherwise empty" },
+      },
+      required: [...Object.keys(RECIPE_PROPS), "note", "minutes", "changes"], additionalProperties: false,
+    },
+    prompt: (i) => {
+      if (i.base) return `This is one of their own recipes:
+${recipeText(i.base)}
+
+Make a ${i.goal === "protein" ? "higher-protein version of it: more protein in one unit, without more calories" : "lighter version of it: fewer calories in one unit"}. It must stay recognisably the same dish and something they would still enjoy: change what matters most (the oil, a fatty cut, sugar, the share of rice or bread, more vegetables or a leaner protein) and leave the rest alone. No extremes: roughly 15–30% better is the aim. Keep the same name, the same unit and a similar yield. In "changes" list each change as one short Persian line («روغن از ۶ قاشق به ۳ قاشق»), most important first. Respect allergies, dislikes (profile.planPrefs) and medical conditions in the profile. note: what stays the same in taste, or what to watch while cooking it this way.
+
+${RECIPE_RULES}`;
+      if (i.have != null) {
+        const want = (i.want || []).map((k: string) => RECIPE_WANTS[k]).filter(Boolean);
+        return `They want a NEW and SIMPLE dish to cook for ${MEALS[i.meal] || "a meal"} today, for ${Math.round(Number(i.people)) || 2} ${Number(i.people) === 1 ? "person" : "people"}: something they do not already make, that an ordinary home cook gets right the first time.${String(i.have).trim() ? ` They wrote (what they have at home, or what they feel like): «${String(i.have).slice(0, 600)}» — build on it.` : ""}${want.length ? ` They asked for: ${want.join("; ")}.` : ""}
+
+Suggest ONE dish:
+- New to them: not a dish that is already in their food bank or their recipes (both are in the data; those are what they eat now), and not just one of them renamed. It may come from any cuisine as long as it suits an Iranian palate.
+- Simple: at most 6 ingredients that carry calories (pantry basics — oil, onion, garlic, spices, salt, tomato paste, lemon — do not count), all sold in an ordinary Iranian supermarket, one pan or pot, 3–5 steps, no special equipment or technique. minutes: the honest total time from start to plate, 30 or less unless the dish cannot be done faster.
+- Fits their day: write it with unit «پرس» and servings = the number of people, so that one پرس is one person's whole meal of about ${Math.round(Number(i.kcal)) || 450} kcal (within 10%: do the arithmetic, the app recomputes it). If rice or bread normally goes with it, put it in the recipe so the پرس is the complete meal. As much protein as the dish realistically allows, looking at what is left of today's protein target, and vegetables where they fit. Go easy on the oil and say the amount in the steps.${(i.avoid || []).length ? `\n- Not any of these, which you already suggested: ${i.avoid.slice(0, 10).map((n: string) => `«${String(n).slice(0, 60)}»`).join("، ")}. Go for a clearly different kind of dish.` : ""}
+Respect profile.planPrefs (dislikes, allergies, notes) and medical conditions in the profile strictly. note: one sentence on why it is worth trying and how it fits their day. "changes": empty.
+
+${RECIPE_RULES}`;
+      }
+      return `They cook this at home and want to know what it really holds: ${String(i.text || "").trim() ? `«${String(i.text).slice(0, 2000)}»` : "(see the photo)"}${i.image ? "\nThe photo that comes with it shows the recipe (handwritten, a screenshot, a page of a book) or the ingredients; read it together with the text, and trust the text where they differ." : ""}
+
+Write it down exactly as they make it: keep every amount they gave and do not make it healthier. Where an amount is missing, assume what an Iranian home cook would usually use for that many people (be realistic about oil: slightly high rather than low). If they gave only the name of a dish, write the usual home recipe for 4 people. note: say which amounts you assumed, so they can correct them. If this is not a dish or a recipe at all, return an empty items list and say so in the note. "changes": empty.
+
+${RECIPE_RULES}`;
+    },
+  },
   title: {
     effort: "low",
     system: "You name chat conversations for the list of past conversations in تن‌آرا, a Persian weight-loss and food-logging app.",
@@ -724,7 +824,8 @@ function refusalText() {
 
 async function runOneShot(mode: string, ctx: Ctx, input: any, use: Use) {
   const m = ONE_SHOT[mode];
-  if (m.image && !okImage(input?.image)) return json({ error: "عکس درست نرسید؛ دوباره امتحان کن." }, 400);
+  const image = m.image && input?.image != null;
+  if ((m.image === true || image) && !okImage(input?.image)) return json({ error: "عکس درست نرسید؛ دوباره امتحان کن." }, 400);
   const S = sections(ctx);
   const prompt = m.prompt(input || {});
   const res: any = await anthropic.beta.messages.create({
@@ -734,7 +835,7 @@ async function runOneShot(mode: string, ctx: Ctx, input: any, use: Use) {
     fallbacks: "default",
     system: m.system || systemBlocks(block(m.shared?.(S) || []), block(m.data?.(S, input || {}) || []), NOTE),
     output_config: { effort: m.effort, format: { type: "json_schema", schema: m.schema } },
-    messages: [{ role: "user", content: m.image ? [imageBlock(input.image), { type: "text", text: prompt }] : prompt }],
+    messages: [{ role: "user", content: image ? [imageBlock(input.image), { type: "text", text: prompt }] : prompt }],
   } as any);
   use.add(mode, res);
   if (res.stop_reason === "refusal") return json({ error: refusalText() }, 422);
@@ -859,7 +960,7 @@ function runChat(ctx: Ctx, history: any[], image: unknown, use: Use) {
   const S = sections(ctx);
 
   // Cached prefix: tools, prompt, and everything that doesn't change while they chat.
-  const system = systemBlocks(block([S.profile(), S.targets(), S.phase(), S.energy(), S.mode(), S.foods(), S.magazine(), S.motivations(), S.reviews(), S.notes(), S.plan(), S.weights(), S.totals(S.yesterday), S.entries(S.detailFrom, S.yesterday)]));
+  const system = systemBlocks(block([S.profile(), S.targets(), S.phase(), S.energy(), S.mode(), S.foods(), S.recipes(), S.magazine(), S.motivations(), S.reviews(), S.notes(), S.plan(), S.weights(), S.totals(S.yesterday), S.entries(S.detailFrom, S.yesterday)]));
   // What changes by the minute goes after the conversation, so it never breaks the cache:
   // the next message finds everything up to this one already cached.
   const live = `<live_data>\n${block([S.now(), S.today(), S.adherence(), S.focus()])}\n</live_data>`;

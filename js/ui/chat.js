@@ -11,7 +11,9 @@ import { today, relLabel, faDMY, weekLabel } from '../lib/dates.js';
 import { toast, confirmBox, sheet, icon } from './dom.js';
 import { pickPhoto, foodPhoto, cameraIcon } from './photo.js';
 import { applySwap } from './plan.js';
-import { amountLabel } from './units.js';
+import { amountLabel, foodMeta } from './units.js';
+import { saveRecipe } from './recipes.js';
+import { recipeFrom, perUnit } from '../domain/recipe.js';
 
 const SUGGESTIONS = [
   'امروز تا الان چطور پیش رفتم؟',
@@ -165,6 +167,10 @@ function describe(a) {
         : `افزودن جمله به انگیزه‌ها:<br><b>«${esc(a.title)}»</b>`;
     case 'food':
       return `افزودن به بانک غذا: <b>${esc(a.name)}</b><br><small>هر ${esc(a.unit)}${a.grams && a.unit !== 'گرم' ? ` (${fa(Math.round(a.grams))} گرم)` : ''} · ${fa(Math.round(a.kcal))} کالری · ${fa(Math.round(a.protein * 10) / 10, 1)} گرم پروتئین</small>`;
+    case 'recipe': {
+      const r = recipeFrom(a, store.get().foods);
+      return r ? `ذخیره در رسپی‌ها: <b>${esc(r.name)}</b><br><small>هر ${foodMeta(perUnit(r))} · ${fa(r.items.length)} ماده</small>` : 'رسپی ناقص';
+    }
     case 'plan_swap':
       return `جایگزینی در ${SLOTS[a.slot]?.label || 'رژیم'}: <b>${esc(a.name)}</b> به‌جای ${esc(a.from)}<br><small>${a.qty ? `${amountLabel(a.qty, a.unit)} · ` : ''}${a.scope === 'plan' ? 'از این به بعد در رژیم' : 'فقط امروز'}</small>`;
     case 'review_goal':
@@ -244,6 +250,12 @@ function apply(a) {
       if (!a.name || !num(a.kcal, 0, 10000)) return 'این پیشنهاد کامل نیست.';
       store.upsertFood({ name: a.name, unit: a.unit, grams: a.grams, kcal: Number(a.kcal), protein: Number(a.protein) || 0, category: a.category, is_veg: !!a.is_veg });
       return null;
+    case 'recipe': {
+      const r = recipeFrom(a, store.get().foods);
+      if (!r) return 'این رسپی کامل نیست.';
+      saveRecipe(r);
+      return null;
+    }
     case 'plan_swap': {
       const at = swapTarget(a);
       if (!at) return 'این جایگزینی دیگر با برنامه‌ات جور نیست.';

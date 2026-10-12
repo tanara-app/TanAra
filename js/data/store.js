@@ -476,6 +476,11 @@ export function saveNote(n) {
   return row;
 }
 
+export function deleteNote(key) {
+  drop('ai_notes', key);
+  commit({ op: 'delete', table: 'ai_notes', key });
+}
+
 /* ---------------- export / import ---------------- */
 export function exportData() {
   const strip = r => { const { user_id, ...rest } = r; return rest; };

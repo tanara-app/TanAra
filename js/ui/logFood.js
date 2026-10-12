@@ -12,11 +12,11 @@ import { ask, aiAvailable, sparkle } from '../ai/hooshvareh.js';
 import { photoItems } from '../domain/photo.js';
 import { pickPhoto, foodPhoto, cameraIcon } from './photo.js';
 
-const mealSeg = meal => `<div class="seg meal-seg" data-meal>
+export const mealSeg = meal => `<div class="seg meal-seg" data-meal>
   ${Object.entries(MEALS).map(([k, l]) => `<button type="button" data-v="${k}" class="${k === meal ? 'on' : ''}">${l}</button>`).join('')}
 </div>`;
 
-function bindMeal(root, set) {
+export function bindMeal(root, set) {
   root.querySelector('[data-meal]').addEventListener('click', e => {
     const b = e.target.closest('button[data-v]');
     if (!b) return;

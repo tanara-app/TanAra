@@ -1,4 +1,4 @@
-// Food bank management: search, add, edit, delete.
+// Food bank management: search, add, edit, delete. Its second tab, «رسپی‌ها», is in recipes.js.
 import * as store from '../data/store.js';
 import { CATEGORIES } from '../data/seedFoods.js';
 import { norm, esc } from '../lib/fa.js';
@@ -6,13 +6,28 @@ import { sheet, toast, confirmBox, icon } from './dom.js';
 import { bindEstimate } from './logFood.js';
 import { foodMeta, unitFields, bindUnitFields } from './units.js';
 import { aiAvailable, sparkle } from '../ai/hooshvareh.js';
+import { recipesPanel, recipes } from './recipes.js';
 
 export function openFoodBank(onChange) {
   let query = '';
+  let tab = 'foods';
   sheet.open(body => {
     function draw() {
       body.innerHTML = `
         <div class="sheet-head"><h2>بانک غذا</h2><button class="icon-btn" data-close aria-label="بستن">${icon.close}</button></div>
+        <div class="seg" data-tab>
+          <button type="button" data-v="foods" class="${tab === 'foods' ? 'on' : ''}">غذاها</button>
+          <button type="button" data-v="recipes" class="${tab === 'recipes' ? 'on' : ''}">رسپی‌ها</button>
+        </div>
+        <div class="stack" data-pane></div>`;
+      body.querySelector('[data-close]').onclick = () => { sheet.close(); onChange?.(); };
+      body.querySelector('[data-tab]').onclick = e => {
+        const b = e.target.closest('button[data-v]');
+        if (b && b.dataset.v !== tab) { tab = b.dataset.v; draw(); }
+      };
+      const pane = body.querySelector('[data-pane]');
+      if (tab === 'recipes') return recipesPanel(pane, onChange);
+      pane.innerHTML = `
         <div class="search">${icon.search}<input type="search" placeholder="جست‌وجو" value="${esc(query)}"></div>
         <button class="btn block" data-new>${icon.plus} غذای جدید</button>
         <div class="food-list bank"></div>`;
@@ -20,17 +35,17 @@ export function openFoodBank(onChange) {
       const list = body.querySelector('.food-list');
       const paint = () => {
         const q = norm(query);
+        const cooked = new Set(recipes().map(r => r.food_id));
         const foods = store.get().foods.filter(f => !q || norm(f.name).includes(q))
           .sort((a, b) => a.name.localeCompare(b.name, 'fa'));
         list.innerHTML = foods.map(f => `
           <button class="food-row" data-id="${f.id}">
             <span class="fname">${esc(f.name)}</span>
-            <span class="fmeta">${foodMeta(f)} · ${CATEGORIES[f.category] || 'سایر'}</span>
+            <span class="fmeta">${foodMeta(f)} · ${CATEGORIES[f.category] || 'سایر'}${cooked.has(f.id) ? ' · از رسپی' : ''}</span>
           </button>`).join('') || '<div class="empty">چیزی پیدا نشد.</div>';
       };
       paint();
       input.addEventListener('input', () => { query = input.value; paint(); });
-      body.querySelector('[data-close]').onclick = () => { sheet.close(); onChange?.(); };
       body.querySelector('[data-new]').onclick = () => openFoodForm(null, () => { paint(); onChange?.(); });
       list.addEventListener('click', e => {
         const b = e.target.closest('[data-id]');

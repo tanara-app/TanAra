@@ -14,6 +14,7 @@ import { lossStart } from '../domain/phase.js';
 import { sortedWeights } from '../domain/stats.js';
 import { today, parse, addDays, diffDays } from '../lib/dates.js';
 import { vaultSummary } from '../ui/vault.js';
+import { perUnit } from '../domain/recipe.js';
 
 const URL_ = `${SUPABASE_URL}/functions/v1/hooshvareh`;
 let getToken = null; // async () => access token, or null when signed out / local mode
@@ -103,7 +104,9 @@ function context() {
     plan: planContext(s, t),
     magazine: magazineContext(s),
     focus: focusKey,
-    notes: s.ai_notes.filter(n => !['thread', 'plan', 'pick', 'mag'].includes(n.kind)).map(({ key, text, created_at }) => ({ key, text, created_at })),
+    // their own recipes, as one unit of the finished dish and what goes in it
+    recipes: s.ai_notes.filter(n => n.kind === 'recipe' && n.data?.items?.length).map(({ data: r }) => ({ name: r.name, ...perUnit(r), in_bank: s.foods.some(f => f.id === r.food_id), items: r.items.map(i => `${i.name} ${Math.round(i.grams)} g`) })),
+    notes: s.ai_notes.filter(n => !['thread', 'plan', 'pick', 'mag', 'recipe'].includes(n.kind)).map(({ key, text, created_at }) => ({ key, text, created_at })),
   };
 }
 
@@ -127,7 +130,7 @@ async function post(body) {
   return res;
 }
 
-// One-shot modes: tip, quote, review, progress, estimate, photo, title, plan, plan_option, plan_swap, magazine. Resolves to the result object.
+// One-shot modes: tip, quote, review, progress, estimate, photo, recipe, title, plan, plan_option, plan_swap, magazine. Resolves to the result object.
 export async function ask(mode, input = {}) {
   const res = await post({ mode, input });
   const j = await res.json();
