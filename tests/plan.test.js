@@ -1,5 +1,5 @@
 import { suite, test, eq, ok, near } from './harness.js';
-import { budgets, fitOption, buildPlan, optionBudget, planOn, previousPlan, planEnd, planDayNo, planOver, picksOn, dayAdherence, adherence, newFoods, optionText, swapItem, restoreItem, sameItems, swapSuggestions, swapsOn, dayPlan, offOn, slotExtras, slotRoom, SLOTS } from '../js/domain/plan.js';
+import { budgets, fitOption, buildPlan, optionBudget, planOn, previousPlan, planEnd, planDayNo, planOver, picksOn, dayAdherence, adherence, newFoods, optionText, swapItem, restoreItem, sameItems, swapSuggestions, swapsOn, dayPlan, offOn, slotExtras, slotRoom, shrinkOption, roomPlan, SLOTS } from '../js/domain/plan.js';
 
 const food = (id, unit, kcal, protein = 0, extra = {}) => ({ id, name: id, unit, kcal, protein, grams: 100, is_veg: false, created_at: '2026-01-01T00:00:00Z', ...extra });
 const FOODS = [
@@ -203,5 +203,29 @@ suite('plan', () => {
     eq(slotRoom(plan, 'snack1', {}, [e('q', 'snack', b.snack1 * 0.95)], entries).locked, true);
     eq(slotRoom(plan, 'snack1', {}, [e('q', 'snack', b.snack1 + 80)], entries).left, -80);
     eq(slotRoom(plan, 'dinner', {}, [], entries).locked, false);
+  });
+
+  test('after off-plan food the options still open are cut down to what is left', () => {
+    const e = (id, meal, kcal) => ({ id, day: '2026-02-03', meal, kcal, created_at: id });
+    const b = budgets(plan.kcal);
+    const extras = [e('x', 'lunch', b.lunch * 0.4)];
+    const rooms = { lunch: slotRoom(plan, 'lunch', {}, extras, extras), dinner: slotRoom(plan, 'dinner', {}, [], []) };
+    const p = roomPlan(plan, {}, rooms, byId);
+    eq(p.slots.dinner, plan.slots.dinner);
+    p.slots.lunch.options.forEach((o, n) => {
+      const full = plan.slots.lunch.options[n];
+      if (o.over) return eq(shrinkOption(full, byId, rooms.lunch.left), null);
+      ok(o.fit && o.kcal <= rooms.lunch.left * 1.15, `${o.id} ${o.kcal} of ${rooms.lunch.left}`);
+      eq([o.id, o.items.map(i => i.food_id)], [full.id, full.items.map(i => i.food_id)]);
+    });
+    ok(p.slots.lunch.options.some(o => o.fit), 'at least one option fits');
+    eq(plan.slots.lunch.options.some(o => o.fit || o.over), false); // the stored plan is untouched
+
+    // an option already ticked stays as it was eaten
+    const first = plan.slots.lunch.options[0];
+    const picked = roomPlan(plan, { lunch: [{ o: first.id, e: ['x'] }] }, rooms, byId);
+    eq(picked.slots.lunch, plan.slots.lunch);
+    // a food that left the bank: the option can't be resized
+    eq(shrinkOption(first, new Map(), 100), null);
   });
 });

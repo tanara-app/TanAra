@@ -8,7 +8,7 @@ import { effectiveTargets, hasMedicalFlag } from '../domain/targets.js';
 import {
   SLOTS, PLAN_DAYS, budgets, buildPlan, fitOption, optionBudget, planOn, planEnd, planDayNo, planOver,
   picksOn, dayAdherence, newFoods, optionText,
-  swapItem, restoreItem, sameItems, swapSuggestions, swapsOn, dayPlan, offOn, slotExtras, slotRoom,
+  swapItem, restoreItem, sameItems, swapSuggestions, swapsOn, dayPlan, offOn, slotExtras, slotRoom, roomPlan,
 } from '../domain/plan.js';
 import { ask, aiAvailable, md, sparkle } from '../ai/hooshvareh.js';
 import { fa, esc, norm } from '../lib/fa.js';
@@ -138,31 +138,57 @@ const entryOf = (day, key, i) => ({
   day, meal: SLOTS[key].meal, food_id: i.food_id, name: i.name, unit: i.unit, qty: i.qty, kcal: i.kcal, protein: i.protein, is_veg: i.is_veg,
 });
 
-function toggle(day, plan, key, optId) {
+/*
+  A day as the plan screen shows it: the plan in force with that day's own versions of options,
+  and — where off-plan food took part of an occasion — the options cut down to what is left.
+  Null when no plan covers the day.
+*/
+function dayView(day) {
   const s = store.get();
   const picks = picksOn(s.ai_notes, s.entries, day);
+  const ticked = new Set(Object.values(picks).flatMap(l => l.map(p => p.o)));
+  // a cut-down version is only kept while it is ticked
+  const swaps = Object.fromEntries(Object.entries(swapsOn(s.ai_notes, day)).map(([id, o]) => [id, o.fit && !ticked.has(id) ? o.base : o]).filter(([, o]) => o));
+  const base = dayPlan(planOn(s.ai_notes, day), swaps);
+  if (!base) return null;
+  const extras = slotExtras(s.entries, picks, offOn(s.ai_notes, day), day);
+  const rooms = Object.fromEntries(Object.keys(SLOTS).map(k => [k, slotRoom(base, k, picks, extras[k], s.entries)]));
+  return { plan: roomPlan(base, picks, rooms, new Map(s.foods.map(f => [f.id, f]))), picks, extras, rooms };
+}
+
+function toggle(day, key, optId) {
+  const s = store.get();
+  const v = dayView(day);
+  if (!v) return;
+  const { plan, picks } = v;
+  const swaps = { ...swapsOn(s.ai_notes, day) };
   const cur = picks[key] || [];
   const had = cur.find(p => p.o === optId);
   const remove = p => p.e.forEach(id => { if (s.entries.some(e => e.id === id)) store.deleteEntry(id); });
+  // unticked, a cut-down option goes back to what it was
+  const unfit = id => { if (swaps[id]?.fit) { if (swaps[id].base) swaps[id] = swaps[id].base; else delete swaps[id]; } };
   if (had) {
     remove(had);
+    unfit(optId);
     picks[key] = cur.filter(p => p !== had);
   } else {
     const opt = plan.slots[key].options.find(o => o.id === optId);
     if (!opt) return;
-    const extras = slotExtras(s.entries, picks, offOn(s.ai_notes, day), day)[key];
-    if (slotRoom(plan, key, picks, extras, s.entries).locked) return toast('سهم این وعده با خوراکی خارج از برنامه پر شده');
+    if (v.rooms[key].locked) return toast('سهم این وعده با خوراکی خارج از برنامه پر شده');
+    if (opt.over) return toast('این گزینه در باقی‌مانده‌ی سهم این وعده جا نمی‌شود');
     const n = plan.slots[key].pick;
     if (cur.length >= n) {
       if (n > 1) return toast('دو گزینه را برداشته‌ای؛ برای عوض کردن، اول یکی را بردار');
-      cur.forEach(remove); // a single choice just moves
+      cur.forEach(p => { remove(p); unfit(p.o); }); // a single choice just moves
       cur.length = 0;
     }
+    // eaten smaller than planned: that version stays with the day, so the card shows what was logged
+    if (opt.fit) swaps[optId] = swaps[optId] && !swaps[optId].fit ? { ...opt, base: swaps[optId] } : opt;
     const ids = opt.items.map(i => store.saveEntry(entryOf(day, key, i)).id);
     picks[key] = [...cur, { o: optId, e: ids, t: optionText(opt) }];
   }
   if (!picks[key].length) delete picks[key];
-  savePicks(day, picks);
+  savePicks(day, picks, swaps);
 }
 
 /* ---------------- swapping one food of an option ---------------- */
@@ -182,6 +208,9 @@ function optionOn(day, key, optId) {
   place, and if the option is already ticked on that day its logged food is replaced too.
   Returns the option as it now reads, or null when it is no longer there.
 */
+// The calories a replacement aims at: the plan's own for that place, or the cut-down ones when the option was eaten smaller.
+const sized = (shown, stored, index) => (shown.fit ? shown.items[index] : stored.items[index]).kcal;
+
 export function applySwap({ day, slot: key, opt: optId, index, food, scope = 'day' }) {
   const at = optionOn(day, key, optId);
   if (!at?.stored.items[index]) return null;
@@ -196,11 +225,11 @@ export function applySwap({ day, slot: key, opt: optId, index, food, scope = 'da
     data.slots[key].options = data.slots[key].options.map(o => (o.id === optId ? fresh : o));
     store.saveNote({ key: cur.key, kind: 'plan', text: cur.text, data });
     // a version kept for this day follows, so its other swaps stay
-    next = swaps[optId] ? swapItem(swaps[optId], index, food, stored.items[index].kcal) : fresh;
+    next = swaps[optId] ? swapItem(swaps[optId], index, food, sized(swaps[optId], stored, index)) : fresh;
     delete next.items[index].was;
     if (sameItems(next, fresh)) { delete swaps[optId]; next = fresh; } else swaps[optId] = next;
   } else {
-    next = food ? swapItem(at.shown, index, food, stored.items[index].kcal) : restoreItem(at.shown, index, stored);
+    next = food ? swapItem(at.shown, index, food, sized(at.shown, stored, index)) : restoreItem(at.shown, index, stored);
     if (sameItems(next, stored)) { delete swaps[optId]; next = stored; } else swaps[optId] = next;
   }
 
@@ -224,7 +253,7 @@ function openSwap(day, key, optId, index) {
   const first = optionOn(day, key, optId);
   const old = first?.shown.items[index];
   if (!old) return;
-  const base = first.stored.items[index];
+  const base = (first.shown.fit ? first.shown : first.stored).items[index];
   const showKcal = !!store.profile().planKcal;
   let query = '';
   let ai = null; // null · 'wait' · [{ food, why }]
@@ -357,12 +386,16 @@ const itemLine = (only, need, canSwap) => (i, n) => `<li>
 const r10 = x => Math.round(x / 10) * 10;
 
 // Under the off-plan foods of an occasion: what is left of its calories, or that it is used up.
-function roomNote(key, room) {
+// `cut`: options were made smaller to fit; `over`: how many could not be.
+function roomNote(key, room, cut, over) {
   const left = r10(room.left);
   const label = SLOTS[key].label;
   const state = left > 0 ? `${room.locked ? 'فقط ' : ''}<b>${fa(left)}</b> کالری از سهم ${label} مانده`
     : left < 0 ? `<b>${fa(-left)}</b> کالری از سهم ${label} بیشتر شده` : `سهم ${label} پر شده`;
-  return `<p class="room small${room.locked ? ' lock' : ''}">${room.locked ? icon.lock : ''}<span>${state}${room.locked ? '؛ گزینه‌های این وعده قفل شد. اگر ثبت خارج از برنامه را برداری، دوباره باز می‌شوند.' : '.'}</span></p>`;
+  const then = room.locked ? '؛ گزینه‌های این وعده قفل شد. اگر ثبت خارج از برنامه را برداری، دوباره باز می‌شوند.'
+    : cut ? `؛ مقدار گزینه‌ها به همین اندازه کم شد${over ? ` (${fa(over)} گزینه آن‌قدر کوچک نمی‌شود و کنار رفت)` : ''}.`
+    : over ? '؛ هیچ‌کدام از گزینه‌ها آن‌قدر کوچک نمی‌شود.' : '.';
+  return `<p class="room small${room.locked ? ' lock' : ''}">${room.locked ? icon.lock : ''}<span>${state}${then}</span></p>`;
 }
 
 /*
@@ -375,6 +408,8 @@ function slotCard(plan, key, day, picks, extras, room, showKcal, only, need) {
   const mine = picks[key] || [];
   const full = mine.length >= slot.pick;
   const known = new Set(slot.options.map(o => o.id));
+  const offer = slot.options.filter(o => !o.over); // the rest no longer fit what off-plan food left
+  const over = slot.options.length - offer.length;
   // ticked before the plan was replaced: still shown, so it can be unticked
   const orphans = mine.filter(p => !known.has(p.o));
   const isOn = o => mine.some(p => p.o === o.id);
@@ -389,7 +424,7 @@ function slotCard(plan, key, day, picks, extras, room, showKcal, only, need) {
         ${o.title ? `<small class="muted popt-sum">${esc(names)}</small>` : ''}
         <div class="popt-more">
           <ul>${o.items.map(itemLine(only, need, !o.slot)).join('')}</ul>
-          ${o.slot ? `<small class="was">برای باقی‌مانده‌ی سهم این وعده · ${only}</small>` : ''}
+          ${o.slot || o.fit ? `<small class="was">${o.fit ? 'کوچک‌شده' : 'برای باقی‌مانده‌ی سهم این وعده'} · ${only}</small>` : ''}
           ${showKcal ? `<small class="muted">${fa(o.kcal)} کالری · ${fa(Math.round(o.protein))} گرم پروتئین</small>` : ''}
         </div>
       </div>
@@ -397,14 +432,14 @@ function slotCard(plan, key, day, picks, extras, room, showKcal, only, need) {
   };
   const wait = busySlots.has(key) ? '<p class="muted small ai-wait"><span class="typing"><i></i><i></i><i></i></span> دارم یک گزینه‌ی دیگر پیدا می‌کنم…</p>' : '';
   const more = !aiAvailable() || wait ? '' : `<button class="link small ai-more" data-more="${key}">${sparkle(14)} هیچ‌کدام را ندارم؛ یک گزینه‌ی دیگر</button>`;
-  const rest = slot.options.filter(o => !isOn(o));
+  const rest = offer.filter(o => !isOn(o));
   const left = r10(room.left);
   // what is left is too little for a whole option: Hooshvareh can size one to it
-  const fit = extras.length && !full && !room.locked && !wait && aiAvailable() && left >= 50 && rest.every(o => o.kcal > room.left * 1.15)
+  const fit = extras.length && !full && !room.locked && !wait && aiAvailable() && left >= 50 && !rest.length
     ? `<button class="link small ai-more" data-fit="${key}" data-kcal="${left}">${sparkle(14)} هوشواره گزینه‌ای برای همین ${fa(left)} کالری بچیند</button>` : '';
   const unfolded = shown.has(`${day}|${key}`);
   const options = room.locked ? slot.options.filter(isOn).map(option).join('')
-    : !full ? slot.options.map(option).join('')
+    : !full ? offer.map(option).join('')
     : `${slot.options.filter(isOn).map(option).join('')}
       ${rest.length ? `<button class="link small fold-btn" data-fold="${key}" aria-expanded="${unfolded}">${fa(rest.length)} گزینه‌ی دیگر ${icon.chevD}</button>
       <div class="fold"${unfolded ? '' : ' hidden'}>${rest.map(option).join('')}${more}</div>` : ''}`;
@@ -421,7 +456,7 @@ function slotCard(plan, key, day, picks, extras, room, showKcal, only, need) {
     ${extras.length ? `<h3 class="list-h">خارج از برنامه</h3>${extras.map(e => `
       <button class="entry" data-entry="${e.id}">
         <span class="ename">${esc(e.name)}</span><span class="eqty">${amountLabel(Number(e.qty), e.unit)}</span><span class="ekcal">${fa(Math.round(e.kcal))}</span>
-      </button>`).join('')}${roomNote(key, room)}${fit}` : ''}
+      </button>`).join('')}${roomNote(key, room, rest.some(o => o.fit), over)}${fit}` : ''}
     ${wait}${full || room.locked ? '' : more}
   </div>`;
 }
@@ -434,7 +469,8 @@ const waiting = () => `<section class="card ai-card">${head('رژیم هوشوا
 */
 export function planHtml(day) {
   const s = store.get();
-  const plan = dayPlan(planOn(s.ai_notes, day), swapsOn(s.ai_notes, day));
+  const view = dayView(day);
+  const plan = view?.plan;
   const isToday = day === today();
   if (!plan) {
     if (!isToday) return '';
@@ -448,15 +484,14 @@ export function planHtml(day) {
 
   const p = store.profile();
   const showKcal = !!p.planKcal;
-  const picks = picksOn(s.ai_notes, s.entries, day);
+  const { picks, extras, rooms } = view;
   const a = dayAdherence(plan, picks);
   const over = planOver(plan, today());
   const fresh = isToday && !over ? newFoods(plan, s.foods) : [];
   const dayNo = planDayNo(plan, day);
   const keys = Object.keys(SLOTS);
   const need = neededFoods(shopList(s.ai_notes)); // foods of the plan waiting on the shopping list
-  const extras = slotExtras(s.entries, picks, offOn(s.ai_notes, day), day);
-  const card = k => slotCard(plan, k, day, picks, extras[k], slotRoom(plan, k, picks, extras[k], s.entries), showKcal, onlyWord(day), need);
+  const card = k => slotCard(plan, k, day, picks, extras[k], rooms[k], showKcal, onlyWord(day), need);
 
   return `
     ${busy ? waiting() : ''}
@@ -499,7 +534,7 @@ export function planHtml(day) {
 export function bindPlan(root, day, redraw) {
   refresh = redraw;
   const s = store.get();
-  const plan = dayPlan(planOn(s.ai_notes, day), swapsOn(s.ai_notes, day));
+  const plan = dayView(day)?.plan;
   const startNew = () => openPrefs(() => generate());
 
   root.querySelectorAll('[data-plan-new]').forEach(b => b.onclick = startNew);
@@ -523,7 +558,7 @@ export function bindPlan(root, day, redraw) {
     const swap = e.target.closest('[data-swap]');
     if (swap) return openSwap(day, b.dataset.slot, b.dataset.opt, Number(swap.dataset.swap));
     // the tick picks; anywhere else on an option not yet picked unfolds its foods
-    if (e.target.closest('.tick') || b.matches('button')) return toggle(day, plan, b.dataset.slot, b.dataset.opt);
+    if (e.target.closest('.tick') || b.matches('button')) return toggle(day, b.dataset.slot, b.dataset.opt);
     if (b.classList.contains('on')) return;
     const k = `${day}|${b.dataset.opt}`;
     b.classList.toggle('open', !opened.delete(k) && !!opened.add(k));

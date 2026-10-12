@@ -249,7 +249,36 @@ export function slotRoom(plan, key, picks, extras, entries) {
   const kcal = list => list.reduce((t, e) => t + (Number(e.kcal) || 0), 0);
   const eaten = Math.round(kcal(extras) + kcal(entries.filter(e => mine.has(e.id))));
   const open = (picks[key]?.length || 0) < plan.slots[key].pick;
-  return { budget, eaten, left: budget - eaten, locked: extras.length > 0 && open && budget - eaten < budget * 0.1 };
+  return { budget, eaten, left: budget - eaten, extras: extras.length, locked: extras.length > 0 && open && budget - eaten < budget * 0.1 };
+}
+
+/*
+  The option cut down to about `kcal`: same foods, amounts refitted in measurable steps (see
+  fitOption). Null when it can't get there, or a food of it has left the bank or changed unit.
+*/
+export function shrinkOption(option, foodsById, kcal) {
+  if (option.items.some(i => foodsById.get(i.food_id)?.unit !== i.unit)) return null;
+  const o = fitOption({ title: option.title, items: option.items.map(i => ({ food_id: i.food_id, qty: i.qty })) }, foodsById, kcal, option.id);
+  if (!o) return null;
+  o.items.forEach((i, n) => { if (option.items[n].was) i.was = option.items[n].was; });
+  return { ...option, ...o, fit: true };
+}
+
+/*
+  The plan as it is offered once off-plan food has taken part of an occasion (`rooms`: slotRoom
+  per slot): the options still to be picked are cut down to what is left, shared between the
+  picks still open. One that can't be made that small is marked `over` — it no longer fits.
+*/
+export function roomPlan(plan, picks, rooms, foodsById) {
+  const slots = Object.fromEntries(Object.entries(plan.slots).map(([k, s]) => {
+    const r = rooms[k];
+    const open = s.pick - (picks[k]?.length || 0);
+    if (!r?.extras || r.locked || open <= 0) return [k, s];
+    const each = r.left / open;
+    const on = new Set(picks[k]?.map(p => p.o));
+    return [k, { ...s, options: s.options.map(o => (on.has(o.id) || o.kcal <= each * 1.15 ? o : shrinkOption(o, foodsById, each) || { ...o, over: true })) }];
+  }));
+  return { ...plan, slots };
 }
 
 // How many of the day's occasions were eaten as planned.
