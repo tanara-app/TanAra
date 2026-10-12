@@ -4,7 +4,7 @@
    Supabase API calls are never touched. Bump CACHE when the shell list changes.
    Only old shell caches are cleared on activate: «tanara-vault» (see store.js) must survive.
    Also shows the push reminders sent by the `remind` Edge Function (see ui/reminders.js). */
-const CACHE = 'tanara-shell-v12';
+const CACHE = 'tanara-shell-v13';
 const SHELL = [
   './', './index.html', './manifest.json', './css/app.css',
   './js/app.js', './js/config.js',
@@ -16,7 +16,7 @@ const SHELL = [
   './js/ui/progress.js', './js/ui/review.js', './js/ui/profile.js', './js/ui/login.js', './js/ui/chart.js', './js/ui/notices.js', './js/ui/motivation.js', './js/ui/vault.js',
   './js/ai/hooshvareh.js', './js/ui/chat.js', './js/ui/aiCards.js', './js/ui/units.js', './js/ui/plan.js', './js/ui/magazine.js',
   './js/ui/phase.js', './js/ui/reminders.js', './js/ui/usage.js', './js/ui/photo.js',
-  './favicon-32-v2.png', './icon-192-v2.png', './icon-512-v2.png', './icon-maskable-192-v2.png', './icon-maskable-512-v2.png', './apple-touch-icon-v2.png',
+  './favicon-32-v2.png', './icon-192-v2.png', './icon-512-v2.png', './icon-maskable-192-v2.png', './icon-maskable-512-v2.png', './apple-touch-icon-v2.png', './badge-96.png',
 ];
 const VENDOR_HOSTS = ['cdn.jsdelivr.net', 'fonts.googleapis.com', 'fonts.gstatic.com'];
 
@@ -58,8 +58,10 @@ self.addEventListener('fetch', e => {
 self.addEventListener('push', e => {
   let d = {};
   try { d = e.data.json(); } catch { /* an empty push still has to show something */ }
+  // badge is the small status-bar icon: Android keeps only its alpha channel, so it has to be
+  // a transparent white silhouette (an opaque icon shows up as a plain white square)
   e.waitUntil(self.registration.showNotification(d.title || 'تن‌آرا', {
-    body: d.body || '', tag: d.tag || 'tanara', icon: './icon-192-v2.png', badge: './icon-maskable-192-v2.png',
+    body: d.body || '', tag: d.tag || 'tanara', icon: './icon-192-v2.png', badge: './badge-96.png',
     dir: 'rtl', lang: 'fa', data: { url: d.url || './' },
   }));
 });
