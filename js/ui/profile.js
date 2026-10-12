@@ -1,17 +1,18 @@
-// Profile & settings: targets, questionnaire edit, data export/import, account.
+// Profile & settings: the targets and the phase up front; everything else (my details,
+// reminders, motivations, food bank, AI use, data, account) is one list of rows that open sheets.
 import * as store from '../data/store.js';
 import { effectiveTargets, clampKcal, safeFloor, hasMedicalFlag, ACTIVITY, CONDITIONS } from '../domain/targets.js';
-import { sortedWeights, waistSeries } from '../domain/stats.js';
+import { sortedWeights } from '../domain/stats.js';
 import { nextTargets } from '../domain/energy.js';
 import { fa, kcal50, parseNum, esc } from '../lib/fa.js';
 import { today, faDMY } from '../lib/dates.js';
 import { sheet, toast, confirmBox, icon } from './dom.js';
 import { fieldsHtml, readFields, bindChoices, validate, medicalNoteHtml, targetsHtml } from './onboarding.js';
 import { openFoodBank } from './foodBank.js';
-import { openMotivationList, openMotivationEditor } from './motivation.js';
+import { openMotivationList } from './motivation.js';
 import { bindVault } from './vault.js';
 import { phaseCard, bindPhase } from './phase.js';
-import { remindersCard, bindReminders } from './reminders.js';
+import { remindersLine, bindReminders } from './reminders.js';
 import { openUsage } from './usage.js';
 import { aiAvailable } from '../ai/hooshvareh.js';
 
@@ -34,13 +35,13 @@ export function recalcTargets() {
   return t;
 }
 
+const row = (attr, title, sub) => `<button class="set-row" ${attr}><span class="grow"><b>${title}</b>${sub ? `<small class="muted">${sub}</small>` : ''}</span>${icon.chevL}</button>`;
+
 export function renderProfile(root) {
   const s = store.get();
   const p = store.profile();
   const eff = effectiveTargets(p);
-  const kg = latestWeight();
   const st = store.syncStatus;
-  const waist = waistSeries(s.waists, p).pop()?.cm || null;
 
   root.innerHTML = `
     <header class="page-head"><h1>نمایه</h1></header>
@@ -58,62 +59,17 @@ export function renderProfile(root) {
       </div>
     </section>
 
-    <section class="card">
-      <h2 class="card-h">اطلاعات من</h2>
-      <dl class="calc">
-        <div><dt>سن</dt><dd>${fa(p.age)}</dd></div>
-        <div><dt>جنس</dt><dd>${p.sex === 'male' ? 'مرد' : 'زن'}</dd></div>
-        <div><dt>قد</dt><dd>${fa(p.heightCm, 1)} سانتی‌متر</dd></div>
-        <div><dt>آخرین وزن</dt><dd>${kg ? `${fa(kg, 1)} کیلو` : '—'}</dd></div>
-        ${waist ? `<div><dt>دور کمر</dt><dd>${fa(waist, 1)} سانتی‌متر</dd></div>` : ''}
-        <div><dt>فعالیت</dt><dd>${ACTIVITY[p.activity]?.label || '—'}</dd></div>
-        <div><dt>بیماری‌ها</dt><dd>${p.conditions?.length ? p.conditions.map(c => CONDITIONS[c]).join('، ') : 'ندارم'}</dd></div>
-        ${p.medications ? `<div><dt>داروها</dt><dd>${esc(p.medications)}</dd></div>` : ''}
-      </dl>
-      <button class="btn block" data-edit>${icon.edit} ویرایش اطلاعات</button>
-    </section>
-
     ${phaseCard()}
 
-    ${remindersCard()}
-
-    <section class="card">
-      <h2 class="card-h">انگیزه‌ها</h2>
-      <p class="muted small">${s.motivations.length ? `${fa(s.motivations.length)} انگیزه ثبت کرده‌اید؛ هر روز بالای صفحه‌ی «امروز» نشان داده می‌شوند.` : 'رویدادی که منتظرش هستید، عکس بدنی که می‌خواهید، عکسی از خودتان یا یک جمله؛ هر روز بالای صفحه‌ی «امروز» می‌بینیدشان.'}</p>
-      <div class="row gap">
-        ${s.motivations.length ? '<button class="btn grow" data-mots>مدیریت انگیزه‌ها</button>' : ''}
-        <button class="btn grow" data-mot-new>افزودن انگیزه</button>
-      </div>
-      <button class="btn block vault-entry" data-vault-open>${icon.lock} صندوقچه‌ی خصوصی${s.vault?.length ? ` · ${fa(s.vault.length)} مورد` : ''}</button>
-      <p class="muted small">عکس‌ها و ویدیوهای شخصی‌ای که انگیزه می‌دهند؛ با رمز شش‌رقمی باز می‌شود.</p>
-    </section>
-
-    ${aiAvailable() ? `<section class="card">
-      <h2 class="card-h">هوشواره</h2>
-      <p class="muted small">هر کاری که هوشواره می‌کند (گفت‌وگو، مجله، رژیم، تخمین غذا…) توکن مصرف می‌کند. این‌جا می‌بینی هر کدام چقدر هزینه داشته.</p>
-      <button class="btn block" data-usage>مصرف هوشواره</button>
-    </section>` : ''}
-
-    <section class="card">
-      <h2 class="card-h">داده‌ها</h2>
-      <p class="muted small">یک فایل از همه‌ی داده‌ها بگیرید و جایی نگه دارید. با وارد کردن همان فایل، همه چیز برمی‌گردد.</p>
-      <div class="row gap">
-        <button class="btn grow" data-export>گرفتن خروجی</button>
-        <label class="btn grow file-btn">وارد کردن فایل<input type="file" accept="application/json,.json" hidden data-import></label>
-      </div>
-      <div class="row gap mt">
-        <button class="btn grow" data-bank>بانک غذا</button>
-        <button class="btn grow" data-defaults>بازگرداندن غذاهای پیش‌فرض</button>
-      </div>
-    </section>
-
-    <section class="card">
-      <h2 class="card-h">حساب</h2>
-      ${session.local
-        ? '<p class="muted small">حالت آزمایشی محلی — داده‌ها فقط روی همین مرورگر است.</p>'
-        : `<p class="small">${esc(session.email || '')}</p>
-           <p class="muted small">${st.pending ? `${fa(st.pending)} تغییر در صف ارسال به سرور` : 'همه چیز روی سرور ذخیره شده'}${st.error ? ` · ${esc(st.error)}` : ''}</p>
-           <button class="btn block" data-signout>خروج از حساب</button>`}
+    <section class="card set-list">
+      ${row('data-edit', 'اطلاعات من', `${fa(p.age)} ساله · قد ${fa(p.heightCm, 1)} · ${ACTIVITY[p.activity]?.label || ''}${p.conditions?.length ? ` · ${p.conditions.map(c => CONDITIONS[c]).join('، ')}` : ''}`)}
+      ${row('data-reminders', 'یادآورها', remindersLine())}
+      ${row('data-mots', 'انگیزه‌ها', s.motivations.length ? `${fa(s.motivations.length)} مورد؛ بالای صفحه‌ی «امروز»` : 'هنوز چیزی اضافه نکرده‌ای')}
+      ${row('data-vault-open', 'صندوقچه‌ی خصوصی', `${s.vault?.length ? `${fa(s.vault.length)} مورد · ` : ''}با رمز شش‌رقمی`)}
+      ${row('data-bank', 'بانک غذا', `${fa(s.foods.length)} غذا`)}
+      ${aiAvailable() ? row('data-usage', 'مصرف هوشواره', 'هر کار هوشواره چقدر هزینه داشته') : ''}
+      ${row('data-data', 'داده‌ها و پشتیبان', 'خروجی گرفتن، برگرداندن، غذاهای پیش‌فرض')}
+      ${row('data-account', 'حساب', session.local ? 'حالت آزمایشی محلی' : `${esc(session.email || '')}${st.pending ? ` · ${fa(st.pending)} تغییر در صف` : ''}`)}
     </section>
     <p class="muted small center">تن‌آرا · نسخه‌ی ۱</p>`;
 
@@ -124,22 +80,54 @@ export function renderProfile(root) {
   };
   root.querySelector('[data-manual]').onclick = () => openManual(p);
   root.querySelector('[data-edit]').onclick = () => openEdit(p);
-  root.querySelector('[data-export]').onclick = doExport;
-  root.querySelector('[data-import]').onchange = e => doImport(e.target);
-  root.querySelector('[data-mots]')?.addEventListener('click', () => openMotivationList());
-  root.querySelector('[data-mot-new]').onclick = () => openMotivationEditor();
+  root.querySelector('[data-mots]').onclick = () => openMotivationList();
   bindVault(root);
   bindPhase(root);
   bindReminders(root);
   root.querySelector('[data-usage]')?.addEventListener('click', openUsage);
   root.querySelector('[data-bank]').onclick = () => openFoodBank();
-  root.querySelector('[data-defaults]').onclick = () => {
-    const n = store.restoreDefaultFoods();
-    toast(n ? `${fa(n)} غذا برگشت` : 'همه‌ی غذاهای پیش‌فرض در بانک هست');
-  };
-  root.querySelector('[data-signout]')?.addEventListener('click', async () => {
-    if (store.syncStatus.pending && !(await confirmBox('هنوز چند تغییر به سرور نرسیده و با خروج از دست می‌رود. خارج می‌شوید؟', 'خروج'))) return;
-    session.signOut?.();
+  root.querySelector('[data-data]').onclick = openData;
+  root.querySelector('[data-account]').onclick = openAccount;
+}
+
+function openData() {
+  sheet.open(body => {
+    body.innerHTML = `
+      <div class="sheet-head"><h2>داده‌ها و پشتیبان</h2><button class="icon-btn" data-close aria-label="بستن">${icon.close}</button></div>
+      <div class="stack">
+        <p class="muted small">یک فایل از همه‌ی داده‌ها بگیر و جایی نگه دار. با وارد کردن همان فایل، همه چیز برمی‌گردد.</p>
+        <button class="btn block" data-export>گرفتن خروجی</button>
+        <label class="btn block file-btn">وارد کردن فایل<input type="file" accept="application/json,.json" hidden data-import></label>
+        <button class="btn block" data-defaults>بازگرداندن غذاهای پیش‌فرض</button>
+      </div>`;
+    body.querySelector('[data-close]').onclick = () => sheet.close();
+    body.querySelector('[data-export]').onclick = doExport;
+    body.querySelector('[data-import]').onchange = async e => { if (await doImport(e.target)) sheet.close(); };
+    body.querySelector('[data-defaults]').onclick = () => {
+      const n = store.restoreDefaultFoods();
+      toast(n ? `${fa(n)} غذا برگشت` : 'همه‌ی غذاهای پیش‌فرض در بانک هست');
+    };
+  });
+}
+
+function openAccount() {
+  const st = store.syncStatus;
+  sheet.open(body => {
+    body.innerHTML = `
+      <div class="sheet-head"><h2>حساب</h2><button class="icon-btn" data-close aria-label="بستن">${icon.close}</button></div>
+      <div class="stack">
+        ${session.local
+          ? '<p class="muted small">حالت آزمایشی محلی — داده‌ها فقط روی همین مرورگر است.</p>'
+          : `<p>${esc(session.email || '')}</p>
+             <p class="muted small">${st.pending ? `${fa(st.pending)} تغییر در صف ارسال به سرور` : 'همه چیز روی سرور ذخیره شده'}${st.error ? ` · ${esc(st.error)}` : ''}</p>
+             <button class="btn block" data-signout>خروج از حساب</button>`}
+      </div>`;
+    body.querySelector('[data-close]').onclick = () => sheet.close();
+    body.querySelector('[data-signout]')?.addEventListener('click', async () => {
+      if (store.syncStatus.pending && !(await confirmBox('هنوز چند تغییر به سرور نرسیده و با خروج از دست می‌رود. خارج می‌شوید؟', 'خروج'))) return;
+      sheet.close();
+      session.signOut?.();
+    });
   });
 }
 
@@ -177,7 +165,7 @@ function openEdit(p) {
       <div class="sheet-head"><h2>ویرایش اطلاعات</h2><button class="icon-btn" data-close aria-label="بستن">${icon.close}</button></div>
       <form class="stack" novalidate>
         ${fieldsHtml.basics(d)}
-        ${fieldsHtml.body(d, false)}
+        ${fieldsHtml.body(d, false, false)}
         <h3 class="list-h">فعالیت</h3>${fieldsHtml.activity(d)}
         <h3 class="list-h">سلامت</h3>${fieldsHtml.health(d)}
         ${fieldsHtml.ed(d)}
@@ -230,4 +218,5 @@ async function doImport(input) {
   if (!(await confirmBox(`همه‌ی داده‌های فعلی با محتوای این فایل (${fa(n)} ثبت غذا، ${fa(obj.data.weights.length)} وزن) جایگزین می‌شود. ادامه می‌دهید؟`, 'جایگزین کن'))) return;
   store.importData(obj);
   toast('داده‌ها برگشت');
+  return true;
 }

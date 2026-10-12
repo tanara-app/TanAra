@@ -650,3 +650,33 @@ body.kb .toast, body.chat-mode .toast { bottom: calc(var(--nav-h) + var(--safe-b
 .ritem .field > span { font-size: .78rem; white-space: nowrap; }
 .ritem .icon-btn.sm { background: var(--surface); flex: none; }
 .chip-btn.on { background: var(--ai-soft); border-color: var(--ai); color: var(--ai); }
+
+/* the check-in (weight + waist), folding cards, the settings list */
+.measure.due { box-shadow: inset 0 0 0 1.5px var(--accent); }
+.measure-state { display: grid; gap: 2px; margin-bottom: 12px; }
+.measure.due .measure-state b { color: var(--accent); }
+.measure-foot { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 6px 16px; margin-top: 10px; }
+.hint summary { list-style: none; cursor: pointer; display: inline-block; }
+.hint summary::-webkit-details-marker { display: none; }
+.hint[open] { flex-basis: 100%; }
+.hint p { margin-top: 6px; }
+.range-seg { margin-top: 10px; }
+.mrow { display: grid; grid-template-columns: 1fr 4.2rem 4.2rem; gap: 8px; align-items: center; width: 100%; text-align: start; }
+.mrow > :not(:first-child) { text-align: center; }
+.mhead { color: var(--muted); font-size: .8rem; padding: 0 2px 4px; border-bottom: 1px solid var(--line); }
+.fold > summary { list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.fold > summary::-webkit-details-marker { display: none; }
+.fold > summary > span { display: grid; gap: 2px; }
+.fold > summary small { color: var(--muted); font-size: .82rem; }
+.fold > summary::after { content: ''; width: 8px; height: 8px; flex: none; margin: 0 6px 4px; border: solid var(--muted); border-width: 0 0 2px 2px; transform: rotate(-45deg); transition: transform .2s; }
+.fold[open] > summary::after { transform: rotate(135deg); margin-bottom: -4px; }
+.fold[open] > summary { margin-bottom: 12px; }
+.set-list { padding: 4px 16px; }
+.set-row {
+  display: flex; align-items: center; gap: 12px; width: 100%; min-height: 60px; padding: 10px 0; text-align: start;
+  border: 0; border-bottom: 1px solid var(--line); background: none; cursor: pointer;
+}
+.set-row:last-child { border-bottom: 0; }
+.set-row b { display: block; font-weight: 600; }
+.set-row small { display: block; font-size: .8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.set-row svg { flex: none; color: var(--muted); }

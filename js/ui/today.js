@@ -16,6 +16,7 @@ import { vaultNudge, bindVault } from './vault.js';
 import { tipCard, bindTip } from './aiCards.js';
 import { magCard, bindMag } from './magazine.js';
 import { planHtml, bindPlan } from './plan.js';
+import { measureNote, bindMeasureNote } from './measure.js';
 
 let day = today();
 export const setDay = d => { day = d; };
@@ -72,6 +73,7 @@ export function renderToday(root) {
       <button type="button" role="tab" data-v="plan" aria-selected="${planMode}" class="${planMode ? 'on' : ''}">رژیم</button>
     </div>
 
+    ${isToday ? measureNote() : ''}
     ${isToday ? motivationCard() : ''}
     ${isToday ? vaultNudge() : ''}
     ${isToday ? tipCard() : ''}
@@ -144,6 +146,7 @@ export function renderToday(root) {
   bindMotivation(root);
   bindVault(root);
   bindPhase(root);
+  bindMeasureNote(root);
   root.querySelectorAll('[data-dismiss]').forEach(b => b.onclick = () => {
     const n = b.closest('[data-notice]');
     dismiss(n.dataset.notice, n.dataset.mark);

@@ -72,17 +72,13 @@ function save(patch) {
   store.saveProfile({ ...store.profile(), reminders: { log: cur.log, weigh: cur.weigh, ...patch, tz: tz() } });
 }
 
-/* ---------------- «نمایه»: the card and its sheet ---------------- */
+/* ---------------- «نمایه»: the row and its sheet ---------------- */
 
-export function remindersCard() {
+// One line for the settings list: what is on, and when.
+export function remindersLine() {
   const s = settings();
-  const line = !s.on ? 'اگر یادت برود غذا یا وزنت را ثبت کنی، تن‌آرا با یک اعلان خبرت می‌کند؛ حتی وقتی اپ بسته است.'
-    : [s.log.on ? `ثبت غذا: ساعت ${faDigits(s.log.at)}` : null, s.weigh.on ? `وزن‌کشی: ${EVERY.find(e => e[0] === Number(s.weigh.every))?.[1] || 'هر هفته'}، ساعت ${faDigits(s.weigh.at)}` : null].filter(Boolean).join(' · ') || 'هر دو یادآور خاموش‌اند.';
-  return `<section class="card">
-    <h2 class="card-h">یادآورها</h2>
-    <p class="muted small">${line}</p>
-    <button class="btn block" data-reminders>${s.on ? 'تنظیم یادآورها' : 'روشن کردن یادآورها'}</button>
-  </section>`;
+  if (!s.on) return 'خاموش';
+  return [s.log.on ? `ثبت غذا ${faDigits(s.log.at)}` : null, s.weigh.on ? `اندازه‌گیری ${EVERY.find(e => e[0] === Number(s.weigh.every))?.[1] || 'هر هفته'}، ${faDigits(s.weigh.at)}` : null].filter(Boolean).join(' · ') || 'هر دو خاموش';
 }
 
 export function bindReminders(root) {
@@ -114,12 +110,12 @@ function openReminders() {
           <label class="check"><input type="checkbox" name="log" ${s.log.on ? 'checked' : ''}><span>یادآور ثبت غذا <small class="muted">فقط اگر تا آن ساعت کمتر از دو وعده ثبت شده باشد</small></span></label>
           <label class="field"><span>ساعت</span><select name="logAt" aria-label="ساعت یادآور ثبت غذا">${times(LOG_TIMES, s.log.at)}</select></label>
 
-          <label class="check"><input type="checkbox" name="weigh" ${s.weigh.on ? 'checked' : ''}><span>یادآور وزن‌کشی <small class="muted">فقط اگر در این فاصله وزنی ثبت نشده باشد</small></span></label>
+          <label class="check"><input type="checkbox" name="weigh" ${s.weigh.on ? 'checked' : ''}><span>یادآور اندازه‌گیری (وزن و دور کمر) <small class="muted">فقط اگر در این فاصله وزنی ثبت نشده باشد</small></span></label>
           <div class="row gap">
-            <label class="field grow"><span>هر چند وقت</span><select name="every" aria-label="فاصله‌ی وزن‌کشی">${EVERY.map(([v, l]) => `<option value="${v}" ${Number(s.weigh.every) === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+            <label class="field grow"><span>وزن‌کشی</span><select name="every" aria-label="فاصله‌ی وزن‌کشی">${EVERY.map(([v, l]) => `<option value="${v}" ${Number(s.weigh.every) === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
             <label class="field grow"><span>ساعت</span><select name="weighAt" aria-label="ساعت یادآور وزن‌کشی">${times(WEIGH_TIMES, s.weigh.at)}</select></label>
           </div>
-          <p class="muted small">وزن را صبح، ناشتا و بعد از دستشویی بکش تا عددها با هم قابل‌مقایسه باشند. اگر دو هفته از آخرین اندازه‌ی دور کمر گذشته باشد، همان اعلان آن را هم یادآوری می‌کند. اعلان تا ${fa(10)} دقیقه بعد از ساعتی که انتخاب کرده‌ای می‌رسد.</p>
+          <p class="muted small">این فاصله برای وزن است؛ دور کمر هر دو هفته یک بار، در همان اعلان و همان فرم ثبت خواسته می‌شود. اعلان تا ${fa(10)} دقیقه بعد از ساعتی که انتخاب کرده‌ای می‌رسد.</p>
         </div>`;
       const q = sel => body.querySelector(sel);
       q('[data-close]').onclick = () => sheet.close();

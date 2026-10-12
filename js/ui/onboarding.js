@@ -24,10 +24,10 @@ export const fieldsHtml = {
         <button type="button" data-v="female" class="${d.sex === 'female' ? 'on' : ''}">زن</button>
       </div>
     </div>`,
-  body: (d, withWeight = true) => `
+  body: (d, withWeight = true, withWaist = true) => `
     <label class="field"><span>قد (سانتی‌متر)</span><input name="heightCm" inputmode="decimal" value="${d.heightCm ? fa(d.heightCm, 1) : ''}" placeholder="مثلاً ۱۷۵"></label>
     ${withWeight ? `<label class="field"><span>وزن فعلی (کیلوگرم)</span><input name="weightKg" inputmode="decimal" value="${d.weightKg ? fa(d.weightKg, 1) : ''}" placeholder="مثلاً ۱۱۰"></label>` : ''}
-    <label class="field"><span>دور کمر (سانتی‌متر) <em>اختیاری</em></span><input name="waistCm" inputmode="decimal" value="${d.waistCm ? fa(d.waistCm, 1) : ''}" placeholder="اندازه در سطح ناف"></label>`,
+    ${withWaist ? `<label class="field"><span>دور کمر (سانتی‌متر) <em>اختیاری</em></span><input name="waistCm" inputmode="decimal" value="${d.waistCm ? fa(d.waistCm, 1) : ''}" placeholder="اندازه در سطح ناف"></label>` : ''}`,
   activity: d => `
     <div class="choices" data-name="activity">
       ${Object.entries(ACTIVITY).map(([k, a]) => `

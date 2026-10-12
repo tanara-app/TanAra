@@ -101,6 +101,7 @@ type Ctx = {
   foods?: any[]; entries?: any[]; weights?: any[]; waists?: any[]; reviews?: any[]; motivations?: any[]; notes?: any[];
   phase?: { phase: string; goalKg?: number | null; breakUntil?: string | null; maintainFrom?: { day: string; kg: number } | null; lossWeeks?: number | null; maintenance?: number | null } | null;
   energy?: any;
+  measure?: { weigh: boolean; waist: boolean } | null;
   vault?: { photos: number; videos: number; links: number; lastOpened: string | null } | null;
   mode?: string; plan?: any; magazine?: any[]; focus?: string; recipes?: any[];
 };
@@ -177,7 +178,7 @@ function sections(c: Ctx) {
     mode: () => `# Mode they are using now\n${c.mode === "plan" ? "رژیم (diet plan)" : "شمارش کالری (calorie counting)"}`,
     plan: () => pl ? `# Current diet plan (you designed it), ${pl.start} to ${pl.end}, for ${pl.kcal} kcal/day\n${(pl.slots || []).map((s: any) => `## ${s.slot} — they pick ${s.pick}\n${s.options.map((o: string, n: number) => `${n + 1}. ${o}`).join("\n")}`).join("\n")}\nFree when hungry: ${(pl.free || []).join("، ") || "-"}\nWhat you told them about it: ${pl.note || "-"}${pl.previous ? `\nPlan before it: from ${pl.previous.start}, ${pl.previous.kcal} kcal/day, ${pl.previous.adherence.done} of ${pl.previous.adherence.of} occasions eaten as planned` : ""}` : "",
     adherence: () => pl ? `# Following the plan, last 4 weeks (day | occasions eaten as planned of 5)\n${(pl.days || []).map((d: any) => `${d.day} | ${d.done}/${d.of}`).join("\n") || "none"}` : "",
-    weights: () => `# Weigh-ins (day | kg), all\n${[...(c.weights || [])].sort((a, b) => (a.day < b.day ? -1 : 1)).map(w => `${w.day} | ${r1(w.kg)}`).join("\n") || "none yet"}${(c.waists || []).length ? `\n\n# Waist measurements (day | cm)${(c.profile as any)?.heightCm ? `; height ${(c.profile as any).heightCm} cm` : ""}\n${[...c.waists!].sort((a, b) => (a.day < b.day ? -1 : 1)).map(w => `${w.day} | ${r1(w.cm)}`).join("\n")}` : ""}`,
+    weights: () => `# Weigh-ins (day | kg), all\n${[...(c.weights || [])].sort((a, b) => (a.day < b.day ? -1 : 1)).map(w => `${w.day} | ${r1(w.kg)}`).join("\n") || "none yet"}${(c.waists || []).length ? `\n\n# Waist measurements (day | cm)${(c.profile as any)?.heightCm ? `; height ${(c.profile as any).heightCm} cm` : ""}\n${[...c.waists!].sort((a, b) => (a.day < b.day ? -1 : 1)).map(w => `${w.day} | ${r1(w.cm)}`).join("\n")}` : ""}${c.measure?.weigh || c.measure?.waist ? `\n\nDue today in the app's check-in (one form on the Progress screen, «پیشرفت», takes both): ${[c.measure.weigh ? "weight" : "", c.measure.waist ? "waist" : ""].filter(Boolean).join(" and ")}` : ""}`,
     phase: () => {
       const ph = c.phase;
       if (!ph) return "";

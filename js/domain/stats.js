@@ -104,6 +104,22 @@ export function waistSeries(waists, p) {
 export const WHTR_GOAL = 0.5;
 export const waistToHeight = (cm, heightCm) => (cm > 0 && heightCm > 0 ? cm / heightCm : null);
 
+/*
+  The check-in: weight and waist are measured together, in one go. Weight is due every `every`
+  days (the interval chosen for the reminder), the waist every two weeks. `weighIn` / `waistIn`
+  are the days left until each is due (0 = due now).
+*/
+export const WAIST_EVERY = 14;
+export function measureDue(weights, waists, p, day, every = 7) {
+  const last = list => list.filter(x => x.day <= day).pop()?.day || null;
+  const left = (d, n) => (d ? Math.max(0, n - diffDays(day, d)) : 0);
+  const lastWeigh = last(sortedWeights(weights || []));
+  const lastWaist = last(waistSeries(waists, p));
+  const weighIn = left(lastWeigh, Math.max(1, Number(every) || 7));
+  const waistIn = left(lastWaist, WAIST_EVERY);
+  return { weigh: !weighIn, waist: !waistIn, weighIn, waistIn, lastWeigh, lastWaist };
+}
+
 // Most-logged foods of one meal in the last 60 days, with the amount used last time in that meal.
 export function frequentFoods(entries, foods, day, meal, limit = 6) {
   const from = addDays(day, -60);

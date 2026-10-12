@@ -1,23 +1,25 @@
-// Progress: log weight and waist, chart, total loss, 4-week rate, the measured energy use,
-// safety + recalc prompts — and the weekly review as a second section of the same tab.
+// Progress: the check-in (weight and waist in one form, see measure.js), one trend card for
+// either of them, the measured energy use, safety + recalc prompts, the history — and the
+// weekly review as a second section of the same tab.
 import * as store from '../data/store.js';
 import { sortedWeights, rollingAvg, rate4w, waistSeries, waistToHeight, WHTR_GOAL } from '../domain/stats.js';
 import { rapidLoss } from '../domain/safety.js';
 import { shouldSuggestRecalc, phaseOn, maintenanceKcal } from '../domain/targets.js';
 import { nextTargets, ENERGY } from '../domain/energy.js';
-import { fa, signed, parseNum, kcal50 } from '../lib/fa.js';
+import { fa, signed, kcal50 } from '../lib/fa.js';
 import { today, addDays, relLabel, faDMY, faFull } from '../lib/dates.js';
-import { icon, toast, confirmBox } from './dom.js';
+import { toast, confirmBox } from './dom.js';
 import { weightChart } from './chart.js';
 import { recalcTargets } from './profile.js';
 import { progressCard, bindProgressCard } from './aiCards.js';
 import { renderReview } from './review.js';
 import { phaseNotes, bindPhase } from './phase.js';
+import { measureCard, bindMeasure, resetMeasureDay, setMeasureDay, takeJump } from './measure.js';
 
-let wDay = today();
-let waistDay = today();
 let rangeKey = '3m';
-export const resetWeighDay = () => { wDay = today(); waistDay = today(); };
+let metric = 'weight'; // what the trend card shows; or 'waist'
+let histAll = false;
+export const resetWeighDay = () => { resetMeasureDay(); histAll = false; };
 let section = 'weight'; // or 'review'
 export const showReview = () => { section = 'review'; };
 const RANGES = { '1m': ['۱ ماه', 30], '3m': ['۳ ماه', 90], all: ['همه', null] };
@@ -31,20 +33,19 @@ function energyCard(s, p, latestKg) {
   if (!p.startDate || !latestKg) return '';
   const t = today();
   const { t: next, m } = nextTargets(p, s.entries, s.weights, latestKg, t);
-  const title = '<h2 class="card-h">مصرف واقعی بدنت</h2>';
+  const fold = (sub, body, open = false) => `<details class="card fold"${open ? ' open' : ''}>
+    <summary><span><h2>مصرف واقعی بدنت</h2><small>${sub}</small></span></summary>${body}</details>`;
   if (!m.ready) {
-    const need = [m.needDays ? `${fa(m.needDays)} روز دیگر ثبت کامل (دست‌کم دو وعده)` : null, m.needWeighs ? `${fa(m.needWeighs)} وزن‌کشی دیگر` : null].filter(Boolean);
-    return `<section class="card">${title}
-      <p class="muted small">فرمول فقط یک حدس است و برای یک نفر می‌تواند چند صد کالری خطا داشته باشد. بعد از حدود چهار هفته، تن‌آرا مصرف واقعی بدنت را از روی چیزی که خورده‌ای و روند وزنت حساب می‌کند.</p>
-      <p class="small">${need.length ? `هنوز لازم است: ${need.join(' و ')}.` : 'ثبت‌ها کافی‌اند؛ فقط باید وزن‌کشی‌ها دست‌کم دو هفته را پوشش بدهند.'}</p>
+    const need = [m.needDays ? `${fa(m.needDays)} روز ثبت کامل` : null, m.needWeighs ? `${fa(m.needWeighs)} وزن‌کشی` : null].filter(Boolean);
+    return fold(need.length ? `هنوز لازم است: ${need.join(' و ')}` : 'وزن‌کشی‌ها باید دست‌کم دو هفته را پوشش بدهند', `
       <div class="bar"><i style="width:${Math.round(Math.min(1, (m.days / ENERGY.MIN_DAYS + m.weighs / ENERGY.MIN_WEIGHS) / 2) * 100)}%"></i></div>
-    </section>`;
+      <p class="muted small mt">فرمول فقط یک حدس است و برای یک نفر می‌تواند چند صد کالری خطا داشته باشد. بعد از حدود چهار هفته، تن‌آرا مصرف واقعی بدنت را از روی چیزی که خورده‌ای (روزهایی با دست‌کم دو وعده‌ی ثبت‌شده) و روند وزنت حساب می‌کند.</p>`);
   }
   const loss = phaseOn(p, t) === 'loss';
   const lossTarget = Number(p.targets?.manualKcal) || p.targets?.kcal;
   const differs = Math.abs(next.kcal - lossTarget) >= 100 || Math.abs(next.tdee - maintenanceKcal(p)) >= 100;
   const moving = Math.abs(m.perWeek) < 0.05 ? 'وزنت تقریباً ثابت مانده' : `هفته‌ای ${fa(Math.abs(m.perWeek), 2)} کیلو ${m.perWeek < 0 ? 'کم' : 'اضافه'} کرده‌ای`;
-  return `<section class="card">${title}
+  return fold(`${kcal50(m.tdee)} کالری در روز${differs ? ' · هدف تازه پیشنهاد شده' : ''}`, `
     <section class="tiles">
       <div class="tile"><span>اندازه‌گیری‌شده</span><b>${kcal50(m.tdee)}</b><small>کالری در روز</small></div>
       <div class="tile"><span>حدس فرمول</span><b>${kcal50(next.formulaTdee)}</b><small>کالری در روز</small></div>
@@ -54,33 +55,57 @@ function energyCard(s, p, latestKg) {
     ${differs ? `<div class="ai-goal"><small class="muted">${loss ? 'هدف پیشنهادی (مصرف واقعی منهای ۵۰۰)' : 'سطح نگهداری پیشنهادی'}</small><b>${kcal50(loss ? next.kcal : next.tdee)} کالری${loss && next.hitFloor ? ' (حداقل ایمن)' : ''}</b>
         <button class="btn sm" data-energy-apply>همین را هدف کن</button></div>
         ${p.targets?.manualKcal ? '<p class="muted small">هدف دستی‌ات با این کار پاک می‌شود.</p>' : ''}`
-      : '<p class="muted small">هدف فعلی‌ات با مصرف واقعی بدنت می‌خواند.</p>'}
+      : '<p class="muted small">هدف فعلی‌ات با مصرف واقعی بدنت می‌خواند.</p>'}`, differs);
+}
+
+/* ---------------- the trend of one of the two: chart + its numbers ---------------- */
+
+function trendCard(s, p, sorted, t) {
+  const waist = metric === 'waist';
+  const series = waist ? waistSeries(s.waists, p).map(w => ({ day: w.day, kg: w.cm })) : sorted;
+  const first = series[0], last = series[series.length - 1];
+  const from = RANGES[rangeKey][1] ? addDays(t, -RANGES[rangeKey][1]) : (first?.day || t);
+  const change = `<div class="tile"><span>تغییر از روز اول</span><b>${first && first !== last ? signed(last.kg - first.kg) : '—'}</b><small>${first ? `${waist ? 'سانت ' : ''}از ${faDMY(first.day)}` : ''}</small></div>`;
+  let tiles;
+  if (waist) {
+    const ratio = last ? waistToHeight(last.kg, p.heightCm) : null;
+    tiles = `<div class="tile"><span>آخرین اندازه</span><b>${last ? fa(last.kg, 1) : '—'}</b><small>${last ? relLabel(last.day) : 'هنوز ثبت نشده'}</small></div>
+      ${change}
+      <div class="tile wide"><span>نسبت کمر به قد</span><b>${ratio ? fa(ratio, 2) : '—'}</b><small>${ratio ? (ratio < WHTR_GOAL ? 'در محدوده‌ی سالم (زیر ۰٫۵)' : `هدف: زیر ۰٫۵، یعنی دور کمر زیر ${fa(Math.floor(p.heightCm * WHTR_GOAL))} سانت`) : ''}</small></div>`;
+  } else {
+    const avg7 = rollingAvg(sorted, t);
+    const rate = rate4w(sorted, t);
+    tiles = `<div class="tile"><span>آخرین وزن</span><b>${last ? fa(last.kg, 1) : '—'}</b><small>${last ? relLabel(last.day) : ''}</small></div>
+      <div class="tile"><span>میانگین ۷ روز اخیر</span><b>${avg7 ? fa(avg7, 1) : '—'}</b><small>کیلو</small></div>
+      ${change}
+      <div class="tile"><span>سرعت ۴ هفته‌ی اخیر</span><b>${rate === null ? '—' : signed(rate)}</b><small>${rate === null ? 'داده‌ی کافی نیست' : 'کیلو در هفته'}</small></div>`;
+  }
+  return `<section class="card">
+    <div class="seg" data-metric role="tablist" aria-label="نمودار">
+      <button type="button" role="tab" data-v="weight" aria-selected="${!waist}" class="${waist ? '' : 'on'}">وزن</button>
+      <button type="button" role="tab" data-v="waist" aria-selected="${waist}" class="${waist ? 'on' : ''}">دور کمر</button>
+    </div>
+    ${waist ? weightChart(series, from, t, { label: 'نمودار دور کمر', dot: 'دور کمر (سانتی‌متر)', line: '', span: 1, empty: 'برای دیدن نمودار، دست‌کم دو بار دور کمر را ثبت کن.' }) : weightChart(series, from, t)}
+    <div class="seg small range-seg" data-range>${Object.entries(RANGES).map(([k, [l]]) => `<button data-v="${k}" class="${k === rangeKey ? 'on' : ''}">${l}</button>`).join('')}</div>
+    <section class="tiles mt">${tiles}</section>
   </section>`;
 }
 
-/* ---------------- waist ---------------- */
+/* ---------------- history: one row per measured day, both numbers ---------------- */
 
-function waistCard(s, p) {
-  const t = today();
-  const series = waistSeries(s.waists, p);
-  const first = series[0], last = series[series.length - 1];
-  const existing = s.waists.find(w => w.day === waistDay);
-  const ratio = last ? waistToHeight(last.cm, p.heightCm) : null;
-  const asWeights = series.map(w => ({ day: w.day, kg: w.cm }));
+function historyCard(s) {
+  const days = new Map();
+  for (const w of s.weights) days.set(w.day, { kg: w.kg });
+  for (const w of s.waists) days.set(w.day, { ...days.get(w.day), cm: w.cm });
+  const all = [...days.entries()].sort((a, b) => (a[0] < b[0] ? 1 : -1));
+  const rows = histAll ? all : all.slice(0, 7);
   return `<section class="card">
-    <h2 class="card-h">دور کمر</h2>
-    <p class="muted small">هر یکی دو هفته، صبح، با متر نواری روی ناف و بدون تو دادن شکم. وقتی وزن چند هفته ثابت می‌ماند، دور کمر نشان می‌دهد بدنت هنوز دارد عوض می‌شود.</p>
-    <form class="row gap weigh-form" data-waist-form novalidate>
-      <label class="field grow"><span>دور کمر ${waistDay === t ? 'امروز' : relLabel(waistDay)} (سانتی‌متر)</span><input name="cm" inputmode="decimal" value="${existing ? fa(existing.cm, 1) : ''}" placeholder="${last ? fa(last.cm, 1) : ''}"></label>
-      <button class="btn primary">${existing ? 'به‌روزرسانی' : 'ثبت'}</button>
-    </form>
-    ${existing ? '<button class="link small" data-delwaist>حذف اندازه‌ی این روز</button>' : ''}
-    ${last ? `<section class="tiles mt">
-      <div class="tile"><span>تغییر از اول</span><b>${first !== last ? signed(last.cm - first.cm) : '—'}</b><small>${first !== last ? `سانتی‌متر از ${faDMY(first.day)}` : 'هنوز یک اندازه ثبت شده'}</small></div>
-      <div class="tile"><span>نسبت کمر به قد</span><b>${ratio ? fa(ratio, 2) : '—'}</b><small>${ratio ? (ratio < WHTR_GOAL ? 'در محدوده‌ی سالم (زیر ۰٫۵)' : `هدف: زیر ۰٫۵ (${fa(Math.floor(p.heightCm * WHTR_GOAL))} سانتی‌متر)`) : ''}</small></div>
-    </section>` : ''}
-    ${series.length >= 2 ? weightChart(asWeights, first.day, t, { label: 'نمودار دور کمر', dot: 'دور کمر (سانتی‌متر)', line: '', span: 1 }) : ''}
-    ${s.waists.length ? `<div class="wlist">${[...s.waists].sort((a, b) => (a.day < b.day ? 1 : -1)).slice(0, 6).map(w => `<button class="wrow" data-waist-day="${w.day}"><span>${faFull(w.day)}</span><b>${fa(w.cm, 1)}</b></button>`).join('')}</div>` : ''}
+    <h2 class="card-h">ثبت‌های اخیر</h2>
+    ${all.length ? `<div class="wlist">
+      <div class="mrow mhead"><span>روز</span><span>وزن</span><span>دور کمر</span></div>
+      ${rows.map(([d, v]) => `<button class="wrow mrow" data-mday="${d}" aria-label="ویرایش ${faFull(d)}"><span>${faFull(d)}</span><b>${v.kg ? fa(v.kg, 1) : '—'}</b><b>${v.cm ? fa(v.cm, 1) : '—'}</b></button>`).join('')}
+    </div>
+    ${all.length > rows.length ? `<button class="link small" data-hist-all>نمایش همه (${fa(all.length)})</button>` : ''}` : '<div class="empty">هنوز چیزی ثبت نشده.</div>'}
   </section>`;
 }
 
@@ -90,17 +115,13 @@ export function renderProgress(root) {
   const sorted = sortedWeights(s.weights);
   const t = today();
   const latest = sorted[sorted.length - 1];
-  const first = sorted[0];
-  const avg7 = rollingAvg(sorted, t);
-  const rate = rate4w(sorted, t);
-  const existing = s.weights.find(w => w.day === wDay);
-  const from = RANGES[rangeKey][1] ? addDays(t, -RANGES[rangeKey][1]) : (first?.day || t);
   const rapid = rapidLoss(s.weights, p.startDate, t);
+  if (takeJump()) section = 'weight';
 
   const head = `
     <header class="page-head"><h1>پیشرفت</h1></header>
     <div class="seg mode-seg" data-section role="tablist" aria-label="بخش">
-      <button type="button" role="tab" data-v="weight" aria-selected="${section === 'weight'}" class="${section === 'weight' ? 'on' : ''}">وزن و روند</button>
+      <button type="button" role="tab" data-v="weight" aria-selected="${section === 'weight'}" class="${section === 'weight' ? 'on' : ''}">اندازه‌ها و روند</button>
       <button type="button" role="tab" data-v="review" aria-selected="${section === 'review'}" class="${section === 'review' ? 'on' : ''}">مرور هفته</button>
     </div>`;
   const bindSection = () => {
@@ -118,18 +139,7 @@ export function renderProgress(root) {
 
   root.innerHTML = `${head}
 
-    <section class="card weigh">
-      <div class="day-nav compact">
-        <button class="icon-btn" data-prev aria-label="روز قبل">${icon.chevR}</button>
-        <div class="day-title"><b>${relLabel(wDay)}</b></div>
-        <button class="icon-btn" data-next aria-label="روز بعد" ${wDay === t ? 'disabled' : ''}>${icon.chevL}</button>
-      </div>
-      <form class="row gap weigh-form" novalidate>
-        <label class="field grow"><span>وزن (کیلوگرم)</span><input name="kg" inputmode="decimal" value="${existing ? fa(existing.kg, 1) : ''}" placeholder="${latest ? fa(latest.kg, 1) : ''}"></label>
-        <button class="btn primary">${existing ? 'به‌روزرسانی' : 'ثبت وزن'}</button>
-      </form>
-      ${existing ? '<button class="link small" data-delw>حذف وزن این روز</button>' : ''}
-    </section>
+    ${measureCard()}
 
     ${phaseNotes()}
 
@@ -140,67 +150,33 @@ export function renderProgress(root) {
       <p>با وزن جدید، هدف‌ها کمی تغییر می‌کنند. دوباره حساب کنیم؟</p>
       <button class="btn sm" data-recalc>محاسبه‌ی دوباره</button></div>` : ''}
 
-    <section class="tiles">
-      <div class="tile"><span>میانگین ۷ روز اخیر</span><b>${avg7 ? fa(avg7, 1) : '—'}</b><small>کیلو</small></div>
-      <div class="tile"><span>تغییر از روز اول</span><b>${first && latest && first !== latest ? signed(latest.kg - first.kg) : '—'}</b><small>${first ? `از ${faDMY(first.day)}` : ''}</small></div>
-      <div class="tile"><span>سرعت ۴ هفته‌ی اخیر</span><b>${rate === null ? '—' : signed(rate)}</b><small>${rate === null ? 'داده‌ی کافی نیست' : 'کیلو در هفته'}</small></div>
-      <div class="tile"><span>آخرین وزن</span><b>${latest ? fa(latest.kg, 1) : '—'}</b><small>${latest ? relLabel(latest.day) : ''}</small></div>
-    </section>
+    ${trendCard(s, p, sorted, t)}
 
     ${progressCard()}
 
-    <section class="card">
-      <div class="seg small" data-range>${Object.entries(RANGES).map(([k, [l]]) => `<button data-v="${k}" class="${k === rangeKey ? 'on' : ''}">${l}</button>`).join('')}</div>
-      ${weightChart(sorted, from, t)}
-    </section>
-
     ${energyCard(s, p, latest?.kg)}
 
-    ${waistCard(s, p)}
-
-    <section class="card">
-      <h2 class="card-h">ثبت‌های اخیر</h2>
-      <div class="wlist">
-        ${[...sorted].reverse().slice(0, 12).map(w => `<button class="wrow" data-day="${w.day}"><span>${faFull(w.day)}</span><b>${fa(w.kg, 1)}</b></button>`).join('') || '<div class="empty">هنوز وزنی ثبت نشده.</div>'}
-      </div>
-    </section>`;
+    ${historyCard(s)}`;
 
   const rerender = () => renderProgress(root);
+  const pick = (sel, set) => {
+    root.querySelector(sel).onclick = e => {
+      const b = e.target.closest('[data-v]');
+      if (b) { set(b.dataset.v); rerender(); }
+    };
+  };
   bindSection();
+  bindMeasure(root, rerender);
   bindProgressCard(root, () => { if (root.isConnected && location.hash === '#/progress' && section === 'weight') rerender(); });
-  root.querySelector('[data-prev]').onclick = () => { wDay = addDays(wDay, -1); rerender(); };
-  root.querySelector('[data-next]').onclick = () => { if (wDay < t) { wDay = addDays(wDay, 1); rerender(); } };
   bindPhase(root);
   root.querySelector('[data-energy-apply]')?.addEventListener('click', async () => {
     if (!(await confirmBox('هدف کالری از روی مصرف واقعی بدنت دوباره حساب شود؟', 'حساب کن'))) return;
     recalcTargets();
     toast('هدف‌ها به‌روز شد');
   });
-  root.querySelector('[data-waist-form]').onsubmit = e => {
-    e.preventDefault();
-    const cm = parseNum(e.target.elements.cm.value);
-    if (!(cm >= 40 && cm <= 250)) return toast('دور کمر را به سانتی‌متر وارد کنید');
-    store.setWaist(waistDay, cm);
-    toast('دور کمر ثبت شد');
-  };
-  root.querySelector('[data-delwaist]')?.addEventListener('click', async () => {
-    if (await confirmBox('اندازه‌ی این روز حذف شود؟', 'حذف')) { store.deleteWaist(waistDay); waistDay = today(); }
-  });
-  root.querySelectorAll('[data-waist-day]').forEach(b => b.onclick = () => { waistDay = b.dataset.waistDay; rerender(); });
-  root.querySelector('form.weigh-form:not([data-waist-form])').onsubmit = e => {
-    e.preventDefault();
-    const kg = parseNum(e.target.elements.kg.value);
-    if (!(kg >= 35 && kg <= 350)) return toast('وزن را درست وارد کنید');
-    store.setWeight(wDay, kg);
-    toast('وزن ثبت شد');
-  };
-  root.querySelector('[data-delw]')?.addEventListener('click', async () => {
-    if (await confirmBox('وزن این روز حذف شود؟', 'حذف')) store.deleteWeight(wDay);
-  });
   root.querySelector('[data-recalc]')?.addEventListener('click', () => { recalcTargets(); toast('هدف‌ها به‌روز شد'); });
-  root.querySelector('[data-range]').onclick = e => {
-    const b = e.target.closest('[data-v]');
-    if (b) { rangeKey = b.dataset.v; rerender(); }
-  };
-  root.querySelectorAll('[data-day]').forEach(b => b.onclick = () => { wDay = b.dataset.day; rerender(); window.scrollTo({ top: 0, behavior: 'smooth' }); });
+  pick('[data-metric]', v => { metric = v; });
+  pick('[data-range]', v => { rangeKey = v; });
+  root.querySelector('[data-hist-all]')?.addEventListener('click', () => { histAll = true; rerender(); });
+  root.querySelectorAll('[data-mday]').forEach(b => b.onclick = () => { setMeasureDay(b.dataset.mday); rerender(); window.scrollTo({ top: 0, behavior: 'smooth' }); });
 }

@@ -11,7 +11,7 @@ import { effectiveTargets, computeTargets, phaseOn, maintenanceKcal } from '../d
 import { SLOTS, planOn, planEnd, previousPlan, adherence, optionText } from '../domain/plan.js';
 import { measuredTdee } from '../domain/energy.js';
 import { lossStart } from '../domain/phase.js';
-import { sortedWeights } from '../domain/stats.js';
+import { sortedWeights, measureDue } from '../domain/stats.js';
 import { today, parse, addDays, diffDays } from '../lib/dates.js';
 import { vaultSummary } from '../ui/vault.js';
 import { perUnit } from '../domain/recipe.js';
@@ -95,6 +95,8 @@ function context() {
     entries: s.entries.map(({ id, day, meal, name, qty, unit, kcal, protein, is_veg, created_at }) => ({ id, day, meal, name, qty, unit, kcal, protein, is_veg, created_at })),
     weights: s.weights.map(({ day, kg }) => ({ day, kg })),
     waists: s.waists.map(({ day, cm }) => ({ day, cm })),
+    // what the check-in asks for today (the two are entered together on «پیشرفت»)
+    measure: p ? (({ weigh, waist }) => ({ weigh, waist }))(measureDue(s.weights, s.waists, p, t, p.reminders?.weigh?.every)) : null,
     phase: phaseContext(p, t),
     energy: energyContext(s, p, t),
     reviews: s.reviews.map(({ week_start, good, hard, next_goal }) => ({ week_start, good, hard, next_goal })),
