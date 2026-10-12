@@ -4,7 +4,7 @@
    Supabase API calls are never touched. Bump CACHE when the shell list changes.
    Only old shell caches are cleared on activate: «tanara-vault» (see store.js) must survive.
    Also shows the push reminders sent by the `remind` Edge Function (see ui/reminders.js). */
-const CACHE = 'tanara-shell-v13';
+const CACHE = 'tanara-shell-v14';
 const SHELL = [
   './', './index.html', './manifest.json', './css/app.css',
   './js/app.js', './js/config.js',

@@ -47,11 +47,3 @@ export function underEating(entries, floor, day) {
   }
   return { days };
 }
-
-export const DOCTOR_SIGNS = [
-  'سرگیجه',
-  'ضعف شدید',
-  'تپش قلب',
-  'ریزش موی زیاد',
-  'هر تغییری در بیماری یا داروهایتان',
-];

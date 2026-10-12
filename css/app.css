@@ -326,9 +326,6 @@ dl.calc dd { margin: 0; text-align: left; }
 .wrow:last-child { border-bottom: 0; }
 .wrow span { color: var(--muted); }
 
-.doctor-box ul { margin: 6px 0; padding-inline-start: 20px; }
-.doctor-box li { margin: 2px 0; }
-
 /* motivation */
 .mot { margin-bottom: 12px; }
 .mot-track {

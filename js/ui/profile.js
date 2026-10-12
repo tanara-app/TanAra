@@ -1,9 +1,8 @@
-// Profile & settings: targets, questionnaire edit, data export/import, doctor guidance, account.
+// Profile & settings: targets, questionnaire edit, data export/import, account.
 import * as store from '../data/store.js';
 import { effectiveTargets, clampKcal, safeFloor, hasMedicalFlag, ACTIVITY, CONDITIONS } from '../domain/targets.js';
 import { sortedWeights, waistSeries } from '../domain/stats.js';
 import { nextTargets } from '../domain/energy.js';
-import { DOCTOR_SIGNS } from '../domain/safety.js';
 import { fa, kcal50, parseNum, esc } from '../lib/fa.js';
 import { today, faDMY } from '../lib/dates.js';
 import { sheet, toast, confirmBox, icon } from './dom.js';
@@ -87,13 +86,6 @@ export function renderProfile(root) {
       </div>
       <button class="btn block vault-entry" data-vault-open>${icon.lock} صندوقچه‌ی خصوصی${s.vault?.length ? ` · ${fa(s.vault.length)} مورد` : ''}</button>
       <p class="muted small">عکس‌ها و ویدیوهای شخصی‌ای که انگیزه می‌دهند؛ با رمز شش‌رقمی باز می‌شود.</p>
-    </section>
-
-    <section class="card doctor-box">
-      <h2 class="card-h">چه وقت به پزشک مراجعه کنم</h2>
-      <p class="small">اگر هر کدام از این‌ها را داشتید، با پزشک‌تان صحبت کنید:</p>
-      <ul>${DOCTOR_SIGNS.map(s => `<li>${s}</li>`).join('')}</ul>
-      ${hasMedicalFlag(p) ? '<p class="small muted">چون بیماری زمینه‌ای یا دارو را ثبت کرده‌اید، بهتر است پزشک‌تان در جریان رژیم باشد.</p>' : ''}
     </section>
 
     ${aiAvailable() ? `<section class="card">
