@@ -7,8 +7,8 @@ import * as store from '../data/store.js';
 import { effectiveTargets, hasMedicalFlag } from '../domain/targets.js';
 import {
   SLOTS, PLAN_DAYS, budgets, buildPlan, fitOption, optionBudget, planOn, planEnd, planDayNo, planOver,
-  picksOn, plannedEntryIds, dayAdherence, newFoods, optionText,
-  swapItem, restoreItem, sameItems, swapSuggestions, swapsOn, dayPlan,
+  picksOn, dayAdherence, newFoods, optionText,
+  swapItem, restoreItem, sameItems, swapSuggestions, swapsOn, dayPlan, offOn, slotExtras, slotRoom,
 } from '../domain/plan.js';
 import { ask, aiAvailable, md, sparkle } from '../ai/hooshvareh.js';
 import { fa, esc, norm } from '../lib/fa.js';
@@ -21,6 +21,8 @@ import { addToShopping } from './shopping.js';
 
 let busy = false;        // a plan is being made
 const busySlots = new Set(); // slots waiting for one more option
+const opened = new Set();    // «day|option id»: options unfolded to show their foods
+const shown = new Set();     // «day|slot»: slots showing the options that folded away once the choice was made
 let refresh = () => {};
 
 const notes = () => store.get().ai_notes;
@@ -86,15 +88,24 @@ function openPrefs(onGo) {
   }, { tall: true });
 }
 
-async function oneMore(plan, key) {
+/*
+  One more option for an occasion. With `fit` ({ day, kcal }) it is sized to what off-plan food
+  left of that occasion and kept with that day only; otherwise it joins the plan.
+*/
+async function oneMore(plan, key, fit = null) {
   if (busySlots.has(key)) return;
   busySlots.add(key); refresh();
   try {
     const slot = plan.slots[key];
-    const budget = optionBudget(plan, key);
+    const budget = fit ? fit.kcal : optionBudget(plan, key);
     const raw = await ask('plan_option', { slot: SLOTS[key].label, kcal: Math.round(budget), existing: slot.options.map(optionText) });
     const opt = fitOption(raw, new Map(store.get().foods.map(f => [f.id, f])), budget, `${key}-x${Date.now().toString(36)}`);
     if (!opt) throw new Error('گزینه‌ی مناسبی پیدا نشد؛ دوباره امتحان کن.');
+    if (fit) {
+      const s = store.get();
+      savePicks(fit.day, picksOn(s.ai_notes, s.entries, fit.day), { ...swapsOn(s.ai_notes, fit.day), [opt.id]: { ...opt, slot: key } });
+      return;
+    }
     // re-read: the plan may have changed while waiting
     const cur = notes().find(n => n.key === plan.key);
     if (!cur) return;
@@ -110,8 +121,17 @@ async function oneMore(plan, key) {
 
 /* ---------------- ticking options ---------------- */
 
-function savePicks(day, picks, swaps = swapsOn(notes(), day)) {
-  store.saveNote({ key: `pick:${day}`, kind: 'pick', text: '', data: { slots: picks, ...(Object.keys(swaps).length ? { swaps } : {}) } });
+function savePicks(day, picks, swaps = swapsOn(notes(), day), off = offOn(notes(), day)) {
+  const alive = new Set(store.get().entries.map(e => e.id));
+  off = Object.fromEntries(Object.entries(off).filter(([id]) => alive.has(id)));
+  store.saveNote({ key: `pick:${day}`, kind: 'pick', text: '', data: { slots: picks, ...(Object.keys(swaps).length ? { swaps } : {}), ...(Object.keys(off).length ? { off } : {}) } });
+}
+
+// Remembers which occasion's «+» logged an off-plan entry, so it counts against that one.
+function placeExtra(day, key, entry) {
+  if (entry.meal !== SLOTS[key].meal) return;
+  const s = store.get();
+  savePicks(day, picksOn(s.ai_notes, s.entries, day), undefined, { ...offOn(s.ai_notes, day), [entry.id]: key });
 }
 
 const entryOf = (day, key, i) => ({
@@ -130,6 +150,8 @@ function toggle(day, plan, key, optId) {
   } else {
     const opt = plan.slots[key].options.find(o => o.id === optId);
     if (!opt) return;
+    const extras = slotExtras(s.entries, picks, offOn(s.ai_notes, day), day)[key];
+    if (slotRoom(plan, key, picks, extras, s.entries).locked) return toast('سهم این وعده با خوراکی خارج از برنامه پر شده');
     const n = plan.slots[key].pick;
     if (cur.length >= n) {
       if (n > 1) return toast('دو گزینه را برداشته‌ای؛ برای عوض کردن، اول یکی را بردار');
@@ -326,43 +348,81 @@ function openSwap(day, key, optId, index) {
 
 // One food of an option; the button beside it swaps just that food for another. `need`: bank
 // foods on the shopping list, marked so it is clear which options have to wait for the shop.
-const itemLine = (only, need) => (i, n) => `<li>
+const itemLine = (only, need, canSwap) => (i, n) => `<li>
   <span>${esc(i.name)}${i.was ? `<small class="was">به‌جای ${esc(i.was)} · ${only}</small>` : ''}${need.has(i.food_id) ? '<small class="was">در لیست خرید</small>' : ''}</span>
   <b>${amountLabel(i.qty, i.unit)}${i.grams ? ` <small>(${fa(i.grams)} گرم)</small>` : ''}</b>
-  <button class="swap-btn" data-swap="${n}" aria-label="جایگزین کردن ${esc(i.name)}">${icon.swap}</button>
+  ${canSwap ? `<button class="swap-btn" data-swap="${n}" aria-label="جایگزین کردن ${esc(i.name)}">${icon.swap}</button>` : ''}
 </li>`;
 
-function slotCard(plan, key, picks, extras, showKcal, only, need) {
+const r10 = x => Math.round(x / 10) * 10;
+
+// Under the off-plan foods of an occasion: what is left of its calories, or that it is used up.
+function roomNote(key, room) {
+  const left = r10(room.left);
+  const label = SLOTS[key].label;
+  const state = left > 0 ? `${room.locked ? 'فقط ' : ''}<b>${fa(left)}</b> کالری از سهم ${label} مانده`
+    : left < 0 ? `<b>${fa(-left)}</b> کالری از سهم ${label} بیشتر شده` : `سهم ${label} پر شده`;
+  return `<p class="room small${room.locked ? ' lock' : ''}">${room.locked ? icon.lock : ''}<span>${state}${room.locked ? '؛ گزینه‌های این وعده قفل شد. اگر ثبت خارج از برنامه را برداری، دوباره باز می‌شوند.' : '.'}</span></p>`;
+}
+
+/*
+  One occasion. To keep the day short an option is a single line until it is tapped (its foods
+  and amounts unfold) or ticked; once the choice is made the other options fold away behind a
+  link, and when off-plan food has used the occasion up they are not offered at all.
+*/
+function slotCard(plan, key, day, picks, extras, room, showKcal, only, need) {
   const slot = plan.slots[key];
   const mine = picks[key] || [];
   const full = mine.length >= slot.pick;
   const known = new Set(slot.options.map(o => o.id));
   // ticked before the plan was replaced: still shown, so it can be unticked
   const orphans = mine.filter(p => !known.has(p.o));
-  return `<div class="meal card slot${full ? ' full' : ''}">
+  const isOn = o => mine.some(p => p.o === o.id);
+  const option = o => {
+    const on = isOn(o);
+    const names = o.items.map(i => i.name).join('، ');
+    // a div, not a button: the swap buttons sit inside it. The tick is the real control.
+    return `<div class="popt${on ? ' on' : ''}${on || opened.has(`${day}|${o.id}`) ? ' open' : ''}" data-slot="${key}" data-opt="${o.id}">
+      <button class="tick" aria-pressed="${on}" aria-label="${esc(o.title || optionText(o))}">${on ? icon.check : ''}</button>
+      <div class="popt-body">
+        <div class="popt-head${o.title ? '' : ' plain'}"><strong>${esc(o.title || names)}</strong>${on ? '' : icon.chevD}</div>
+        ${o.title ? `<small class="muted popt-sum">${esc(names)}</small>` : ''}
+        <div class="popt-more">
+          <ul>${o.items.map(itemLine(only, need, !o.slot)).join('')}</ul>
+          ${o.slot ? `<small class="was">برای باقی‌مانده‌ی سهم این وعده · ${only}</small>` : ''}
+          ${showKcal ? `<small class="muted">${fa(o.kcal)} کالری · ${fa(Math.round(o.protein))} گرم پروتئین</small>` : ''}
+        </div>
+      </div>
+    </div>`;
+  };
+  const wait = busySlots.has(key) ? '<p class="muted small ai-wait"><span class="typing"><i></i><i></i><i></i></span> دارم یک گزینه‌ی دیگر پیدا می‌کنم…</p>' : '';
+  const more = !aiAvailable() || wait ? '' : `<button class="link small ai-more" data-more="${key}">${sparkle(14)} هیچ‌کدام را ندارم؛ یک گزینه‌ی دیگر</button>`;
+  const rest = slot.options.filter(o => !isOn(o));
+  const left = r10(room.left);
+  // what is left is too little for a whole option: Hooshvareh can size one to it
+  const fit = extras.length && !full && !room.locked && !wait && aiAvailable() && left >= 50 && rest.every(o => o.kcal > room.left * 1.15)
+    ? `<button class="link small ai-more" data-fit="${key}" data-kcal="${left}">${sparkle(14)} هوشواره گزینه‌ای برای همین ${fa(left)} کالری بچیند</button>` : '';
+  const unfolded = shown.has(`${day}|${key}`);
+  const options = room.locked ? slot.options.filter(isOn).map(option).join('')
+    : !full ? slot.options.map(option).join('')
+    : `${slot.options.filter(isOn).map(option).join('')}
+      ${rest.length ? `<button class="link small fold-btn" data-fold="${key}" aria-expanded="${unfolded}">${fa(rest.length)} گزینه‌ی دیگر ${icon.chevD}</button>
+      <div class="fold"${unfolded ? '' : ' hidden'}>${rest.map(option).join('')}${more}</div>` : ''}`;
+  return `<div class="meal card slot${full ? ' full' : ''}${room.locked ? ' locked' : ''}">
     <div class="meal-head">
       <h2>${SLOTS[key].label}</h2>
-      <span class="muted">${full ? `${icon.check}` : pickWord(slot.pick)}</span>
-      <button class="icon-btn sm" data-add="${SLOTS[key].meal}" aria-label="ثبت چیزی خارج از برنامه در ${SLOTS[key].label}">${icon.plus}</button>
+      <span class="muted">${full ? icon.check : room.locked ? icon.lock : pickWord(slot.pick)}</span>
+      <button class="icon-btn sm" data-add="${SLOTS[key].meal}" data-key="${key}" aria-label="ثبت چیزی خارج از برنامه در ${SLOTS[key].label}">${icon.plus}</button>
     </div>
-    ${slot.options.map(o => {
-      const on = mine.some(p => p.o === o.id);
-      // a div, not a button: the swap buttons sit inside it. The tick is the real control.
-      return `<div class="popt${on ? ' on' : ''}" data-slot="${key}" data-opt="${o.id}">
-        <button class="tick" aria-pressed="${on}" aria-label="${esc(o.title || optionText(o))}">${on ? icon.check : ''}</button>
-        <div class="popt-body">${o.title ? `<strong>${esc(o.title)}</strong>` : ''}<ul>${o.items.map(itemLine(only, need)).join('')}</ul>${showKcal ? `<small class="muted">${fa(o.kcal)} کالری · ${fa(Math.round(o.protein))} گرم پروتئین</small>` : ''}</div>
-      </div>`;
-    }).join('')}
+    ${options}
     ${orphans.map(p => `<button class="popt on" data-slot="${key}" data-opt="${esc(p.o)}" aria-pressed="true">
       <span class="tick">${icon.check}</span><span class="popt-body"><strong>از برنامه‌ی قبلی</strong><small class="muted">${esc(p.t || '')}</small></span>
     </button>`).join('')}
     ${extras.length ? `<h3 class="list-h">خارج از برنامه</h3>${extras.map(e => `
       <button class="entry" data-entry="${e.id}">
-        <span class="ename">${esc(e.name)}</span><span class="eqty">${amountLabel(Number(e.qty), e.unit)}</span><span class="ekcal">${showKcal ? fa(Math.round(e.kcal)) : ''}</span>
-      </button>`).join('')}` : ''}
-    ${aiAvailable() ? (busySlots.has(key)
-      ? '<p class="muted small ai-wait"><span class="typing"><i></i><i></i><i></i></span> دارم یک گزینه‌ی دیگر پیدا می‌کنم…</p>'
-      : `<button class="link small ai-more" data-more="${key}">${sparkle(14)} هیچ‌کدام را ندارم؛ یک گزینه‌ی دیگر</button>`) : ''}
+        <span class="ename">${esc(e.name)}</span><span class="eqty">${amountLabel(Number(e.qty), e.unit)}</span><span class="ekcal">${fa(Math.round(e.kcal))}</span>
+      </button>`).join('')}${roomNote(key, room)}${fit}` : ''}
+    ${wait}${full || room.locked ? '' : more}
   </div>`;
 }
 
@@ -389,19 +449,14 @@ export function planHtml(day) {
   const p = store.profile();
   const showKcal = !!p.planKcal;
   const picks = picksOn(s.ai_notes, s.entries, day);
-  const planned = plannedEntryIds(picks);
   const a = dayAdherence(plan, picks);
   const over = planOver(plan, today());
   const fresh = isToday && !over ? newFoods(plan, s.foods) : [];
   const dayNo = planDayNo(plan, day);
   const keys = Object.keys(SLOTS);
   const need = neededFoods(shopList(s.ai_notes)); // foods of the plan waiting on the shopping list
-  // off-plan entries are listed under the last occasion of their meal (both snacks log as «میان‌وعده»)
-  const lastOf = {};
-  keys.forEach(k => { lastOf[SLOTS[k].meal] = k; });
-  const extrasFor = k => (lastOf[SLOTS[k].meal] === k
-    ? s.entries.filter(e => e.day === day && e.meal === SLOTS[k].meal && !planned.has(e.id)).sort((x, y) => (x.created_at < y.created_at ? -1 : 1))
-    : []);
+  const extras = slotExtras(s.entries, picks, offOn(s.ai_notes, day), day);
+  const card = k => slotCard(plan, k, day, picks, extras[k], slotRoom(plan, k, picks, extras[k], s.entries), showKcal, onlyWord(day), need);
 
   return `
     ${busy ? waiting() : ''}
@@ -432,7 +487,7 @@ export function planHtml(day) {
       </div>
     </section>
 
-    <section class="meals">${keys.map(k => slotCard(plan, k, picks, extrasFor(k), showKcal, onlyWord(day), need)).join('')}</section>
+    <section class="meals">${keys.map(card).join('')}</section>
 
     ${plan.free?.length ? `<section class="card">
       <h2 class="card-h">هر وقت گرسنه شدی</h2>
@@ -466,10 +521,21 @@ export function bindPlan(root, day, redraw) {
   });
   root.querySelectorAll('[data-opt]').forEach(b => b.onclick = e => {
     const swap = e.target.closest('[data-swap]');
-    if (swap) openSwap(day, b.dataset.slot, b.dataset.opt, Number(swap.dataset.swap));
-    else toggle(day, plan, b.dataset.slot, b.dataset.opt);
+    if (swap) return openSwap(day, b.dataset.slot, b.dataset.opt, Number(swap.dataset.swap));
+    // the tick picks; anywhere else on an option not yet picked unfolds its foods
+    if (e.target.closest('.tick') || b.matches('button')) return toggle(day, plan, b.dataset.slot, b.dataset.opt);
+    if (b.classList.contains('on')) return;
+    const k = `${day}|${b.dataset.opt}`;
+    b.classList.toggle('open', !opened.delete(k) && !!opened.add(k));
+  });
+  root.querySelectorAll('[data-fold]').forEach(b => b.onclick = () => {
+    const k = `${day}|${b.dataset.fold}`;
+    const open = !shown.delete(k) && !!shown.add(k);
+    b.setAttribute('aria-expanded', open);
+    b.nextElementSibling.hidden = !open;
   });
   root.querySelectorAll('[data-more]').forEach(b => b.onclick = () => oneMore(plan, b.dataset.more));
-  root.querySelectorAll('.slot [data-add]').forEach(b => b.onclick = () => openLogSheet({ day, meal: b.dataset.add }));
+  root.querySelectorAll('[data-fit]').forEach(b => b.onclick = () => oneMore(plan, b.dataset.fit, { day, kcal: Number(b.dataset.kcal) }));
+  root.querySelectorAll('.slot [data-add]').forEach(b => b.onclick = () => openLogSheet({ day, meal: b.dataset.add, onSaved: row => placeExtra(day, b.dataset.key, row) }));
   root.querySelectorAll('.slot [data-entry]').forEach(b => b.onclick = () => openEntrySheet(s.entries.find(e => e.id === b.dataset.entry)));
 }

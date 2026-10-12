@@ -33,9 +33,11 @@ const foodRow = (f, extra = '') => `
 
 const aiEstBtn = () => (aiAvailable() ? `<button type="button" class="btn ai-btn" data-ai-est>${sparkle()} تخمین کالری با هوشواره</button><p class="muted small ai-est-note" hidden></p>` : '');
 
-export function openLogSheet({ day = today(), meal = null } = {}) {
+// `onSaved` is called with every entry the sheet logs (the diet plan notes which occasion it was for).
+export function openLogSheet({ day = today(), meal = null, onSaved = null } = {}) {
   let curMeal = meal || (day === today() ? mealForNow() : 'lunch');
   let query = '';
+  const save = e => { const row = store.saveEntry(e); onSaved?.(row); return row; };
 
   sheet.open(body => {
     function drawList() {
@@ -161,7 +163,7 @@ export function openLogSheet({ day = today(), meal = null } = {}) {
       };
       body.querySelector('[data-save]')?.addEventListener('click', () => {
         const on = items.filter((_, n) => !off.has(n));
-        on.forEach(({ bank, ...it }) => store.saveEntry({ day, meal: curMeal, ...it }));
+        on.forEach(({ bank, ...it }) => save({ day, meal: curMeal, ...it }));
         URL.revokeObjectURL(shot.url);
         sheet.close();
         toast(`${fa(on.length)} مورد ثبت شد`);
@@ -195,7 +197,7 @@ export function openLogSheet({ day = today(), meal = null } = {}) {
       body.querySelectorAll('[data-edit]').forEach(b => b.onclick = edit);
       body.querySelector('[data-save]').onclick = () => {
         const a = amount.get();
-        store.saveEntry({ day, meal: curMeal, food_id: food.id, name: food.name, ...a, is_veg: food.is_veg });
+        save({ day, meal: curMeal, food_id: food.id, name: food.name, ...a, is_veg: food.is_veg });
         sheet.close();
         toast(`${food.name} ثبت شد`);
       };
@@ -242,7 +244,7 @@ export function openLogSheet({ day = today(), meal = null } = {}) {
         if (F.save.checked) {
           food_id = store.upsertFood({ name, ...r, is_veg: F.veg.checked, category: F.veg.checked ? 'veg' : 'other' }).id;
         }
-        store.saveEntry({ day, meal: curMeal, food_id, name, ...amount.get(), is_veg: F.veg.checked });
+        save({ day, meal: curMeal, food_id, name, ...amount.get(), is_veg: F.veg.checked });
         sheet.close();
         toast(`${name} ثبت شد`);
       };

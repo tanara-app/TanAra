@@ -1,5 +1,5 @@
 import { suite, test, eq, ok, near } from './harness.js';
-import { budgets, fitOption, buildPlan, optionBudget, planOn, previousPlan, planEnd, planDayNo, planOver, picksOn, dayAdherence, adherence, newFoods, optionText, swapItem, restoreItem, sameItems, swapSuggestions, swapsOn, dayPlan, SLOTS } from '../js/domain/plan.js';
+import { budgets, fitOption, buildPlan, optionBudget, planOn, previousPlan, planEnd, planDayNo, planOver, picksOn, dayAdherence, adherence, newFoods, optionText, swapItem, restoreItem, sameItems, swapSuggestions, swapsOn, dayPlan, offOn, slotExtras, slotRoom, SLOTS } from '../js/domain/plan.js';
 
 const food = (id, unit, kcal, protein = 0, extra = {}) => ({ id, name: id, unit, kcal, protein, grams: 100, is_veg: false, created_at: '2026-01-01T00:00:00Z', ...extra });
 const FOODS = [
@@ -172,5 +172,36 @@ suite('plan', () => {
     eq(p.slots.lunch.options[0].items[0].name, 'bread');
     eq(p.slots.lunch.options.length, plan.slots.lunch.options.length);
     eq(plan.slots.lunch.options[0].items[0].name, 'rice');
+  });
+
+  test('an option made for one day shows on that day only, after the plan\'s own', () => {
+    const small = { ...plan.slots.lunch.options[0], id: 'lunch-x1', slot: 'lunch' };
+    const p = dayPlan(plan, { 'lunch-x1': small });
+    eq(p.slots.lunch.options.length, plan.slots.lunch.options.length + 1);
+    eq(p.slots.lunch.options.at(-1).id, 'lunch-x1');
+    eq(p.slots.dinner.options.length, plan.slots.dinner.options.length);
+  });
+
+  test('off-plan food counts against its occasion and locks it when nothing is left', () => {
+    const e = (id, meal, kcal, created_at = id) => ({ id, day: '2026-02-03', meal, kcal, created_at });
+    const entries = [e('a', 'snack', 50), e('b', 'snack', 70), e('c', 'lunch', 200), e('d', 'lunch', 300), e('z', 'lunch', 999)];
+    entries[4].day = '2026-02-04';
+    const picks = { lunch: [{ o: 'lunch-1', e: ['d'] }] };
+    const day = [{ key: 'pick:2026-02-03', kind: 'pick', data: { slots: {}, off: { a: 'snack1', c: 'dinner' } } }];
+    eq(offOn(day, '2026-02-02'), {});
+    const x = slotExtras(entries, picks, offOn(day, '2026-02-03'), '2026-02-03');
+    eq(x.snack1.map(i => i.id), ['a']);
+    eq(x.snack2.map(i => i.id), ['b']);      // not placed: the last snack of the day
+    eq(x.lunch.map(i => i.id), ['c']);       // placed at dinner but logged as lunch: its meal wins
+    eq(x.dinner, []);
+
+    const b = budgets(plan.kcal);
+    const lunch = slotRoom(plan, 'lunch', picks, x.lunch, entries);
+    eq([lunch.eaten, lunch.left, lunch.locked], [500, b.lunch - 500, false]); // already picked: nothing to lock
+    const s1 = slotRoom(plan, 'snack1', {}, x.snack1, entries);
+    eq([s1.left, s1.locked], [b.snack1 - 50, false]);
+    eq(slotRoom(plan, 'snack1', {}, [e('q', 'snack', b.snack1 * 0.95)], entries).locked, true);
+    eq(slotRoom(plan, 'snack1', {}, [e('q', 'snack', b.snack1 + 80)], entries).left, -80);
+    eq(slotRoom(plan, 'dinner', {}, [], entries).locked, false);
   });
 });

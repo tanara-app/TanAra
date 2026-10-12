@@ -170,7 +170,11 @@ export const swapsOn = (notes, day) => notes.find(n => n.key === `pick:${day}`)?
 // The plan as it reads on a day: options swapped for that day only replace the stored ones.
 export function dayPlan(plan, swaps) {
   if (!plan || !Object.keys(swaps || {}).length) return plan;
-  const slots = Object.fromEntries(Object.entries(plan.slots).map(([k, s]) => [k, { ...s, options: s.options.map(o => swaps[o.id] || o) }]));
+  const slots = Object.fromEntries(Object.entries(plan.slots).map(([k, s]) => {
+    const ids = new Set(s.options.map(o => o.id));
+    // options made for that day alone (fitted to what an off-plan food left) come last
+    return [k, { ...s, options: [...s.options.map(o => swaps[o.id] || o), ...Object.values(swaps).filter(o => o.slot === k && !ids.has(o.id))] }];
+  }));
   return { ...plan, slots };
 }
 
@@ -211,6 +215,42 @@ export function picksOn(notes, entries, day) {
 }
 
 export const plannedEntryIds = picks => new Set(Object.values(picks).flatMap(l => l.flatMap(p => p.e)));
+
+/* ---------------- food eaten outside the plan ---------------- */
+
+// Which occasion an off-plan entry was logged at: { [entry id]: slot }, kept with the day's picks.
+export const offOn = (notes, day) => notes.find(n => n.key === `pick:${day}`)?.data?.off || {};
+
+/*
+  The day's entries that no ticked option accounts for, per occasion: { [slot]: [entries] }.
+  An entry goes to the occasion whose «+» logged it (`off`) while it is still in that meal;
+  otherwise to the last occasion of its meal (both snacks log as «میان‌وعده»).
+*/
+export function slotExtras(entries, picks, off, day) {
+  const planned = plannedEntryIds(picks);
+  const keys = Object.keys(SLOTS);
+  const lastOf = {};
+  keys.forEach(k => { lastOf[SLOTS[k].meal] = k; });
+  const out = Object.fromEntries(keys.map(k => [k, []]));
+  entries.filter(e => e.day === day && !planned.has(e.id) && lastOf[e.meal])
+    .sort((x, y) => (x.created_at < y.created_at ? -1 : 1))
+    .forEach(e => out[SLOTS[off[e.id]]?.meal === e.meal ? off[e.id] : lastOf[e.meal]].push(e));
+  return out;
+}
+
+/*
+  What is left of an occasion's calories once its off-plan food (`extras`) and its ticked
+  options are counted. `locked`: off-plan food has used the occasion up (less than a tenth of
+  its budget is left) while an option was still to be picked — nothing more fits there.
+*/
+export function slotRoom(plan, key, picks, extras, entries) {
+  const budget = budgets(plan.kcal)[key];
+  const mine = new Set((picks[key] || []).flatMap(p => p.e));
+  const kcal = list => list.reduce((t, e) => t + (Number(e.kcal) || 0), 0);
+  const eaten = Math.round(kcal(extras) + kcal(entries.filter(e => mine.has(e.id))));
+  const open = (picks[key]?.length || 0) < plan.slots[key].pick;
+  return { budget, eaten, left: budget - eaten, locked: extras.length > 0 && open && budget - eaten < budget * 0.1 };
+}
 
 // How many of the day's occasions were eaten as planned.
 export function dayAdherence(plan, picks) {

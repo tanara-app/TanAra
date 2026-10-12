@@ -515,6 +515,27 @@ button.tick { padding: 0; background: transparent; cursor: pointer; }
 .tick svg { width: 16px; height: 16px; }
 .popt-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
 .popt-body strong { font-size: .95rem; }
+.popt-head { display: flex; align-items: center; gap: 8px; }
+.popt-head strong { flex: 1; min-width: 0; }
+.popt-head .chev-d { flex: none; margin-inline-start: auto; color: var(--muted); transition: transform .15s; }
+.popt.open .popt-head .chev-d { transform: rotate(180deg); }
+.popt.open .popt-head.plain strong { display: none; }
+.popt.on .popt-head.plain { display: none; }
+.popt-sum { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.popt.open .popt-sum { display: none; }
+.popt-more { display: none; flex-direction: column; gap: 4px; }
+.popt.open .popt-more { display: flex; }
+.popt-more > .was { font-size: .76rem; color: var(--ai); }
+button.tick { position: relative; }
+button.tick::after { content: ''; position: absolute; inset: -12px; }
+.fold-btn { display: inline-flex; align-items: center; gap: 4px; margin-top: 10px; color: var(--muted); }
+.fold-btn .chev-d { width: 16px; height: 16px; transition: transform .15s; }
+.fold-btn[aria-expanded="true"] .chev-d { transform: rotate(180deg); }
+.room { margin-top: 8px; color: var(--muted); }
+.room b { color: var(--text); }
+.room.lock { display: flex; align-items: flex-start; gap: 8px; padding: 10px 12px; border-radius: 12px; background: var(--surface-2); }
+.room.lock svg { flex: none; margin-top: 2px; }
+.slot.locked .meal-head .muted svg { color: var(--muted); }
 .popt-body ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
 .popt-body li { display: flex; justify-content: space-between; gap: 12px; font-size: .9rem; }
 .popt-body li span { color: var(--muted); min-width: 0; }
