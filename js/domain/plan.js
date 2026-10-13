@@ -239,17 +239,46 @@ export function slotExtras(entries, picks, off, day) {
 }
 
 /*
-  What is left of an occasion's calories once its off-plan food (`extras`) and its ticked
-  options are counted. `locked`: off-plan food has used the occasion up (less than a tenth of
-  its budget is left) while an option was still to be picked — nothing more fits there.
+  What is left of an occasion's calories once its off-plan food (`extras`), its ticked options
+  and what it owes for earlier occasions (`owed`, see dayRooms) are counted. `locked`: those
+  have used the occasion up (less than a tenth of its budget is left) while an option was
+  still to be picked — nothing more fits there.
 */
-export function slotRoom(plan, key, picks, extras, entries) {
+export function slotRoom(plan, key, picks, extras, entries, owed = 0) {
   const budget = budgets(plan.kcal)[key];
   const mine = new Set((picks[key] || []).flatMap(p => p.e));
   const kcal = list => list.reduce((t, e) => t + (Number(e.kcal) || 0), 0);
   const eaten = Math.round(kcal(extras) + kcal(entries.filter(e => mine.has(e.id))));
   const open = (picks[key]?.length || 0) < plan.slots[key].pick;
-  return { budget, eaten, left: budget - eaten, extras: extras.length, locked: extras.length > 0 && open && budget - eaten < budget * 0.1 };
+  const left = budget - owed - eaten;
+  return { budget, owed, eaten, left, extras: extras.length, locked: (extras.length > 0 || owed > 0) && open && left < budget * 0.1 };
+}
+
+/*
+  slotRoom for every occasion of a day, with what off-plan food took beyond an occasion's
+  calories carried on to the ones after it: the excess is shared between the later occasions
+  still to be picked, by the size of their budgets (`owed`), so no single meal pays for all of
+  it. An occasion eaten under its budget pays the debt off by that much; whatever an occasion
+  can't absorb moves on. `passed`: the calories this occasion handed on to later ones. Nothing
+  is carried to the next day.
+*/
+export function dayRooms(plan, picks, extras, entries) {
+  const b = budgets(plan.kcal);
+  const keys = Object.keys(SLOTS);
+  const isOpen = k => (picks[k]?.length || 0) < plan.slots[k].pick;
+  const out = {};
+  let debt = 0;
+  keys.forEach((k, n) => {
+    const open = isOpen(k);
+    const owed = open && debt > 0 ? Math.round(debt * b[k] / keys.slice(n).filter(isOpen).reduce((t, x) => t + b[x], 0)) : 0;
+    const r = out[k] = slotRoom(plan, k, picks, extras[k], entries, owed);
+    const off = extras[k].reduce((t, e) => t + (Number(e.kcal) || 0), 0);
+    // picked in full: only what the off-plan food added counts, not an option a little over its budget
+    const more = r.left >= 0 ? 0 : open ? -r.left : Math.min(off, -r.left);
+    debt = Math.max(0, debt - owed - (open ? 0 : Math.max(0, r.left))) + more;
+    r.passed = keys.slice(n + 1).some(isOpen) ? Math.round(more) : 0;
+  });
+  return out;
 }
 
 /*
@@ -265,15 +294,15 @@ export function shrinkOption(option, foodsById, kcal) {
 }
 
 /*
-  The plan as it is offered once off-plan food has taken part of an occasion (`rooms`: slotRoom
-  per slot): the options still to be picked are cut down to what is left, shared between the
-  picks still open. One that can't be made that small is marked `over` — it no longer fits.
+  The plan as it is offered once off-plan food has taken part of an occasion, its own or an
+  earlier one's excess (`rooms`: dayRooms): the options still to be picked are cut down to what
+  is left, shared between the picks still open. One that can't be made that small is marked `over` — it no longer fits.
 */
 export function roomPlan(plan, picks, rooms, foodsById) {
   const slots = Object.fromEntries(Object.entries(plan.slots).map(([k, s]) => {
     const r = rooms[k];
     const open = s.pick - (picks[k]?.length || 0);
-    if (!r?.extras || r.locked || open <= 0) return [k, s];
+    if (!(r?.extras || r?.owed) || r.locked || open <= 0) return [k, s];
     const each = r.left / open;
     const on = new Set(picks[k]?.map(p => p.o));
     return [k, { ...s, options: s.options.map(o => (on.has(o.id) || o.kcal <= each * 1.15 ? o : shrinkOption(o, foodsById, each) || { ...o, over: true })) }];

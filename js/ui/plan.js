@@ -8,7 +8,7 @@ import { effectiveTargets, hasMedicalFlag } from '../domain/targets.js';
 import {
   SLOTS, PLAN_DAYS, budgets, buildPlan, fitOption, optionBudget, planOn, planEnd, planDayNo, planOver,
   picksOn, dayAdherence, newFoods, optionText,
-  swapItem, restoreItem, sameItems, swapSuggestions, swapsOn, dayPlan, offOn, slotExtras, slotRoom, roomPlan,
+  swapItem, restoreItem, sameItems, swapSuggestions, swapsOn, dayPlan, offOn, slotExtras, dayRooms, roomPlan,
 } from '../domain/plan.js';
 import { ask, aiAvailable, md, sparkle } from '../ai/hooshvareh.js';
 import { fa, esc, norm } from '../lib/fa.js';
@@ -140,7 +140,8 @@ const entryOf = (day, key, i) => ({
 
 /*
   A day as the plan screen shows it: the plan in force with that day's own versions of options,
-  and — where off-plan food took part of an occasion — the options cut down to what is left.
+  and — where off-plan food took part of an occasion, or went over an earlier one — the options
+  cut down to what is left.
   Null when no plan covers the day.
 */
 function dayView(day) {
@@ -152,7 +153,7 @@ function dayView(day) {
   const base = dayPlan(planOn(s.ai_notes, day), swaps);
   if (!base) return null;
   const extras = slotExtras(s.entries, picks, offOn(s.ai_notes, day), day);
-  const rooms = Object.fromEntries(Object.keys(SLOTS).map(k => [k, slotRoom(base, k, picks, extras[k], s.entries)]));
+  const rooms = dayRooms(base, picks, extras, s.entries);
   return { plan: roomPlan(base, picks, rooms, new Map(s.foods.map(f => [f.id, f]))), picks, extras, rooms };
 }
 
@@ -174,7 +175,7 @@ function toggle(day, key, optId) {
   } else {
     const opt = plan.slots[key].options.find(o => o.id === optId);
     if (!opt) return;
-    if (v.rooms[key].locked) return toast('سهم این وعده با خوراکی خارج از برنامه پر شده');
+    if (v.rooms[key].locked) return toast(v.rooms[key].extras ? 'سهم این وعده با خوراکی خارج از برنامه پر شده' : 'سهم این وعده با اضافه‌ی وعده‌های قبل پر شده');
     if (opt.over) return toast('این گزینه در باقی‌مانده‌ی سهم این وعده جا نمی‌شود');
     const n = plan.slots[key].pick;
     if (cur.length >= n) {
@@ -385,17 +386,21 @@ const itemLine = (only, need, canSwap) => (i, n) => `<li>
 
 const r10 = x => Math.round(x / 10) * 10;
 
-// Under the off-plan foods of an occasion: what is left of its calories, or that it is used up.
+// Under an occasion that off-plan food touched — its own, or an earlier one's that went over
+// (`room.owed`): what is left of its calories, or that it is used up.
 // `cut`: options were made smaller to fit; `over`: how many could not be.
 function roomNote(key, room, cut, over) {
   const left = r10(room.left);
   const label = SLOTS[key].label;
+  const owed = r10(room.owed) > 0 ? `<b>${fa(r10(room.owed))}</b> کالری اضافه‌ی وعده‌های قبل از سهم ${label} کم شد. ` : '';
   const state = left > 0 ? `${room.locked ? 'فقط ' : ''}<b>${fa(left)}</b> کالری از سهم ${label} مانده`
     : left < 0 ? `<b>${fa(-left)}</b> کالری از سهم ${label} بیشتر شده` : `سهم ${label} پر شده`;
-  const then = room.locked ? '؛ گزینه‌های این وعده قفل شد. اگر ثبت خارج از برنامه را برداری، دوباره باز می‌شوند.'
+  const on = room.passed > 0 ? 'این اضافه از سهم وعده‌های بعدی کم شد.' : '';
+  const then = room.locked ? `؛ گزینه‌های این وعده قفل شد. ${on}${room.extras ? `${on ? ' ' : ''}اگر ثبت خارج از برنامه را برداری، دوباره باز می‌شوند.` : ''}`
+    : on ? `؛ ${on}`
     : cut ? `؛ مقدار گزینه‌ها به همین اندازه کم شد${over ? ` (${fa(over)} گزینه آن‌قدر کوچک نمی‌شود و کنار رفت)` : ''}.`
     : over ? '؛ هیچ‌کدام از گزینه‌ها آن‌قدر کوچک نمی‌شود.' : '.';
-  return `<p class="room small${room.locked ? ' lock' : ''}">${room.locked ? icon.lock : ''}<span>${state}${then}</span></p>`;
+  return `<p class="room small${room.locked ? ' lock' : ''}">${room.locked ? icon.lock : ''}<span>${owed}${state}${then}</span></p>`;
 }
 
 /*
@@ -435,7 +440,8 @@ function slotCard(plan, key, day, picks, extras, room, showKcal, only, need) {
   const rest = offer.filter(o => !isOn(o));
   const left = r10(room.left);
   // what is left is too little for a whole option: Hooshvareh can size one to it
-  const fit = extras.length && !full && !room.locked && !wait && aiAvailable() && left >= 50 && !rest.length
+  const touched = extras.length || r10(room.owed) > 0; // off-plan food changed what this occasion has
+  const fit = touched && !full && !room.locked && !wait && aiAvailable() && left >= 50 && !rest.length
     ? `<button class="link small ai-more" data-fit="${key}" data-kcal="${left}">${sparkle(14)} هوشواره گزینه‌ای برای همین ${fa(left)} کالری بچیند</button>` : '';
   const unfolded = shown.has(`${day}|${key}`);
   const options = room.locked ? slot.options.filter(isOn).map(option).join('')
@@ -456,7 +462,8 @@ function slotCard(plan, key, day, picks, extras, room, showKcal, only, need) {
     ${extras.length ? `<h3 class="list-h">خارج از برنامه</h3>${extras.map(e => `
       <button class="entry" data-entry="${e.id}">
         <span class="ename">${esc(e.name)}</span><span class="eqty">${amountLabel(Number(e.qty), e.unit)}</span><span class="ekcal">${fa(Math.round(e.kcal))}</span>
-      </button>`).join('')}${roomNote(key, room, rest.some(o => o.fit), over)}${fit}` : ''}
+      </button>`).join('')}` : ''}
+    ${touched ? `${roomNote(key, room, rest.some(o => o.fit), over)}${fit}` : ''}
     ${wait}${full || room.locked ? '' : more}
   </div>`;
 }

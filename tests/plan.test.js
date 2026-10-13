@@ -1,5 +1,5 @@
 import { suite, test, eq, ok, near } from './harness.js';
-import { budgets, fitOption, buildPlan, optionBudget, planOn, previousPlan, planEnd, planDayNo, planOver, picksOn, dayAdherence, adherence, newFoods, optionText, swapItem, restoreItem, sameItems, swapSuggestions, swapsOn, dayPlan, offOn, slotExtras, slotRoom, shrinkOption, roomPlan, SLOTS } from '../js/domain/plan.js';
+import { budgets, fitOption, buildPlan, optionBudget, planOn, previousPlan, planEnd, planDayNo, planOver, picksOn, dayAdherence, adherence, newFoods, optionText, swapItem, restoreItem, sameItems, swapSuggestions, swapsOn, dayPlan, offOn, slotExtras, slotRoom, dayRooms, shrinkOption, roomPlan, SLOTS } from '../js/domain/plan.js';
 
 const food = (id, unit, kcal, protein = 0, extra = {}) => ({ id, name: id, unit, kcal, protein, grams: 100, is_veg: false, created_at: '2026-01-01T00:00:00Z', ...extra });
 const FOODS = [
@@ -227,5 +227,45 @@ suite('plan', () => {
     eq(picked.slots.lunch, plan.slots.lunch);
     // a food that left the bank: the option can't be resized
     eq(shrinkOption(first, new Map(), 100), null);
+  });
+
+  test('calories eaten over an occasion are taken off the later ones still open', () => {
+    const e = (id, meal, kcal) => ({ id, day: '2026-02-03', meal, kcal, created_at: id });
+    const b = budgets(plan.kcal);
+    const none = { breakfast: [], snack1: [], lunch: [], snack2: [], dinner: [] };
+    const sumOf = (r, k) => Object.values(r).reduce((t, x) => t + x[k], 0);
+    eq(sumOf(dayRooms(plan, {}, none, []), 'owed'), 0);
+
+    // breakfast eaten off-plan, 200 over: shared by the size of the budgets
+    const big = e('x', 'breakfast', b.breakfast + 200);
+    let r = dayRooms(plan, {}, { ...none, breakfast: [big] }, [big]);
+    eq([r.breakfast.owed, r.breakfast.left, r.breakfast.locked, r.breakfast.passed], [0, -200, true, 200]);
+    near(sumOf(r, 'owed'), 200, 2);
+    ok(r.lunch.owed > r.dinner.owed && r.dinner.owed > r.snack1.owed, 'the bigger the meal, the more it gives');
+    eq(r.lunch.left, b.lunch - r.lunch.owed);
+    eq(r.dinner.passed, 0);
+    const cut = roomPlan(plan, {}, r, byId);
+    ok(cut.slots.lunch.options.every(o => o.over || o.kcal <= r.lunch.left * 1.15), 'lunch options are cut down');
+
+    // lunch then eaten as planned in full: it paid nothing, so the rest owes it all
+    const l = e('l', 'lunch', b.lunch);
+    const picks = { lunch: Array.from({ length: plan.slots.lunch.pick }, () => ({ o: 'lunch-1', e: ['l'] })) };
+    r = dayRooms(plan, picks, { ...none, breakfast: [big] }, [big, l]);
+    eq(r.lunch.owed, 0);
+    near(r.snack1.owed + r.snack2.owed + r.dinner.owed, 200, 2);
+    // eaten 120 under instead: that much of the debt is gone
+    l.kcal = b.lunch - 120;
+    r = dayRooms(plan, picks, { ...none, breakfast: [big] }, [big, l]);
+    near(r.snack1.owed + r.snack2.owed + r.dinner.owed, 80, 2);
+
+    // more than the rest of the day holds: everything after is used up
+    const huge = e('h', 'breakfast', plan.kcal);
+    r = dayRooms(plan, {}, { ...none, breakfast: [huge] }, [huge]);
+    ok(['snack1', 'lunch', 'snack2', 'dinner'].every(k => r[k].locked && r[k].left <= 0), 'all locked');
+
+    // over at dinner: nothing after it to take from
+    const late = e('d', 'dinner', b.dinner + 300);
+    r = dayRooms(plan, {}, { ...none, dinner: [late] }, [late]);
+    eq([sumOf(r, 'owed'), r.dinner.passed], [0, 0]);
   });
 });

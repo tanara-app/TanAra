@@ -8,7 +8,7 @@
 import * as store from '../data/store.js';
 import { SUPABASE_URL, SUPABASE_KEY } from '../config.js';
 import { effectiveTargets, computeTargets, phaseOn, maintenanceKcal } from '../domain/targets.js';
-import { SLOTS, planOn, planEnd, previousPlan, adherence, optionText } from '../domain/plan.js';
+import { SLOTS, planOn, planEnd, previousPlan, adherence, optionText, picksOn, offOn, slotExtras, dayRooms } from '../domain/plan.js';
 import { measuredTdee } from '../domain/energy.js';
 import { lossStart } from '../domain/phase.js';
 import { sortedWeights, measureDue } from '../domain/stats.js';
@@ -37,10 +37,14 @@ function planContext(s, t) {
   });
   const prev = previousPlan(s.ai_notes, plan);
   const from = addDays(t, -27);
+  const picks = picksOn(s.ai_notes, s.entries, t);
+  const rooms = dayRooms(plan, picks, slotExtras(s.entries, picks, offOn(s.ai_notes, t), t), s.entries);
   return {
     ...brief(plan), note: plan.note,
     previous: prev ? { start: prev.start, kcal: prev.kcal, adherence: (({ done, of }) => ({ done, of }))(adherence(s.ai_notes, s.entries, prev.start, addDays(plan.start, -1))) } : null,
     days: adherence(s.ai_notes, s.entries, from, t).days,
+    // today's occasions that off-plan food changed: what is left, and what was taken off for earlier ones
+    rooms: Object.keys(SLOTS).filter(k => rooms[k].extras || rooms[k].owed).map(k => ({ slot: SLOTS[k].label, left: rooms[k].left, owed: rooms[k].owed, locked: rooms[k].locked })),
   };
 }
 
