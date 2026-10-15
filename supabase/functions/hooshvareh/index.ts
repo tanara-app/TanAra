@@ -588,7 +588,12 @@ const planSlot = {
 const PLAN_RULES = `Rules for every option:
 - Use ONLY foods from their food bank, by exact food_id. Quantity is in that food's own unit (as listed in the bank), in multiples of 0.5 — or in grams (multiples of 10) for foods whose unit is «گرم».
 - Work out the calories from the bank (kcal per unit × qty) and land within ±10% of the budget. The app recomputes every number and drops options that miss, so do the arithmetic.
-- Realistic Iranian combinations and household amounts a person can measure without a scale; 1–4 foods per option.
+- Every option must be a meal an Iranian household would actually put on the table together at that time of day — the way it is really eaten, not a list of foods that only adds up on paper. Before keeping an option, ask: would someone serve these on one tray? If not, drop it.
+  - A ready dish is a meal on its own: حلیم، عدسی، آش، کله‌پاچه، خوراک لوبیا، املت، کوکو، خورش with rice, کباب with rice or bread. Pair it only with what traditionally goes beside it (bread, the usual garnish, salad, yogurt, دوغ, tea) — never with another protein that has nothing to do with it (حلیم with egg, عدسی with chicken, آش with tuna). If a dish is short on protein, lower its amount and choose another option for protein, don't bolt on an unrelated protein.
+  - Respect the time of day: breakfast foods (نان و پنیر، تخم‌مرغ، عدسی، حلیم، املت، کره و مربا) at breakfast; rice and خورش at lunch or dinner, not at breakfast or as a snack.
+  - Keep the parts of an option from the same kind of meal: نان و پنیر و گردو، نان و پنیر و گوجه و خیار، املت با نان، برنج و خورش و سالاد، ساندویچ مرغ و خیارشور، ماست و میوه. Not bread with fruit and tuna, not rice with egg and cheese.
+  - The title names the meal as people call it (e.g. «عدسی با نان»، «چلو جوجه و سالاد»), not a list of ingredients.
+- Household amounts a person can measure without a scale; 1–4 foods per option.
 - Respect profile.planPrefs (dislikes, allergies, notes) strictly, and medical conditions in the profile in the general, well-established way (e.g. diabetes: no sugary items or juice, prefer whole grains and legumes; blood pressure / heart: avoid salty and fried; kidney disease: do not push protein above the target). Prefer foods they actually log and like over foods they never eat.`;
 
 // `data`: the sections this mode needs — nothing else is sent. `shared`: sections that stay
@@ -652,7 +657,7 @@ note: 2–3 short Persian sentences to them: the idea behind this plan. ${i.incl
       },
       required: ["foods"], additionalProperties: false,
     },
-    prompt: (i) => `In their diet plan, one option for «${i.slot}» is: ${i.option}. They like it but don't have «${i.food}» or don't want it, and want to replace only that food (about ${Math.round(Number(i.kcal)) || "?"} kcal of it); the rest stays. Suggest up to 3 foods from their food bank that can take its place: the same role in the meal (bread for bread, a protein source for a protein source, fruit for fruit), a natural fit with the rest of the option, and not already in it. Best first. The app sets the amounts itself (same calories), so give only the foods. Respect profile.planPrefs (dislikes, allergies, notes) and medical conditions in the profile strictly. If nothing in the bank fits, return an empty list.`,
+    prompt: (i) => `In their diet plan, one option for «${i.slot}» is: ${i.option}. They like it but don't have «${i.food}» or don't want it, and want to replace only that food (about ${Math.round(Number(i.kcal)) || "?"} kcal of it); the rest stays. Suggest up to 3 foods from their food bank that can take its place: the same role in the meal (bread for bread, a protein source for a protein source, fruit for fruit), something an Iranian would really eat together with the rest of the option (no egg next to حلیم, no tuna next to آش), and not already in it. Best first. The app sets the amounts itself (same calories), so give only the foods. Respect profile.planPrefs (dislikes, allergies, notes) and medical conditions in the profile strictly. If nothing in the bank fits, return an empty list.`,
   },
   tip: {
     effort: "low",
