@@ -259,8 +259,10 @@ export function slotRoom(plan, key, picks, extras, entries, owed = 0) {
   calories carried on to the ones after it: the excess is shared between the later occasions
   still to be picked, by the size of their budgets (`owed`), so no single meal pays for all of
   it. An occasion eaten under its budget pays the debt off by that much; whatever an occasion
-  can't absorb moves on. `passed`: the calories this occasion handed on to later ones. Nothing
-  is carried to the next day.
+  can't absorb moves on; an occasion is never charged past what it has left. What the later
+  occasions can't take falls back on earlier ones still to be picked (`back`), so their room
+  never runs past what is left of the day. `passed`: the calories this occasion handed on to
+  other ones. Nothing is carried to the next day.
 */
 export function dayRooms(plan, picks, extras, entries) {
   const b = budgets(plan.kcal);
@@ -270,13 +272,20 @@ export function dayRooms(plan, picks, extras, entries) {
   let debt = 0;
   keys.forEach((k, n) => {
     const open = isOpen(k);
-    const owed = open && debt > 0 ? Math.round(debt * b[k] / keys.slice(n).filter(isOpen).reduce((t, x) => t + b[x], 0)) : 0;
+    const share = open && debt > 0 ? Math.round(debt * b[k] / keys.slice(n).filter(isOpen).reduce((t, x) => t + b[x], 0)) : 0;
+    const owed = Math.min(share, Math.max(0, slotRoom(plan, k, picks, extras[k], entries).left));
     const r = out[k] = slotRoom(plan, k, picks, extras[k], entries, owed);
     const off = extras[k].reduce((t, e) => t + (Number(e.kcal) || 0), 0);
     // picked in full: only what the off-plan food added counts, not an option a little over its budget
     const more = r.left >= 0 ? 0 : open ? -r.left : Math.min(off, -r.left);
     debt = Math.max(0, debt - owed - (open ? 0 : Math.max(0, r.left))) + more;
-    r.passed = keys.slice(n + 1).some(isOpen) ? Math.round(more) : 0;
+    r.passed = more > 0 && keys.some((x, m) => m !== n && isOpen(x)) ? Math.round(more) : 0;
+  });
+  const back = keys.filter(k => isOpen(k) && out[k].left > 0);
+  const room = back.reduce((t, k) => t + out[k].left, 0);
+  if (debt > 0 && room > 0) back.forEach(k => {
+    const take = Math.round(Math.min(out[k].left, debt * out[k].left / room));
+    out[k] = { ...slotRoom(plan, k, picks, extras[k], entries, out[k].owed + take), passed: out[k].passed, back: take };
   });
   return out;
 }

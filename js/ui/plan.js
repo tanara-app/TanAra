@@ -175,7 +175,7 @@ function toggle(day, key, optId) {
   } else {
     const opt = plan.slots[key].options.find(o => o.id === optId);
     if (!opt) return;
-    if (v.rooms[key].locked) return toast(v.rooms[key].extras ? 'سهم این وعده با خوراکی خارج از برنامه پر شده' : 'سهم این وعده با اضافه‌ی وعده‌های قبل پر شده');
+    if (v.rooms[key].locked) return toast(v.rooms[key].extras ? 'سهم این وعده با خوراکی خارج از برنامه پر شده' : 'سهم این وعده با اضافه‌ی وعده‌های دیگر پر شده');
     if (opt.over) return toast('این گزینه در باقی‌مانده‌ی سهم این وعده جا نمی‌شود');
     const n = plan.slots[key].pick;
     if (cur.length >= n) {
@@ -392,10 +392,10 @@ const r10 = x => Math.round(x / 10) * 10;
 function roomNote(key, room, cut, over) {
   const left = r10(room.left);
   const label = SLOTS[key].label;
-  const owed = r10(room.owed) > 0 ? `<b>${fa(r10(room.owed))}</b> کالری اضافه‌ی وعده‌های قبل از سهم ${label} کم شد. ` : '';
+  const owed = r10(room.owed) > 0 ? `<b>${fa(r10(room.owed))}</b> کالری اضافه‌ی وعده‌های ${room.back ? 'دیگر' : 'قبل'} از سهم ${label} کم شد. ` : '';
   const state = left > 0 ? `${room.locked ? 'فقط ' : ''}<b>${fa(left)}</b> کالری از سهم ${label} مانده`
     : left < 0 ? `<b>${fa(-left)}</b> کالری از سهم ${label} بیشتر شده` : `سهم ${label} پر شده`;
-  const on = room.passed > 0 ? 'این اضافه از سهم وعده‌های بعدی کم شد.' : '';
+  const on = room.passed > 0 ? 'این اضافه از سهم وعده‌های دیگر کم شد.' : '';
   const then = room.locked ? `؛ گزینه‌های این وعده قفل شد. ${on}${room.extras ? `${on ? ' ' : ''}اگر ثبت خارج از برنامه را برداری، دوباره باز می‌شوند.` : ''}`
     : on ? `؛ ${on}`
     : cut ? `؛ مقدار گزینه‌ها به همین اندازه کم شد${over ? ` (${fa(over)} گزینه آن‌قدر کوچک نمی‌شود و کنار رفت)` : ''}.`
