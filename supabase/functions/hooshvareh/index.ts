@@ -600,7 +600,7 @@ const PLAN_RULES = `Rules for every option:
 // `image`: the request carries a photo (input.image, base64 JPEG) for the model to look at;
 // "optional" when the mode also works without one.
 type OneShot = {
-  effort: string; max_tokens?: number; schema: any; prompt: (i: any) => string; image?: boolean | "optional";
+  effort: string; max_tokens?: number; schema: any; prompt: (i: any, c: Ctx) => string; image?: boolean | "optional";
   system?: string; shared?: (S: Sections) => string[]; data?: (S: Sections, i: any) => string[];
 };
 const ONE_SHOT: Record<string, OneShot> = {
@@ -662,7 +662,10 @@ note: 2–3 short Persian sentences to them: the idea behind this plan. ${i.incl
     effort: "low",
     data: (S) => [S.now(), S.profile(), S.phase(), S.mode(), S.notes()],
     schema: { type: "object", properties: { text: str() }, required: ["text"], additionalProperties: false },
-    prompt: () => `Write today's tip for the top of the Today screen: one or two short sentences (max ~35 words) teaching one practical dieting technique that helps people stick to a diet and lose fat — e.g. eating more slowly, protein at every meal, high-volume low-calorie foods, planning meals ahead, keeping tempting foods out of sight, smaller plates, sleep and hunger, handling eating out or a slip-up, self-monitoring, drinking water before meals. Only advice that is well supported by scientific research (systematic reviews or solid trials); nothing speculative, no fads. This is NOT an analysis of their data: don't comment on their numbers, logs, weight or progress (the Progress screen does that). You may pick a technique that suits their phase, mode and profile, and must respect any medical conditions in it. A different technique from your earlier tips. No greeting.`,
+    // with a (possible) eating-disorder history, no restriction or monitoring techniques at all
+    prompt: (_i, c) => ["yes", "unsure"].includes((c.profile as any)?.edHistory)
+      ? `Write today's tip for the top of the Today screen: one or two short sentences (max ~35 words), one gentle, well-evidenced habit for a healthy relationship with food and body — e.g. regular, balanced meals without skipping, enjoying food without guilt, sleep, enjoyable movement, eating with others, being kind to yourself after a hard day. Nothing about restricting, cutting, portion control, appetite, calories, weighing or tracking. Don't comment on their data. A different habit from your earlier tips. No greeting.`
+      : `Write today's tip for the top of the Today screen: one or two short sentences (max ~35 words) teaching one practical dieting technique that helps people stick to a diet and lose fat — e.g. eating more slowly, protein at every meal, high-volume low-calorie foods, planning meals ahead, keeping tempting foods out of sight, smaller plates, sleep and hunger, handling eating out or a slip-up, self-monitoring, drinking water before meals. Only advice that is well supported by scientific research (systematic reviews or solid trials); nothing speculative, no fads, nothing that means eating below their safe minimum. This is NOT an analysis of their data: don't comment on their numbers, logs, weight or progress (the Progress screen does that). You may pick a technique that suits their phase, mode and profile, and must respect any medical conditions in it. A different technique from your earlier tips. No greeting.`,
   },
   quote: {
     effort: "low",
@@ -913,7 +916,7 @@ async function runOneShot(mode: string, ctx: Ctx, input: any, use: Use) {
   const image = m.image && input?.image != null;
   if ((m.image === true || image) && !okImage(input?.image)) return json({ error: "عکس درست نرسید؛ دوباره امتحان کن." }, 400);
   const S = sections(ctx);
-  const prompt = m.prompt(input || {});
+  const prompt = m.prompt(input || {}, ctx);
   const res: any = await anthropic.beta.messages.create({
     model: MODEL,
     max_tokens: m.max_tokens || 8000,
