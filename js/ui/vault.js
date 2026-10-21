@@ -32,9 +32,16 @@ const settings = () => store.profile()?.vault || {};
 const saveSettings = patch => store.saveProfile({ ...store.profile(), vault: { ...settings(), ...patch } });
 const every = () => settings().every ?? 3;
 
+// Kept per account, so a second person on this device has their own PIN tries and «last opened».
 const ls = {
-  get(k, fb) { try { return JSON.parse(localStorage.getItem(`tanara:vault-${k}`)) ?? fb; } catch { return fb; } },
-  set(k, v) { try { localStorage.setItem(`tanara:vault-${k}`, JSON.stringify(v)); } catch { /* ignore */ } },
+  get(k, fb) {
+    try {
+      const old = `tanara:vault-${k}`; // before accounts were separated: only the owner had used it
+      if (localStorage.getItem(old) !== null) { localStorage.setItem(store.localKey(`vault-${k}`), localStorage.getItem(old)); localStorage.removeItem(old); }
+      return JSON.parse(localStorage.getItem(store.localKey(`vault-${k}`))) ?? fb;
+    } catch { return fb; }
+  },
+  set(k, v) { try { localStorage.setItem(store.localKey(`vault-${k}`), JSON.stringify(v)); } catch { /* ignore */ } },
 };
 const lastSeen = () => ls.get('seen', null);
 

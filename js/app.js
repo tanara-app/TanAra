@@ -13,6 +13,7 @@ import { renderChat } from './ui/chat.js';
 import { renderMagazine } from './ui/magazine.js';
 import { configureAI, sparkle } from './ai/hooshvareh.js';
 import { configureVault } from './ui/vault.js';
+import { disable as disableReminders } from './ui/reminders.js';
 
 const view = $('#view');
 const nav = $('#nav');
@@ -175,7 +176,15 @@ if (params.has('local')) {
     setSession({
       local: false,
       email: user.email,
-      signOut: async () => { store.clearLocal(); await sb.auth.signOut(); location.hash = '#/today'; },
+      // Nothing of this person stays behind for whoever signs in next on this device: their
+      // reminders stop here, the local copy goes, and a reload drops everything held in memory.
+      signOut: async () => {
+        await disableReminders().catch(() => {});
+        store.clearLocal();
+        await sb.auth.signOut();
+        location.hash = '#/today';
+        location.reload();
+      },
     });
     start(user.id, createSupabaseRemote(sb));
   };

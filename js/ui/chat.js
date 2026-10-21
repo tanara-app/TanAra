@@ -38,13 +38,13 @@ let viewRoot = null;
   device; null is the single conversation from before threads existed. A new conversation
   gets its id now but only shows up in the list once something is said in it.
 */
-const THREAD_KEY = 'tanara:chat-thread';
+const THREAD_KEY = () => store.localKey('chat-thread');
 const newId = () => (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()));
 let current;
 function loadThread() {
   if (current !== undefined) return;
   let saved = null;
-  try { saved = localStorage.getItem(THREAD_KEY); } catch { /* private mode */ }
+  try { saved = localStorage.getItem(THREAD_KEY()); } catch { /* private mode */ }
   const list = threads();
   const id = saved === null ? undefined : saved || null;
   if (id !== undefined && list.some(t => t.id === id)) current = id;
@@ -53,7 +53,7 @@ function loadThread() {
 function setThread(id) {
   current = id;
   focusArticle(null); // an article's full text only rides along in the conversation opened for it
-  try { localStorage.setItem(THREAD_KEY, id ?? ''); } catch { /* ignore */ }
+  try { localStorage.setItem(THREAD_KEY(), id ?? ''); } catch { /* ignore */ }
 }
 // Opens a fresh conversation with a question already typed (used by the magazine).
 export function startChat(text) {

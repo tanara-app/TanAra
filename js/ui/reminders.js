@@ -50,7 +50,8 @@ async function enable() {
   if (error) throw new Error('اشتراک این دستگاه ذخیره نشد؛ دوباره امتحان کن.');
 }
 
-async function disable() {
+// Also run on sign-out, so this device stops getting the reminders of whoever signed out.
+export async function disable() {
   const sub = await subscription();
   if (!sub) return;
   await store.removePush(sub.endpoint);

@@ -26,6 +26,8 @@ let flushing = false;
 let flushTimer = null;
 const listeners = new Set();
 export let syncStatus = { pending: 0, error: null, lastPull: null };
+// Prefix for anything else this device remembers for the signed-in person (cleared on sign-out).
+export const localKey = k => `tanara:${ns}:${k}`;
 
 const uid = () => (crypto.randomUUID ? crypto.randomUUID()
   : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
