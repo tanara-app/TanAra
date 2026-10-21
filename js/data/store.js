@@ -57,6 +57,8 @@ export function init(namespace, remoteAdapter) {
   queue = lsGet('queue', []);
   urlCache = null;
   syncStatus = { pending: queue.length, error: null, lastPull: null };
+  // copies of files from the removed «صندوقچه»; gone at once, without waiting for the new service worker
+  try { caches.delete('tanara-vault').catch(() => {}); } catch { /* no Cache API */ }
   fillFoodGrams();
 }
 
