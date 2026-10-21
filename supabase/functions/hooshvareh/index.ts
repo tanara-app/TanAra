@@ -10,6 +10,7 @@
     progress  analysis of the weight trend
     estimate  calories / protein / weight of one unit for a food the bank doesn't have
     photo     the foods on a photographed plate, with amounts, ready to be logged
+    label     a packaged food's nutrition label, read from a photo (when its barcode wasn't found)
     recipe    a home recipe as ingredients by weight (the app adds it up): theirs written
               down from text or a photo, a lighter version of one, or a new and simple
               dish to try that fits what is left of the day
@@ -703,6 +704,26 @@ note: 2–3 short Persian sentences to them: the idea behind this plan. ${i.incl
       required: ["name", "unit", "grams", "kcal", "protein", "category", "is_veg", "note"], additionalProperties: false,
     },
     prompt: (i) => `Estimate calories, protein and the weight in grams for this food, for one household unit${i.unit ? ` (unit: ${i.unit}${i.unit === "گرم" ? " — then grams is 1 and kcal/protein are per gram" : ""})` : ""}, the way it is usually prepared and served in Iran: «${i.name}». Be realistic, slightly conservative-high rather than low. Keep kcal consistent with grams (realistic energy density). Use their food bank for consistency with similar items. is_veg is false unless the food is itself mainly non-starchy vegetables.`,
+  },
+  label: {
+    effort: "low",
+    image: true,
+    system: "You read nutrition labels on packaged foods for تن‌آرا, a Persian food-logging app. Exact numbers only.",
+    schema: {
+      type: "object",
+      properties: {
+        found: { type: "boolean", description: "false when no nutrition table (or no energy value) can be read" },
+        name: str("Persian name of the product with its brand, as on the pack; empty if not visible"),
+        kcal_100: { type: "number", description: "kcal per 100 g (or 100 ml)" },
+        protein_100: { type: "number", description: "grams of protein per 100 g (or 100 ml)" },
+        pack_g: { type: "number", description: "net weight (g) or volume (ml) of the whole pack if printed, else 0" },
+        category: { type: "string", enum: ["grain", "stew", "protein", "legume", "breakfast", "dairy", "fruit", "veg", "nuts", "drink", "sweet", "other"] },
+        is_veg: VEG,
+        note: str("one short Persian line: anything converted or unclear (kJ to kcal, per-serving to per-100 g), or why it could not be read"),
+      },
+      required: ["found", "name", "kcal_100", "protein_100", "pack_g", "category", "is_veg", "note"], additionalProperties: false,
+    },
+    prompt: (i) => `This is a photo of a packaged food's nutrition label (Iranian labels: «ارزش غذایی», «انرژی», «پروتئین»; often a traffic-light panel per serving).${i.name ? ` They call it «${String(i.name).slice(0, 80)}».` : ""} Read the energy and protein and give them per 100 g (or 100 ml): when the label gives them only per serving or per pack, convert using the weight printed for that serving or pack; when energy is only in kJ, divide by 4.184. Read the digits exactly; do not estimate from what the product usually is. If there is no readable energy value, set found to false, the numbers to 0 and say why in the note.`,
   },
   photo: {
     effort: "medium",

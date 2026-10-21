@@ -167,6 +167,7 @@ export function upsertFood(food) {
     kcal: Number(food.kcal) || 0,
     protein: Number(food.protein) || 0,
     is_veg: !!food.is_veg,
+    barcode: food.barcode || null,
     created_at: food.created_at || now(),
     updated_at: now(),
   };

@@ -12,7 +12,7 @@ import { sheet, icon } from './dom.js';
 const PRICE = { input: 2, cache_read: 0.2, cache_write: 2.5, output: 10, search: 0.01 };
 const MODES = {
   chat: 'گفت‌وگو', magazine: 'مجله', plan: 'چیدن رژیم', plan_option: 'گزینه‌ی دیگر رژیم', plan_swap: 'جایگزین در رژیم', tip: 'نکته‌ی امروز',
-  review: 'تحلیل هفته', progress: 'تحلیل روند', estimate: 'تخمین غذا', photo: 'عکس غذا', recipe: 'رسپی', shop: 'لیست خرید', quote: 'جمله‌ی انگیزشی', title: 'اسم گفت‌وگو',
+  review: 'تحلیل هفته', progress: 'تحلیل روند', estimate: 'تخمین غذا', photo: 'عکس غذا', label: 'برچسب بسته', recipe: 'رسپی', shop: 'لیست خرید', quote: 'جمله‌ی انگیزشی', title: 'اسم گفت‌وگو',
 };
 const DAYS = 30;
 

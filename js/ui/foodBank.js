@@ -1,12 +1,13 @@
 // Food bank management: search, add, edit, delete. Its second tab, «رسپی‌ها», is in recipes.js.
 import * as store from '../data/store.js';
 import { CATEGORIES } from '../data/seedFoods.js';
-import { norm, esc } from '../lib/fa.js';
+import { norm, esc, faDigits } from '../lib/fa.js';
 import { sheet, toast, confirmBox, icon } from './dom.js';
 import { bindEstimate } from './logFood.js';
 import { foodMeta, unitFields, bindUnitFields } from './units.js';
 import { aiAvailable, sparkle } from '../ai/hooshvareh.js';
 import { recipesPanel, recipes } from './recipes.js';
+import { scanBarcode, barcodeBox, fillFromBarcode, barcodeIcon } from './barcode.js';
 
 export function openFoodBank(onChange) {
   let query = '';
@@ -58,11 +59,14 @@ export function openFoodBank(onChange) {
 
 export function openFoodForm(food, onSaved) {
   const f = food || { name: '', unit: 'کفگیر', grams: 120, kcal: '', protein: '', category: 'other', is_veg: false };
+  let barcode = f.barcode || null;
   sheet.open(body => {
     body.innerHTML = `
       <div class="sheet-head"><h2>${food ? 'ویرایش غذا' : 'غذای جدید'}</h2><button class="icon-btn" data-close aria-label="بستن">${icon.close}</button></div>
       <form class="stack" novalidate>
         <label class="field"><span>اسم</span><input name="name" value="${esc(f.name)}"></label>
+        <div data-bc-slot>${barcode ? `<p class="small muted">${barcodeIcon} بارکد <bdi>${faDigits(barcode)}</bdi></p>` : ''}</div>
+        <button type="button" class="btn" data-scan>${barcodeIcon} ${barcode ? 'عوض کردن بارکد' : food ? 'وصل کردن بارکد بسته' : 'پر کردن با بارکد بسته'}</button>
         ${aiAvailable() ? `<button type="button" class="btn ai-btn" data-ai-est>${sparkle()} تخمین کالری با هوشواره</button><p class="muted small ai-est-note" hidden></p>` : ''}
         ${unitFields(f)}
         <label class="field"><span>دسته</span><select name="category">${Object.entries(CATEGORIES).map(([k, l]) => `<option value="${k}" ${k === f.category ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
@@ -76,6 +80,19 @@ export function openFoodForm(food, onSaved) {
     body.querySelector('[data-close]').onclick = () => sheet.close();
     const units = bindUnitFields(form, F);
     bindEstimate(body, F, units, { keepUnit: !!food });
+    // A new food is filled in from the product; an existing one only gets the barcode, so
+    // numbers already corrected by hand stay as they are.
+    body.querySelector('[data-scan]').onclick = async () => {
+      const code = await scanBarcode();
+      if (!code || !form.isConnected) return;
+      const other = store.get().foods.find(x => x.barcode === code && x.id !== food?.id);
+      if (other) return toast(`این بارکد مال «${other.name}» است`);
+      barcode = code;
+      const slot = body.querySelector('[data-bc-slot]');
+      if (food) { slot.innerHTML = `<p class="small muted">${barcodeIcon} بارکد <bdi>${faDigits(code)}</bdi> وصل شد؛ با «ذخیره» می‌ماند.</p>`; return; }
+      slot.innerHTML = barcodeBox(code);
+      fillFromBarcode(body, F, units, code);
+    };
     form.onsubmit = e => {
       e.preventDefault();
       const name = F.name.value.trim();
@@ -83,7 +100,7 @@ export function openFoodForm(food, onSaved) {
       const err = form.querySelector('.err');
       if (!name) { err.textContent = 'اسم را بنویسید.'; err.hidden = false; return; }
       if (r.error) { err.textContent = r.error; err.hidden = false; return; }
-      store.upsertFood({ ...(food || {}), name, ...r, category: F.category.value, is_veg: F.veg.checked });
+      store.upsertFood({ ...(food || {}), name, ...r, category: F.category.value, is_veg: F.veg.checked, barcode });
       sheet.close();
       toast('ذخیره شد');
       onSaved?.();

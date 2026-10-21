@@ -1,5 +1,6 @@
 // The food-logging sheet: frequents → search → quantity → save. Built for 2–3 taps.
 // Or one photo: Hooshvareh lists what is on the plate and it is logged after a look.
+// Or a packaged food's barcode: from the bank if scanned before, else looked up (barcode.js).
 import * as store from '../data/store.js';
 import { MEALS, frequentFoods, lastAmountFor } from '../domain/stats.js';
 import { CATEGORIES, GRAM } from '../data/seedFoods.js';
@@ -11,6 +12,7 @@ import { foodMeta, amountLabel, unitFields, bindUnitFields, mountAmount } from '
 import { ask, aiAvailable, sparkle } from '../ai/hooshvareh.js';
 import { photoItems } from '../domain/photo.js';
 import { pickPhoto, foodPhoto, cameraIcon } from './photo.js';
+import { scanBarcode, barcodeBox, fillFromBarcode, barcodeIcon } from './barcode.js';
 
 export const mealSeg = meal => `<div class="seg meal-seg" data-meal>
   ${Object.entries(MEALS).map(([k, l]) => `<button type="button" data-v="${k}" class="${k === meal ? 'on' : ''}">${l}</button>`).join('')}
@@ -52,6 +54,7 @@ export function openLogSheet({ day = today(), meal = null, onSaved = null } = {}
         <div class="sheet-foot">
           ${aiAvailable() ? `<button class="btn block ai-btn" data-photo>${cameraIcon} عکس بگیر؛ هوشواره ثبتش می‌کند</button>` : ''}
           <div class="row gap">
+            <button class="btn grow" data-scan>${barcodeIcon} بارکد</button>
             <button class="btn grow" data-custom>غذای دلخواه</button>
             <button class="btn grow" data-bank>بانک غذا</button>
           </div>
@@ -93,8 +96,18 @@ export function openLogSheet({ day = today(), meal = null, onSaved = null } = {}
         if (f) return drawQty(store.get().foods.find(x => x.id === f.dataset.food));
         if (e.target.closest('[data-custom]')) drawCustom();
       });
-      body.querySelector('.sheet-foot [data-custom]').onclick = drawCustom;
+      body.querySelector('.sheet-foot [data-custom]').onclick = () => drawCustom();
+      body.querySelector('[data-scan]').onclick = scan;
       body.querySelector('[data-photo]')?.addEventListener('click', takePhoto);
+    }
+
+    // A barcode seen before opens its bank food; a new one opens «غذای دلخواه», filled in.
+    async function scan() {
+      const code = await scanBarcode();
+      if (!code || !body.isConnected) return;
+      const food = store.get().foods.find(f => f.barcode === code);
+      if (food) return drawQty(food);
+      drawCustom(code);
     }
 
     /*
@@ -203,8 +216,11 @@ export function openLogSheet({ day = today(), meal = null, onSaved = null } = {}
       };
     }
 
-    // A food that isn't in the bank: describe one unit, say how much was eaten, optionally keep it.
-    function drawCustom() {
+    /*
+      A food that isn't in the bank: describe one unit, say how much was eaten, optionally keep it.
+      From a barcode it is filled in from the product and kept by default, with its barcode.
+    */
+    function drawCustom(code = null) {
       body.innerHTML = `
         <div class="sheet-head">
           <button class="icon-btn" data-back aria-label="برگشت">${icon.chevR}</button>
@@ -212,12 +228,13 @@ export function openLogSheet({ day = today(), meal = null, onSaved = null } = {}
         </div>
         ${mealSeg(curMeal)}
         <form class="stack" novalidate>
-          <label class="field"><span>اسم غذا</span><input name="name" value="${esc(query)}" placeholder="مثلاً ساندویچ مرغ"></label>
+          <label class="field"><span>اسم غذا</span><input name="name" value="${code ? '' : esc(query)}" placeholder="مثلاً ساندویچ مرغ"></label>
+          ${code ? barcodeBox(code) : ''}
           ${aiEstBtn()}
           ${unitFields({ unit: 'پرس', grams: 300, kcal: '', protein: '' })}
           <div class="qty-box"><div class="stack" data-amount></div></div>
           <label class="check"><input type="checkbox" name="veg"><span>جزو وعده‌ی سبزی حساب شود</span></label>
-          <label class="check"><input type="checkbox" name="save"><span>به بانک غذا هم اضافه شود</span></label>
+          <label class="check"><input type="checkbox" name="save" ${code ? 'checked' : ''}><span>به بانک غذا هم اضافه شود${code ? ' (دفعه‌ی بعد با همین بارکد مستقیم می‌آید)' : ''}</span></label>
           <p class="err" hidden></p>
           <button class="btn primary block big">ثبت</button>
         </form>`;
@@ -232,6 +249,9 @@ export function openLogSheet({ day = today(), meal = null, onSaved = null } = {}
       };
       amount = mountAmount(body.querySelector('[data-amount]'), base, { qty: 1, grams: false });
       bindEstimate(body, F, units);
+      // the form has no category field; a product's category still reaches the bank
+      let category = null;
+      if (code) fillFromBarcode(body, F, units, code, f => { category = f.category; });
       body.querySelector('[data-back]').onclick = drawList;
       form.onsubmit = e => {
         e.preventDefault();
@@ -242,13 +262,13 @@ export function openLogSheet({ day = today(), meal = null, onSaved = null } = {}
         if (r.error) { err.textContent = r.error; err.hidden = false; return; }
         let food_id = null;
         if (F.save.checked) {
-          food_id = store.upsertFood({ name, ...r, is_veg: F.veg.checked, category: F.veg.checked ? 'veg' : 'other' }).id;
+          food_id = store.upsertFood({ name, ...r, is_veg: F.veg.checked, category: category || (F.veg.checked ? 'veg' : 'other'), barcode: code }).id;
         }
         save({ day, meal: curMeal, food_id, name, ...amount.get(), is_veg: F.veg.checked });
         sheet.close();
         toast(`${name} ثبت شد`);
       };
-      F.name.focus();
+      if (!code) F.name.focus();
     }
 
     drawList();
