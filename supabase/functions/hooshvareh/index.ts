@@ -660,9 +660,9 @@ note: 2–3 short Persian sentences to them: the idea behind this plan. ${i.incl
   },
   tip: {
     effort: "low",
-    data: (S) => [S.now(), S.profile(), S.targets(), S.phase(), S.energy(), S.mode(), S.plan(), S.adherence(), S.weights(), S.totals(), S.recent(), S.reviews(), S.motivations(), S.notes()],
+    data: (S) => [S.now(), S.profile(), S.phase(), S.mode(), S.notes()],
     schema: { type: "object", properties: { text: str() }, required: ["text"], additionalProperties: false },
-    prompt: () => `Write today's tip for the top of the Today screen: one or two short sentences (max ~35 words), one practical, evidence-based nutrition or habit tip tailored to what their recent data shows (e.g. protein below target, few vegetables, late-night snacking, gaps in logging, weight trend, a waist that shrinks while the weight stands still, the phase they are in, an upcoming event). If there is little data, give a good general tip for starting out. Different in topic from your earlier tips. No greeting.`,
+    prompt: () => `Write today's tip for the top of the Today screen: one or two short sentences (max ~35 words) teaching one practical dieting technique that helps people stick to a diet and lose fat — e.g. eating more slowly, protein at every meal, high-volume low-calorie foods, planning meals ahead, keeping tempting foods out of sight, smaller plates, sleep and hunger, handling eating out or a slip-up, self-monitoring, drinking water before meals. Only advice that is well supported by scientific research (systematic reviews or solid trials); nothing speculative, no fads. This is NOT an analysis of their data: don't comment on their numbers, logs, weight or progress (the Progress screen does that). You may pick a technique that suits their phase, mode and profile, and must respect any medical conditions in it. A different technique from your earlier tips. No greeting.`,
   },
   quote: {
     effort: "low",
