@@ -7,7 +7,7 @@ import * as store from '../data/store.js';
 import { effectiveTargets, hasMedicalFlag } from '../domain/targets.js';
 import {
   SLOTS, PLAN_DAYS, budgets, buildPlan, fitOption, optionBudget, planOn, planEnd, planDayNo, planOver,
-  picksOn, dayAdherence, newFoods, optionText,
+  picksOn, dayAdherence, newFoods, goneFoods, optionText,
   swapItem, restoreItem, sameItems, swapSuggestions, swapsOn, dayPlan, offOn, slotExtras, dayRooms, roomPlan,
 } from '../domain/plan.js';
 import { ask, aiAvailable, md, sparkle } from '../ai/hooshvareh.js';
@@ -495,6 +495,7 @@ export function planHtml(day) {
   const a = dayAdherence(plan, picks);
   const over = planOver(plan, today());
   const fresh = isToday && !over ? newFoods(plan, s.foods) : [];
+  const gone = isToday && !over ? goneFoods(plan, s.foods) : [];
   const dayNo = planDayNo(plan, day);
   const keys = Object.keys(SLOTS);
   const need = neededFoods(shopList(s.ai_notes)); // foods of the plan waiting on the shopping list
@@ -516,6 +517,11 @@ export function planHtml(day) {
       <strong>غذای تازه در بانک غذا</strong>
       <p>${fresh.slice(0, 4).map(f => `«${esc(f.name)}»`).join('، ')}${fresh.length > 4 ? ' و…' : ''} را اضافه کرده‌ای. هوشواره برنامه را با ${fresh.length > 1 ? 'این‌ها' : 'این'} به‌روز کند؟</p>
       <div class="row gap"><button class="btn primary sm" data-plan-fresh>به‌روز کن</button><button class="btn ghost sm" data-plan-skip>نه</button></div>
+    </div>` : ''}
+    ${gone.length && !busy ? `<div class="note soft" data-gone>
+      <strong>غذای حذف‌شده از بانک غذا</strong>
+      <p>${gone.slice(0, 4).map(f => `«${esc(f.name)}»`).join('، ')}${gone.length > 4 ? ' و…' : ''} را از بانک غذا حذف کرده‌ای، ولی در این برنامه ${gone.length > 1 ? 'هستند' : 'هست'}. هوشواره برنامه را بدون ${gone.length > 1 ? 'این‌ها' : 'آن'} به‌روز کند؟</p>
+      <div class="row gap"><button class="btn primary sm" data-plan-gone>به‌روز کن</button><button class="btn ghost sm" data-plan-keep>نه</button></div>
     </div>` : ''}
 
     <section class="card ai-card plan-card">
@@ -555,12 +561,17 @@ export function bindPlan(root, day, redraw) {
   if (!plan) return;
 
   const fresh = newFoods(plan, s.foods);
-  root.querySelector('[data-plan-fresh]')?.addEventListener('click', () =>
-    generate({ days: Math.max(1, diffDays(planEnd(plan), today()) + 1), include: fresh }));
-  root.querySelector('[data-plan-skip]')?.addEventListener('click', () => {
+  const gone = goneFoods(plan, s.foods);
+  // a refresh keeps the period's end; it's made from the bank as it is now, so deleted foods drop out
+  const refreshPlan = () => generate({ days: Math.max(1, diffDays(planEnd(plan), today()) + 1), include: fresh });
+  const markSeen = list => {
     const cur = notes().find(n => n.key === plan.key);
-    if (cur) store.saveNote({ key: cur.key, kind: 'plan', text: cur.text, data: { ...cur.data, seenFoods: [...(cur.data.seenFoods || []), ...fresh.map(f => f.id)] } });
-  });
+    if (cur) store.saveNote({ key: cur.key, kind: 'plan', text: cur.text, data: { ...cur.data, seenFoods: [...(cur.data.seenFoods || []), ...list.map(f => f.id)] } });
+  };
+  root.querySelector('[data-plan-fresh]')?.addEventListener('click', refreshPlan);
+  root.querySelector('[data-plan-gone]')?.addEventListener('click', refreshPlan);
+  root.querySelector('[data-plan-skip]')?.addEventListener('click', () => markSeen(fresh));
+  root.querySelector('[data-plan-keep]')?.addEventListener('click', () => markSeen(gone));
   root.querySelectorAll('[data-opt]').forEach(b => b.onclick = e => {
     const swap = e.target.closest('[data-swap]');
     if (swap) return openSwap(day, b.dataset.slot, b.dataset.opt, Number(swap.dataset.swap));

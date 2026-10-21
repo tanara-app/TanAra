@@ -347,5 +347,15 @@ export function newFoods(plan, foods) {
   return foods.filter(f => f.created_at > plan.made && !used.has(f.id) && !seen.has(f.id));
 }
 
+// Foods the plan uses that have since been deleted from the bank, once each: [{ id, name }].
+export function goneFoods(plan, foods) {
+  const have = new Set(foods.map(f => f.id));
+  const seen = new Set(plan.seenFoods || []);
+  const gone = new Map();
+  [...Object.values(plan.slots).flatMap(s => s.options.flatMap(o => o.items)), ...(plan.free || [])]
+    .forEach(i => { if (i.food_id && !have.has(i.food_id) && !seen.has(i.food_id)) gone.set(i.food_id, i.name); });
+  return [...gone].map(([id, name]) => ({ id, name }));
+}
+
 // «۲ کف‌دست نان سنگک، ۳۰ گرم پنیر» — plain text, for Hooshvareh.
 export const optionText = o => o.items.map(i => `${i.qty} ${i.unit} ${i.name}`).join(' + ');
