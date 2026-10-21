@@ -36,8 +36,7 @@ const every = () => settings().every ?? 3;
 const ls = {
   get(k, fb) {
     try {
-      const old = `tanara:vault-${k}`; // before accounts were separated: only the owner had used it
-      if (localStorage.getItem(old) !== null) { localStorage.setItem(store.localKey(`vault-${k}`), localStorage.getItem(old)); localStorage.removeItem(old); }
+      localStorage.removeItem(`tanara:vault-${k}`); // from before accounts were separated; not handed to anyone
       return JSON.parse(localStorage.getItem(store.localKey(`vault-${k}`))) ?? fb;
     } catch { return fb; }
   },

@@ -154,6 +154,9 @@ if (params.has('local')) {
   const onSession = session => {
     const user = session?.user || null;
     if (currentId !== undefined && (user?.id ?? null) === currentId) return;
+    // the session ended some other way (expired, signed out in another tab): start clean, so
+    // nothing held in memory carries over to whoever signs in next (the local copy is per account)
+    if (currentId && !user) { location.reload(); return; }
     currentId = user?.id ?? null;
     if (!user) {
       configureAI(null);

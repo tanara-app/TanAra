@@ -54,8 +54,9 @@ async function enable() {
 export async function disable() {
   const sub = await subscription();
   if (!sub) return;
-  await store.removePush(sub.endpoint);
-  await sub.unsubscribe().catch(() => {});
+  // the browser's subscription goes even if the server can't be reached: a dead endpoint
+  // left in push_subs only gets a refusal from the push service
+  try { await store.removePush(sub.endpoint); } finally { await sub.unsubscribe().catch(() => {}); }
 }
 
 // Sends a test notification to this person's devices. Resolves to how many accepted it.
