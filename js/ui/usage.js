@@ -56,6 +56,6 @@ export function openUsage() {
       <div class="wlist usage-list">${list.map(([mode, m]) => `
         <div class="wrow"><span>${MODES[mode] || mode} <small class="muted">${fa(m.n)} بار · هر بار ${usd(m.cost / m.n)}</small></span><b>${usd(m.cost)}</b></div>
         <div class="bar usage-bar"><i style="width:${Math.max(2, Math.round(m.cost / total * 100))}%"></i></div>`).join('')}</div>
-      <p class="muted small">${input ? `${fa(Math.round(cached / input * 100))}٪ از ورودی‌ها از کش خوانده شده (ده برابر ارزان‌تر). ` : ''}عددها تخمینی‌اند (از روی تعداد توکن و قیمت رسمی مدل)؛ صورت‌حساب واقعی در کنسول Anthropic است. یادآورها و یادآور صندوقچه هزینه‌ای ندارند.</p>`;
+      <p class="muted small">${input ? `${fa(Math.round(cached / input * 100))}٪ از ورودی‌ها از کش خوانده شده (ده برابر ارزان‌تر). ` : ''}عددها تخمینی‌اند (از روی تعداد توکن و قیمت رسمی مدل)؛ صورت‌حساب واقعی در کنسول Anthropic است. یادآورها هزینه‌ای ندارند.</p>`;
   }, { tall: true });
 }

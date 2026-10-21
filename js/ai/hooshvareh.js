@@ -13,7 +13,6 @@ import { measuredTdee } from '../domain/energy.js';
 import { lossStart } from '../domain/phase.js';
 import { sortedWeights, measureDue } from '../domain/stats.js';
 import { today, parse, addDays, diffDays } from '../lib/dates.js';
-import { vaultSummary } from '../ui/vault.js';
 import { perUnit } from '../domain/recipe.js';
 import { shopList, toBuy } from '../domain/shopping.js';
 
@@ -93,7 +92,7 @@ function context() {
     today: t,
     todayFa: new Intl.DateTimeFormat('fa-IR-u-ca-persian', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(parse(t)),
     now: `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`,
-    profile: p && (({ vault, ...rest }) => rest)(p), // the vault's PIN hash is nobody's business
+    profile: p,
     targets: p ? effectiveTargets(p) : null,
     foods: s.foods.map(({ id, name, category, unit, grams, kcal, protein, is_veg, created_at }) => ({ id, name, category, unit, grams, kcal, protein, is_veg, created_at })),
     // ids are not shown to the model; the Edge Function needs them to point a correction at a record
@@ -106,7 +105,6 @@ function context() {
     energy: energyContext(s, p, t),
     reviews: s.reviews.map(({ week_start, good, hard, next_goal }) => ({ week_start, good, hard, next_goal })),
     motivations: s.motivations.map(({ kind, title, note, day, image_path }) => ({ kind, title, note, day, image_path: image_path ? 1 : null })),
-    vault: vaultSummary(),
     mode: p?.mode === 'plan' ? 'plan' : 'count',
     plan: planContext(s, t),
     magazine: magazineContext(s),

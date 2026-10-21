@@ -10,7 +10,6 @@ import { sheet, toast, confirmBox, icon } from './dom.js';
 import { fieldsHtml, readFields, bindChoices, validate, medicalNoteHtml, targetsHtml } from './onboarding.js';
 import { openFoodBank } from './foodBank.js';
 import { openMotivationList } from './motivation.js';
-import { bindVault } from './vault.js';
 import { phaseCard, bindPhase } from './phase.js';
 import { remindersLine, bindReminders } from './reminders.js';
 import { openUsage } from './usage.js';
@@ -66,7 +65,6 @@ export function renderProfile(root) {
       ${row('data-edit', 'اطلاعات من', `${fa(p.age)} ساله · قد ${fa(p.heightCm, 1)} · ${ACTIVITY[p.activity]?.label || ''}${p.conditions?.length ? ` · ${p.conditions.map(c => CONDITIONS[c]).join('، ')}` : ''}`)}
       ${row('data-reminders', 'یادآورها', remindersLine())}
       ${row('data-mots', 'انگیزه‌ها', s.motivations.length ? `${fa(s.motivations.length)} مورد؛ بالای صفحه‌ی «امروز»` : 'هنوز چیزی اضافه نکرده‌ای')}
-      ${row('data-vault-open', 'صندوقچه‌ی خصوصی', `${s.vault?.length ? `${fa(s.vault.length)} مورد · ` : ''}با رمز شش‌رقمی`)}
       ${row('data-bank', 'بانک غذا', `${fa(s.foods.length)} غذا`)}
       ${row('data-shopping', 'لیست خرید', shoppingLine())}
       ${aiAvailable() ? row('data-usage', 'مصرف هوشواره', 'هر کار هوشواره چقدر هزینه داشته') : ''}
@@ -83,7 +81,6 @@ export function renderProfile(root) {
   root.querySelector('[data-manual]').onclick = () => openManual(p);
   root.querySelector('[data-edit]').onclick = () => openEdit(p);
   root.querySelector('[data-mots]').onclick = () => openMotivationList();
-  bindVault(root);
   bindPhase(root);
   bindReminders(root);
   root.querySelector('[data-usage]')?.addEventListener('click', openUsage);

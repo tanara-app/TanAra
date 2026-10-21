@@ -6,7 +6,6 @@ import { today, addDays, diffDays, faDM, faDMY, jParts, fromJalali, J_MONTHS } f
 import { sheet, toast, confirmBox, icon } from './dom.js';
 import { dismissed, dismiss } from './notices.js';
 import { ask, aiAvailable, sparkle } from '../ai/hooshvareh.js';
-import { bindVault } from './vault.js';
 
 export const KINDS = {
   event: { label: 'رویداد', long: 'رویداد پیش رو' },
@@ -106,7 +105,7 @@ export function motivationCard() {
     <div class="mot-track">${v.map(slideHtml).join('')}</div>
     <div class="mot-foot">
       <div class="mot-dots">${v.length > 1 ? v.map((_, i) => `<i class="${i === slideIdx ? 'on' : ''}"></i>`).join('') : ''}</div>
-      <span class="mot-links"><button class="link small" data-vault-open>${icon.lock} صندوقچه</button><button class="link small" data-mot-list>انگیزه‌ها</button></span>
+      <span class="mot-links"><button class="link small" data-mot-list>انگیزه‌ها</button></span>
     </div>
   </section>`;
 }
@@ -190,10 +189,8 @@ export function openMotivationList() {
             <small class="muted">${KINDS[m.kind].label}${m.kind === 'event' ? ` · ${faDM(m.day)}${m.day < t ? ' · گذشت' : ''}` : ''}</small></span>
           </button>`).join('') || '<div class="empty">هنوز چیزی اضافه نکرده‌ای.</div>'}
         </div>
-        <button class="btn primary block" data-add>${icon.plus} افزودن انگیزه</button>
-        <button class="btn block" data-vault-open>${icon.lock} صندوقچه‌ی خصوصی</button>`;
+        <button class="btn primary block" data-add>${icon.plus} افزودن انگیزه</button>`;
       hydrateImages(body);
-      bindVault(body);
       body.querySelector('[data-close]').onclick = () => sheet.close();
       body.querySelector('[data-add]').onclick = () => openMotivationEditor(null, draw);
       body.querySelectorAll('[data-id]').forEach(b => b.onclick = () => openMotivationView(b.dataset.id));

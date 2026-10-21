@@ -12,7 +12,6 @@ import { icon } from './dom.js';
 import { openLogSheet, openEntrySheet } from './logFood.js';
 import { dismissed, dismiss } from './notices.js';
 import { motivationCard, bindMotivation } from './motivation.js';
-import { vaultNudge, bindVault } from './vault.js';
 import { tipCard, bindTip } from './aiCards.js';
 import { magCard, bindMag } from './magazine.js';
 import { planHtml, bindPlan } from './plan.js';
@@ -76,7 +75,6 @@ export function renderToday(root) {
 
     ${isToday ? measureNote() : ''}
     ${isToday ? motivationCard() : ''}
-    ${isToday ? vaultNudge() : ''}
     ${isToday ? tipCard() : ''}
     ${isToday ? magCard() : ''}
     ${isToday ? phaseNotes() : ''}
@@ -146,7 +144,6 @@ export function renderToday(root) {
   const redraw = () => { if (root.querySelector('[data-mode]')) renderToday(root); };
   if (planMode) bindPlan(root, day, redraw);
   bindMotivation(root);
-  bindVault(root);
   bindPhase(root);
   bindMeasureNote(root);
   bindShopping(root);

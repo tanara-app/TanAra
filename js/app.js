@@ -12,7 +12,6 @@ import { renderLogin } from './ui/login.js';
 import { renderChat } from './ui/chat.js';
 import { renderMagazine } from './ui/magazine.js';
 import { configureAI, sparkle } from './ai/hooshvareh.js';
-import { configureVault } from './ui/vault.js';
 import { disable as disableReminders } from './ui/reminders.js';
 
 const view = $('#view');
@@ -160,7 +159,6 @@ if (params.has('local')) {
     currentId = user?.id ?? null;
     if (!user) {
       configureAI(null);
-      configureVault(null);
       started = false;
       nav.hidden = true;
       document.body.classList.remove('chat-mode');
@@ -169,13 +167,6 @@ if (params.has('local')) {
       return;
     }
     configureAI(async () => (await sb.auth.getSession()).data.session?.access_token || null);
-    // a forgotten vault PIN is reset by proving the account password again
-    configureVault({
-      verifyPassword: async password => {
-        const { error } = await sb.auth.signInWithPassword({ email: user.email, password });
-        return !error ? 'ok' : /invalid/i.test(error.message) ? 'wrong' : 'net';
-      },
-    });
     setSession({
       local: false,
       email: user.email,
