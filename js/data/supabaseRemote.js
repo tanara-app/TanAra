@@ -1,8 +1,8 @@
 // Supabase adapter for the store. Every table is RLS-locked to the signed-in owner and
 // fills user_id from the JWT, so the client never sends it.
 
-const CONFLICT = { profile: 'user_id', reviews: 'user_id,week_start', weights: 'user_id,day', waists: 'user_id,day', foods: 'id', entries: 'id', motivations: 'id', chat: 'id', ai_notes: 'user_id,key' };
-const DELETE_KEY = { profile: 'user_id', foods: 'id', entries: 'id', weights: 'day', waists: 'day', reviews: 'week_start', motivations: 'id', chat: 'id', ai_notes: 'key' };
+const CONFLICT = { profile: 'user_id', reviews: 'user_id,week_start', weights: 'user_id,day', waists: 'user_id,day', activity: 'user_id,day', foods: 'id', entries: 'id', motivations: 'id', chat: 'id', ai_notes: 'user_id,key' };
+const DELETE_KEY = { profile: 'user_id', foods: 'id', entries: 'id', weights: 'day', waists: 'day', activity: 'day', reviews: 'week_start', motivations: 'id', chat: 'id', ai_notes: 'key' };
 const BUCKET = 'motivation'; // private; files live under <user id>/
 const strip = rows => rows.map(({ user_id, ...r }) => r);
 
@@ -31,14 +31,14 @@ export function createSupabaseRemote(sb) {
   return {
     async fetchAll() {
       try {
-        const [profile, foods, entries, weights, waists, reviews, motivations, chat, aiNotes] = await Promise.all([
-          all('profile'), all('foods', 'created_at'), all('entries', 'created_at'), all('weights', 'day'), all('waists', 'day'), all('reviews', 'week_start'),
+        const [profile, foods, entries, weights, waists, activity, reviews, motivations, chat, aiNotes] = await Promise.all([
+          all('profile'), all('foods', 'created_at'), all('entries', 'created_at'), all('weights', 'day'), all('waists', 'day'), all('activity', 'day'), all('reviews', 'week_start'),
           all('motivations', 'created_at'), all('chat', 'created_at'), all('ai_notes', 'created_at'),
         ]);
         return {
           data: {
             profile: profile[0] ? strip(profile)[0] : null,
-            foods: strip(foods), entries: strip(entries), weights: strip(weights), waists: strip(waists), reviews: strip(reviews),
+            foods: strip(foods), entries: strip(entries), weights: strip(weights), waists: strip(waists), activity: strip(activity), reviews: strip(reviews),
             motivations: strip(motivations), chat: strip(chat), ai_notes: strip(aiNotes),
           },
         };
@@ -65,7 +65,7 @@ export function createSupabaseRemote(sb) {
 
     // Used by import: wipe this user's rows, then insert the file's rows. Children first on delete.
     async replaceAll(data) {
-      for (const t of ['entries', 'weights', 'waists', 'reviews', 'motivations', 'chat', 'ai_notes', 'foods', 'profile']) {
+      for (const t of ['entries', 'weights', 'waists', 'activity', 'reviews', 'motivations', 'chat', 'ai_notes', 'foods', 'profile']) {
         const { error } = await sb.from(t).delete().not('user_id', 'is', null);
         if (error) return { error };
       }
@@ -73,7 +73,7 @@ export function createSupabaseRemote(sb) {
         const { error } = await sb.from('profile').insert({ data: data.profile.data, updated_at: data.profile.updated_at });
         if (error) return { error };
       }
-      for (const t of ['foods', 'entries', 'weights', 'waists', 'reviews', 'motivations', 'chat', 'ai_notes']) {
+      for (const t of ['foods', 'entries', 'weights', 'waists', 'activity', 'reviews', 'motivations', 'chat', 'ai_notes']) {
         const r = await insertChunks(t, data[t] || []);
         if (r.error) return r;
       }

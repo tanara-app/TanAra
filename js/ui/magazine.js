@@ -13,7 +13,7 @@ import { startChat } from './chat.js';
 
 const CATS = {
   nutrition: 'تغذیه', activity: 'ورزش و تحرک', sleep_stress: 'خواب و استرس', habits: 'روان‌شناسی عادت',
-  myths: 'باورهای رایج', body: 'بدن و متابولیسم', practical: 'زندگی روزمره',
+  myths: 'باورهای رایج', body: 'بدن و متابولیسم', practical: 'زندگی روزمره', maintain: 'نگه داشتن وزن',
 };
 const EVIDENCE = { strong: 'شواهد قوی', moderate: 'شواهد متوسط', limited: 'شواهد محدود' };
 

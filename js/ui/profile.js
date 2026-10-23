@@ -1,7 +1,7 @@
 // Profile & settings: the targets and the phase up front; everything else (my details,
 // reminders, motivations, food bank, shopping list, AI use, data, account) is one list of rows that open sheets.
 import * as store from '../data/store.js';
-import { effectiveTargets, clampKcal, safeFloor, hasMedicalFlag, ACTIVITY, CONDITIONS } from '../domain/targets.js';
+import { effectiveTargets, clampKcal, safeFloor, hasMedicalFlag, ACTIVITY, CONDITIONS, correcting, rampKcal } from '../domain/targets.js';
 import { sortedWeights } from '../domain/stats.js';
 import { nextTargets } from '../domain/energy.js';
 import { fa, kcal50, parseNum, esc } from '../lib/fa.js';
@@ -50,7 +50,7 @@ export function renderProfile(root) {
     <section class="card">
       <h2 class="card-h">هدف‌های روزانه</h2>
       <div class="targets">
-        <div class="tile big"><span>کالری</span><b>${kcal50(eff.kcal)}</b><small>${eff.phase !== 'loss' ? 'سطح نگهداری' : p.targets?.manualKcal ? 'دستی' : p.targets?.source === 'measured' ? 'از مصرف واقعی بدنت' : 'محاسبه‌شده'}</small></div>
+        <div class="tile big"><span>کالری</span><b>${kcal50(eff.kcal)}</b><small>${correcting(p) ? 'اصلاح کوتاه' : rampKcal(p) ? 'رو به نگهداری' : eff.phase !== 'loss' ? 'سطح نگهداری' : p.targets?.manualKcal ? 'دستی' : p.targets?.source === 'measured' ? 'از مصرف واقعی بدنت' : 'محاسبه‌شده'}</small></div>
         <div class="tile big"><span>پروتئین</span><b>${fa(eff.protein)}</b><small>گرم${p.targets?.manualProtein ? ' · دستی' : ''}</small></div>
       </div>
       <p class="muted small">آخرین محاسبه با وزن ${fa(p.targets?.baseWeight, 1)} کیلو${p.targets?.computedAt ? `، ${faDMY(p.targets.computedAt)}` : ''}.</p>

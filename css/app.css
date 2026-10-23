@@ -744,3 +744,9 @@ body.kb .toast, body.chat-mode .toast { bottom: calc(var(--nav-h) + var(--safe-b
 .bc-box { display: flex; flex-direction: column; gap: 8px; margin-top: -4px; }
 .bc-box p { margin: 0; }
 .bc-box svg, [data-bc-slot] svg { vertical-align: -5px; }
+
+/* maintenance: where the 7-day average sits against the band */
+.zone-green { color: var(--accent); }
+.zone-yellow { color: var(--protein); }
+.zone-red { color: var(--protein); }
+.zone-low { color: var(--doctor); }

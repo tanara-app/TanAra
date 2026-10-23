@@ -3,7 +3,8 @@
 import * as store from '../data/store.js';
 import { effectiveTargets } from '../domain/targets.js';
 import { phaseNotes, bindPhase, phaseLabel } from './phase.js';
-import { MEALS, entriesOn, totals, daysLoggedInWeek } from '../domain/stats.js';
+import { lightOn } from '../domain/phase.js';
+import { MEALS, entriesOn, totals, daysLoggedInWeek, sortedWeights } from '../domain/stats.js';
 import { underEating, rapidLoss } from '../domain/safety.js';
 import { fa, kcal50, round50, esc, qtyLabel } from '../lib/fa.js';
 import { amountLabel } from './units.js';
@@ -12,11 +13,12 @@ import { icon } from './dom.js';
 import { openLogSheet, openEntrySheet } from './logFood.js';
 import { dismissed, dismiss } from './notices.js';
 import { motivationCard, bindMotivation } from './motivation.js';
-import { tipCard, bindTip } from './aiCards.js';
+import { tipCard, bindTip, occasionCard, bindOccasion } from './aiCards.js';
 import { magCard, bindMag } from './magazine.js';
 import { planHtml, bindPlan } from './plan.js';
 import { measureNote, bindMeasureNote } from './measure.js';
 import { shoppingPill, bindShopping } from './shopping.js';
+import { activityPill, bindActivity } from './activity.js';
 
 let day = today();
 export const setDay = d => { day = d; };
@@ -76,6 +78,7 @@ export function renderToday(root) {
     ${isToday ? measureNote() : ''}
     ${isToday ? motivationCard() : ''}
     ${isToday ? tipCard() : ''}
+    ${isToday ? occasionCard() : ''}
     ${isToday ? magCard() : ''}
     ${isToday ? phaseNotes() : ''}
 
@@ -100,8 +103,9 @@ export function renderToday(root) {
 
     <div class="pills">
       <div class="pill">${icon.leaf}<span>سبزی ${isToday ? 'امروز' : ''}: <b>${qtyLabel(Math.round(tot.veg * 2) / 2)}</b> وعده</span></div>
-      <div class="pill"><span>این هفته <b>${fa(logged)}</b> روز ثبت کرده‌اید</span></div>
+      <div class="pill"><span>این هفته <b>${fa(logged)}</b> روز ثبت کرده‌اید${lightOn(p, sortedWeights(s.weights), today()) ? ' · ثبت سبک' : ''}</span></div>
       ${t.phase !== 'loss' ? `<div class="pill"><span>مرحله: <b>${phaseLabel(p, day)}</b></span></div>` : ''}
+      ${activityPill(day)}
       ${shoppingPill()}
     </div>
 
@@ -147,6 +151,7 @@ export function renderToday(root) {
   bindPhase(root);
   bindMeasureNote(root);
   bindShopping(root);
+  bindActivity(root, day);
   root.querySelectorAll('[data-dismiss]').forEach(b => b.onclick = () => {
     const n = b.closest('[data-notice]');
     dismiss(n.dataset.notice, n.dataset.mark);
@@ -154,5 +159,5 @@ export function renderToday(root) {
   });
   // last: generating the tip or today's magazine article redraws this screen
   const redrawAi = () => { if (root.querySelector('[data-mode]') && day === today()) renderToday(root); };
-  if (isToday) { bindTip(redrawAi); bindMag(root, redrawAi); }
+  if (isToday) { bindTip(redrawAi); bindMag(root, redrawAi); bindOccasion(root, redrawAi); }
 }

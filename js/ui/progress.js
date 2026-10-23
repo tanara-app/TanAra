@@ -11,7 +11,7 @@ import { today, addDays, relLabel, faDMY, faFull } from '../lib/dates.js';
 import { toast, confirmBox } from './dom.js';
 import { weightChart } from './chart.js';
 import { recalcTargets } from './profile.js';
-import { progressCard, bindProgressCard } from './aiCards.js';
+import { progressCard, bindProgressCard, maintainCard, bindMaintainCard } from './aiCards.js';
 import { renderReview } from './review.js';
 import { phaseNotes, bindPhase } from './phase.js';
 import { measureCard, bindMeasure, resetMeasureDay, setMeasureDay, takeJump } from './measure.js';
@@ -152,6 +152,8 @@ export function renderProgress(root) {
 
     ${trendCard(s, p, sorted, t)}
 
+    ${maintainCard()}
+
     ${progressCard()}
 
     ${energyCard(s, p, latest?.kg)}
@@ -167,7 +169,9 @@ export function renderProgress(root) {
   };
   bindSection();
   bindMeasure(root, rerender);
-  bindProgressCard(root, () => { if (root.isConnected && location.hash === '#/progress' && section === 'weight') rerender(); });
+  const redrawAi = () => { if (root.isConnected && location.hash === '#/progress' && section === 'weight') rerender(); };
+  bindProgressCard(root, redrawAi);
+  bindMaintainCard(root, redrawAi);
   bindPhase(root);
   root.querySelector('[data-energy-apply]')?.addEventListener('click', async () => {
     if (!(await confirmBox('هدف کالری از روی مصرف واقعی بدنت دوباره حساب شود؟', 'حساب کن'))) return;

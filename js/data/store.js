@@ -13,10 +13,10 @@
 import { SEED_FOODS, UNIT_GRAMS, GRAM } from './seedFoods.js';
 import { parseNum } from '../lib/fa.js';
 
-export const TABLES = ['profile', 'foods', 'entries', 'weights', 'waists', 'reviews', 'motivations', 'chat', 'ai_notes'];
-export const KEY = { profile: 'user_id', foods: 'id', entries: 'id', weights: 'day', waists: 'day', reviews: 'week_start', motivations: 'id', chat: 'id', ai_notes: 'key' };
+export const TABLES = ['profile', 'foods', 'entries', 'weights', 'waists', 'activity', 'reviews', 'motivations', 'chat', 'ai_notes'];
+export const KEY = { profile: 'user_id', foods: 'id', entries: 'id', weights: 'day', waists: 'day', activity: 'day', reviews: 'week_start', motivations: 'id', chat: 'id', ai_notes: 'key' };
 
-const empty = () => ({ profile: null, foods: [], entries: [], weights: [], waists: [], reviews: [], motivations: [], chat: [], ai_notes: [] });
+const empty = () => ({ profile: null, foods: [], entries: [], weights: [], waists: [], activity: [], reviews: [], motivations: [], chat: [], ai_notes: [] });
 
 let ns = 'local';
 let remote = null;
@@ -307,6 +307,21 @@ export function deleteWaist(day) {
   commit({ op: 'delete', table: 'waists', key: day });
 }
 
+// Minutes of activity, at most one row per day (0 removes it).
+export function setActivity(day, minutes) {
+  const m = Math.round(Number(minutes) || 0);
+  if (m <= 0) {
+    if (!state.activity.some(a => a.day === day)) return;
+    drop('activity', day);
+    commit({ op: 'delete', table: 'activity', key: day });
+    return;
+  }
+  const existing = state.activity.find(a => a.day === day);
+  const row = { id: existing?.id || uid(), day, minutes: Math.min(1440, m), created_at: existing?.created_at || now() };
+  put('activity', row);
+  commit({ op: 'upsert', table: 'activity', row });
+}
+
 export function saveReview(r) {
   const row = { week_start: r.week_start, good: r.good || '', hard: r.hard || '', next_goal: r.next_goal || '', updated_at: now() };
   put('reviews', row);
@@ -444,6 +459,7 @@ export function exportData() {
       entries: state.entries.map(strip),
       weights: state.weights.map(strip),
       waists: state.waists.map(strip),
+      activity: state.activity.map(strip),
       reviews: state.reviews.map(strip),
       motivations: state.motivations.map(strip),
       chat: state.chat.map(strip),
@@ -469,6 +485,7 @@ export function importData(obj) {
     entries: d.entries.map(e => ({ ...e, food_id: foodIds.has(e.food_id) ? e.food_id : null })),
     weights: d.weights,
     waists: Array.isArray(d.waists) ? d.waists : [], // files from before waist was tracked have none
+    activity: Array.isArray(d.activity) ? d.activity : [],
     reviews: d.reviews,
     motivations: Array.isArray(d.motivations) ? d.motivations : [],
     chat: Array.isArray(d.chat) ? d.chat : [],

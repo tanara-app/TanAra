@@ -1,5 +1,6 @@
 import { suite, test, eq, near } from './harness.js';
-import { totals, vegServings, daysLoggedInWeek, rollingAvg, weekAvg, rate4w, projectWeight, weekSummary, waistSeries, waistToHeight, measureDue, frequentFoods, lastAmountFor } from '../js/domain/stats.js';
+import { totals, vegServings, daysLoggedInWeek, rollingAvg, weekAvg, rate4w, projectWeight, weekSummary, waistSeries, waistToHeight, measureDue, frequentFoods, lastAmountFor, activityWeek } from '../js/domain/stats.js';
+import { upcoming } from '../js/domain/occasions.js';
 import { weekStart, addDays, diffDays } from '../js/lib/dates.js';
 
 const w = (day, kg) => ({ day, kg });
@@ -87,5 +88,20 @@ suite('stats', () => {
     eq(f.map(x => [x.food.id, x.n, x.last]), [['a', 2, { qty: 2, grams: false }]]);
     eq(lastAmountFor(entries, foods[1], 'dinner'), { qty: 150, grams: true });
     eq(lastAmountFor(entries, { id: 'zzz', unit: 'عدد' }, 'dinner'), { qty: 1, grams: false });
+  });
+});
+
+
+suite('occasions', () => {
+  test('yalda, nowruz and saved events within a week', () => {
+    eq(upcoming('2026-12-13').map(o => o.key), []);
+    eq(upcoming('2026-12-15').map(o => [o.key, o.inDays]), [['yalda:2026-12-21', 6]]);      // 30 Azar 1405
+    eq(upcoming('2027-03-15').map(o => o.key), ['nowruz:2027-03-21']);                       // 1 Farvardin 1406
+    const ev = [{ id: 'a', kind: 'event', title: 'عروسی', day: '2026-11-02' }, { id: 'b', kind: 'quote', day: '2026-11-01' }];
+    eq(upcoming('2026-10-30', ev).map(o => [o.name, o.inDays]), [['عروسی', 3]]);
+  });
+
+  test('a week of activity minutes', () => {
+    eq(activityWeek([{ day: '2026-10-17', minutes: 30 }, { day: '2026-10-23', minutes: 45 }, { day: '2026-10-24', minutes: 60 }], '2026-10-17'), 75);
   });
 });

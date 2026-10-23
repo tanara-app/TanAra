@@ -7,11 +7,12 @@
 */
 import * as store from '../data/store.js';
 import { SUPABASE_URL, SUPABASE_KEY } from '../config.js';
-import { effectiveTargets, computeTargets, phaseOn, maintenanceKcal } from '../domain/targets.js';
+import { effectiveTargets, computeTargets, phaseOn, maintenanceKcal, rampKcal, correcting } from '../domain/targets.js';
 import { SLOTS, planOn, planEnd, previousPlan, adherence, optionText, picksOn, offOn, slotExtras, dayRooms } from '../domain/plan.js';
 import { measuredTdee } from '../domain/energy.js';
-import { lossStart } from '../domain/phase.js';
-import { sortedWeights, measureDue } from '../domain/stats.js';
+import { lossStart, zone, maintainWeeks, lightOn } from '../domain/phase.js';
+import { sortedWeights, measureDue, activityWeek, weekStart, ACTIVITY_GOAL } from '../domain/stats.js';
+import { upcoming } from '../domain/occasions.js';
 import { today, parse, addDays, diffDays } from '../lib/dates.js';
 import { perUnit } from '../domain/recipe.js';
 import { shopList, toBuy } from '../domain/shopping.js';
@@ -61,16 +62,34 @@ function magazineContext(s) {
   });
 }
 
-// Where they are on the road: the phase, the goal, how long they have been losing.
-function phaseContext(p, t) {
+// Where they are on the road: the phase, the goal, how long they have been losing; in
+// maintenance the band, the climb or correction, light logging and where the weight sits now.
+function phaseContext(s, p, t) {
   if (!p) return null;
   const phase = phaseOn(p, t);
   const since = lossStart(p);
+  const z = zone(p, sortedWeights(s.weights), t);
+  const m = phase === 'maintain';
   return {
     phase, goalKg: Number(p.goalKg) || null, breakUntil: phase === 'break' ? p.breakUntil : null,
-    maintainFrom: phase === 'maintain' ? p.maintainFrom || null : null,
+    maintainFrom: m ? p.maintainFrom || null : null,
     lossWeeks: phase === 'loss' && since ? Math.floor(diffDays(t, since) / 7) : null,
     maintenance: maintenanceKcal(p) || null,
+    ...(m ? {
+      weeks: maintainWeeks(p, t), climb: rampKcal(p, t), correctUntil: correcting(p, t) ? p.correctUntil : null,
+      lightLog: !!p.lightLog, lightNow: lightOn(p, sortedWeights(s.weights), t),
+      band: z ? { lo: z.lo, hi: z.hi } : null, zone: z ? { zone: z.zone, avg: Math.round(z.avg * 10) / 10 } : null,
+    } : {}),
+  };
+}
+
+// Minutes of activity: the last four weeks day by day, this week's total and the goal.
+function activityContext(s, p, t) {
+  const from = addDays(t, -27);
+  return {
+    days: s.activity.filter(a => a.day >= from && a.day <= t).sort((a, b) => (a.day < b.day ? -1 : 1)).map(({ day, minutes }) => ({ day, minutes })),
+    week: activityWeek(s.activity, weekStart(t)),
+    goal: ACTIVITY_GOAL[phaseOn(p, t)] || 150,
   };
 }
 
@@ -101,7 +120,10 @@ function context() {
     waists: s.waists.map(({ day, cm }) => ({ day, cm })),
     // what the check-in asks for today (the two are entered together on «پیشرفت»)
     measure: p ? (({ weigh, waist }) => ({ weigh, waist }))(measureDue(s.weights, s.waists, p, t, p.reminders?.weigh?.every)) : null,
-    phase: phaseContext(p, t),
+    phase: phaseContext(s, p, t),
+    activity: p ? activityContext(s, p, t) : null,
+    // yearly occasions and their own events in the coming week
+    occasions: upcoming(t, s.motivations).map(({ name, day, inDays, days }) => ({ name, day, inDays, days })),
     energy: energyContext(s, p, t),
     reviews: s.reviews.map(({ week_start, good, hard, next_goal }) => ({ week_start, good, hard, next_goal })),
     motivations: s.motivations.map(({ kind, title, note, day, image_path }) => ({ kind, title, note, day, image_path: image_path ? 1 : null })),
@@ -137,7 +159,7 @@ async function post(body) {
   return res;
 }
 
-// One-shot modes: tip, quote, review, progress, estimate, photo, label, recipe, shop, title, plan, plan_option, plan_swap, magazine. Resolves to the result object.
+// One-shot modes: tip, quote, review, progress, maintain, occasion, estimate, photo, label, recipe, shop, title, plan, plan_option, plan_swap, magazine. Resolves to the result object.
 export async function ask(mode, input = {}) {
   const res = await post({ mode, input });
   const j = await res.json();

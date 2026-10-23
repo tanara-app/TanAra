@@ -1,5 +1,5 @@
 import { suite, test, eq, ok } from './harness.js';
-import { computeTargets, effectiveTargets, safeFloor, clampKcal, phaseOn, maintenanceKcal, shouldSuggestRecalc, hasMedicalFlag } from '../js/domain/targets.js';
+import { computeTargets, effectiveTargets, safeFloor, clampKcal, phaseOn, maintenanceKcal, shouldSuggestRecalc, hasMedicalFlag, rampKcal } from '../js/domain/targets.js';
 
 const man = { sex: 'male', age: 35, heightCm: 180, weightKg: 100, activity: 'sedentary' };
 
@@ -52,6 +52,20 @@ suite('targets', () => {
     eq(phaseOn(onBreak, '2026-01-19'), 'loss');
     eq(effectiveTargets(onBreak, '2026-01-10').kcal, 2350);
     eq(effectiveTargets(onBreak, '2026-01-19').kcal, 1850);
+  });
+
+  test('the climb into maintenance: 150 kcal a week from where losing ended', () => {
+    const p = { sex: 'male', phase: 'maintain', maintainFrom: { day: '2026-01-01', kg: 80, kcal: 1850 }, targets: { kcal: 1850, protein: 113, tdee: 2350 } };
+    eq(['2026-01-01', '2026-01-07', '2026-01-08', '2026-01-15', '2026-01-22', '2026-01-29'].map(d => effectiveTargets(p, d).kcal), [2000, 2000, 2150, 2300, 2350, 2350]);
+    eq(rampKcal(p, '2026-01-22'), null);
+    eq(effectiveTargets({ ...p, maintainFrom: { day: '2026-01-01', kg: 80 } }, '2026-01-01').kcal, 2350); // switched before the climb existed
+    eq(effectiveTargets({ ...p, maintainFrom: { day: '2026-01-01', kg: 80, kcal: 2400 } }, '2026-01-01').kcal, 2350);
+  });
+
+  test('a correction is maintenance minus 300, never under the floor', () => {
+    const p = { sex: 'male', phase: 'maintain', maintainFrom: { day: '2026-01-01', kg: 80, kcal: 1850 }, targets: { kcal: 1850, protein: 113, tdee: 2350 }, correctFrom: '2026-03-01', correctUntil: '2026-03-14' };
+    eq([effectiveTargets(p, '2026-03-01').kcal, effectiveTargets(p, '2026-03-15').kcal], [2050, 2350]);
+    eq(effectiveTargets({ ...p, targets: { kcal: 1500, tdee: 1700 } }, '2026-03-02').kcal, 1500);
   });
 
   test('maintenance for a profile saved before energy use was stored comes from the formula', () => {

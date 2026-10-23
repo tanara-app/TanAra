@@ -160,3 +160,14 @@ export function lastAmountFor(entries, food, meal) {
 }
 
 export { weekStart, range, parse };
+
+/*
+  Activity: minutes a day that got the body moving (a brisk walk counts). The WHO asks adults
+  for 150–300 minutes of moderate activity a week; people who keep lost weight off tend to be
+  near the top of that or above it, so maintenance aims higher (ACSM, 2009: 200–300).
+*/
+export const ACTIVITY_GOAL = { loss: 150, break: 150, maintain: 250 };
+export function activityWeek(activity, ws) {
+  const end = addDays(ws, 6);
+  return (activity || []).filter(a => a.day >= ws && a.day <= end).reduce((s, a) => s + (Number(a.minutes) || 0), 0);
+}

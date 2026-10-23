@@ -1,8 +1,10 @@
 // Target calculation. Pure functions — no DOM, no storage.
 import { round50 } from '../lib/fa.js';
-import { today } from '../lib/dates.js';
+import { today, diffDays } from '../lib/dates.js';
 
 export const DEFICIT = 500; // kcal below what the body uses, while losing weight
+export const RAMP_STEP = 150; // kcal added each week while climbing from the deficit to maintenance
+export const CORRECT_KCAL = 300; // kcal below maintenance during a short correction (see phase.js)
 
 export const ACTIVITY = {
   sedentary: { label: 'کم‌تحرک', factor: 1.2, hint: 'بیشتر روز نشسته، ورزش منظم ندارم' },
@@ -66,15 +68,37 @@ export function maintenanceKcal(p) {
   return Number.isFinite(f) ? f : 0;
 }
 
+// A short correction in maintenance: the weight crept above the band, so two weeks a little
+// under maintenance bring it back (see phase.js).
+export const correcting = (p, day = today()) =>
+  phaseOn(p, day) === 'maintain' && !!p?.correctUntil && day <= p.correctUntil && (!p.correctFrom || day >= p.correctFrom);
+
+/*
+  The climb into maintenance: the target does not jump from the deficit to the full figure on
+  the first day, it goes up RAMP_STEP a week from where losing ended (maintainFrom.kcal). The
+  weight then shows where maintenance really is, before the full figure is reached.
+  null when there is no climb (finished, or nothing to climb from).
+*/
+export function rampKcal(p, day = today()) {
+  if (phaseOn(p, day) !== 'maintain') return null;
+  const from = Number(p?.maintainFrom?.kcal), full = round50(maintenanceKcal(p));
+  if (!(from > 0) || !p.maintainFrom.day || from >= full) return null;
+  const k = from + RAMP_STEP * (Math.floor(Math.max(0, diffDays(day, p.maintainFrom.day)) / 7) + 1);
+  return k < full ? round50(k) : null;
+}
+
 // What the app actually uses on a given day. A manual calorie target never goes below the
-// floor; outside the loss phase the target is maintenance, not the deficit.
+// floor; outside the loss phase the target is maintenance (or the climb to it), not the deficit.
 export function effectiveTargets(p, day = today()) {
   if (!p) return { kcal: 0, protein: 0, floor: 1200, phase: 'loss' };
   const floor = safeFloor(p.sex);
   const t = p.targets || {};
   const phase = phaseOn(p, day);
   const loss = Math.max(floor, Number(t.manualKcal) || t.kcal || floor);
-  const kcal = phase === 'loss' ? loss : Math.max(loss, round50(maintenanceKcal(p)));
+  const full = Math.max(loss, round50(maintenanceKcal(p)));
+  const kcal = phase === 'loss' ? loss
+    : correcting(p, day) ? Math.max(floor, round50(maintenanceKcal(p) - CORRECT_KCAL))
+    : rampKcal(p, day) ?? full;
   const protein = Number(t.manualProtein) || t.protein || 0;
   return { kcal, protein, floor, phase, manual: !!(t.manualKcal || t.manualProtein) };
 }

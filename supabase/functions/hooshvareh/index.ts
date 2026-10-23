@@ -89,6 +89,8 @@ Where they are on the road
 - The data says which phase they are in. «کاهش وزن»: the calorie target is what their body uses minus about 500. «نگهداری» (maintenance, after reaching the goal weight) and «استراحت از رژیم» (a planned two-week break in the middle of losing): the calorie target in the data is already their maintenance level, so do not push a deficit; eating at target and holding weight is the success. A diet break is optional: the evidence that it speeds up fat loss is mixed, its real use is making a long diet easier to keep up. When the goal weight is reached, congratulate them and point them to «نمایه» ← «مرحله» to switch to «نگهداری». You cannot change the phase, the goal weight or the targets yourself.
 - "Measured energy use", when the data has it, is worked out from their own log (what they ate against how their weight moved) and is more accurate for them than any formula; use it when talking about how much they burn. If the app's suggestion based on it has not been applied, they can do so in «پیشرفت».
 - Waist: they can record their waist (cm, at the navel) in «پیشرفت» every week or two. Weight standing still while the waist shrinks is real progress; say so when you see it. Waist divided by height under 0.5 is the widely used healthy mark.
+- Keeping the weight off matters as much as losing it (most people who lose weight regain it, usually after they stop weighing and logging), so take maintenance seriously. How it works in the app: on switching to «نگهداری» the targets are worked out again at the new weight, and the calorie target climbs 150 kcal a week from the deficit to maintenance. The weight being held has a band of ±1 kg. Above it by 1–2 kg the app offers a two-week correction at 300 kcal under maintenance; 2 kg or more above, going back to «کاهش وزن»; 2 kg below, raising the maintenance level. After six weeks in the band they may choose light logging (food logging optional, weighing not; full logging comes back by itself above the band, and the evening log reminder only comes then). The app also counts months held and nudges after ten days without a weigh-in. A kilo or so in the first days of maintenance or a diet break is water and glycogen, not fat. What helps most in maintenance, by the evidence: regular weighing, plenty of activity (about 250 minutes a week), protein at meals, a consistent eating pattern, planning for holidays and events, and acting early on small gains.
+- Activity: they can log minutes of movement a day on the Today screen (the «تحرک» pill). The weekly goal is 150 minutes while losing and 250 in maintenance. Encourage it, especially walking; never as a licence to eat more or to «burn off» a meal.
 - Reminders: the app can send push reminders to log food and to weigh in (profile.reminders; set in «نمایه» ← «یادآورها»). If they keep forgetting to log or weigh, suggest turning them on.
 
 The two modes of the app
@@ -101,7 +103,13 @@ type Ctx = {
   profile?: Record<string, unknown> | null;
   targets?: { kcal: number; protein: number; floor: number };
   foods?: any[]; entries?: any[]; weights?: any[]; waists?: any[]; reviews?: any[]; motivations?: any[]; notes?: any[];
-  phase?: { phase: string; goalKg?: number | null; breakUntil?: string | null; maintainFrom?: { day: string; kg: number } | null; lossWeeks?: number | null; maintenance?: number | null } | null;
+  phase?: {
+    phase: string; goalKg?: number | null; breakUntil?: string | null; maintainFrom?: { day: string; kg: number; kcal?: number } | null; lossWeeks?: number | null; maintenance?: number | null;
+    weeks?: number | null; climb?: number | null; correctUntil?: string | null; lightLog?: boolean; lightNow?: boolean;
+    band?: { lo: number; hi: number } | null; zone?: { zone: string; avg: number } | null;
+  } | null;
+  activity?: { days: { day: string; minutes: number }[]; week: number; goal: number } | null;
+  occasions?: { name: string; day: string; inDays: number; days: number }[];
   energy?: any;
   measure?: { weigh: boolean; waist: boolean } | null;
   mode?: string; plan?: any; magazine?: any[]; focus?: string; recipes?: any[];
@@ -185,7 +193,7 @@ function sections(c: Ctx) {
       const ph = c.phase;
       if (!ph) return "";
       const goal = ph.goalKg ? `goal weight ${r1(ph.goalKg)} kg` : "no goal weight set";
-      if (ph.phase === "maintain") return `# Phase\nنگهداری (maintenance)${ph.maintainFrom ? ` since ${ph.maintainFrom.day}, holding about ${r1(ph.maintainFrom.kg)} kg` : ""}; ${goal}. The calorie target is their maintenance level.`;
+      if (ph.phase === "maintain") return `# Phase\nنگهداری (maintenance)${ph.maintainFrom ? ` since ${ph.maintainFrom.day}, holding about ${r1(ph.maintainFrom.kg)} kg` : ""}${ph.band ? `; their weight band is ${r1(ph.band.lo)}–${r1(ph.band.hi)} kg` : ""}; ${goal}. ${ph.correctUntil ? `A two-week correction runs until ${ph.correctUntil}: the target is 300 kcal under maintenance (${ph.maintenance} kcal) to bring the weight back into the band.` : ph.climb ? `Still climbing to maintenance: this week's target is ${ph.climb} kcal, rising 150 kcal a week until ${ph.maintenance} kcal.` : `The calorie target is their maintenance level${ph.maintenance ? ` (${ph.maintenance} kcal)` : ""}.`}${ph.lightLog ? " They chose light logging: logging food is optional while the weight is in the band, weighing is not." : ""}`;
       if (ph.phase === "break") return `# Phase\nاستراحت از رژیم (diet break) until ${ph.breakUntil}: the calorie target is their maintenance level${ph.maintenance ? ` (${ph.maintenance} kcal)` : ""}; after it they go back to losing. ${goal}.`;
       return `# Phase\nکاهش وزن (losing weight)${ph.lossWeeks != null ? `, ${ph.lossWeeks} weeks in a row so far` : ""}; ${goal}.${ph.maintenance ? ` Their maintenance level is about ${ph.maintenance} kcal.` : ""}`;
     },
@@ -195,6 +203,20 @@ function sections(c: Ctx) {
       if (!m.ready) return `# Measured energy use\nNot enough data yet: it needs ${m.needDays || 0} more fully logged days (at least two meals each) and ${m.needWeighs || 0} more weigh-ins, over three to four weeks. Until then the targets come from a formula${m.formula ? ` (about ${m.formula} kcal/day)` : ""}.`;
       return `# Measured energy use (from their own log, ${m.from} to ${m.to})\nabout ${m.tdee} kcal/day: they ate ${m.intake} kcal/day on ${m.days} fully logged days while their weight changed ${r1(m.perWeek)} kg/week (${m.weighs} weigh-ins).${m.formula ? ` The formula had estimated ${m.formula}.` : ""}${m.clamped ? " The raw figure was further from the formula than is plausible (probably gaps in logging), so it is held within 25% of it." : ""} Their current target is based on: ${m.source || "formula"}.`;
     },
+
+    // what changes from day to day in maintenance: where the 7-day average sits in the band
+    standing: () => {
+      const z = c.phase?.zone;
+      if (!z) return "";
+      const what: Record<string, string> = { green: "in the band", yellow: "just above the band: a two-week correction is offered", red: "2 kg or more above where maintenance began: going back to losing is suggested", low: "2 kg or more below: their maintenance level is set too low" };
+      return `# Maintenance today\n7-day average ${r1(z.avg)} kg, ${what[z.zone] || z.zone}.${c.phase?.lightLog ? (c.phase.lightNow ? " Light logging is in force." : " Light logging is suspended until the weight is back in the band: full logging asked for.") : ""}${c.phase?.weeks != null ? ` ${c.phase.weeks} weeks in maintenance.` : ""}`;
+    },
+    activity: () => {
+      const a = c.activity;
+      if (!a) return "";
+      return `# Activity (minutes a day of walking, sport or other movement they logged), last 4 weeks\n${a.days.map(d => `${d.day} | ${d.minutes}`).join("\n") || "none logged"}\nThis week so far: ${a.week} of a ${a.goal}-minute weekly goal.`;
+    },
+    occasions: () => (c.occasions || []).length ? `# Coming up (occasions that make eating harder)\n${c.occasions!.map(o => `${o.name}: ${o.inDays === 0 ? "today" : `in ${o.inDays} days`} (${o.day}${o.days > 1 ? `, lasts about ${o.days} days` : ""})`).join("\n")}` : "",
 
     // Logged days up to `to`: one line per day for the last TOTALS_DAYS, weekly averages before.
     totals: (to = c.today) => {
@@ -665,7 +687,7 @@ note: 2–3 short Persian sentences to them: the idea behind this plan. ${i.incl
     // with a (possible) eating-disorder history, no restriction or monitoring techniques at all
     prompt: (_i, c) => ["yes", "unsure"].includes((c.profile as any)?.edHistory)
       ? `Write today's tip for the top of the Today screen: one or two short sentences (max ~35 words), one gentle, well-evidenced habit for a healthy relationship with food and body — e.g. regular, balanced meals without skipping, enjoying food without guilt, sleep, enjoyable movement, eating with others, being kind to yourself after a hard day. Nothing about restricting, cutting, portion control, appetite, calories, weighing or tracking. Don't comment on their data. A different habit from your earlier tips. No greeting.`
-      : `Write today's tip for the top of the Today screen: one or two short sentences (max ~35 words) teaching one practical dieting technique that helps people stick to a diet and lose fat — e.g. eating more slowly, protein at every meal, high-volume low-calorie foods, planning meals ahead, keeping tempting foods out of sight, smaller plates, sleep and hunger, handling eating out or a slip-up, self-monitoring, drinking water before meals. Only advice that is well supported by scientific research (systematic reviews or solid trials); nothing speculative, no fads, nothing that means eating below their safe minimum. This is NOT an analysis of their data: don't comment on their numbers, logs, weight or progress (the Progress screen does that). You may pick a technique that suits their phase, mode and profile, and must respect any medical conditions in it. A different technique from your earlier tips. No greeting.`,
+      : `Write today's tip for the top of the Today screen: one or two short sentences (max ~35 words) teaching one practical dieting technique that helps people stick to a diet and lose fat — e.g. eating more slowly, protein at every meal, high-volume low-calorie foods, planning meals ahead, keeping tempting foods out of sight, smaller plates, sleep and hunger, handling eating out or a slip-up, self-monitoring, drinking water before meals. In maintenance, prefer the techniques of keeping weight off instead: regular weighing and acting early on a small gain, plenty of walking and activity, a consistent eating pattern on weekdays and weekends, planning for holidays and eating out, keeping protein up. Only advice that is well supported by scientific research (systematic reviews or solid trials); nothing speculative, no fads, nothing that means eating below their safe minimum. This is NOT an analysis of their data: don't comment on their numbers, logs, weight or progress (the Progress screen does that). You may pick a technique that suits their phase, mode and profile, and must respect any medical conditions in it. A different technique from your earlier tips. No greeting.`,
   },
   quote: {
     effort: "low",
@@ -675,19 +697,33 @@ note: 2–3 short Persian sentences to them: the idea behind this plan. ${i.incl
   },
   review: {
     effort: "medium",
-    data: (S, i) => [S.now(), S.profile(), S.targets(), S.phase(), S.mode(), S.plan(), S.adherence(), S.weights(), S.totals(), S.entries(String(i.week_start), addDays(String(i.week_start), 6)), S.reviews()],
+    data: (S, i) => [S.now(), S.profile(), S.targets(), S.phase(), S.standing(), S.activity(), S.mode(), S.plan(), S.adherence(), S.weights(), S.totals(), S.entries(String(i.week_start), addDays(String(i.week_start), 6)), S.reviews()],
     schema: {
       type: "object",
       properties: { analysis: str("Persian, simple Markdown, max ~110 words"), next_goal: str("one small, concrete goal, max ~14 words") },
       required: ["analysis", "next_goal"], additionalProperties: false,
     },
-    prompt: (i) => `Analyse their week from ${i.week_start} to ${addDays(String(i.week_start), 6)} (Saturday to Friday): how consistently they logged, calories vs target, protein, vegetables, weight change, and what they wrote in that week's review if anything. Start with what went well, then the one pattern most worth changing, then why. Then suggest one small, concrete, achievable goal for next week.`,
+    prompt: (i) => `Analyse their week from ${i.week_start} to ${addDays(String(i.week_start), 6)} (Saturday to Friday): how consistently they logged, calories vs target, protein, vegetables, activity minutes, weight change, and what they wrote in that week's review if anything. Start with what went well, then the one pattern most worth changing, then why. Then suggest one small, concrete, achievable goal for next week.`,
   },
   progress: {
     effort: "medium",
-    data: (S) => [S.now(), S.profile(), S.targets(), S.phase(), S.energy(), S.mode(), S.adherence(), S.weights(), S.totals(), S.reviews()],
+    data: (S) => [S.now(), S.profile(), S.targets(), S.phase(), S.standing(), S.energy(), S.mode(), S.adherence(), S.weights(), S.totals(), S.reviews()],
     schema: { type: "object", properties: { text: str("Persian, simple Markdown, max ~110 words") }, required: ["text"], additionalProperties: false },
     prompt: () => `Analyse their weight trend for the Progress screen: the overall direction and pace (use weekly averages, not single weigh-ins — daily water swings are normal), how it relates to their eating, whether the pace is healthy (0.25–1 kg/week is a good range while losing; in maintenance or on a diet break, holding steady is the aim), and one encouraging, practical next step. If there are waist measurements, read them together with the weight: a shrinking waist with a flat weight is progress. If measured energy use is in the data and differs from the formula by more than about 150 kcal, say in one sentence what that means for their target. If there are too few weigh-ins, say what's needed.`,
+  },
+  // once a month in maintenance, on «پیشرفت»
+  maintain: {
+    effort: "medium",
+    data: (S) => [S.now(), S.profile(), S.targets(), S.phase(), S.standing(), S.energy(), S.activity(), S.weights(), S.totals(), S.reviews(), S.notes()],
+    schema: { type: "object", properties: { text: str("Persian, simple Markdown, max ~120 words") }, required: ["text"], additionalProperties: false },
+    prompt: () => `Write this month's maintenance review for the Progress screen. They lost weight and are now keeping it off; this is the part where most people regain, so it matters. Cover briefly: how the weight has held against its band over the last month (weekly averages, not single weigh-ins), how steady their weighing and logging have been, activity minutes against the weekly goal, and whether the measured energy use suggests the maintenance level needs moving. Start with what is going well. Then the one habit most worth protecting or fixing next month, as something concrete. If an occasion is coming up, a line on it. Kind and plain; no alarm over normal swings of a kilo.`,
+  },
+  // a few days before an occasion that makes eating harder (یلدا، نوروز، رمضان، their own events)
+  occasion: {
+    effort: "low",
+    data: (S) => [S.now(), S.profile(), S.targets(), S.phase(), S.mode()],
+    schema: { type: "object", properties: { text: str("Persian, simple Markdown, max ~90 words") }, required: ["text"], additionalProperties: false },
+    prompt: (i, c) => `«${i.name}» is ${Number(i.inDays) === 0 ? "today" : `in ${i.inDays} days`} (${i.day}${Number(i.days) > 1 ? `, lasting about ${i.days} days` : ""}). Write them a short, practical plan for it as 3–4 "if this happens, I will…" lines (implementation intentions), specific to this occasion and to Iranian customs around it (e.g. آجیل و شیرینی و میوه‌ی شب یلدا، دید و بازدید نوروز، افطار و سحری), plus one line on what to do the day after if it went over: back to the usual routine, no making up for it by eating less. ${["yes", "unsure"].includes((c.profile as any)?.edHistory) ? "They may have a history of disordered eating: nothing about restricting, counting, compensating or weighing; focus on regular meals, enjoying the occasion and being kind to themselves." : "Enjoying the occasion is part of the plan; no banning foods."} Fit it to their phase. No greeting.`,
   },
   estimate: {
     effort: "low",
@@ -948,6 +984,7 @@ const MAG_CATEGORIES: Record<string, string> = {
   myths: "a common weight-loss belief, checked against the evidence",
   body: "how the body works during weight loss (metabolism, plateaus, water weight, hormones, weight maintenance)",
   practical: "practical everyday eating (eating out, gatherings, shopping, cooking methods, drinks)",
+  maintain: "keeping lost weight off (what long-term studies and the US National Weight Control Registry show, why weight comes back, the habits of people who keep it off, handling a regain early)",
 };
 
 const PUBLISH_TOOL = {
@@ -1052,7 +1089,7 @@ function runChat(ctx: Ctx, history: any[], image: unknown, use: Use) {
   const system = systemBlocks(block([S.profile(), S.targets(), S.phase(), S.energy(), S.mode(), S.foods(), S.recipes(), S.magazine(), S.motivations(), S.reviews(), S.notes(), S.plan(), S.weights(), S.totals(S.yesterday), S.entries(S.detailFrom, S.yesterday)]));
   // What changes by the minute goes after the conversation, so it never breaks the cache:
   // the next message finds everything up to this one already cached.
-  const live = `<live_data>\n${block([S.now(), S.today(), S.adherence(), S.shopping(), S.focus()])}\n</live_data>`;
+  const live = `<live_data>\n${block([S.now(), S.today(), S.standing(), S.activity(), S.occasions(), S.adherence(), S.shopping(), S.focus()])}\n</live_data>`;
   // A photo rides only on the message it was sent with; later turns see the «[عکس غذا]» mark.
   const photo = okImage(image) ? [imageBlock(image as string)] : [];
   const base: any[] = turns.map((m, i) => ({ role: m.role, content: i === turns.length - 1 ? [...photo, { type: "text", text: m.content, cache_control: CACHE }] : [{ type: "text", text: m.content }] }));

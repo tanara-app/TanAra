@@ -7,9 +7,12 @@
     POST + user JWT        { test: true } sends a test notification to that person's devices
 
   What is due comes from the profile (profile.data.reminders, set in «نمایه» ← «یادآورها»):
-    log    at a chosen evening time, if fewer than two meals were logged that day
+    log    at a chosen evening time, if fewer than two meals were logged that day — but not
+           in maintenance with light logging on while the weight is in its band (the same
+           rule as js/domain/phase.js → lightOn)
     weigh  at a chosen morning time, if the last weigh-in is `every` days old or more
-           (the text also asks for the waist when that is two weeks old)
+           (the text also asks for the waist when that is two weeks old, and is warmer after
+           a long gap: stopping weighing is how regain usually starts)
   Times are in the person's own time zone (reminders.tz). The texts are fixed: no AI call.
 
   Deployed with verify_jwt off: the cron call carries no JWT, so each path checks its own
@@ -150,6 +153,23 @@ const minutes = (hhmm: unknown, fallback: number) => {
 };
 const daysBetween = (a: string, b: string) => Math.round((Date.parse(a + "T12:00:00Z") - Date.parse(b + "T12:00:00Z")) / 86400000);
 const inWindow = (now: number, at: number) => now >= at && now < at + WINDOW_MIN;
+const BAND_KG = 1;     // js/domain/phase.js
+const LAPSE_DAYS = 10; // js/domain/phase.js
+
+// Light logging in force: in maintenance, chosen, and the 7-day average not above the band.
+async function lightOn(data: any, user: string, day: string) {
+  const kg = Number(data?.maintainFrom?.kg);
+  if (data?.phase !== "maintain" || !data?.lightLog || !(kg > 0)) return false;
+  const { data: rows } = await admin.from("weights").select("kg").eq("user_id", user).gte("day", addDays(day, -6)).lte("day", day);
+  if (!rows?.length) return true;
+  const avg = rows.reduce((s, r) => s + Number(r.kg), 0) / rows.length;
+  return avg < kg + BAND_KG - 1e-9;
+}
+const addDays = (day: string, n: number) => {
+  const d = new Date(day + "T12:00:00Z");
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+};
 
 async function latest(table: string, user: string) {
   const { data } = await admin.from(table).select("day").eq("user_id", user).order("day", { ascending: false }).limit(1);
@@ -165,12 +185,13 @@ async function runDue(k: Keys) {
 
   for (const [user, list] of byUser) {
     const { data: prof } = await admin.from("profile").select("data").eq("user_id", user).maybeSingle();
-    const r = (prof?.data as any)?.reminders;
+    const data = prof?.data as any;
+    const r = data?.reminders;
     if (!r) continue;
     const now = localNow(String(r.tz || "Asia/Tehran"));
     const notes: Record<string, Note> = {};
 
-    if (r.log?.on && inWindow(now.min, minutes(r.log.at, 21 * 60))) {
+    if (r.log?.on && inWindow(now.min, minutes(r.log.at, 21 * 60)) && !(await lightOn(data, user, now.day))) {
       const { data: rows } = await admin.from("entries").select("meal").eq("user_id", user).eq("day", now.day);
       const meals = new Set((rows || []).map(x => x.meal)).size;
       if (meals < 2) notes.log = {
@@ -184,9 +205,12 @@ async function runDue(k: Keys) {
       if (!lastW || daysBetween(now.day, lastW) >= every) {
         const lastWaist = await latest("waists", user);
         const waistToo = !lastWaist || daysBetween(now.day, lastWaist) >= 14;
+        const gap = lastW ? daysBetween(now.day, lastW) : 0;
         notes.weigh = {
           tag: "weigh", url: "./#/progress", title: "تن‌آرا",
-          body: `وقت وزن‌کشی است: صبح، ناشتا${waistToo ? "؛ دور کمرت را هم اندازه بگیر" : ""}. یک عدد به‌تنهایی مهم نیست، روندش مهم است.`,
+          body: gap >= Math.max(LAPSE_DAYS, every + 3)
+            ? `${gap.toLocaleString("fa-IR")} روز است وزن ثبت نشده. یک وزن‌کشی صبح، ناشتا، کافی است تا دوباره بدانی کجایی؛ عددش هر چه باشد، بی‌خبری بدتر است.`
+            : `وقت وزن‌کشی است: صبح، ناشتا${waistToo ? "؛ دور کمرت را هم اندازه بگیر" : ""}. یک عدد به‌تنهایی مهم نیست، روندش مهم است.`,
         };
       }
     }

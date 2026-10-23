@@ -5,6 +5,7 @@
 */
 import * as store from '../data/store.js';
 import { measureDue, sortedWeights, waistSeries } from '../domain/stats.js';
+import { lapse } from '../domain/phase.js';
 import { fa, parseNum } from '../lib/fa.js';
 import { today, addDays, relLabel } from '../lib/dates.js';
 import { icon, toast, confirmBox } from './dom.js';
@@ -17,6 +18,8 @@ export const setMeasureDay = d => { day = d; };
 // «پیشرفت» should open on the form, whatever section was open last
 let jump = false;
 export const takeJump = () => { const j = jump; jump = false; return j; };
+// Opens «پیشرفت» on today's form, from anywhere.
+export function goMeasure() { day = today(); jump = true; location.hash = '#/progress'; }
 
 export function due(on = today()) {
   const s = store.get();
@@ -38,6 +41,9 @@ function state(d) {
 export function measureNote() {
   const d = due();
   if (!d.weigh || dismissed('measure', today())) return '';
+  // a long gap has its own, stronger note (phase.js)
+  const gap = lapse(sortedWeights(store.get().weights), today(), store.profile()?.reminders?.weigh?.every);
+  if (gap && !dismissed('lapse', gap.last)) return '';
   return `<div class="note soft" data-measure-note>
     <strong>${d.waist ? 'امروز وقت اندازه‌گیری است: وزن و دور کمر' : 'امروز وقت وزن‌کشی است'}</strong>
     <p>صبح، ناشتا و بعد از دستشویی${d.waist ? '؛ هر دو عدد را یک‌جا ثبت می‌کنی' : ''}.</p>
@@ -46,7 +52,7 @@ export function measureNote() {
 }
 
 export function bindMeasureNote(root) {
-  root.querySelector('[data-measure-go]')?.addEventListener('click', () => { jump = true; location.hash = '#/progress'; });
+  root.querySelector('[data-measure-go]')?.addEventListener('click', goMeasure);
   root.querySelector('[data-measure-later]')?.addEventListener('click', e => { dismiss('measure', today()); e.target.closest('.note').remove(); });
 }
 
