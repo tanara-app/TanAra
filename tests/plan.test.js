@@ -270,9 +270,16 @@ suite('plan', () => {
     r = dayRooms(plan, {}, { ...none, breakfast: [huge] }, [huge]);
     ok(['snack1', 'lunch', 'snack2', 'dinner'].every(k => r[k].locked && r[k].left <= 0), 'all locked');
 
-    // over at dinner: nothing after it to take from
+    // over at dinner: nothing after it, so the earlier ones still open take it, by what they have left
     const late = e('d', 'dinner', b.dinner + 300);
     r = dayRooms(plan, {}, { ...none, dinner: [late] }, [late]);
+    eq([r.dinner.owed, r.dinner.passed], [0, 300]);
+    near(sumOf(r, 'owed'), 300, 2);
+    ok(r.lunch.back > r.snack1.back, 'the more a meal has left, the more it takes back');
+    // and with every earlier one picked in full, nobody is charged
+    const full = Object.fromEntries(['breakfast', 'snack1', 'lunch', 'snack2'].map(k => [k, Array.from({ length: plan.slots[k].pick }, () => ({ o: `${k}-1`, e: [k] }))]));
+    const ate = ['breakfast', 'snack1', 'lunch', 'snack2'].map(k => e(k, SLOTS[k].meal, b[k]));
+    r = dayRooms(plan, full, { ...none, dinner: [late] }, [...ate, late]);
     eq([sumOf(r, 'owed'), r.dinner.passed], [0, 0]);
   });
 
