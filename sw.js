@@ -1,10 +1,11 @@
 /* App-shell cache for تن‌آرا: makes the app installable and lets it open offline.
    Own files are network-first, so a new deploy shows up on the next online open;
+   they skip the browser's HTTP cache (GitHub Pages sends max-age=600, which would hide a deploy for 10 min);
    the cache is only the fallback. Pinned CDN files are cache-first.
    Supabase API calls are never touched. Bump CACHE when the shell list changes.
    Every other cache is cleared on activate (including «tanara-vault», from the removed vault).
    Also shows the push reminders sent by the `remind` Edge Function (see ui/reminders.js). */
-const CACHE = 'tanara-shell-v21';
+const CACHE = 'tanara-shell-v22';
 const SHELL = [
   './', './index.html', './manifest.json', './css/app.css',
   './js/app.js', './js/config.js',
@@ -22,7 +23,7 @@ const SHELL = [
 const VENDOR_HOSTS = ['cdn.jsdelivr.net', 'fastly.jsdelivr.net', 'fonts.googleapis.com', 'fonts.gstatic.com'];
 
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)));
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL.map(u => new Request(u, { cache: 'reload' })))));
   self.skipWaiting();
 });
 
@@ -46,7 +47,7 @@ self.addEventListener('fetch', e => {
 
   if (url.origin !== self.location.origin) return;
 
-  e.respondWith(fetch(req).then(res => {
+  e.respondWith(fetch(req, { cache: 'no-cache' }).then(res => {
     if (res.ok) { const copy = res.clone(); caches.open(CACHE).then(c => c.put(req, copy)); }
     return res;
   // offline: the cached copy; only a page load falls back to the app shell (a script or
