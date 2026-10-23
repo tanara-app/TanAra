@@ -66,7 +66,7 @@ Language and style
 
 Nutrition and safety
 - Give only well-established, evidence-based nutrition and behaviour advice. When something is uncertain or debated, say so briefly.
-- Calorie estimates use Iranian household units (کفگیر، کف‌دست، قاشق، لیوان، ...) as in the food bank. Each bank food also has the weight in grams of one unit, so amounts can be logged in grams (unit «گرم», qty = grams).
+- Calorie estimates use Iranian household units (کفگیر، کف‌دست، قاشق، لیوان، ...) as in the food bank. Each bank food also has the weight in grams of one unit, so amounts can be logged in grams (unit «گرم», qty = grams). Some also have a second household unit («also by نان کامل, 400 g»); an amount can be given in it too (unit = that name, qty in it), whichever is more natural for what they ate.
 - Never suggest eating below the person's safety floor (given in the data), crash diets, long fasts, skipping meals as a strategy, diet pills, laxatives or supplements for weight loss.
 - If weight is dropping more than ~1.5 kg/week for several weeks, or calories have been below the floor for days, gently say so and suggest seeing a doctor.
 - You are not a doctor. If the profile lists medical conditions, medications, or a possible eating-disorder history, keep advice general and suggest checking with their doctor or a dietitian for anything specific. Warning signs that always mean "see a doctor": سرگیجه، ضعف شدید، تپش قلب، ریزش موی زیاد، any change in illness or medication.
@@ -234,7 +234,7 @@ function sections(c: Ctx) {
     },
     recipes: () => (c.recipes || []).length ? `# Their own recipes, in «بانک غذا» ← «رسپی‌ها» (name | one unit, grams | kcal | protein g | what goes into the whole pot)\n${c.recipes!.map(r => `${r.name} | ${r.unit}${r.grams ? `, ${Math.round(r.grams)} g` : ""} | ${Math.round(r.kcal)} | ${r1(r.protein)}${r.in_bank ? " | in the bank" : ""} | ${(r.items || []).join("، ")}`).join("\n")}` : "",
     shopping: () => `# Their shopping list («لیست خرید»): still to buy\n${(c.shopping || []).slice(0, 60).map(i => `${String(i.name).slice(0, 80)}${i.amount ? ` (${String(i.amount).slice(0, 40)})` : ""}`).join("، ") || "nothing on it"}`,
-    foods: () => `# Their food bank (food_id | name | unit | grams in one unit | kcal per unit | protein g per unit | veg)\n${foods.map(f => `${f.alias} | ${f.name} | ${f.unit} | ${f.grams ? r1(f.grams) : "?"} | ${r1(f.kcal)} | ${r1(f.protein)}${f.is_veg ? " | veg" : ""}`).join("\n")}`,
+    foods: () => `# Their food bank (food_id | name | unit | grams in one unit | kcal per unit | protein g per unit | veg | second unit, grams in one)\n${foods.map(f => `${f.alias} | ${f.name} | ${f.unit} | ${f.grams ? r1(f.grams) : "?"} | ${r1(f.kcal)} | ${r1(f.protein)}${f.is_veg ? " | veg" : ""}${f.unit2 && f.grams2 ? ` | also by ${f.unit2}, ${r1(f.grams2)} g` : ""}`).join("\n")}`,
   };
 }
 type Sections = ReturnType<typeof sections>;

@@ -1,13 +1,22 @@
 // Taking a photo of food for Hooshvareh: pick (camera or gallery), shrink, base64.
 import { shrink } from './motivation.js';
+import { choose } from './dom.js';
 
-// Opens the system picker. Resolves to the chosen File, or null when nothing was picked.
-// Must be called from a tap.
-export function pickPhoto() {
+/*
+  Resolves to the chosen File, or null when nothing was picked. Must be called from a tap.
+  from: 'camera' opens the camera straight away (Android otherwise shows a file picker
+  first), 'gallery' the photo picker, 'ask' lets them choose (for screenshots).
+*/
+export async function pickPhoto(from = 'camera') {
+  if (from === 'ask') {
+    from = await choose('عکس از کجا؟', [{ value: 'camera', label: 'گرفتن عکس با دوربین' }, { value: 'gallery', label: 'انتخاب از گالری یا اسکرین‌شات' }]);
+    if (!from) return null;
+  }
   return new Promise(resolve => {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/*';
+    if (from === 'camera') input.capture = 'environment';
     input.onchange = () => resolve(input.files?.[0] || null);
     input.addEventListener('cancel', () => resolve(null));
     input.click();

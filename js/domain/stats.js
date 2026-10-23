@@ -138,12 +138,14 @@ export function frequentFoods(entries, foods, day, meal, limit = 6) {
     .map(([id, s]) => ({ food: byId.get(id), last: amountOf(s.last, byId.get(id)), n: s.n }));
 }
 
-// The amount to start from: { qty, grams } — grams true when it was weighed. Only amounts in
-// the food's current unit (or grams) carry over; after a unit change it starts at 1.
+// The amount to start from: { qty, grams, unit2 } — grams true when it was weighed, unit2 when
+// it was in the food's second unit. Only amounts in the food's current units (or grams) carry
+// over; after a unit change it starts at 1.
 function amountOf(e, food) {
   if (!e) return { qty: 1, grams: false };
   if (e.unit === 'گرم' && food.unit !== 'گرم') return { qty: Number(e.qty), grams: true };
   if (e.unit === food.unit) return { qty: Number(e.qty), grams: false };
+  if (food.unit2 && e.unit === food.unit2) return { qty: Number(e.qty), grams: false, unit2: true };
   return { qty: 1, grams: false };
 }
 

@@ -389,7 +389,7 @@ export function openEntrySheet(entry) {
   const q0 = Number(entry.qty) || 1;
   // per-unit values: from the food if still linked, else derived from the entry itself
   const per = food
-    ? { unit: food.unit, grams: food.grams, kcal: food.kcal, protein: food.protein }
+    ? { unit: food.unit, grams: food.grams, kcal: food.kcal, protein: food.protein, unit2: food.unit2, grams2: food.grams2 }
     : { unit: entry.unit || 'پرس', grams: entry.unit === GRAM ? 1 : null, kcal: entry.kcal / q0, protein: entry.protein / q0 };
   let meal = entry.meal;
 
@@ -411,10 +411,11 @@ export function openEntrySheet(entry) {
     let amount = null;
     const units = bindUnitFields(form, F, () => amount?.refresh());
     const base = () => { const r = units.read(); return r.error ? per : r; };
-    const start = entry.unit === GRAM && per.unit !== GRAM ? { qty: q0, grams: true } : { qty: q0, grams: false };
+    const start = entry.unit === GRAM && per.unit !== GRAM ? { qty: q0, grams: true }
+      : { qty: q0, grams: false, unit2: !!per.unit2 && entry.unit === per.unit2 };
     amount = mountAmount(body.querySelector('[data-amount]'), base, start);
-    const changed = r => food && ['unit', 'grams', 'kcal', 'protein'].some(k =>
-      typeof r[k] === 'number' ? Math.abs(r[k] - (Number(food[k]) || 0)) > 1e-6 : r[k] !== food[k]);
+    const changed = r => food && ['unit', 'grams', 'kcal', 'protein', 'unit2', 'grams2'].some(k =>
+      typeof r[k] === 'number' ? Math.abs(r[k] - (Number(food[k]) || 0)) > 1e-6 : (r[k] ?? null) !== (food[k] ?? null));
     body.querySelector('[data-close]').onclick = () => sheet.close();
     body.querySelector('[data-save]').onclick = () => {
       const r = units.read();

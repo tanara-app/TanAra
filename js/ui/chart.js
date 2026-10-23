@@ -21,8 +21,9 @@ export function weightChart(sorted, from, to, { label = 'نمودار وزن', d
   let lo = Math.min(...vals), hi = Math.max(...vals);
   const pad = Math.max(0.5, (hi - lo) * 0.12);
   lo = Math.floor(lo - pad); hi = Math.ceil(hi + pad);
-  // RTL: time runs right → left, matching the reading direction.
-  const x = d => W - R - (diffDays(d, start) / span) * (W - L - R);
+  // Time runs left → right like any chart, with the kilos on the left. The SVG is drawn LTR:
+  // inside the RTL page text-anchor would flip and push the labels into the plot.
+  const x = d => L + (diffDays(d, start) / span) * (W - L - R);
   const y = kg => T + (1 - (kg - lo) / (hi - lo)) * (H - T - B);
 
   const ticks = 4;

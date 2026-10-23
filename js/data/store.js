@@ -60,6 +60,7 @@ export function init(namespace, remoteAdapter) {
   // copies of files from the removed «صندوقچه»; gone at once, without waiting for the new service worker
   try { caches.delete('tanara-vault').catch(() => {}); } catch { /* no Cache API */ }
   fillFoodGrams();
+  if (!remote) fillFoodUnit2();
 }
 
 export function clearLocal() {
@@ -135,6 +136,7 @@ export async function pull() {
   persist();
   emit();
   fillFoodGrams();
+  fillFoodUnit2();
 }
 
 /* ---------------- writes ---------------- */
@@ -168,6 +170,8 @@ export function upsertFood(food) {
     protein: Number(food.protein) || 0,
     is_veg: !!food.is_veg,
     barcode: food.barcode || null,
+    unit2: food.unit2 && Number(food.grams2) > 0 ? String(food.unit2).trim() : null,
+    grams2: food.unit2 && Number(food.grams2) > 0 ? Number(food.grams2) : null,
     created_at: food.created_at || now(),
     updated_at: now(),
   };
@@ -187,7 +191,7 @@ export function deleteFood(id) {
 export function addFoods(list) {
   const rows = list.map(f => ({
     id: uid(), name: f.name, category: f.category, unit: f.unit, grams: f.grams ?? null,
-    kcal: f.kcal, protein: f.protein, is_veg: !!f.is_veg, created_at: now(), updated_at: now(),
+    unit2: f.unit2 ?? null, grams2: f.grams2 ?? null, kcal: f.kcal, protein: f.protein, is_veg: !!f.is_veg, created_at: now(), updated_at: now(),
   }));
   rows.forEach(r => state.foods.push(r));
   persist(); emit();
@@ -215,6 +219,27 @@ function fillFoodGrams() {
     } else if (UNIT_GRAMS[f.unit]) patch = { grams: UNIT_GRAMS[f.unit] };
     if (!patch) continue;
     Object.assign(f, patch, { updated_at: now() });
+    rows.push(f);
+  }
+  if (!rows.length) return;
+  persist(); emit();
+  if (remote) { queue.push({ op: 'upsert', table: 'foods', row: rows.map(r => ({ ...r })) }); persist(); flush(); }
+}
+
+/*
+  Seeded foods saved before foods had a second unit get the seed's, once per device (after a
+  pull when signed in, so the server's copy is the one looked at). A second unit removed by
+  hand on this device stays removed.
+*/
+function fillFoodUnit2() {
+  const seed = new Map(SEED_FOODS.filter(f => f.unit2).map(f => [f.name, f]));
+  if (lsGet('unit2Filled', false) || !state.foods.length || !seed.size) return;
+  lsSet('unit2Filled', true);
+  const rows = [];
+  for (const f of state.foods) {
+    const sd = seed.get(f.name);
+    if (!sd || f.unit2 || sd.unit !== f.unit || !(Number(f.grams) > 0)) continue;
+    Object.assign(f, { unit2: sd.unit2, grams2: sd.grams2, updated_at: now() });
     rows.push(f);
   }
   if (!rows.length) return;

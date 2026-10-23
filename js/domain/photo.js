@@ -19,6 +19,8 @@ export function photoItems(raw, foods) {
     // per one of the unit the amount is given in, when the bank can say
     const per = f && i.unit === f.unit ? { kcal: f.kcal, protein: f.protein }
       : f && i.unit === GRAM && Number(f.grams) > 0 ? { kcal: f.kcal / f.grams, protein: f.protein / f.grams }
+      : f && f.unit2 && i.unit === f.unit2 && Number(f.grams2) > 0 && (f.unit === GRAM || Number(f.grams) > 0)
+        ? { kcal: f.kcal * f.grams2 / (f.unit === GRAM ? 1 : f.grams), protein: f.protein * f.grams2 / (f.unit === GRAM ? 1 : f.grams) }
       : null;
     if (per) {
       out.push({ food_id: f.id, name: f.name, unit: i.unit, qty, kcal: Math.round(per.kcal * qty), protein: r1(per.protein * qty), is_veg: !!f.is_veg, bank: true });

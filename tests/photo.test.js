@@ -4,7 +4,8 @@ import { photoItems } from '../js/domain/photo.js';
 const FOODS = [
   { id: 'rice', name: 'برنج', unit: 'کفگیر', grams: 80, kcal: 100, protein: 2, is_veg: false },
   { id: 'salad', name: 'سالاد', unit: 'کاسه', grams: null, kcal: 30, protein: 1, is_veg: true },
-  { id: 'cheese', name: 'پنیر', unit: 'گرم', grams: 1, kcal: 2.5, protein: 0.2, is_veg: false },
+  { id: 'cheese', name: 'پنیر', unit: 'گرم', grams: 1, kcal: 2.5, protein: 0.2, is_veg: false, unit2: 'قاشق', grams2: 10 },
+  { id: 'bread', name: 'سنگک', unit: 'کف‌دست', grams: 40, kcal: 110, protein: 4, is_veg: false, unit2: 'نان کامل', grams2: 400 },
 ];
 const it = o => ({ name: 'x', food_id: '', qty: 1, unit: 'پرس', kcal: 100, protein: 5, is_veg: false, ...o });
 
@@ -17,6 +18,11 @@ suite('photo', () => {
   test('a bank food given in grams is converted through the weight of its unit', () => {
     eq(photoItems({ items: [it({ food_id: 'rice', qty: 200, unit: 'گرم' })] }, FOODS)[0].kcal, 250);
     eq(photoItems({ items: [it({ food_id: 'cheese', qty: 40, unit: 'گرم' })] }, FOODS)[0], { food_id: 'cheese', name: 'پنیر', unit: 'گرم', qty: 40, kcal: 100, protein: 8, is_veg: false, bank: true });
+  });
+
+  test('a bank food given in its second unit goes through grams', () => {
+    eq(photoItems({ items: [it({ food_id: 'bread', qty: 0.5, unit: 'نان کامل' })] }, FOODS)[0].kcal, 550);
+    eq(photoItems({ items: [it({ food_id: 'cheese', qty: 2, unit: 'قاشق' })] }, FOODS)[0].kcal, 50);
   });
 
   test('when the bank cannot say (no weight, or another unit) the estimate stands, unlinked', () => {

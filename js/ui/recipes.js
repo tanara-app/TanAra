@@ -217,7 +217,7 @@ function openMine(onChange) {
       const form = body.querySelector('form');
       body.querySelector('[data-close]').onclick = () => sheet.close();
       body.querySelector('[data-photo]').onclick = async () => {
-        const file = await pickPhoto();
+        const file = await pickPhoto('ask');
         if (!file || !body.isConnected) return;
         try { shot = await foodPhoto(file); draw(form.elements.text.value); } catch { toast('عکس خوانده نشد'); }
       };

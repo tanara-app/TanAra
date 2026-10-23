@@ -350,7 +350,7 @@ dl.calc dd { margin: 0; text-align: left; }
 /* progress */
 .weigh-form { align-items: flex-end; }
 .weigh-form .btn { min-height: 50px; }
-.chart { width: 100%; height: auto; display: block; margin-top: 10px; }
+.chart { width: 100%; height: auto; display: block; margin-top: 10px; direction: ltr; }
 .chart .grid { stroke: var(--line); stroke-width: 1; }
 .chart .ax { fill: var(--muted); font-size: 10px; font-family: inherit; }
 .chart .avg-line { fill: none; stroke: var(--accent); stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }

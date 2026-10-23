@@ -375,7 +375,7 @@ function buildShell(root) {
   box.addEventListener('scroll', () => { stuck = nearBottom(box, 40); }, { passive: true });
 
   root.querySelector('[data-attach]')?.addEventListener('click', async () => {
-    const file = await pickPhoto();
+    const file = await pickPhoto('ask');
     if (!file) return;
     try { setShot(await foodPhoto(file)); } catch { toast('عکس خوانده نشد'); }
   });
