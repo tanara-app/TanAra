@@ -359,20 +359,31 @@ export function goneFoods(plan, foods) {
 
 // «۲ کف‌دست نان سنگک، ۳۰ گرم پنیر» — plain text, for Hooshvareh.
 /*
-  How much of a food fits in `kcal` calories (what is left of an occasion): the most of it, in
-  measurable steps (half units — a quarter when not even half fits — or 5 g), that stays within
-  them, but no more than a sensible helping (3 units, 400 g; `capped`). Null when nothing fits.
-  A food with no calories gets one unit (100 g), marked `free`.
+  How much of each food fits in `kcal` calories (what is left of an occasion) when they are
+  eaten together: the calories are handed out one measurable step at a time (a quarter, then
+  half units, or 5 g), always to the food with the fewest calories so far, until no step fits —
+  so the foods end up with about equal calories. None goes past a sensible helping (3 units,
+  400 g; `capped` when more would still have fitted). Null for a food not even a step of which
+  fits. A food with no calories gets one unit (100 g), marked `free`.
 */
-export function portionFor(food, kcal) {
-  const g = food.unit === GRAM;
-  const per = Number(food.kcal) || 0;
-  if (per <= 0) return { qty: g ? 100 : 1, free: true, capped: false };
-  const most = kcal / per + 1e-9;
-  const fit = g ? Math.floor(most / 5) * 5 : Math.floor(most * 2) / 2 || Math.floor(most * 4) / 4;
-  if (!(fit > 0)) return null;
-  const max = g ? 400 : 3;
-  return { qty: Math.min(fit, max), free: false, capped: fit > max };
+export function portionsFor(foods, kcal) {
+  const per = foods.map(f => Number(f.kcal) || 0);
+  const g = foods.map(f => f.unit === GRAM);
+  const max = i => (g[i] ? 400 : 3);
+  const next = i => (g[i] ? qty[i] + 5 : qty[i] < 0.5 ? qty[i] + 0.25 : qty[i] + 0.5);
+  const qty = foods.map(() => 0);
+  let left = kcal + 1e-9;
+  const fits = i => per[i] > 0 && next(i) <= max(i) && (next(i) - qty[i]) * per[i] <= left;
+  for (;;) {
+    const i = foods.map((_, n) => n).filter(fits).sort((a, b) => qty[a] * per[a] - qty[b] * per[b])[0];
+    if (i == null) break;
+    left -= (next(i) - qty[i]) * per[i];
+    qty[i] = next(i);
+  }
+  return foods.map((_, i) => (per[i] <= 0 ? { qty: g[i] ? 100 : 1, free: true, capped: false }
+    : qty[i] > 0 ? { qty: qty[i], free: false, capped: qty[i] === max(i) && (g[i] ? 5 : 0.5) * per[i] <= left } : null));
 }
+
+export const portionFor = (food, kcal) => portionsFor([food], kcal)[0];
 
 export const optionText = o => o.items.map(i => `${i.qty} ${i.unit} ${i.name}`).join(' + ');

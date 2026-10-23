@@ -334,6 +334,13 @@ dl.calc dd { margin: 0; text-align: left; }
 .portion { text-align: center; margin: 0; }
 .portion b { color: var(--text); }
 .fmeta b { color: var(--text); font-weight: 600; }
+.portions { gap: 10px; }
+.portion-row { display: flex; align-items: center; gap: 8px; }
+.portion-row .grow { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.portion-row small b { color: var(--text); }
+.portion-row .icon-btn.sm { background: var(--surface); flex: none; }
+.chosen-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; background: var(--surface-2); border-radius: var(--radius); padding: 8px 12px; }
+.chosen-bar span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .qty-box .field input { background: var(--surface) !important; }
 .qty-box > .stack { gap: 14px; }
 .qty-box .link { align-self: center; }

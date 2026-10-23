@@ -1,5 +1,5 @@
 import { suite, test, eq, ok, near } from './harness.js';
-import { budgets, fitOption, buildPlan, optionBudget, planOn, previousPlan, planEnd, planDayNo, planOver, picksOn, dayAdherence, adherence, newFoods, goneFoods, optionText, swapItem, restoreItem, sameItems, swapSuggestions, swapsOn, dayPlan, offOn, slotExtras, slotRoom, dayRooms, shrinkOption, roomPlan, portionFor, SLOTS } from '../js/domain/plan.js';
+import { budgets, fitOption, buildPlan, optionBudget, planOn, previousPlan, planEnd, planDayNo, planOver, picksOn, dayAdherence, adherence, newFoods, goneFoods, optionText, swapItem, restoreItem, sameItems, swapSuggestions, swapsOn, dayPlan, offOn, slotExtras, slotRoom, dayRooms, shrinkOption, roomPlan, portionFor, portionsFor, SLOTS } from '../js/domain/plan.js';
 
 const food = (id, unit, kcal, protein = 0, extra = {}) => ({ id, name: id, unit, kcal, protein, grams: 100, is_veg: false, created_at: '2026-01-01T00:00:00Z', ...extra });
 const FOODS = [
@@ -292,5 +292,23 @@ suite('plan', () => {
     eq(portionFor(byId.get('salad'), 900), { qty: 3, free: false, capped: true });
     eq(portionFor(byId.get('cheese'), 5000).qty, 400);
     eq(portionFor(food('water', 'لیوان', 0), 0), { qty: 1, free: true, capped: false });
+  });
+
+  test('foods eaten together share what is left, about equally by calories', () => {
+    const qtys = (foods, kcal) => portionsFor(foods.map(f => byId.get(f)), kcal).map(p => p && p.qty);
+    // 500 kcal: rice (100) and stew (150) — 250 each would be 2.5 and 1.67, steps make it 2.5 + 1.5
+    eq(qtys(['rice', 'stew'], 500), [2.5, 1.5]);
+    // never over what is left
+    for (const k of [90, 230, 410, 777]) {
+      const fs = ['rice', 'cheese', 'egg'].map(f => byId.get(f));
+      const total = portionsFor(fs, k).reduce((t, p, i) => t + (p ? p.qty * fs[i].kcal : 0), 0);
+      ok(total <= k, `${total} <= ${k}`);
+    }
+    // too little for both: the first one a step of which fits gets it, the other none
+    eq(qtys(['cake', 'apple'], 90), [0.25, null]);
+    // a free food takes nothing from the others
+    eq(portionsFor([byId.get('rice'), food('tea', 'لیوان', 0)], 200), [{ qty: 2, free: false, capped: false }, { qty: 1, free: true, capped: false }]);
+    // one food alone is the same as portionFor
+    eq(portionsFor([byId.get('rice')], 260), [portionFor(byId.get('rice'), 260)]);
   });
 });
