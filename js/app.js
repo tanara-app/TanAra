@@ -13,6 +13,9 @@ import { renderChat } from './ui/chat.js';
 import { renderMagazine } from './ui/magazine.js';
 import { configureAI, sparkle } from './ai/hooshvareh.js';
 import { disable as disableReminders } from './ui/reminders.js';
+import { applyTheme } from './ui/theme.js';
+
+applyTheme();
 
 const view = $('#view');
 const nav = $('#nav');

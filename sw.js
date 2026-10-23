@@ -4,7 +4,7 @@
    Supabase API calls are never touched. Bump CACHE when the shell list changes.
    Every other cache is cleared on activate (including «tanara-vault», from the removed vault).
    Also shows the push reminders sent by the `remind` Edge Function (see ui/reminders.js). */
-const CACHE = 'tanara-shell-v20';
+const CACHE = 'tanara-shell-v21';
 const SHELL = [
   './', './index.html', './manifest.json', './css/app.css',
   './js/app.js', './js/config.js',
@@ -15,7 +15,7 @@ const SHELL = [
   './js/ui/dom.js', './js/ui/onboarding.js', './js/ui/today.js', './js/ui/logFood.js', './js/ui/foodBank.js',
   './js/ui/progress.js', './js/ui/review.js', './js/ui/profile.js', './js/ui/login.js', './js/ui/chart.js', './js/ui/notices.js', './js/ui/motivation.js',
   './js/ai/hooshvareh.js', './js/ui/chat.js', './js/ui/aiCards.js', './js/ui/units.js', './js/ui/plan.js', './js/ui/magazine.js',
-  './js/ui/phase.js', './js/ui/reminders.js', './js/ui/usage.js', './js/ui/photo.js', './js/ui/recipes.js', './js/ui/measure.js', './js/ui/shopping.js', './js/ui/barcode.js',
+  './js/ui/phase.js', './js/ui/reminders.js', './js/ui/usage.js', './js/ui/photo.js', './js/ui/recipes.js', './js/ui/measure.js', './js/ui/shopping.js', './js/ui/barcode.js', './js/ui/theme.js',
   './favicon-32-v2.png', './icon-192-v2.png', './icon-512-v2.png', './icon-maskable-192-v2.png', './icon-maskable-512-v2.png', './apple-touch-icon-v2.png', './badge-96.png',
 ];
 // fastly.jsdelivr.net: the barcode reader's WebAssembly (pinned version), for phones without a built-in one

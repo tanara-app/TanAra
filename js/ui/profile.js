@@ -6,7 +6,7 @@ import { sortedWeights } from '../domain/stats.js';
 import { nextTargets } from '../domain/energy.js';
 import { fa, kcal50, parseNum, esc } from '../lib/fa.js';
 import { today, faDMY } from '../lib/dates.js';
-import { sheet, toast, confirmBox, icon } from './dom.js';
+import { sheet, toast, confirmBox, choose, icon } from './dom.js';
 import { fieldsHtml, readFields, bindChoices, validate, medicalNoteHtml, targetsHtml } from './onboarding.js';
 import { openFoodBank } from './foodBank.js';
 import { openMotivationList } from './motivation.js';
@@ -15,6 +15,7 @@ import { remindersLine, bindReminders } from './reminders.js';
 import { openUsage } from './usage.js';
 import { openShopping, shoppingLine } from './shopping.js';
 import { aiAvailable } from '../ai/hooshvareh.js';
+import { THEMES, getTheme, setTheme } from './theme.js';
 
 let session = { email: null, signOut: null, local: true };
 export const setSession = s => { session = s; };
@@ -68,6 +69,7 @@ export function renderProfile(root) {
       ${row('data-bank', 'بانک غذا', `${fa(s.foods.length)} غذا`)}
       ${row('data-shopping', 'لیست خرید', shoppingLine())}
       ${aiAvailable() ? row('data-usage', 'مصرف هوشواره', 'هر کار هوشواره چقدر هزینه داشته') : ''}
+      ${row('data-theme', 'ظاهر', THEMES.find(t => t.value === getTheme()).label)}
       ${row('data-data', 'داده‌ها و پشتیبان', 'خروجی گرفتن، برگرداندن، غذاهای پیش‌فرض')}
       ${row('data-account', 'حساب', session.local ? 'حالت آزمایشی محلی' : `${esc(session.email || '')}${st.pending ? ` · ${fa(st.pending)} تغییر در صف` : ''}`)}
     </section>
@@ -86,6 +88,10 @@ export function renderProfile(root) {
   root.querySelector('[data-usage]')?.addEventListener('click', openUsage);
   root.querySelector('[data-bank]').onclick = () => openFoodBank();
   root.querySelector('[data-shopping]').onclick = () => openShopping();
+  root.querySelector('[data-theme]').onclick = async () => {
+    const t = await choose('ظاهر', THEMES, getTheme());
+    if (t) { setTheme(t); renderProfile(root); }
+  };
   root.querySelector('[data-data]').onclick = openData;
   root.querySelector('[data-account]').onclick = openAccount;
 }
