@@ -589,6 +589,11 @@ export function bindPlan(root, day, redraw) {
   });
   root.querySelectorAll('[data-more]').forEach(b => b.onclick = () => oneMore(plan, b.dataset.more));
   root.querySelectorAll('[data-fit]').forEach(b => b.onclick = () => oneMore(plan, b.dataset.fit, { day, kcal: Number(b.dataset.kcal) }));
-  root.querySelectorAll('.slot [data-add]').forEach(b => b.onclick = () => openLogSheet({ day, meal: b.dataset.add, onSaved: row => placeExtra(day, b.dataset.key, row) }));
+  // «+» says how much of a food fits what is left of the occasion, instead of asking
+  root.querySelectorAll('.slot [data-add]').forEach(b => b.onclick = () => {
+    const k = b.dataset.key;
+    const room = { kcal: dayView(day)?.rooms[k]?.left ?? 0, label: SLOTS[k].label };
+    openLogSheet({ day, meal: b.dataset.add, room, onSaved: row => placeExtra(day, k, row) });
+  });
   root.querySelectorAll('.slot [data-entry]').forEach(b => b.onclick = () => openEntrySheet(s.entries.find(e => e.id === b.dataset.entry)));
 }

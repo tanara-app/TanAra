@@ -1,5 +1,5 @@
 import { suite, test, eq, ok, near } from './harness.js';
-import { budgets, fitOption, buildPlan, optionBudget, planOn, previousPlan, planEnd, planDayNo, planOver, picksOn, dayAdherence, adherence, newFoods, goneFoods, optionText, swapItem, restoreItem, sameItems, swapSuggestions, swapsOn, dayPlan, offOn, slotExtras, slotRoom, dayRooms, shrinkOption, roomPlan, SLOTS } from '../js/domain/plan.js';
+import { budgets, fitOption, buildPlan, optionBudget, planOn, previousPlan, planEnd, planDayNo, planOver, picksOn, dayAdherence, adherence, newFoods, goneFoods, optionText, swapItem, restoreItem, sameItems, swapSuggestions, swapsOn, dayPlan, offOn, slotExtras, slotRoom, dayRooms, shrinkOption, roomPlan, portionFor, SLOTS } from '../js/domain/plan.js';
 
 const food = (id, unit, kcal, protein = 0, extra = {}) => ({ id, name: id, unit, kcal, protein, grams: 100, is_veg: false, created_at: '2026-01-01T00:00:00Z', ...extra });
 const FOODS = [
@@ -274,5 +274,16 @@ suite('plan', () => {
     const late = e('d', 'dinner', b.dinner + 300);
     r = dayRooms(plan, {}, { ...none, dinner: [late] }, [late]);
     eq([sumOf(r, 'owed'), r.dinner.passed], [0, 0]);
+  });
+
+  test('a portion is the most of a food that fits what is left, in measurable steps', () => {
+    eq(portionFor(byId.get('rice'), 260), { qty: 2.5, free: false, capped: false });
+    eq(portionFor(byId.get('cheese'), 99), { qty: 35, free: false, capped: false });
+    eq(portionFor(byId.get('cake'), 100), { qty: 0.25, free: false, capped: false });
+    eq(portionFor(byId.get('cake'), 60), null);
+    eq(portionFor(byId.get('rice'), 0), null);
+    eq(portionFor(byId.get('salad'), 900), { qty: 3, free: false, capped: true });
+    eq(portionFor(byId.get('cheese'), 5000).qty, 400);
+    eq(portionFor(food('water', 'لیوان', 0), 0), { qty: 1, free: true, capped: false });
   });
 });

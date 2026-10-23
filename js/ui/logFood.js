@@ -4,7 +4,7 @@
 import * as store from '../data/store.js';
 import { MEALS, frequentFoods, lastAmountFor } from '../domain/stats.js';
 import { CATEGORIES, GRAM } from '../data/seedFoods.js';
-import { norm, esc, fa } from '../lib/fa.js';
+import { norm, esc, fa, qtyLabel } from '../lib/fa.js';
 import { mealForNow, today } from '../lib/dates.js';
 import { sheet, toast, confirmBox, icon } from './dom.js';
 import { openFoodBank, openFoodForm } from './foodBank.js';
@@ -13,6 +13,7 @@ import { ask, aiAvailable, sparkle } from '../ai/hooshvareh.js';
 import { photoItems } from '../domain/photo.js';
 import { pickPhoto, foodPhoto, cameraIcon } from './photo.js';
 import { scanBarcode, barcodeBox, fillFromBarcode, barcodeIcon } from './barcode.js';
+import { portionFor } from '../domain/plan.js';
 
 export const mealSeg = meal => `<div class="seg meal-seg" data-meal>
   ${Object.entries(MEALS).map(([k, l]) => `<button type="button" data-v="${k}" class="${k === meal ? 'on' : ''}">${l}</button>`).join('')}
@@ -33,13 +34,43 @@ const foodRow = (f, extra = '') => `
     <span class="fmeta">${foodMeta(f)}${extra}</span>
   </button>`;
 
+/*
+  The diet plan's «+»: instead of an amount to choose, the most of the food that fits what is
+  left of the occasion (`room`: { kcal, label }, see portionFor). Same { get, refresh } as
+  mountAmount; get() is null when nothing fits, or base() gives null (calories not typed yet).
+*/
+function mountPortion(box, base, room) {
+  const left = Math.max(0, Math.round(room.kcal));
+  let a = null;
+  function draw() {
+    const b = base();
+    const p = b && portionFor(b, left);
+    a = p && { unit: b.unit, qty: p.qty, kcal: b.kcal * p.qty, protein: b.protein * p.qty };
+    const grams = a && b.unit !== GRAM && Number(b.grams) > 0 ? ` (حدود ${fa(Math.round(a.qty * b.grams))} گرم)` : '';
+    box.innerHTML = !b ? '<p class="muted portion">کالری‌اش را بنویس تا بگویم در این وعده چقدر از آن می‌توانی بخوری.</p>'
+      : !a ? `<p class="portion">${left ? `از سهم ${room.label} فقط <b>${fa(left)}</b> کالری مانده؛ حتی ${qtyLabel(0.25)} ${esc(b.unit)} از این هم در آن جا نمی‌شود.` : `سهم ${room.label} پر شده؛ چیزی از این در آن جا نمی‌شود.`}</p>`
+      : `<p class="portion">در ${room.label} ${p.free ? 'بدون حساب کالری' : 'تا'} <b>${amountLabel(a.qty, a.unit)}</b>${grams} می‌توانی بخوری</p>
+        <div class="preview"><b>${fa(Math.round(a.kcal))}</b> کالری · <b>${fa(Math.round(a.protein * 10) / 10, 1)}</b> گرم پروتئین</div>
+        <small class="muted portion">${p.free ? 'کالری ندارد و از سهم این وعده کم نمی‌کند.'
+          : `از <b>${fa(left)}</b> کالری‌ای که از سهم ${room.label} مانده${p.capped ? '؛ بیشتر از این هم جا می‌شود، ولی برای یک وعده همین اندازه بس است' : ''}.`}</small>`;
+  }
+  draw();
+  return { get: () => a, refresh: draw };
+}
+
 const aiEstBtn = () => (aiAvailable() ? `<button type="button" class="btn ai-btn" data-ai-est>${sparkle()} تخمین کالری با هوشواره</button><p class="muted small ai-est-note" hidden></p>` : '');
 
 // `onSaved` is called with every entry the sheet logs (the diet plan notes which occasion it was for).
-export function openLogSheet({ day = today(), meal = null, onSaved = null } = {}) {
+// `room` ({ kcal, label }): from the diet plan's «+» — the meal is fixed and a bank food or one
+// typed in is given the amount that fits what is left of the occasion (mountPortion).
+export function openLogSheet({ day = today(), meal = null, onSaved = null, room = null } = {}) {
   let curMeal = meal || (day === today() ? mealForNow() : 'lunch');
   let query = '';
   const save = e => { const row = store.saveEntry(e); onSaved?.(row); return row; };
+  const seg = () => (room ? `<p class="muted small portion">ثبت در ${room.label}</p>` : mealSeg(curMeal));
+  const onMeal = (root, set) => { if (!room) bindMeal(root, set); };
+  // in the list, next to each food: how much of it the occasion still has room for
+  const fits = f => { const p = room && portionFor(f, room.kcal); return !room ? '' : p ? ` · <b>تا ${amountLabel(p.qty, f.unit)}</b>` : ' · جا نمی‌شود'; };
 
   sheet.open(body => {
     function drawList() {
@@ -48,7 +79,7 @@ export function openLogSheet({ day = today(), meal = null, onSaved = null } = {}
           <h2>ثبت غذا</h2>
           <button class="icon-btn" data-close aria-label="بستن">${icon.close}</button>
         </div>
-        ${mealSeg(curMeal)}
+        ${seg()}
         <div class="search">${icon.search}<input type="search" placeholder="جست‌وجو در بانک غذا" value="${esc(query)}" autocomplete="off"></div>
         <div class="food-list"></div>
         <div class="sheet-foot">
@@ -70,7 +101,7 @@ export function openLogSheet({ day = today(), meal = null, onSaved = null } = {}
           const hits = foods.filter(f => norm(f.name).includes(q))
             .sort((a, b) => norm(a.name).indexOf(q) - norm(b.name).indexOf(q));
           list.innerHTML = hits.length
-            ? hits.map(f => foodRow(f)).join('')
+            ? hits.map(f => foodRow(f, fits(f))).join('')
             : `<div class="empty">پیدا نشد. <button class="link" data-custom>«${esc(query)}» را دستی ثبت کنید</button></div>`;
           return;
         }
@@ -79,14 +110,14 @@ export function openLogSheet({ day = today(), meal = null, onSaved = null } = {}
         const groups = {};
         foods.forEach(f => (groups[f.category] ||= []).push(f));
         list.innerHTML = `
-          ${freq.length ? `<h3 class="list-h">پرتکرارهای من در ${MEALS[curMeal]}</h3>${freq.map(x => foodRow(x.food, ` · معمولاً ${amountLabel(x.last.qty, x.last.grams ? GRAM : x.food.unit)}`)).join('')}` : ''}
+          ${freq.length ? `<h3 class="list-h">پرتکرارهای من در ${MEALS[curMeal]}</h3>${freq.map(x => foodRow(x.food, room ? fits(x.food) : ` · معمولاً ${amountLabel(x.last.qty, x.last.grams ? GRAM : x.food.unit)}`)).join('')}` : ''}
           ${Object.keys(CATEGORIES).filter(c => groups[c]).map(c => `
             <h3 class="list-h">${CATEGORIES[c]}</h3>
-            ${groups[c].sort((a, b) => a.name.localeCompare(b.name, 'fa')).map(f => foodRow(f)).join('')}`).join('')}
+            ${groups[c].sort((a, b) => a.name.localeCompare(b.name, 'fa')).map(f => foodRow(f, fits(f))).join('')}`).join('')}
           ${!foods.length ? '<div class="empty">بانک غذا خالی است. از «بانک غذا» غذا اضافه کنید.</div>' : ''}`;
       }
       drawResults();
-      bindMeal(body, v => { curMeal = v; drawResults(); });
+      onMeal(body, v => { curMeal = v; drawResults(); });
 
       input.addEventListener('input', () => { query = input.value; drawResults(); });
       body.querySelector('[data-close]').onclick = () => sheet.close();
@@ -142,7 +173,7 @@ export function openLogSheet({ day = today(), meal = null, onSaved = null } = {}
       const off = new Set();
       body.innerHTML = `
         <div class="sheet-head"><button class="icon-btn" data-back aria-label="برگشت">${icon.chevR}</button><h2>از روی عکس</h2><span></span></div>
-        ${mealSeg(curMeal)}
+        ${seg()}
         <img class="photo-prev shot" src="${shot.url}" alt="">
         ${result.note ? `<p class="small ai-est-note">${sparkle(14)} ${esc(result.note)}</p>` : ''}
         ${items.length ? `<div class="shot-list">${items.map((it, n) => `
@@ -156,7 +187,7 @@ export function openLogSheet({ day = today(), meal = null, onSaved = null } = {}
         </form>
         ${items.length ? '<button class="btn primary block big" data-save></button>' : ''}
         <p class="muted small">تخمین از روی عکس تقریبی است: روغن، شکر و عمق ظرف در عکس دیده نمی‌شود. بعد از ثبت هم می‌توانی هر مورد را باز و اصلاح کنی.</p>`;
-      bindMeal(body, v => { curMeal = v; });
+      onMeal(body, v => { curMeal = v; });
       body.querySelector('[data-back]').onclick = drawList;
       const paint = () => {
         const on = items.filter((_, n) => !off.has(n));
@@ -190,12 +221,12 @@ export function openLogSheet({ day = today(), meal = null, onSaved = null } = {}
           <h2>${esc(food.name)}</h2>
           <button class="icon-btn" data-edit aria-label="ویرایش غذا">${icon.edit}</button>
         </div>
-        ${mealSeg(curMeal)}
+        ${seg()}
         <div class="qty-box"><div class="stack" data-amount></div>
           <button class="link small" data-edit>کالری، واحد یا وزنش دقیق نیست؟ ویرایش</button>
         </div>
         <button class="btn primary block big" data-save>ثبت</button>`;
-      bindMeal(body, v => { curMeal = v; });
+      onMeal(body, v => { curMeal = v; });
       // Every bank food — seeded ones included — can be corrected right here; the fix sticks for next time.
       const edit = () => openFoodForm(food, () => {
         const fresh = store.get().foods.find(x => x.id === food.id);
@@ -203,13 +234,18 @@ export function openLogSheet({ day = today(), meal = null, onSaved = null } = {}
         food = fresh;
         body.querySelector('.sheet-head h2').textContent = food.name;
         amount.refresh();
+        if (room) btn.disabled = !amount.get();
       });
-      const amount = mountAmount(body.querySelector('[data-amount]'), () => food,
-        lastAmountFor(store.get().entries, food, curMeal), { onEditFood: edit });
+      const box = body.querySelector('[data-amount]');
+      const amount = room ? mountPortion(box, () => food, room)
+        : mountAmount(box, () => food, lastAmountFor(store.get().entries, food, curMeal), { onEditFood: edit });
+      const btn = body.querySelector('[data-save]');
+      if (room && !amount.get()) btn.disabled = true;
       body.querySelector('[data-back]').onclick = drawList;
       body.querySelectorAll('[data-edit]').forEach(b => b.onclick = edit);
-      body.querySelector('[data-save]').onclick = () => {
+      btn.onclick = () => {
         const a = amount.get();
+        if (!a) return;
         save({ day, meal: curMeal, food_id: food.id, name: food.name, ...a, is_veg: food.is_veg });
         sheet.close();
         toast(`${food.name} ثبت شد`);
@@ -226,7 +262,7 @@ export function openLogSheet({ day = today(), meal = null, onSaved = null } = {}
           <button class="icon-btn" data-back aria-label="برگشت">${icon.chevR}</button>
           <h2>غذای دلخواه</h2><span></span>
         </div>
-        ${mealSeg(curMeal)}
+        ${seg()}
         <form class="stack" novalidate>
           <label class="field"><span>اسم غذا</span><input name="name" value="${code ? '' : esc(query)}" placeholder="مثلاً ساندویچ مرغ"></label>
           ${code ? barcodeBox(code) : ''}
@@ -238,7 +274,7 @@ export function openLogSheet({ day = today(), meal = null, onSaved = null } = {}
           <p class="err" hidden></p>
           <button class="btn primary block big">ثبت</button>
         </form>`;
-      bindMeal(body, v => { curMeal = v; });
+      onMeal(body, v => { curMeal = v; });
       const form = body.querySelector('form');
       const F = form.elements;
       let amount = null;
@@ -247,7 +283,8 @@ export function openLogSheet({ day = today(), meal = null, onSaved = null } = {}
         const r = units.read();
         return r.error ? { unit: F.unit.value === GRAM ? GRAM : 'پرس', grams: null, kcal: 0, protein: 0 } : r;
       };
-      amount = mountAmount(body.querySelector('[data-amount]'), base, { qty: 1, grams: false });
+      amount = room ? mountPortion(body.querySelector('[data-amount]'), () => { const r = units.read(); return r.error ? null : r; }, room)
+        : mountAmount(body.querySelector('[data-amount]'), base, { qty: 1, grams: false });
       bindEstimate(body, F, units);
       // the form has no category field; a product's category still reaches the bank
       let category = null;
@@ -260,11 +297,13 @@ export function openLogSheet({ day = today(), meal = null, onSaved = null } = {}
         const r = units.read();
         if (!name) { err.textContent = 'اسم غذا را بنویسید.'; err.hidden = false; return; }
         if (r.error) { err.textContent = r.error; err.hidden = false; return; }
+        const a = amount.get();
+        if (!a) { err.textContent = `این خوراکی در سهم ${room.label} جا نمی‌شود.`; err.hidden = false; return; }
         let food_id = null;
         if (F.save.checked) {
           food_id = store.upsertFood({ name, ...r, is_veg: F.veg.checked, category: category || (F.veg.checked ? 'veg' : 'other'), barcode: code }).id;
         }
-        save({ day, meal: curMeal, food_id, name, ...amount.get(), is_veg: F.veg.checked });
+        save({ day, meal: curMeal, food_id, name, ...a, is_veg: F.veg.checked });
         sheet.close();
         toast(`${name} ثبت شد`);
       };

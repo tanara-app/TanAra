@@ -358,4 +358,21 @@ export function goneFoods(plan, foods) {
 }
 
 // «۲ کف‌دست نان سنگک، ۳۰ گرم پنیر» — plain text, for Hooshvareh.
+/*
+  How much of a food fits in `kcal` calories (what is left of an occasion): the most of it, in
+  measurable steps (half units — a quarter when not even half fits — or 5 g), that stays within
+  them, but no more than a sensible helping (3 units, 400 g; `capped`). Null when nothing fits.
+  A food with no calories gets one unit (100 g), marked `free`.
+*/
+export function portionFor(food, kcal) {
+  const g = food.unit === GRAM;
+  const per = Number(food.kcal) || 0;
+  if (per <= 0) return { qty: g ? 100 : 1, free: true, capped: false };
+  const most = kcal / per + 1e-9;
+  const fit = g ? Math.floor(most / 5) * 5 : Math.floor(most * 2) / 2 || Math.floor(most * 4) / 4;
+  if (!(fit > 0)) return null;
+  const max = g ? 400 : 3;
+  return { qty: Math.min(fit, max), free: false, capped: fit > max };
+}
+
 export const optionText = o => o.items.map(i => `${i.qty} ${i.unit} ${i.name}`).join(' + ');

@@ -331,6 +331,9 @@ dl.calc dd { margin: 0; text-align: left; }
 .chip.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
 .preview { text-align: center; color: var(--muted); }
 .preview b { color: var(--text); font-size: 1.1rem; }
+.portion { text-align: center; margin: 0; }
+.portion b { color: var(--text); }
+.fmeta b { color: var(--text); font-weight: 600; }
 .qty-box .field input { background: var(--surface) !important; }
 .qty-box > .stack { gap: 14px; }
 .qty-box .link { align-self: center; }
