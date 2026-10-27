@@ -1,12 +1,12 @@
 /*
-  Magazine: one article a day that Hooshvareh researches with real web search (trusted
+  Magazine: one article a week (Saturday → Friday) that Hooshvareh researches with real web search (trusted
   health sources only — the list is MAG_DOMAINS in the Edge Function) and writes for this
-  person. Articles are ai_notes: 'mag:<day>' for the daily one, 'mag:<day>:<n>' for one
-  asked for by topic; everything shown is in note.data.
+  person. Articles are ai_notes: 'mag:<day>' for the weekly one, 'mag:<day>:<n>' for one
+  asked for by topic (it then takes that week's place); everything shown is in note.data.
 */
 import * as store from '../data/store.js';
 import { ask, aiAvailable, aiOnline, md, sparkle, focusArticle } from '../ai/hooshvareh.js';
-import { today, parse, relLabel } from '../lib/dates.js';
+import { today, parse, relLabel, weekStart, addDays, faFull } from '../lib/dates.js';
 import { fa, esc } from '../lib/fa.js';
 import { toast, sheet, icon } from './dom.js';
 import { startChat } from './chat.js';
@@ -17,18 +17,23 @@ const CATS = {
 };
 const EVIDENCE = { strong: 'شواهد قوی', moderate: 'شواهد متوسط', limited: 'شواهد محدود' };
 
-const busy = new Map();   // note key → topic asked for ('' for the daily one)
-const failed = new Map(); // note key → error message; the daily one then waits for a manual retry
+const busy = new Map();   // note key → topic asked for ('' for the weekly one)
+const failed = new Map(); // note key → error message; the weekly one then waits for a manual retry
 let openKey = null;       // article to open as soon as the tab is shown
 
 const articles = () => store.get().ai_notes.filter(n => n.kind === 'mag' && n.data?.title).sort((a, b) => (a.key < b.key ? 1 : -1));
 const dayOf = n => n.key.slice(4, 14);
 const dailyKey = () => `mag:${today()}`;
-// the section of the day rotates through the categories
-const categoryFor = day => Object.keys(CATS)[Math.floor(parse(day).getTime() / 864e5) % Object.keys(CATS).length];
+// the section of the week rotates through the categories
+const categoryFor = day => Object.keys(CATS)[Math.round(parse(weekStart(day)).getTime() / 6048e5) % Object.keys(CATS).length];
+
+// At most one article a week, whether it wrote itself or was asked for by topic (about four a month).
+const weekArticle = () => articles().find(n => dayOf(n) >= weekStart(today()));
+const weekTaken = () => !!weekArticle() || busy.size > 0;
+const nextWeek = () => faFull(addDays(weekStart(today()), 7));
 
 async function generate(key, topic, refresh, quiet = false) {
-  if (busy.has(key)) return;
+  if (weekTaken()) return;
   busy.set(key, topic);
   failed.delete(key);
   refresh();
@@ -45,30 +50,30 @@ async function generate(key, topic, refresh, quiet = false) {
 }
 
 // An article is the costliest thing Hooshvareh does (web searches and a long text), so the
-// daily one stops writing itself while the last two daily articles sit unread; it starts
-// again once one of them is opened, and the button writes today's at any time.
+// weekly one stops writing itself while the last two weekly articles sit unread; it starts
+// again once one of them is opened, and the button writes this week's at any time.
 const UNREAD_PAUSE = 2;
 function paused() {
   const daily = articles().filter(n => n.key.length === 14).slice(0, UNREAD_PAUSE);
   return daily.length === UNREAD_PAUSE && daily.every(n => !n.data.read);
 }
 
-// Writes today's article once, after the first pull (so another device's isn't duplicated).
+// Writes this week's article once, after the first pull (so another device's isn't duplicated).
 function autoDaily(refresh) {
   const key = dailyKey();
-  if (store.note(key) || busy.has(key) || failed.has(key) || !aiOnline() || !store.syncStatus.lastPull || paused()) return;
+  if (weekTaken() || failed.has(key) || !aiOnline() || !store.syncStatus.lastPull || paused()) return;
   generate(key, '', refresh, true);
 }
 
 const meta = n => `${CATS[n.data.category] || 'مجله'} · ${fa(Math.max(1, Number(n.data.minutes) || 3))} دقیقه`;
 
-/* ---------------- Today: today's unread article ---------------- */
+/* ---------------- Today: this week's unread article ---------------- */
 
 export function magCard() {
-  const n = store.note(dailyKey());
-  if (!n?.data?.title || n.data.read) return '';
+  const n = weekArticle();
+  if (!n || n.data.read) return '';
   return `<button class="card mag-teaser" data-mag-open="${n.key}">
-    <small class="mag-meta"><span class="ai-mark">${sparkle(14)}</span> مقاله‌ی امروز مجله · ${meta(n)}</small>
+    <small class="mag-meta"><span class="ai-mark">${sparkle(14)}</span> مقاله‌ی این هفته‌ی مجله · ${meta(n)}</small>
     <b>${esc(n.data.title)}</b>
     <span class="muted small">${esc(n.data.summary || '')}</span>
   </button>`;
@@ -85,7 +90,7 @@ export function bindMag(root, refresh) {
 /* ---------------- the tab ---------------- */
 
 const waiting = topic => `<section class="card ai-card">
-  <p class="muted small ai-wait"><span class="typing"><i></i><i></i><i></i></span> ${topic ? `دارم درباره‌ی «${esc(topic)}» در منابع معتبر می‌گردم…` : 'دارم برای مقاله‌ی امروز در منابع معتبر می‌گردم…'}</p>
+  <p class="muted small ai-wait"><span class="typing"><i></i><i></i><i></i></span> ${topic ? `دارم درباره‌ی «${esc(topic)}» در منابع معتبر می‌گردم…` : 'دارم برای مقاله‌ی این هفته در منابع معتبر می‌گردم…'}</p>
   <p class="muted small">جست‌وجو و نوشتن حدود یک دقیقه طول می‌کشد.</p>
 </section>`;
 
@@ -102,24 +107,25 @@ export function renderMagazine(root) {
   const list = articles();
   const key = dailyKey();
   const ok = aiAvailable();
-  const dailyMissing = !store.note(key) && !busy.has(key);
+  const free = !weekTaken();
 
   root.innerHTML = `
     <header class="page-head mag-head">
       <h1>مجله</h1>
-      <p class="muted small">هر روز یک مقاله که هوشواره از منابع معتبر علمی جمع می‌کند و برای خودت می‌نویسد.</p>
+      <p class="muted small">هر هفته یک مقاله که هوشواره از منابع معتبر علمی جمع می‌کند و برای خودت می‌نویسد.</p>
     </header>
 
     ${!ok ? '<div class="note soft"><p>مجله فقط وقتی وارد حساب شده‌ای ساخته می‌شود.</p></div>' : ''}
     ${[...busy].map(([, topic]) => waiting(topic)).join('')}
-    ${ok && dailyMissing ? `<section class="card">
-      <p class="muted small">${failed.get(key) ? esc(failed.get(key)) : navigator.onLine === false ? 'برای مقاله‌ی امروز به اینترنت وصل شو.' : paused() ? 'دو مقاله‌ی آخر را هنوز نخوانده‌ای، برای همین مقاله‌ی امروز خودکار نوشته نشد. هر وقت خواستی با این دکمه بنویسش.' : 'مقاله‌ی امروز هنوز آماده نشده.'}</p>
-      <button class="btn block" data-daily>مقاله‌ی امروز را بنویس</button>
+    ${ok && free ? `<section class="card">
+      <p class="muted small">${failed.get(key) ? esc(failed.get(key)) : navigator.onLine === false ? 'برای مقاله‌ی این هفته به اینترنت وصل شو.' : paused() ? 'دو مقاله‌ی آخر را هنوز نخوانده‌ای، برای همین مقاله‌ی این هفته خودکار نوشته نشد. هر وقت خواستی با این دکمه بنویسش، یا موضوعش را خودت بگو.' : 'مقاله‌ی این هفته هنوز آماده نشده.'}</p>
+      <button class="btn block" data-daily>مقاله‌ی این هفته را بنویس</button>
     </section>` : ''}
 
     ${list.map((n, i) => row(n, i === 0)).join('') || (busy.size || !ok ? '' : '<div class="empty">هنوز مقاله‌ای نیست.</div>')}
 
-    ${ok ? `<button class="btn block ai-btn mag-ask" data-topic>${sparkle(18)} مقاله درباره‌ی موضوع دلخواه</button>` : ''}`;
+    ${ok && free ? `<button class="btn block ai-btn mag-ask" data-topic>${sparkle(18)} مقاله‌ی این هفته درباره‌ی موضوع دلخواه</button>` : ''}
+    ${ok && !busy.size && weekArticle() ? `<p class="muted small mag-next">هر هفته یک مقاله؛ مقاله‌ی بعدی از ${nextWeek()}.</p>` : ''}`;
 
   const refresh = () => { if (root.isConnected && location.hash === '#/mag') renderMagazine(root); };
   root.querySelectorAll('[data-open]').forEach(b => b.onclick = () => openArticle(b.dataset.open));

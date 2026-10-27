@@ -447,6 +447,7 @@ img[data-img]:not([src]) { visibility: hidden; }
 .mag-item:not(.unread):not(.lead) b { font-weight: 500; }
 .mag-teaser { background: linear-gradient(135deg, var(--ai-soft), var(--surface) 65%); }
 .mag-ask { margin-top: 4px; }
+.mag-next { text-align: center; margin: 4px 0 0; }
 .mag-article { display: flex; flex-direction: column; gap: 12px; padding-bottom: 8px; }
 .mag-article > h2 { font-size: 1.45rem; font-weight: 800; line-height: 1.5; }
 .mag-lede { margin: 0; color: var(--muted); font-size: 1.02rem; line-height: 1.9; }
