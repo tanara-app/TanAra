@@ -8,17 +8,23 @@ import { choose } from './dom.js';
   first), 'gallery' the photo picker, 'ask' lets them choose (for screenshots).
 */
 export async function pickPhoto(from = 'camera') {
+  return (await pickPhotos(from, false))[0] || null;
+}
+
+// Same, but from the gallery several can be chosen at once. Resolves to an array (empty when none).
+export async function pickPhotos(from = 'ask', multiple = true) {
   if (from === 'ask') {
-    from = await choose('عکس از کجا؟', [{ value: 'camera', label: 'گرفتن عکس با دوربین' }, { value: 'gallery', label: 'انتخاب از گالری یا اسکرین‌شات' }]);
-    if (!from) return null;
+    from = await choose('عکس از کجا؟', [{ value: 'camera', label: 'گرفتن عکس با دوربین' }, { value: 'gallery', label: multiple ? 'انتخاب از گالری (یک یا چند عکس)' : 'انتخاب از گالری یا اسکرین‌شات' }]);
+    if (!from) return [];
   }
   return new Promise(resolve => {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/*';
     if (from === 'camera') input.capture = 'environment';
-    input.onchange = () => resolve(input.files?.[0] || null);
-    input.addEventListener('cancel', () => resolve(null));
+    else input.multiple = multiple;
+    input.onchange = () => resolve([...(input.files || [])]);
+    input.addEventListener('cancel', () => resolve([]));
     input.click();
   });
 }

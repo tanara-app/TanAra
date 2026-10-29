@@ -9,7 +9,7 @@ import { SLOTS, planOn, swapsOn, swapItem } from '../domain/plan.js';
 import { fa, esc, qtyLabel, norm } from '../lib/fa.js';
 import { today, relLabel, faDMY, weekLabel } from '../lib/dates.js';
 import { toast, confirmBox, sheet, icon } from './dom.js';
-import { pickPhoto, foodPhoto, cameraIcon } from './photo.js';
+import { pickPhotos, foodPhoto, cameraIcon } from './photo.js';
 import { applySwap } from './plan.js';
 import { amountLabel, foodMeta } from './units.js';
 import { saveRecipe } from './recipes.js';
@@ -27,9 +27,10 @@ const SUGGESTIONS = [
 // A message sent with a photo starts with this mark, so later turns (which no longer carry
 // the photo) still say there was one. The Edge Function's prompt knows it.
 const PHOTO_MARK = '[عکس غذا]';
+const MAX_SHOTS = 6; // photos that can go with one message
 
 let draft = '';
-let shot = null; // a food photo waiting to go with the next message: { b64, url }
+let shots = []; // food photos waiting to go with the next message: [{ b64, url }]
 let live = null; // the reply being streamed: { text, actions, error, thread }
 let viewRoot = null;
 
@@ -374,11 +375,7 @@ function buildShell(root) {
   stuck = true;
   box.addEventListener('scroll', () => { stuck = nearBottom(box, 40); }, { passive: true });
 
-  root.querySelector('[data-attach]')?.addEventListener('click', async () => {
-    const file = await pickPhoto('ask');
-    if (!file) return;
-    try { setShot(await foodPhoto(file)); } catch { toast('عکس خوانده نشد'); }
-  });
+  root.querySelector('[data-attach]')?.addEventListener('click', addShots);
   paintShot();
 
   root.querySelector('[data-new]').onclick = () => {
@@ -410,21 +407,38 @@ const nearBottom = (box, slack = 120) => box.scrollTop + box.clientHeight >= box
 
 function paintSend() {
   const b = viewRoot?.querySelector('.send');
-  if (b) b.disabled = !aiAvailable() || !!live || !(draft.trim() || shot);
+  if (b) b.disabled = !aiAvailable() || !!live || !(draft.trim() || shots.length);
 }
 
-function setShot(next) {
-  if (shot) URL.revokeObjectURL(shot.url);
-  shot = next;
+// The camera takes one; the gallery several at once. Each tap adds to what is waiting.
+async function addShots() {
+  const room = MAX_SHOTS - shots.length;
+  if (room <= 0) { toast(`با هر پیام تا ${fa(MAX_SHOTS)} عکس می‌شود فرستاد`); return; }
+  const files = await pickPhotos('ask');
+  if (!files.length) return;
+  if (files.length > room) toast(`فقط ${fa(room)} عکس دیگر جا داشت`);
+  let bad = 0;
+  for (const f of files.slice(0, room)) {
+    try { shots.push(await foodPhoto(f)); } catch { bad++; }
+  }
+  if (bad) toast(bad > 1 ? `${fa(bad)} عکس خوانده نشد` : 'عکس خوانده نشد');
+  paintShot(); paintSend();
+}
+function setShots(next) {
+  for (const s of shots) if (!next.includes(s)) URL.revokeObjectURL(s.url);
+  shots = next;
   paintShot();
   paintSend();
 }
 function paintShot() {
   const box = viewRoot?.querySelector('[data-shot]');
   if (!box) return;
-  box.hidden = !shot;
-  box.innerHTML = shot ? `<img src="${shot.url}" alt=""><span class="muted small">با پیام بعدی فرستاده می‌شود؛ هوشواره غذاها را پیدا می‌کند و برای ثبت پیشنهاد می‌دهد.</span><button type="button" class="icon-btn sm" data-shot-x aria-label="برداشتن عکس">${icon.close}</button>` : '';
-  box.querySelector('[data-shot-x]')?.addEventListener('click', () => setShot(null));
+  box.hidden = !shots.length;
+  const many = shots.length > 1;
+  box.innerHTML = shots.length ? `<div class="shot-thumbs">${shots.map((s, i) => `<div class="shot-thumb"><img src="${s.url}" alt=""><button type="button" class="shot-x" data-shot-x="${i}" aria-label="برداشتن عکس">${icon.close}</button></div>`).join('')}${shots.length < MAX_SHOTS ? `<button type="button" class="shot-more" data-shot-more aria-label="عکس دیگر">+</button>` : ''}</div>
+    <span class="muted small">${many ? `${fa(shots.length)} عکس با پیام بعدی فرستاده می‌شود` : 'با پیام بعدی فرستاده می‌شود'}؛ هوشواره غذاها را پیدا می‌کند و برای ثبت پیشنهاد می‌دهد.</span>` : '';
+  box.querySelectorAll('[data-shot-x]').forEach(b => b.addEventListener('click', () => setShots(shots.filter((_, i) => i !== +b.dataset.shotX))));
+  box.querySelector('[data-shot-more]')?.addEventListener('click', addShots);
   keepBottom();
 }
 
@@ -504,11 +518,11 @@ function paintLive() {
 }
 
 async function send() {
-  const image = shot?.b64 || null;
-  const text = image ? `${PHOTO_MARK} ${draft.trim() || 'این را خوردم؛ برایم ثبتش کن.'}` : draft.trim();
+  const images = shots.map(s => s.b64);
+  const text = images.length ? `${PHOTO_MARK} ${draft.trim() || (images.length > 1 ? 'این‌ها را خوردم؛ برایم ثبتشان کن.' : 'این را خوردم؛ برایم ثبتش کن.')}` : draft.trim();
   if (!text || live || !aiAvailable()) return;
   draft = '';
-  setShot(null);
+  setShots([]);
   const thread = current || null;
   // History for the model: this conversation, plus what became of each proposal.
   const history = sorted().filter(m => sameThread(m, thread)).map(m => ({
@@ -525,7 +539,7 @@ async function send() {
     await chat(history, {
       onText: d => { live.text += d; cancelAnimationFrame(raf); raf = requestAnimationFrame(paintLive); },
       onAction: a => { live.actions.push(arrived(a)); paintLive(); },
-      image,
+      images,
     });
   } catch (e) {
     live.error = e.message;

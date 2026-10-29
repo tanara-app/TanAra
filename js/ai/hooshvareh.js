@@ -170,10 +170,10 @@ export async function ask(mode, input = {}) {
 /*
   Chat: messages are [{ role, content }] oldest first. Calls onText(delta) as the reply
   streams and onAction(proposal) for each proposed change. Resolves when the reply ends.
-  `image` (base64 JPEG) is a photo sent with the last message.
+  `images` (base64 JPEGs) are the photos sent with the last message.
 */
-export async function chat(messages, { onText, onAction, image = null }) {
-  const res = await post({ mode: 'chat', messages, ...(image ? { image } : {}) });
+export async function chat(messages, { onText, onAction, images = [] }) {
+  const res = await post({ mode: 'chat', messages, ...(images.length ? { images } : {}) });
   const reader = res.body.getReader();
   const dec = new TextDecoder();
   let buf = '';

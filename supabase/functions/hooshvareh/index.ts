@@ -42,7 +42,7 @@ const MODEL = "claude-sonnet-5-5";
 // Server-side fallback: if a safety classifier declines, the API retries on the model
 // Anthropic recommends for that category instead of failing the request.
 const BETAS = ["server-side-fallback-2026-07-01"];
-const MAX_BODY = 4_000_000;
+const MAX_BODY = 8_000_000; // room for a few chat photos on top of the data
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -80,7 +80,7 @@ Changing their data (chat only)
 - You can also correct what is already recorded. A logged food: propose_edit_entry or propose_delete_entry (name it by its day, meal and name exactly as logged; in "to" give only what changes; a new qty alone keeps the same calories per unit). A food in the bank with a wrong number, unit weight or vegetable flag: propose_edit_food (fix_logged also corrects the name and vegetable flag on everything already logged from it; the calories of past entries stay as they were). A wrong weigh-in or waist: propose_delete_measurement, or to change the value just propose it again for the same day. Foods ticked from the diet plan are ordinary entries and can be corrected the same way.
 - When you notice a mistake in the record yourself (a food wrongly counted as a vegetable, an obvious duplicate, an impossible amount, a meal on the wrong day), say what you see and propose the fix in the same reply instead of only mentioning it. Never tell them you cannot edit past records. If a mistake comes from the food bank, fix it there (with fix_logged) so it does not come back.
 - What you still cannot change: the profile, the targets, the phase and goal weight, the reminders, the text of their weekly reviews, saved motivations, and the plan beyond a single swap. Say where in the app they can do it.
-- When a message comes with a photo of food, work out what is on the plate and how much (household units, or grams when a bank food is weighed), and call propose_log_food once per food, for the meal that fits the time unless they say otherwise. Say in one line what you assumed (portion size, oil); a photo hides oil, sugar and depth, so call it an estimate. If the photo is not food, say so and propose nothing. «[عکس غذا]» at the start of an earlier message of theirs means it came with a photo that you can no longer see.
+- When a message comes with a photo of food (or several: they can be different foods, or the same plate from other angles — count a food seen in two photos once, unless they say they had it twice), work out what is on the plate and how much (household units, or grams when a bank food is weighed), and call propose_log_food once per food, for the meal that fits the time unless they say otherwise. Say in one line what you assumed (portion size, oil); a photo hides oil, sugar and depth, so call it an estimate. If the photo is not food, say so and propose nothing. «[عکس غذا]» at the start of an earlier message of theirs means it came with a photo that you can no longer see.
 - «رسپی‌ها» (a tab inside «بانک غذا») holds their own home dishes as ingredients by weight; the app adds the pot up, so the calories of one کفگیر are those of their pot, and a saved recipe can also be a food in the bank. When you give them a recipe in the chat, or they tell you how they cook something and its numbers matter, call propose_recipe so they can keep it: every ingredient that carries calories (oil included) in grams for the whole pot. The app does the arithmetic and shows the result on the card, so in your text call per-serving numbers approximate («حدود»). In that tab they can also have you write a recipe down from text or a photo, make one lighter, or — the main use — get a new, simple dish to try («غذای تازه») sized to what is left of their day. When they ask you for a recipe in the chat, keep to the same spirit unless they ask otherwise: few ingredients, few steps, ordinary supermarket items.
 - «لیست خرید» (opened from the Today screen or «نمایه») is their shopping list: foods they have run out of or need for the plan. What is still to buy is in the data. When they say they are out of something, need to buy something, or have bought something on it, call propose_shopping; name things the way they are bought in a shop, with an amount only if they gave one or it is obvious. When they ask what to eat and something they would need is still on the list, they do not have it yet: suggest something else, or say it needs a trip to the shop. In the list itself they can also have you work out a week's groceries from their plan.
 - Use get_entries when you need individual foods from days older than the detailed window, and get_article for the full text of a magazine article before discussing its content, unless that text is already in the data.
@@ -920,6 +920,7 @@ function usageLog(sb: any): Use {
 
 // A photo from the app: base64 JPEG, already shrunk on the phone.
 const okImage = (v: unknown) => typeof v === "string" && v.length > 200 && v.length < 3_000_000 && /^[A-Za-z0-9+/]+=*$/.test(v);
+const MAX_CHAT_PHOTOS = 6;
 const imageBlock = (data: string) => ({ type: "image", source: { type: "base64", media_type: "image/jpeg", data } });
 
 // Chat history from the app: plain text turns, oldest first. Keep it valid: starts with
@@ -1079,7 +1080,7 @@ async function runMagazine(ctx: Ctx, input: any, use: Use) {
   return json({ error: "مقاله آماده نشد؛ دوباره امتحان کن." }, 502);
 }
 
-function runChat(ctx: Ctx, history: any[], image: unknown, use: Use) {
+function runChat(ctx: Ctx, history: any[], images: unknown, use: Use) {
   const turns = cleanHistory(history);
   if (!turns.length || turns[turns.length - 1].role !== "user") return json({ error: "پیامی نیست." }, 400);
   const enc = new TextEncoder();
@@ -1090,8 +1091,9 @@ function runChat(ctx: Ctx, history: any[], image: unknown, use: Use) {
   // What changes by the minute goes after the conversation, so it never breaks the cache:
   // the next message finds everything up to this one already cached.
   const live = `<live_data>\n${block([S.now(), S.today(), S.standing(), S.activity(), S.occasions(), S.adherence(), S.shopping(), S.focus()])}\n</live_data>`;
-  // A photo rides only on the message it was sent with; later turns see the «[عکس غذا]» mark.
-  const photo = okImage(image) ? [imageBlock(image as string)] : [];
+  // Photos ride only on the message they were sent with; later turns see the «[عکس غذا]» mark.
+  const list = Array.isArray(images) ? images : images != null ? [images] : [];
+  const photo = list.filter(okImage).slice(0, MAX_CHAT_PHOTOS).map(v => imageBlock(v as string));
   const base: any[] = turns.map((m, i) => ({ role: m.role, content: i === turns.length - 1 ? [...photo, { type: "text", text: m.content, cache_control: CACHE }] : [{ type: "text", text: m.content }] }));
   const withLive = (asSystem: boolean) => asSystem
     ? [...base, { role: "system", content: live }]
@@ -1197,7 +1199,7 @@ Deno.serve(async (req) => {
 
   const use = usageLog(sb);
   try {
-    if (body.mode === "chat") return runChat(ctx, body.messages, body.image, use); // saves its usage when the stream ends
+    if (body.mode === "chat") return runChat(ctx, body.messages, body.images ?? body.image, use); // saves its usage when the stream ends
     const res = body.mode === "magazine" ? await runMagazine(ctx, body.input, use)
       : ONE_SHOT[body.mode] ? await runOneShot(body.mode, ctx, body.input, use)
       : json({ error: "unknown mode" }, 400);
