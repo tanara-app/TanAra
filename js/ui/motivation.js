@@ -134,12 +134,17 @@ export function bindMotivation(root) {
   // RTL scrollers report negative scrollLeft
   const dir = getComputedStyle(track).direction === 'rtl' ? -1 : 1;
   if (slideIdx) track.scrollLeft = dir * slideIdx * track.clientWidth;
+  // the track takes the height of the slide showing, so a one-line sentence stays small
+  const slides = track.querySelectorAll('.mot-slide');
+  const fit = () => { if (slides[slideIdx]) track.style.height = `${slides[slideIdx].offsetHeight}px`; };
+  fit();
   let raf = 0;
   track.addEventListener('scroll', () => {
     cancelAnimationFrame(raf);
     raf = requestAnimationFrame(() => {
       slideIdx = Math.round(Math.abs(track.scrollLeft) / track.clientWidth);
       dots.forEach((d, i) => d.classList.toggle('on', i === slideIdx));
+      fit();
     });
   }, { passive: true });
 }
