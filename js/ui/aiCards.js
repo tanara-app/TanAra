@@ -36,19 +36,40 @@ const thinking = text => `<p class="muted small ai-wait"><span class="typing"><i
 /* ---------------- Today: tip of the day ---------------- */
 
 const tipKey = () => `tip:${today()}`;
+const TIP_FOLD = () => store.localKey('tipOpen');
+const tipOpen = () => { try { return localStorage.getItem(TIP_FOLD()) === '1'; } catch { return false; } };
+
+// A tip starts with its bold title line; the explanation under it folds away until tapped.
+function tipParts(text) {
+  const [first, ...rest] = String(text || '').trim().split('\n');
+  const m = first.match(/^\*\*(.+?)\*\*\s*$/);
+  return m && rest.join('').trim() ? { title: m[1], body: rest.join('\n') } : null;
+}
 
 export function tipCard() {
   if (!aiAvailable()) return '';
   const n = store.note(tipKey());
   // checked first: while «یک نکته‌ی دیگر» is being made, the old tip gives way to the wait
   if (busy.has(tipKey())) return `<section class="card ai-card">${head('نکته‌ی امروز هوشواره')}${thinking(n ? 'دارم یک نکته‌ی تازه آماده می‌کنم…' : 'دارم نکته‌ی امروزت را آماده می‌کنم…')}</section>`;
-  if (n) return `<section class="card ai-card">${head('نکته‌ی امروز هوشواره')}<div class="ai-text">${md(n.text)}</div><div class="row gap"><a class="link small" href="#/ai">بیشتر بپرس</a><button class="link small" data-tip-again>یک نکته‌ی دیگر</button></div></section>`;
+  const links = '<div class="row gap"><a class="link small" href="#/ai">بیشتر بپرس</a><button class="link small" data-tip-again>یک نکته‌ی دیگر</button></div>';
+  const parts = n && tipParts(n.text);
+  if (parts) return `<section class="card ai-card fold${tipOpen() ? '' : ' folded'}" data-tip-fold>
+    ${head('نکته‌ی امروز هوشواره')}
+    <button type="button" class="fold-h tip-title" aria-expanded="${tipOpen()}"><b>${md(`**${parts.title}**`).replace(/^<p>|<\/p>$/g, '')}</b>${icon.chevD}</button>
+    <div class="fold-body"><div class="ai-text">${md(parts.body)}</div>${links}</div>
+  </section>`;
+  if (n) return `<section class="card ai-card">${head('نکته‌ی امروز هوشواره')}<div class="ai-text">${md(n.text)}</div>${links}</section>`;
   return '';
 }
 
 // Generates today's tip once, after the first pull (so another device's tip isn't duplicated).
 export function bindTip(refresh, root = document) {
   const key = tipKey();
+  root.querySelector('[data-tip-fold] .fold-h')?.addEventListener('click', e => {
+    const open = e.currentTarget.closest('[data-tip-fold]').classList.toggle('folded') === false;
+    e.currentTarget.setAttribute('aria-expanded', open);
+    try { localStorage.setItem(TIP_FOLD(), open ? '1' : '0'); } catch { /* ignore */ }
+  });
   // another tip today moves on to the next topic, so it is really a different one
   root.querySelector('[data-tip-again]')?.addEventListener('click', () => {
     const shift = (store.note(key)?.data?.shift || 0) + 1;

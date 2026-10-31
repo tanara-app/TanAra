@@ -774,3 +774,7 @@ body.kb .toast, body.chat-mode .toast { bottom: calc(var(--nav-h) + var(--safe-b
 .fold.folded .fold-h { margin-bottom: 0; }
 .fold.folded .fold-h .chev-d { transform: rotate(90deg); }
 .fold.folded .fold-body { display: none; }
+.tip-title { display: flex; align-items: center; gap: 6px; }
+.tip-title b { flex: 1; font-size: .95rem; }
+.tip-title b b { font-weight: inherit; }
+.fold:not(.folded) .tip-title { margin-bottom: 6px; }
