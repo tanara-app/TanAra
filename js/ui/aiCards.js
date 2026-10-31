@@ -40,15 +40,20 @@ const tipKey = () => `tip:${today()}`;
 export function tipCard() {
   if (!aiAvailable()) return '';
   const n = store.note(tipKey());
+  // checked first: while «یک نکته‌ی دیگر» is being made, the old tip gives way to the wait
+  if (busy.has(tipKey())) return `<section class="card ai-card">${head('نکته‌ی امروز هوشواره')}${thinking(n ? 'دارم یک نکته‌ی تازه آماده می‌کنم…' : 'دارم نکته‌ی امروزت را آماده می‌کنم…')}</section>`;
   if (n) return `<section class="card ai-card">${head('نکته‌ی امروز هوشواره')}<div class="ai-text">${md(n.text)}</div><div class="row gap"><a class="link small" href="#/ai">بیشتر بپرس</a><button class="link small" data-tip-again>یک نکته‌ی دیگر</button></div></section>`;
-  if (busy.has(tipKey())) return `<section class="card ai-card">${head('نکته‌ی امروز هوشواره')}${thinking('دارم نکته‌ی امروزت را آماده می‌کنم…')}</section>`;
   return '';
 }
 
 // Generates today's tip once, after the first pull (so another device's tip isn't duplicated).
 export function bindTip(refresh, root = document) {
   const key = tipKey();
-  root.querySelector('[data-tip-again]')?.addEventListener('click', () => generate(key, 'tip', 'tip', {}, r => ({ text: r.text }), refresh));
+  // another tip today moves on to the next topic, so it is really a different one
+  root.querySelector('[data-tip-again]')?.addEventListener('click', () => {
+    const shift = (store.note(key)?.data?.shift || 0) + 1;
+    generate(key, 'tip', 'tip', { shift }, r => ({ text: r.text, data: { shift } }), refresh);
+  });
   if (store.note(key) || busy.has(key) || failed.has(key) || !aiOnline() || !store.syncStatus.lastPull) return;
   generate(key, 'tip', 'tip', {}, r => ({ text: r.text }), refresh, true);
 }

@@ -744,10 +744,11 @@ note: 2–3 short Persian sentences to them: the idea behind this plan. ${i.incl
     schema: { type: "object", properties: { text: str("Persian, simple Markdown") }, required: ["text"], additionalProperties: false },
     // A topic a day from a fixed rotation, so the tips stay on diet science and don't repeat.
     // With a (possible) eating-disorder history the rotation is about nourishment, not restriction.
-    prompt: (_i, c) => {
+    prompt: (i, c) => {
       const care = ["yes", "unsure"].includes((c.profile as any)?.edHistory);
       const list = care ? TIP_TOPICS_CARE : TIP_TOPICS;
-      const n = Math.floor(Date.parse(c.today + "T12:00:00Z") / 86400000);
+      // «یک نکته‌ی دیگر» asks again with shift 1, 2, …: the next topics in the rotation
+      const n = Math.floor(Date.parse(c.today + "T12:00:00Z") / 86400000) + (Math.floor(Number(i.shift)) || 0);
       const topic = list[((n % list.length) + list.length) % list.length];
       return `Write today's tip for the top of the Today screen: one useful, scientifically grounded fact about nutrition and dieting, explained so they learn something. Today's topic: ${topic}.
 
