@@ -135,7 +135,10 @@ function context() {
     recipes: s.ai_notes.filter(n => n.kind === 'recipe' && n.data?.items?.length).map(({ data: r }) => ({ name: r.name, ...perUnit(r), in_bank: s.foods.some(f => f.id === r.food_id), items: r.items.map(i => `${i.name} ${Math.round(i.grams)} g`) })),
     // «لیست خرید»: what is still waiting to be bought
     shopping: toBuy(shopList(s.ai_notes)).map(({ name, amount }) => ({ name, amount })),
-    notes: s.ai_notes.filter(n => !['thread', 'plan', 'pick', 'mag', 'recipe', 'shop'].includes(n.kind)).map(({ key, text, created_at }) => ({ key, text, created_at })),
+    // «برگشت به مسیر»: what they said when the diet slipped, what was planned, how it went
+    checkins: s.ai_notes.filter(n => n.kind === 'checkin' && n.data).sort((a, b) => (a.key < b.key ? -1 : 1)).slice(-5)
+      .map(({ key, data: d }) => ({ day: key.slice(8), signs: d.signs, mood: d.mood, causes: d.causes, said: d.said, cause: d.cause, steps: d.steps, goal: d.goal, outcome: d.outcome || null })),
+    notes: s.ai_notes.filter(n => !['thread', 'plan', 'pick', 'mag', 'recipe', 'shop', 'checkin'].includes(n.kind)).map(({ key, text, created_at }) => ({ key, text, created_at })),
   };
 }
 
@@ -159,7 +162,7 @@ async function post(body) {
   return res;
 }
 
-// One-shot modes: tip, quote, review, progress, maintain, occasion, estimate, photo, label, recipe, shop, title, plan, plan_option, plan_swap, magazine. Resolves to the result object.
+// One-shot modes: tip, quote, review, progress, maintain, checkin, occasion, estimate, photo, label, recipe, shop, title, plan, plan_option, plan_swap, magazine. Resolves to the result object.
 export async function ask(mode, input = {}) {
   const res = await post({ mode, input });
   const j = await res.json();

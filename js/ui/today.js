@@ -19,6 +19,7 @@ import { planHtml, bindPlan } from './plan.js';
 import { measureNote, bindMeasureNote } from './measure.js';
 import { shoppingPill, bindShopping } from './shopping.js';
 import { activityPill, bindActivity } from './activity.js';
+import { checkinCard, bindCheckin } from './checkin.js';
 
 let day = today();
 export const setDay = d => { day = d; };
@@ -81,6 +82,7 @@ export function renderToday(root) {
     ${isToday ? occasionCard() : ''}
     ${isToday ? magCard() : ''}
     ${isToday ? phaseNotes() : ''}
+    ${isToday ? checkinCard() : ''}
 
     ${counting ? `<section class="card summary">
       <div class="ring-wrap">
@@ -152,6 +154,7 @@ export function renderToday(root) {
   bindMeasureNote(root);
   bindShopping(root);
   bindActivity(root, day);
+  bindCheckin(root, redraw);
   root.querySelectorAll('[data-dismiss]').forEach(b => b.onclick = () => {
     const n = b.closest('[data-notice]');
     dismiss(n.dataset.notice, n.dataset.mark);

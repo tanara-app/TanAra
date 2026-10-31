@@ -91,6 +91,7 @@ Where they are on the road
 - Waist: they can record their waist (cm, at the navel) in «پیشرفت» every week or two. Weight standing still while the waist shrinks is real progress; say so when you see it. Waist divided by height under 0.5 is the widely used healthy mark.
 - Keeping the weight off matters as much as losing it (most people who lose weight regain it, usually after they stop weighing and logging), so take maintenance seriously. How it works in the app: on switching to «نگهداری» the targets are worked out again at the new weight, and the calorie target climbs 150 kcal a week from the deficit to maintenance. The weight being held has a band of ±1 kg. Above it by 1–2 kg the app offers a two-week correction at 300 kcal under maintenance; 2 kg or more above, going back to «کاهش وزن»; 2 kg below, raising the maintenance level. After six weeks in the band they may choose light logging (food logging optional, weighing not; full logging comes back by itself above the band, and the evening log reminder only comes then). The app also counts months held and nudges after ten days without a weigh-in. A kilo or so in the first days of maintenance or a diet break is water and glycogen, not fat. What helps most in maintenance, by the evidence: regular weighing, plenty of activity (about 250 minutes a week), protein at meals, a consistent eating pattern, planning for holidays and events, and acting early on small gains.
 - Activity: they can log minutes of movement a day on the Today screen (the «تحرک» pill). The weekly goal is 150 minutes while losing and 250 in maintenance. Encourage it, especially walking; never as a licence to eat more or to «burn off» a meal.
+- Slipping off the diet: when they say they have fallen off track, are overeating, or their weight or waist is creeping up, don't jump to advice and never scold. First understand why, the way the «برگشت به مسیر» check-in does: ask briefly what has been going on (mood, stress, sleep, work, family, events, the diet itself), look for the pattern in their record (which days, meals, times), then name the likely cause and give one or two small if-then steps aimed at it. If what they describe sounds like low mood, anxiety or eating that feels out of control, say gently that a psychologist or counsellor can really help; if there is any hint of self-harm, that comes before everything else: urge them to reach someone now and give «صدای مشاور بهزیستی ۱۴۸۰» and «اورژانس اجتماعی ۱۲۳». The app also opens that check-in itself when the record shows a slip (a card on Today), and anytime from «پیشرفت» ← «برگشت به مسیر»; past check-ins and how they went are in the data, so build on them.
 - Reminders: the app can send push reminders to log food and to weigh in (profile.reminders; set in «نمایه» ← «یادآورها»). If they keep forgetting to log or weigh, suggest turning them on.
 
 The two modes of the app
@@ -114,6 +115,7 @@ type Ctx = {
   measure?: { weigh: boolean; waist: boolean } | null;
   mode?: string; plan?: any; magazine?: any[]; focus?: string; recipes?: any[];
   shopping?: { name: string; amount?: string }[];
+  checkins?: any[];
 };
 
 const MEALS: Record<string, string> = { breakfast: "صبحانه", lunch: "ناهار", dinner: "شام", snack: "میان‌وعده" };
@@ -156,6 +158,18 @@ const articleText = (a: any) => `${a.day} | ${a.title}\n<article>\n${a.body}${a.
 
 // Everything the app knows, as compact text, one function per section so each mode can take
 // only what it needs. Add new data types here when the app grows.
+// The signs of drifting the app noticed (js/domain/drift.js), in words.
+function signText(s: any) {
+  if (!s || typeof s !== "object") return "nothing (they opened it themselves)";
+  const out: string[] = [];
+  if (s.weight) out.push(`2-week mean weight ${r1(s.weight.from)} → ${r1(s.weight.to)} kg (+${r1(s.weight.gain)}) while losing`);
+  if (s.waist) out.push(`waist ${r1(s.waist.from)} → ${r1(s.waist.to)} cm since ${s.waist.since}`);
+  if (s.logging) out.push(`logged ${s.logging.now} days last week, usually ~${r1(s.logging.before)}`);
+  if (s.over) out.push(`${s.over.days} well-logged days last week ~${s.over.by} kcal over target`);
+  if (s.plan) out.push(`diet plan followed ${s.plan.now}% of occasions last week, ${s.plan.before}% before`);
+  return out.join("; ") || "nothing (they opened it themselves)";
+}
+
 function sections(c: Ctx) {
   const entries = c.entries || [];
   const byDay = new Map<string, any[]>();
@@ -244,6 +258,7 @@ function sections(c: Ctx) {
     },
     reviews: () => `# Weekly reviews they wrote (weeks start Saturday)\n${[...(c.reviews || [])].sort((a, b) => (a.week_start < b.week_start ? -1 : 1)).map(r => `week of ${r.week_start}: good: ${r.good || "-"} / hard: ${r.hard || "-"} / next goal: ${r.next_goal || "-"}`).join("\n") || "none"}`,
     motivations: () => `# Motivations they saved\n${(c.motivations || []).map(m => `${kinds[m.kind] || m.kind}${m.day ? ` (${m.day})` : ""}: ${m.title || "(no title)"}${m.note ? ` — ${m.note}` : ""}${m.image_path ? " [has photo]" : ""}`).join("\n") || "none"}`,
+    checkins: () => (c.checkins || []).length ? `# «برگشت به مسیر» check-ins: when the diet slipped, what they told you, what you made of it and planned, and how it went (latest last)\n${c.checkins!.map(k => `${k.day}: noticed ${signText(k.signs)}; mood ${k.mood ? `${k.mood}/5` : "-"}; they named: ${(k.causes || []).join("، ") || "-"}${k.said ? `; they wrote: «${String(k.said).slice(0, 600)}»` : ""}\n  your reading: ${String(k.cause || "-").slice(0, 600)}\n  plan: ${(k.steps || []).join(" / ")}${k.goal ? `; week goal: ${k.goal}` : ""}\n  outcome a week later: ${({ good: "went well", some: "partly", no: "did not work" } as Record<string, string>)[k.outcome] || "not asked yet"}`).join("\n")}` : "",
     notes: () => `# What you (Hooshvareh) already told them outside the chat, latest last\n${[...(c.notes || [])].sort((a, b) => (a.created_at < b.created_at ? -1 : 1)).slice(-20).map(n => `${n.key}: ${n.text}`).join("\n") || "none"}`,
     magazine: () => {
       const mag = [...(c.magazine || [])].sort((a, b) => (a.day < b.day ? -1 : 1));
@@ -629,7 +644,7 @@ const ONE_SHOT: Record<string, OneShot> = {
   plan: {
     effort: "medium",
     max_tokens: 20000,
-    data: (S) => [S.now(), S.profile(), S.targets(), S.phase(), S.energy(), S.mode(), S.foods(), S.plan(), S.adherence(), S.weights(), S.totals(), S.recent(), S.reviews()],
+    data: (S) => [S.now(), S.profile(), S.targets(), S.phase(), S.energy(), S.mode(), S.foods(), S.plan(), S.adherence(), S.weights(), S.totals(), S.recent(), S.reviews(), S.checkins()],
     schema: {
       type: "object",
       properties: {
@@ -697,7 +712,7 @@ note: 2–3 short Persian sentences to them: the idea behind this plan. ${i.incl
   },
   review: {
     effort: "medium",
-    data: (S, i) => [S.now(), S.profile(), S.targets(), S.phase(), S.standing(), S.activity(), S.mode(), S.plan(), S.adherence(), S.weights(), S.totals(), S.entries(String(i.week_start), addDays(String(i.week_start), 6)), S.reviews()],
+    data: (S, i) => [S.now(), S.profile(), S.targets(), S.phase(), S.standing(), S.activity(), S.mode(), S.plan(), S.adherence(), S.weights(), S.totals(), S.entries(String(i.week_start), addDays(String(i.week_start), 6)), S.reviews(), S.checkins()],
     schema: {
       type: "object",
       properties: { analysis: str("Persian, simple Markdown, max ~110 words"), next_goal: str("one small, concrete goal, max ~14 words") },
@@ -707,16 +722,57 @@ note: 2–3 short Persian sentences to them: the idea behind this plan. ${i.incl
   },
   progress: {
     effort: "medium",
-    data: (S) => [S.now(), S.profile(), S.targets(), S.phase(), S.standing(), S.energy(), S.mode(), S.adherence(), S.weights(), S.totals(), S.reviews()],
+    data: (S) => [S.now(), S.profile(), S.targets(), S.phase(), S.standing(), S.energy(), S.mode(), S.adherence(), S.weights(), S.totals(), S.reviews(), S.checkins()],
     schema: { type: "object", properties: { text: str("Persian, simple Markdown, max ~110 words") }, required: ["text"], additionalProperties: false },
     prompt: () => `Analyse their weight trend for the Progress screen: the overall direction and pace (use weekly averages, not single weigh-ins — daily water swings are normal), how it relates to their eating, whether the pace is healthy (0.25–1 kg/week is a good range while losing; in maintenance or on a diet break, holding steady is the aim), and one encouraging, practical next step. If there are waist measurements, read them together with the weight: a shrinking waist with a flat weight is progress. If measured energy use is in the data and differs from the formula by more than about 150 kcal, say in one sentence what that means for their target. If there are too few weigh-ins, say what's needed.`,
   },
   // once a month in maintenance, on «پیشرفت»
   maintain: {
     effort: "medium",
-    data: (S) => [S.now(), S.profile(), S.targets(), S.phase(), S.standing(), S.energy(), S.activity(), S.weights(), S.totals(), S.reviews(), S.notes()],
+    data: (S) => [S.now(), S.profile(), S.targets(), S.phase(), S.standing(), S.energy(), S.activity(), S.weights(), S.totals(), S.reviews(), S.checkins(), S.notes()],
     schema: { type: "object", properties: { text: str("Persian, simple Markdown, max ~120 words") }, required: ["text"], additionalProperties: false },
     prompt: () => `Write this month's maintenance review for the Progress screen. They lost weight and are now keeping it off; this is the part where most people regain, so it matters. Cover briefly: how the weight has held against its band over the last month (weekly averages, not single weigh-ins), how steady their weighing and logging have been, activity minutes against the weekly goal, and whether the measured energy use suggests the maintenance level needs moving. Start with what is going well. Then the one habit most worth protecting or fixing next month, as something concrete. If an occasion is coming up, a line on it. Kind and plain; no alarm over normal swings of a kilo.`,
+  },
+  // «برگشت به مسیر»: the diet is slipping; find out why with them, and plan the way back
+  checkin: {
+    effort: "medium",
+    max_tokens: 6000,
+    data: (S) => [S.now(), S.profile(), S.targets(), S.phase(), S.standing(), S.mode(), S.plan(), S.adherence(), S.activity(), S.occasions(), S.weights(), S.totals(), S.recent(), S.reviews(), S.motivations(), S.checkins()],
+    schema: {
+      type: "object",
+      properties: {
+        cause: str("Persian, simple Markdown, max ~90 words: what most likely lies behind the slip, and what in their own record and words points to it"),
+        steps: { type: "array", items: str("one Persian step, max ~22 words, as «اگر/وقتی …، …»"), description: "exactly 3" },
+        first_step: str("one tiny Persian action for today, max ~14 words"),
+        goal: str("one small, concrete, checkable goal for this week, max ~14 words"),
+        support: str("Persian, max ~60 words, or empty: only when professional or medical help is warranted (see the rules)"),
+      },
+      required: ["cause", "steps", "first_step", "goal", "support"], additionalProperties: false,
+    },
+    prompt: (i, c) => {
+      const mood = Number(i.mood) || 0;
+      const care = ["yes", "unsure"].includes((c.profile as any)?.edHistory);
+      const f = i.follow;
+      return `They are slipping off their diet, and this is the «برگشت به مسیر» check-in: the app does not want to just warn them, but to find out WHY with them and help them back before a small slip becomes a regain. Work like a skilled, warm behavioural coach (cognitive-behavioural and motivational-interviewing informed), not a calorie counter.
+
+What the app noticed in their record: ${signText(i.signs)}.
+How they say they feel these days: ${mood ? `${mood} of 5 (1 = very bad, 5 = very good)` : "not given"}.
+What they say has been going on: ${(Array.isArray(i.causes) ? i.causes : []).map((x: unknown) => `«${String(x).slice(0, 60)}»`).join("، ") || "nothing picked"}.
+In their own words: ${i.said ? `«${String(i.said).slice(0, 1500)}»` : "-"}
+${f ? `This follows the check-in of ${f.day}, whose plan ${f.outcome === "some" ? "only partly worked" : "did not work"} (plan: ${(f.steps || []).join(" / ")}; goal: ${f.goal || "-"}). Find what got in the way; keep what helped, change or shrink what didn't — a smaller, easier plan beats a better one they won't do.` : ""}
+
+1. cause: Find the most likely root cause (or two that feed each other), not the symptom. "Eating more" is a symptom; tiredness, stress or low mood, poor sleep, boredom, loneliness, a changed routine, social pressure, a monotonous diet, all-or-nothing thinking after one bad day, hunger from too strict a target, or results that seem to stall are causes. Put what they said next to the record: which days, meals and times went over or went unlogged (evenings? weekends? after a certain date?), whether logging stopped first, sleep- or work-related patterns, how activity changed, what their weekly reviews said was hard, events around those dates. Quote one or two concrete facts from the data. If their words and the data point different ways, say so gently. If they picked «نمی‌دانم چرا», offer your best reading from the data as a question to consider. If the data is thin, say what you are inferring from. Kind, no blame; a slip is information, not failure.
+2. steps: exactly 3, each an "if/when …, then I …" plan aimed at THAT cause, small enough to do this week and specific to their life and food (their food bank, plan, schedule). Examples of matching a cause: stress or low mood → a non-food way to wind down at the hour it hits, and a planned satisfying snack instead of grazing; poor sleep → a sleep anchor plus a protein-rich breakfast; boredom or evening grazing → a plan for that hour; a monotonous diet → new options («برنامه‌ی تازه» or «یک گزینه‌ی دیگر» in «رژیم», a new recipe in «رسپی‌ها»); tired of logging → make it lighter (a photo of the plate, or just the main meals, for now); social events → a plan for the next one; lost motivation → reconnect with their own saved motivations (quote one if they have it), and a visible small win; no visible results → remind that the waist and the weekly mean matter more than one weigh-in; too hungry → check the target is not too strict, more protein and volume. Use app features where they truly help (photo logging, reminders, the «تحرک» pill, «انگیزه‌ها», the diet plan), by their names.
+3. first_step: one tiny thing to do today that starts it.
+4. goal: one small checkable goal for the week, connected to the cause.
+Never suggest eating less to "make up" for the slip, skipping meals, or anything under the safety floor. In maintenance, the aim is back into the band, not a new diet.${care ? " They may have a history of disordered eating: no restriction, counting, compensating or weighing advice at all; focus on regular meals, feelings, self-kindness and support, and suggest staying in touch with a professional in support." : ""}
+
+support: leave it EMPTY unless one of these applies, then write it warmly and plainly:
+- Signs of something heavier than a rough patch (mood 1–2 together with sadness, anxiety or loneliness; or words of hopelessness, not enjoying anything, weeks of feeling low): say that how they feel matters more than the diet right now, and that talking to a psychologist or counsellor helps and is a strength; the diet can wait or go gentler.
+- Anything suggesting thoughts of self-harm or not wanting to live: put that first and only, with no diet advice in support: ask them to reach out now to someone they trust, and give the Iranian lines: «صدای مشاور بهزیستی ۱۴۸۰» and «اورژانس اجتماعی ۱۲۳» (or ۱۱۵ in an emergency). In that case also keep cause and steps very gentle and short.
+- Repeated eating that feels out of control («پرخوری بی‌اختیار»), or compensating behaviour: it is common and treatable; suggest a psychologist or dietitian experienced with eating behaviour.
+- Illness, pain, a medication change or a possible hormonal cause: suggest checking with their doctor.`;
+    },
   },
   // a few days before an occasion that makes eating harder (یلدا، نوروز، رمضان، their own events)
   occasion: {
@@ -1087,7 +1143,7 @@ function runChat(ctx: Ctx, history: any[], images: unknown, use: Use) {
   const S = sections(ctx);
 
   // Cached prefix: tools, prompt, and everything that doesn't change while they chat.
-  const system = systemBlocks(block([S.profile(), S.targets(), S.phase(), S.energy(), S.mode(), S.foods(), S.recipes(), S.magazine(), S.motivations(), S.reviews(), S.notes(), S.plan(), S.weights(), S.totals(S.yesterday), S.entries(S.detailFrom, S.yesterday)]));
+  const system = systemBlocks(block([S.profile(), S.targets(), S.phase(), S.energy(), S.mode(), S.foods(), S.recipes(), S.magazine(), S.motivations(), S.reviews(), S.checkins(), S.notes(), S.plan(), S.weights(), S.totals(S.yesterday), S.entries(S.detailFrom, S.yesterday)]));
   // What changes by the minute goes after the conversation, so it never breaks the cache:
   // the next message finds everything up to this one already cached.
   const live = `<live_data>\n${block([S.now(), S.today(), S.standing(), S.activity(), S.occasions(), S.adherence(), S.shopping(), S.focus()])}\n</live_data>`;

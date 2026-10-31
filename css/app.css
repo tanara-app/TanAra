@@ -757,3 +757,13 @@ body.kb .toast, body.chat-mode .toast { bottom: calc(var(--nav-h) + var(--safe-b
 .zone-yellow { color: var(--protein); }
 .zone-red { color: var(--protein); }
 .zone-low { color: var(--doctor); }
+
+/* «برگشت به مسیر»: the check-in */
+.checkin-signs { margin: 4px 0 8px; padding-inline-start: 18px; }
+.checkin-signs li { margin: 2px 0; }
+.field-label { font-weight: 600; font-size: .92rem; margin: 14px 0 6px; }
+.checkin-mood button { font-size: .8rem; padding-inline: 2px; }
+.checkin-group { margin-bottom: 10px; }
+.checkin-group > small { display: block; margin-bottom: 4px; }
+.chip-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.row.wrap { flex-wrap: wrap; }

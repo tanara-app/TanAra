@@ -14,6 +14,7 @@ import { recalcTargets } from './profile.js';
 import { progressCard, bindProgressCard, maintainCard, bindMaintainCard } from './aiCards.js';
 import { renderReview } from './review.js';
 import { phaseNotes, bindPhase } from './phase.js';
+import { checkinEntry, bindCheckin } from './checkin.js';
 import { measureCard, bindMeasure, resetMeasureDay, setMeasureDay, takeJump } from './measure.js';
 
 let rangeKey = '3m';
@@ -156,6 +157,8 @@ export function renderProgress(root) {
 
     ${progressCard()}
 
+    ${checkinEntry()}
+
     ${energyCard(s, p, latest?.kg)}
 
     ${historyCard(s)}`;
@@ -173,6 +176,7 @@ export function renderProgress(root) {
   bindProgressCard(root, redrawAi);
   bindMaintainCard(root, redrawAi);
   bindPhase(root);
+  bindCheckin(root, rerender);
   root.querySelector('[data-energy-apply]')?.addEventListener('click', async () => {
     if (!(await confirmBox('هدف کالری از روی مصرف واقعی بدنت دوباره حساب شود؟', 'حساب کن'))) return;
     recalcTargets();

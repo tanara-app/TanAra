@@ -13,9 +13,9 @@ import { fa, kcal50, parseNum } from '../lib/fa.js';
 import { today, diffDays, faDM } from '../lib/dates.js';
 import { sheet, toast, confirmBox, icon } from './dom.js';
 import { dismissed, dismiss } from './notices.js';
-import { startChat } from './chat.js';
 import { aiAvailable } from '../ai/hooshvareh.js';
 import { goMeasure } from './measure.js';
+import { openCheckin } from './checkin.js';
 
 const LABEL = { loss: 'کاهش وزن', maintain: 'نگهداری', break: 'استراحت از رژیم' };
 export const phaseLabel = (p, day = today()) => LABEL[phaseOn(p, day)];
@@ -187,8 +187,8 @@ export function phaseNotes() {
     <div class="row gap"><button class="btn sm" data-phase-act="break">استراحت دوهفته‌ای</button><button class="btn ghost sm" data-phase-dismiss="${mark}">فعلاً نه</button></div></div>`);
   const z = zone(p, w, t);
   if (z?.zone === 'red') out.push(`<div class="note soft"><strong>وزنت دارد برمی‌گردد</strong>
-    <p>میانگین ۷ روزه‌ات ${fa(z.gain, 1)} کیلو بالاتر از وزنی است که نگهداری را با آن شروع کردی (بیشتر از ${fa(REGAIN_KG)} کیلو). زود جلویش را گرفتن خیلی راحت‌تر از بعداً است.${aiAvailable() ? ' با هوشواره ببین چه عوض شده.' : ''}</p>
-    <div class="row gap"><button class="btn sm" data-phase-act="loss">برگشت به کاهش وزن</button>${aiAvailable() ? '<button class="btn ghost sm" data-phase-ask="regain">از هوشواره بپرس</button>' : ''}</div></div>`);
+    <p>میانگین ۷ روزه‌ات ${fa(z.gain, 1)} کیلو بالاتر از وزنی است که نگهداری را با آن شروع کردی (بیشتر از ${fa(REGAIN_KG)} کیلو). زود جلویش را گرفتن خیلی راحت‌تر از بعداً است.${aiAvailable() ? ' با هوشواره ببین چه عوض شده و از کجا شروع کنی.' : ''}</p>
+    <div class="row gap"><button class="btn sm" data-phase-act="loss">برگشت به کاهش وزن</button>${aiAvailable() ? '<button class="btn ghost sm" data-phase-checkin>بیا ببینیم چه شده</button>' : ''}</div></div>`);
   const cd = correctionDue(p, w, t);
   if (cd && !dismissed('correct', t)) out.push(`<div class="note soft" data-phase-note="correct"><strong>وزنت کمی بالاتر از بازه است</strong>
     <p>میانگین ۷ روزه‌ات ${fa(cd.avg, 1)} کیلو است؛ بازه‌ات تا ${fa(cd.hi, 1)}. حالا که فاصله کم است، دو هفته با ${fa(CORRECT_KCAL)} کالری کمتر برش می‌گرداند.</p>
@@ -212,10 +212,6 @@ export function phaseNotes() {
   return out.join('');
 }
 
-const ASK = {
-  regain: 'وزنم در نگهداری دارد برمی‌گردد. با نگاه به ثبت‌هایم بگو چه عوض شده و از این هفته چه کنم؟',
-};
-
 // Wires the card and the notes, wherever they were drawn.
 export function bindPhase(root) {
   root.querySelectorAll('[data-phase-act]').forEach(b => b.onclick = () => {
@@ -231,7 +227,7 @@ export function bindPhase(root) {
     if (kind && i > 0) dismiss(kind, v.slice(i + 1)); else dismiss('break', v);
     b.closest('.note').remove();
   });
-  root.querySelectorAll('[data-phase-ask]').forEach(b => b.onclick = () => { startChat(ASK[b.dataset.phaseAsk]); location.hash = '#/ai'; });
+  root.querySelectorAll('[data-phase-checkin]').forEach(b => b.onclick = () => openCheckin());
   root.querySelectorAll('[data-phase-weigh]').forEach(b => b.onclick = () => { goMeasure(); });
   root.querySelector('[data-light]')?.addEventListener('change', e => go(e.target.checked ? 'light' : 'full').then(() => {
     e.target.checked = !!store.profile()?.lightLog;
