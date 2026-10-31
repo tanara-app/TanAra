@@ -767,3 +767,10 @@ body.kb .toast, body.chat-mode .toast { bottom: calc(var(--nav-h) + var(--safe-b
 .checkin-group > small { display: block; margin-bottom: 4px; }
 .chip-row { display: flex; flex-wrap: wrap; gap: 6px; }
 .row.wrap { flex-wrap: wrap; }
+
+/* an AI card folded to its title (the trend analysis) */
+.fold-h { width: 100%; background: none; border: 0; padding: 0; color: inherit; font: inherit; text-align: start; cursor: pointer; }
+.fold-h .chev-d { transition: transform .2s; color: var(--muted); }
+.fold.folded .fold-h { margin-bottom: 0; }
+.fold.folded .fold-h .chev-d { transform: rotate(90deg); }
+.fold.folded .fold-body { display: none; }

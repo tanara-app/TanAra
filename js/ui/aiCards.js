@@ -5,7 +5,7 @@ import * as store from '../data/store.js';
 import { ask, aiAvailable, aiOnline, md, sparkle } from '../ai/hooshvareh.js';
 import { today, faDMY, faDM } from '../lib/dates.js';
 import { esc, fa } from '../lib/fa.js';
-import { toast } from './dom.js';
+import { toast, icon } from './dom.js';
 import { phaseOn } from '../domain/targets.js';
 import { maintainWeeks } from '../domain/phase.js';
 import { upcoming } from '../domain/occasions.js';
@@ -80,22 +80,40 @@ export function bindReviewCard(root, ws, refresh, useGoal) {
 
 const latestProgress = () => store.get().ai_notes.filter(n => n.kind === 'progress').sort((a, b) => (a.key < b.key ? 1 : -1))[0] || null;
 
+// The analysis is long, so once written it stays folded to its title until tapped open; the
+// choice is remembered on this device (a convenience, not data).
+const FOLD = () => store.localKey('progressOpen');
+const progressOpen = () => { try { return localStorage.getItem(FOLD()) === '1'; } catch { return false; } };
+
 export function progressCard() {
   if (!aiAvailable()) return '';
   const key = `progress:${today()}`;
   const n = latestProgress();
   const day = n?.key.slice(9);
+  if (n && !busy.has(key)) return `<section class="card ai-card fold${progressOpen() ? '' : ' folded'}" data-ai-fold>
+    <button type="button" class="ai-card-h fold-h" aria-expanded="${progressOpen()}"><span class="ai-mark">${sparkle(16)}</span><b>تحلیل روند</b><small class="muted">${day === today() ? 'امروز' : faDMY(day)}</small>${icon.chevD}</button>
+    <div class="fold-body"><div class="ai-text">${md(n.text)}</div><button class="link small" data-ai-progress>تحلیل تازه</button></div>
+  </section>`;
   return `<section class="card ai-card">
-    ${head('تحلیل روند', n && !busy.has(key) ? `<small class="muted">${day === today() ? 'امروز' : faDMY(day)}</small>` : '')}
+    ${head('تحلیل روند')}
     ${busy.has(key) ? thinking('دارم روند وزنت را بررسی می‌کنم…')
-      : n ? `<div class="ai-text">${md(n.text)}</div>${day !== today() ? '<button class="link small" data-ai-progress>تحلیل تازه</button>' : ''}`
+      : n ? `<div class="ai-text">${md(n.text)}</div>`
       : '<p class="muted small">هوشواره روند وزن و غذاخوردنت را کنار هم می‌گذارد و می‌گوید کجای کاری.</p><button class="btn block" data-ai-progress>تحلیل روند من</button>'}
   </section>`;
 }
 
 export function bindProgressCard(root, refresh) {
-  root.querySelector('[data-ai-progress]')?.addEventListener('click', () =>
-    generate(`progress:${today()}`, 'progress', 'progress', {}, r => ({ text: r.text }), refresh));
+  root.querySelector('[data-ai-progress]')?.addEventListener('click', () => {
+    // a fresh analysis is asked for to be read: show it open
+    try { localStorage.setItem(FOLD(), '1'); } catch { /* ignore */ }
+    generate(`progress:${today()}`, 'progress', 'progress', {}, r => ({ text: r.text }), refresh);
+  });
+  root.querySelector('[data-ai-fold] .fold-h')?.addEventListener('click', e => {
+    const card = e.currentTarget.closest('[data-ai-fold]');
+    const open = card.classList.toggle('folded') === false;
+    e.currentTarget.setAttribute('aria-expanded', open);
+    try { localStorage.setItem(FOLD(), open ? '1' : '0'); } catch { /* ignore */ }
+  });
 }
 
 /* ---------------- Progress: the monthly maintenance review ---------------- */
