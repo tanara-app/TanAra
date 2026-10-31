@@ -640,6 +640,48 @@ type OneShot = {
   effort: string; max_tokens?: number; schema: any; prompt: (i: any, c: Ctx) => string; image?: boolean | "optional";
   system?: string; shared?: (S: Sections) => string[]; data?: (S: Sections, i: any) => string[];
 };
+// «نکته‌ی امروز»: one topic a day, in turn (see ONE_SHOT.tip).
+const TIP_TOPICS = [
+  "water: drinking water before meals and fullness; thirst mistaken for hunger",
+  "protein: why it is the most filling macronutrient and protects muscle while losing",
+  "fibre and vegetables: volume, slower digestion, fullness",
+  "energy density: eating a larger volume of food for fewer calories",
+  "liquid calories: sweet drinks, juice and why the body barely compensates for them",
+  "sleep and appetite: ghrelin, leptin and cravings after a short night",
+  "eating speed: how long fullness signals take and what slowing down does",
+  "daily movement (NEAT): steps and everyday activity versus formal exercise",
+  "strength training while losing weight: keeping muscle and metabolism",
+  "water weight: why the scale jumps day to day (salt, carbohydrate, glycogen) and why weekly averages matter",
+  "plateaus and metabolic adaptation: what really happens and what to do",
+  "ultra-processed foods: what the controlled trial showed about how much people eat",
+  "breakfast and meal timing: what the evidence does and doesn't show",
+  "cooking oil and hidden calories in Iranian cooking (stews, rice, frying)",
+  "bread and rice: refined versus whole grains, portion and fullness",
+  "fruit versus fruit juice and dried fruit",
+  "nuts: healthy but energy-dense; how much is a portion",
+  "dairy and yoghurt in a weight-loss diet",
+  "self-monitoring: what logging food and weighing do for weight loss, by the evidence",
+  "stress, cortisol and emotional eating: the mechanism and what helps",
+  "the slow pace: why 0.5–1 kg a week keeps the weight off better than crash diets",
+  "salt, bloating and blood pressure",
+  "sugar cravings: how they work, and how they fade when sugar is cut back gradually",
+  "the waist: why waist size says more about health than weight alone",
+];
+const TIP_TOPICS_CARE = [
+  "water and hydration: how it helps energy, digestion and concentration",
+  "protein at meals: steady energy and keeping muscle strong",
+  "fibre, vegetables and fruit: digestion, gut health and feeling well",
+  "regular meals: why skipping meals backfires on energy and mood",
+  "sleep and appetite: how a short night changes hunger signals",
+  "movement for mood: what research shows about walking and wellbeing",
+  "whole grains versus refined: steady blood sugar and energy",
+  "calcium, dairy and bone health",
+  "iron and tiredness: foods that help and what helps absorb them",
+  "healthy fats: nuts, olive oil and fish",
+  "stress and eating: how stress affects appetite and gentle ways to wind down",
+  "water weight: why the body's weight naturally swings from day to day",
+];
+
 const ONE_SHOT: Record<string, OneShot> = {
   plan: {
     effort: "medium",
@@ -697,12 +739,25 @@ note: 2–3 short Persian sentences to them: the idea behind this plan. ${i.incl
   },
   tip: {
     effort: "low",
+    max_tokens: 3000,
     data: (S) => [S.now(), S.profile(), S.phase(), S.mode(), S.notes()],
-    schema: { type: "object", properties: { text: str() }, required: ["text"], additionalProperties: false },
-    // with a (possible) eating-disorder history, no restriction or monitoring techniques at all
-    prompt: (_i, c) => ["yes", "unsure"].includes((c.profile as any)?.edHistory)
-      ? `Write today's tip for the top of the Today screen: one or two short sentences (max ~35 words), one gentle, well-evidenced habit for a healthy relationship with food and body — e.g. regular, balanced meals without skipping, enjoying food without guilt, sleep, enjoyable movement, eating with others, being kind to yourself after a hard day. Nothing about restricting, cutting, portion control, appetite, calories, weighing or tracking. Don't comment on their data. A different habit from your earlier tips. No greeting.`
-      : `Write today's tip for the top of the Today screen: one or two short sentences (max ~35 words) teaching one practical dieting technique that helps people stick to a diet and lose fat — e.g. eating more slowly, protein at every meal, high-volume low-calorie foods, planning meals ahead, keeping tempting foods out of sight, smaller plates, sleep and hunger, handling eating out or a slip-up, self-monitoring, drinking water before meals. In maintenance, prefer the techniques of keeping weight off instead: regular weighing and acting early on a small gain, plenty of walking and activity, a consistent eating pattern on weekdays and weekends, planning for holidays and eating out, keeping protein up. Only advice that is well supported by scientific research (systematic reviews or solid trials); nothing speculative, no fads, nothing that means eating below their safe minimum. This is NOT an analysis of their data: don't comment on their numbers, logs, weight or progress (the Progress screen does that). You may pick a technique that suits their phase, mode and profile, and must respect any medical conditions in it. A different technique from your earlier tips. No greeting.`,
+    schema: { type: "object", properties: { text: str("Persian, simple Markdown") }, required: ["text"], additionalProperties: false },
+    // A topic a day from a fixed rotation, so the tips stay on diet science and don't repeat.
+    // With a (possible) eating-disorder history the rotation is about nourishment, not restriction.
+    prompt: (_i, c) => {
+      const care = ["yes", "unsure"].includes((c.profile as any)?.edHistory);
+      const list = care ? TIP_TOPICS_CARE : TIP_TOPICS;
+      const n = Math.floor(Date.parse(c.today + "T12:00:00Z") / 86400000);
+      const topic = list[((n % list.length) + list.length) % list.length];
+      return `Write today's tip for the top of the Today screen: one useful, scientifically grounded fact about nutrition and dieting, explained so they learn something. Today's topic: ${topic}.
+
+Shape (Persian, about 60–90 words, simple Markdown, no greeting):
+- First line: a short bold title of 3–6 words that states the fact (e.g. «**آب قبل از غذا، سیرتر سر سفره**»).
+- Then 2–3 sentences: what research has found, with one concrete number or finding where it is solid (e.g. how much, how long, by how much), and WHY it works (the body mechanism, in plain words).
+- Last sentence: exactly how to use it today, practical and specific to Iranian food and habits.
+Only what is well supported by systematic reviews or solid trials; if the effect is modest, say so honestly instead of overselling. No fads, no supplements or pills, nothing below their safe minimum, nothing against a medical condition in their profile.${care ? " They may have a history of disordered eating: frame everything as nourishing the body and feeling well; nothing about cutting, restricting, calorie numbers, weighing or compensating." : ""}${c.phase?.phase === "maintain" ? " They are in maintenance: where the topic allows, frame it as keeping the weight off." : ""}
+This is NOT an analysis of their data: don't mention their numbers, logs or progress. Don't repeat a fact from your earlier tips (in the data, keys tip:…); take a different angle on the topic if needed.`;
+    },
   },
   quote: {
     effort: "low",

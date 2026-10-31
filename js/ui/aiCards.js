@@ -40,14 +40,15 @@ const tipKey = () => `tip:${today()}`;
 export function tipCard() {
   if (!aiAvailable()) return '';
   const n = store.note(tipKey());
-  if (n) return `<section class="card ai-card">${head('نکته‌ی امروز هوشواره')}<div class="ai-text">${md(n.text)}</div><a class="link small" href="#/ai">بیشتر بپرس</a></section>`;
+  if (n) return `<section class="card ai-card">${head('نکته‌ی امروز هوشواره')}<div class="ai-text">${md(n.text)}</div><div class="row gap"><a class="link small" href="#/ai">بیشتر بپرس</a><button class="link small" data-tip-again>یک نکته‌ی دیگر</button></div></section>`;
   if (busy.has(tipKey())) return `<section class="card ai-card">${head('نکته‌ی امروز هوشواره')}${thinking('دارم نکته‌ی امروزت را آماده می‌کنم…')}</section>`;
   return '';
 }
 
 // Generates today's tip once, after the first pull (so another device's tip isn't duplicated).
-export function bindTip(refresh) {
+export function bindTip(refresh, root = document) {
   const key = tipKey();
+  root.querySelector('[data-tip-again]')?.addEventListener('click', () => generate(key, 'tip', 'tip', {}, r => ({ text: r.text }), refresh));
   if (store.note(key) || busy.has(key) || failed.has(key) || !aiOnline() || !store.syncStatus.lastPull) return;
   generate(key, 'tip', 'tip', {}, r => ({ text: r.text }), refresh, true);
 }

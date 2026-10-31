@@ -162,5 +162,5 @@ export function renderToday(root) {
   });
   // last: generating the tip or today's magazine article redraws this screen
   const redrawAi = () => { if (root.querySelector('[data-mode]') && day === today()) renderToday(root); };
-  if (isToday) { bindTip(redrawAi); bindMag(root, redrawAi); bindOccasion(root, redrawAi); }
+  if (isToday) { bindTip(redrawAi, root); bindMag(root, redrawAi); bindOccasion(root, redrawAi); }
 }
