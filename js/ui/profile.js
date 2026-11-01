@@ -1,5 +1,5 @@
-// Profile & settings: the targets and the phase up front; everything else (my details,
-// reminders, motivations, food bank, shopping list, AI use, data, account) is one list of rows that open sheets.
+// Profile & settings: the targets (folded to one line) and the phase up front; everything else is rows
+// that open sheets, in small titled groups so the eye finds the group first and then the row.
 import * as store from '../data/store.js';
 import { effectiveTargets, clampKcal, safeFloor, hasMedicalFlag, ACTIVITY, CONDITIONS, correcting, rampKcal } from '../domain/targets.js';
 import { sortedWeights } from '../domain/stats.js';
@@ -37,7 +37,23 @@ export function recalcTargets() {
   return t;
 }
 
-const row = (attr, title, sub) => `<button class="set-row" ${attr}><span class="grow"><b>${title}</b>${sub ? `<small class="muted">${sub}</small>` : ''}</span>${icon.chevL}</button>`;
+// Line icons for the rows, drawn like the ones in dom.js.
+const svg = d => `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+const ICON = {
+  me: svg('<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>'),
+  mots: svg('<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/>'),
+  bank: svg('<path d="M3 11h18a9 9 0 0 1-18 0z"/><path d="M8 7c0-1.5 1-2 1-3.5M12 7c0-1.5 1-2 1-3.5M16 7c0-1.5 1-2 1-3.5"/>'),
+  cart: svg('<circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2.5 3.5h3l2.4 11.2a1.5 1.5 0 0 0 1.5 1.2h8.3a1.5 1.5 0 0 0 1.5-1.1L21 8H6.6"/>'),
+  voice: svg('<path d="M4 5h16v11H9l-5 4z"/><path d="M9 10.5h6"/>'),
+  usage: svg('<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>'),
+  bell: svg('<path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M10 21h4"/>'),
+  theme: svg('<circle cx="12" cy="12" r="8.5"/><path d="M12 3.5v17a8.5 8.5 0 0 0 0-17z" fill="currentColor"/>'),
+  data: svg('<ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/>'),
+  account: svg('<circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M17 6l3 3M15 8l2 2"/>'),
+};
+const row = (attr, ic, title, sub) => `<button class="set-row" ${attr}><i class="set-ic">${ICON[ic]}</i><span class="grow"><b>${title}</b>${sub ? `<small class="muted">${sub}</small>` : ''}</span>${icon.chevL}</button>`;
+const group = (title, rows) => `<h2 class="set-h">${title}</h2><section class="card set-list">${rows}</section>`;
+let targetsOpen = false;
 
 export function renderProfile(root) {
   const s = store.get();
@@ -48,8 +64,8 @@ export function renderProfile(root) {
   root.innerHTML = `
     <header class="page-head"><h1>نمایه</h1></header>
 
-    <section class="card">
-      <h2 class="card-h">هدف‌های روزانه</h2>
+    <details class="card fold targets-fold"${targetsOpen ? ' open' : ''}>
+      <summary><span><h2>هدف‌های روزانه</h2><small>${kcal50(eff.kcal)} کالری · ${fa(eff.protein)} گرم پروتئین</small></span></summary>
       <div class="targets">
         <div class="tile big"><span>کالری</span><b>${kcal50(eff.kcal)}</b><small>${correcting(p) ? 'اصلاح کوتاه' : rampKcal(p) ? 'رو به نگهداری' : eff.phase !== 'loss' ? 'سطح نگهداری' : p.targets?.manualKcal ? 'دستی' : p.targets?.source === 'measured' ? 'از مصرف واقعی بدنت' : 'محاسبه‌شده'}</small></div>
         <div class="tile big"><span>پروتئین</span><b>${fa(eff.protein)}</b><small>گرم${p.targets?.manualProtein ? ' · دستی' : ''}</small></div>
@@ -59,24 +75,28 @@ export function renderProfile(root) {
         <button class="btn grow" data-recalc>محاسبه‌ی دوباره</button>
         <button class="btn grow" data-manual>تنظیم دستی</button>
       </div>
-    </section>
+    </details>
 
     ${phaseCard()}
 
-    <section class="card set-list">
-      ${row('data-edit', 'اطلاعات من', `${fa(p.age)} ساله · قد ${fa(p.heightCm, 1)} · ${ACTIVITY[p.activity]?.label || ''}${p.conditions?.length ? ` · ${p.conditions.map(c => CONDITIONS[c]).join('، ')}` : ''}`)}
-      ${row('data-reminders', 'یادآورها', remindersLine())}
-      ${row('data-mots', 'انگیزه‌ها', s.motivations.length ? `${fa(s.motivations.length)} مورد؛ بالای صفحه‌ی «امروز»` : 'هنوز چیزی اضافه نکرده‌ای')}
-      ${row('data-bank', 'بانک غذا', `${fa(s.foods.length)} غذا`)}
-      ${row('data-shopping', 'لیست خرید', shoppingLine())}
-      ${aiAvailable() ? row('data-usage', 'مصرف هوشواره', 'هر کار هوشواره چقدر هزینه داشته') : ''}
-      ${row('data-mascot', 'جمله‌های تشویقی و صدای هوشواره', { off: 'خاموش', text: 'فقط نوشته؛ بعد از ثبت‌ها و بالای «امروز»', voice: 'نوشته و صدای هایمردینگر' }[buddyMode()])}
-      ${row('data-theme', 'ظاهر', THEMES.find(t => t.value === getTheme()).label)}
-      ${row('data-data', 'داده‌ها و پشتیبان', 'خروجی گرفتن، برگرداندن، غذاهای پیش‌فرض')}
-      ${row('data-account', 'حساب', session.local ? 'حالت آزمایشی محلی' : `${esc(session.email || '')}${st.pending ? ` · ${fa(st.pending)} تغییر در صف` : ''}`)}
-    </section>
+    ${group('من و برنامه‌ام', `
+      ${row('data-edit', 'me', 'اطلاعات من', `${fa(p.age)} ساله · قد ${fa(p.heightCm, 1)}`)}
+      ${row('data-mots', 'mots', 'انگیزه‌ها', s.motivations.length ? `${fa(s.motivations.length)} مورد` : 'هنوز خالی')}`)}
+    ${group('ابزارها', `
+      ${row('data-bank', 'bank', 'بانک غذا', `${fa(s.foods.length)} غذا`)}
+      ${row('data-shopping', 'cart', 'لیست خرید', shoppingLine())}`)}
+    ${group('هوشواره', `
+      ${row('data-mascot', 'voice', 'جمله‌ها و صدای هوشواره', MODES.find(m => m.value === buddyMode()).label)}
+      ${aiAvailable() ? row('data-usage', 'usage', 'مصرف هوشواره', 'هزینه‌ی ۳۰ روز اخیر') : ''}`)}
+    ${group('تنظیمات', `
+      ${row('data-reminders', 'bell', 'یادآورها', remindersLine())}
+      ${row('data-theme', 'theme', 'ظاهر', THEMES.find(t => t.value === getTheme()).label)}`)}
+    ${group('حساب و داده‌ها', `
+      ${row('data-data', 'data', 'داده‌ها و پشتیبان', 'خروجی و برگرداندن')}
+      ${row('data-account', 'account', 'حساب', session.local ? 'حالت آزمایشی محلی' : `${esc(session.email || '')}${st.pending ? ` · ${fa(st.pending)} تغییر در صف` : ''}`)}`)}
     <p class="muted small center">تن‌آرا · نسخه‌ی ۱</p>`;
 
+  root.querySelector('.targets-fold').ontoggle = e => { targetsOpen = e.currentTarget.open; };
   root.querySelector('[data-recalc]').onclick = async () => {
     const msg = p.targets?.manualKcal || p.targets?.manualProtein
       ? 'هدف‌ها با آخرین وزن دوباره حساب شوند؟ تنظیم دستی پاک می‌شود.' : 'هدف‌ها با آخرین وزن دوباره حساب شوند؟';
@@ -95,7 +115,7 @@ export function renderProfile(root) {
     if (t) { setTheme(t); renderProfile(root); }
   };
   root.querySelector('[data-mascot]').onclick = async () => {
-    const v = await choose('جمله‌های تشویقی و صدای هوشواره', MODES, buddyMode());
+    const v = await choose('جمله‌ها و صدای هوشواره', MODES, buddyMode());
     if (v) { setBuddyMode(v); renderProfile(root); }
   };
   root.querySelector('[data-data]').onclick = openData;

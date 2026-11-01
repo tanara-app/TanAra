@@ -738,6 +738,13 @@ body.kb .toast, body.chat-mode .toast { bottom: calc(var(--nav-h) + var(--safe-b
 .set-row b { display: block; font-weight: 600; }
 .set-row small { display: block; font-size: .8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .set-row svg { flex: none; color: var(--muted); }
+.set-row .set-ic { display: grid; place-items: center; flex: none; width: 36px; height: 36px; border-radius: 11px; background: var(--accent-soft); }
+.set-row .set-ic svg { color: var(--accent); }
+.set-row[data-mascot] .set-ic, .set-row[data-usage] .set-ic { background: var(--ai-soft); }
+.set-row[data-mascot] .set-ic svg, .set-row[data-usage] .set-ic svg { color: var(--ai); }
+.set-h { margin: 18px 6px 6px; color: var(--muted); font-size: .82rem; font-weight: 600; }
+.targets-fold[open] > summary { margin-bottom: 12px; }
+.targets-fold > .targets { margin-bottom: 10px; }
 
 /* shopping list */
 .pill-btn { border: 0; cursor: pointer; font-family: inherit; }
