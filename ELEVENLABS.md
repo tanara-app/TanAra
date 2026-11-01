@@ -1,17 +1,16 @@
 # Brief for the ElevenLabs assistant: voice and sound effects for "Heimerdinger"
 
-Please read this whole brief. First ask me which voice to use (Step 1), then produce every audio file listed below. Work through the lists in order and name each file exactly as given.
+Please read this whole brief. First ask me which voice and model to use (Step 1), then produce every audio file listed below. Work through the lists in order and name each file exactly as given.
 
 ## What this is for
 A small, cute, cheerful professor-inventor character (named Heimerdinger) lives inside a private Persian (Farsi) health and food-logging app. He pops up for a few seconds and says one short line of encouragement when the user logs a meal, moves, or reviews their week. The lines are in Persian. They are short (1–4 seconds), warm and playful, and never judgmental.
 
-## Step 1: ask me which voice to use
-I have already made the voice for this character myself. **Do not create, design or clone a new voice.** Before generating anything, ask me which of my voices to use, and wait for my answer. Then use that one voice for every spoken file below.
+## Step 1: ask me which voice and which model to use
+I have already made the voice for this character myself. **Do not create, design or clone a new voice, and do not pick the model yourself.** Before generating anything, ask me which of my voices and which model to use, and wait for my answer. Then use that one voice and that model for every spoken file below.
 
 ## Step 2: generate the spoken lines (Text to Speech)
-- Model: **Eleven v3** (best Persian, understands audio tags).
 - Language: Persian (Farsi). Read the Persian text naturally, in casual spoken Tehrani style.
-- The English words in square brackets, like [excited], are **audio tags**: they set the emotion and must NOT be spoken. Keep them in the text you send to the model.
+- The English words in square brackets, like [excited], are **audio tags**: they set the emotion and must NOT be spoken. If the model I choose supports audio tags, keep them in the text; if it does not, remove them before generating and use only the Persian text.
 - One line = one file. Do not merge lines. No music or background sound in these files.
 - Leave about 0.1 s of silence at the start and end; no long pauses.
 - Output: **MP3, 44.1 kHz, 128 kbps** (or lower).
