@@ -1,19 +1,12 @@
 # Brief for the ElevenLabs assistant: voice and sound effects for "Heimerdinger"
 
-Please read this whole brief, then produce every audio file listed below. Work through the lists in order and name each file exactly as given.
+Please read this whole brief. First ask me which voice to use (Step 1), then produce every audio file listed below. Work through the lists in order and name each file exactly as given.
 
 ## What this is for
 A small, cute, cheerful professor-inventor character (named Heimerdinger) lives inside a private Persian (Farsi) health and food-logging app. He pops up for a few seconds and says one short line of encouragement when the user logs a meal, moves, or reviews their week. The lines are in Persian. They are short (1–4 seconds), warm and playful, and never judgmental.
 
-## Step 1: create the voice (Voice Design)
-Create ONE new, original voice with Voice Design (not a clone of any real person or existing character). Description:
-
-> A small, elderly male professor with a slightly high-pitched, nasal voice. Fast, enthusiastic and excitable, like a brilliant eccentric inventor who gets thrilled by scientific discoveries. Warm, kind and encouraging, with a gentle, slightly fussy academic tone and playful energy.
-
-Preview text for designing it (Persian):
-> آه، چه داده‌ی جالبی! آفرین، داری عالی پیش میری. علم ازت ممنونه!
-
-Use this same voice for every spoken file below.
+## Step 1: ask me which voice to use
+I have already made the voice for this character myself. **Do not create, design or clone a new voice.** Before generating anything, ask me which of my voices to use, and wait for my answer. Then use that one voice for every spoken file below.
 
 ## Step 2: generate the spoken lines (Text to Speech)
 - Model: **Eleven v3** (best Persian, understands audio tags).
