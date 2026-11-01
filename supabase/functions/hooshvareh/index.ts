@@ -854,7 +854,7 @@ support: leave it EMPTY unless one of these applies, then write it warmly and pl
       },
       required: ["name", "unit", "grams", "kcal", "protein", "category", "is_veg", "note"], additionalProperties: false,
     },
-    prompt: (i) => `Estimate calories, protein and the weight in grams for this food, for one household unit${i.unit ? ` (unit: ${i.unit}${i.unit === "گرم" ? " — then grams is 1 and kcal/protein are per gram" : ""})` : ""}, the way it is usually prepared and served in Iran: «${i.name}». Be realistic, slightly conservative-high rather than low. Keep kcal consistent with grams (realistic energy density). Use their food bank for consistency with similar items. is_veg is false unless the food is itself mainly non-starchy vegetables.`,
+    prompt: (i) => `Estimate calories, protein and the weight in grams for this food, for one household unit${i.unit ? ` (unit: ${i.unit}${i.unit === "گرم" ? " — then grams is 1 and kcal/protein are per gram" : ""})` : ""}, the way it is usually prepared and served in Iran: «${i.name}».${Number(i.grams) > 0 ? ` They say one ${i.unit} of it weighs ${Number(i.grams)} g: use exactly that weight.` : ""}${i.per100 ? ` Its pack label gives ${Number(i.per100.kcal)} kcal and ${Number(i.per100.protein)} g protein per 100 g: use exactly these, only the weight of a unit (if not given) is to estimate.` : ""} Be realistic, slightly conservative-high rather than low. Keep kcal consistent with grams (realistic energy density). Use their food bank for consistency with similar items. is_veg is false unless the food is itself mainly non-starchy vegetables.`,
   },
   label: {
     effort: "low",

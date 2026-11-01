@@ -122,7 +122,7 @@ export async function fillFromBarcode(root, F, units, code, onFill) {
   const fill = (f, src) => {
     if (!box.isConnected) return;
     if (f.name && !F.name.value.trim()) F.name.value = f.name;
-    units.set({ unit: f.unit, grams: f.unit === GRAM ? 1 : f.grams, kcal: f.kcal, protein: f.protein });
+    units.set({ unit: f.unit, grams: f.unit === GRAM ? 1 : f.grams, kcal: f.kcal, protein: f.protein }, { exact: true });
     if (F.category && f.category && f.category !== 'other') { F.category.value = f.category; F.category.dispatchEvent(new Event('change')); }
     if (f.is_veg) F.veg.checked = true;
     onFill?.(f);

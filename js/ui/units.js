@@ -77,11 +77,18 @@ export function unitFields(f, { kcalLabel = 'کالری' } = {}) {
 }
 
 /*
-  Wires unitFields. Returns { read, set }: read() → { unit, grams, kcal, protein } per one
-  unit (per gram for «گرم»), or { error }; set(values) fills the fields from such values.
+  Wires unitFields. Returns { read, set, exact, picked }: read() → { unit, grams, kcal, protein } per
+  one unit (per gram for «گرم»), or { error }; set(values) fills the fields from such values.
+
+  Numbers that were filled in (a barcode, a label, Hooshvareh) carry an energy density, so
+  from then on the weight of a unit sets them: a milk read per ۱۰۰ گرم, switched to «قوطی»
+  of ۳۰۰ گرم, shows the calories of ۳۰۰ گرم. Typing a number by hand drops the density.
+  set(values, { exact: true }) marks the numbers as read off the pack; exact() then gives
+  them per gram (until typed over), so an estimate keeps to them.
 */
 export function bindUnitFields(root, F, onChange) {
   let lastUnit = F.unit.value, lastUnit2 = F.unit2.value;
+  let dens = null, exact = false; // { kcal, protein } per gram, while the numbers follow the weight
   const gf = root.querySelector('[data-gf]');
   const other = root.querySelector('[data-other]');
   const g2f = root.querySelector('[data-g2f]');
@@ -111,6 +118,14 @@ export function bindUnitFields(root, F, onChange) {
     if (Number.isFinite(kcal)) F.kcal.value = fa(Math.round(kcal * f));
     if (Number.isFinite(protein)) F.protein.value = fa(r1(protein * f), 1);
   };
+  // the numbers of one unit from the density: per ۱۰۰ گرم, or for the unit's weight
+  const follow = () => {
+    if (!dens) return false;
+    const g = grams();
+    if (g > 0) show(dens.kcal * g, dens.protein * g);
+    else F.kcal.value = F.protein.value = ''; // a unit with no weight yet: nothing to show
+    return true;
+  };
   // rescale the typed numbers by a factor (unit ↔ ۱۰۰ گرم)
   const scale = f => {
     if (!F.kcal.value) return;
@@ -126,17 +141,13 @@ export function bindUnitFields(root, F, onChange) {
     if (u === prev) { labels(); return; }
     if (u === OTHER) { labels(); F.unitOther.focus(); onChange?.(); return; }
     const g = parseNum(F.grams.value);
-    if (u === GRAM) {
-      // one unit of g grams → per ۱۰۰ گرم
-      if (g > 0) scale(100 / g);
-    } else {
-      // a weight that was only the old unit's default follows the new unit
-      if (prev !== GRAM && (!(g > 0) || g === UNIT_GRAMS[prev])) F.grams.value = UNIT_GRAMS[u] ? fa(UNIT_GRAMS[u]) : '';
-      // per ۱۰۰ گرم → one unit of its weight
-      const ng = parseNum(F.grams.value);
-      if (prev === GRAM && ng > 0) scale(ng / 100);
-    }
+    // numbers typed per ۱۰۰ گرم have a density of their own
+    if (prev === GRAM && !dens && F.kcal.value) dens = { kcal: parseNum(F.kcal.value) / 100, protein: (parseNum(F.protein.value) || 0) / 100 };
+    // a weight that was only the old unit's default (or none) follows the new unit
+    if (u !== GRAM && (!(g > 0) || g === UNIT_GRAMS[prev] || prev === GRAM)) F.grams.value = UNIT_GRAMS[u] ? fa(UNIT_GRAMS[u]) : '';
+    if (!follow() && u === GRAM && g > 0) scale(100 / g); // one unit of g grams → per ۱۰۰ گرم
     labels(); onChange?.();
+    if (u !== GRAM && !F.grams.value) F.grams.focus();
   });
   F.unit2.addEventListener('change', () => {
     const u = F.unit2.value, prev = lastUnit2;
@@ -149,6 +160,8 @@ export function bindUnitFields(root, F, onChange) {
     if (u === OTHER) F.unit2Other.focus();
     else if (u && !F.grams2.value) F.grams2.focus();
   });
+  F.grams.addEventListener('input', follow);
+  [F.kcal, F.protein].forEach(i => i.addEventListener('input', () => { dens = null; exact = false; }));
   [F.grams, F.kcal, F.protein, F.unitOther, F.grams2, F.unit2Other].forEach(i => i.addEventListener('input', () => { labels(); onChange?.(); }));
   labels();
 
@@ -166,7 +179,10 @@ export function bindUnitFields(root, F, onChange) {
       if (u2 && !(g > 0)) return { error: `برای واحد دوم، اول بنویس هر ${unit} چند گرم است.` };
       return { unit, grams: g > 0 ? g : null, kcal: v.kcal, protein: v.protein || 0, unit2: u2 || null, grams2: u2 ? g2 : null };
     },
-    set({ unit, grams: g, kcal, protein, unit2, grams2 }) {
+    exact: () => (exact && dens) || null,
+    // the unit and its weight as they stand, before calories are in
+    picked: () => ({ unit: unitName(), grams: grams() }),
+    set({ unit, grams: g, kcal, protein, unit2, grams2 }, { exact: ex = false } = {}) {
       if (unit2) {
         if (![...F.unit2.options].some(o => o.value === unit2)) F.unit2.add(new Option(unit2, unit2), F.unit2.options.length - 1);
         F.unit2.value = unit2;
@@ -181,7 +197,11 @@ export function bindUnitFields(root, F, onChange) {
         F.unit.dispatchEvent(new Event('change')); // repaint the picker; handler sees no change
       }
       if (!per100() && g > 0) F.grams.value = fa(r1(g), 1);
+      if (per100()) F.grams.value = ''; // no stale weight waiting for the next unit
       show(kcal, protein);
+      const w = per100() ? 1 : g;
+      dens = w > 0 && kcal >= 0 ? { kcal: kcal / w, protein: (protein || 0) / w } : null;
+      exact = ex && !!dens;
       labels(); onChange?.();
     },
   };

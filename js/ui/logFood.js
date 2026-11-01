@@ -352,8 +352,10 @@ export function openLogSheet({ day = today(), meal = null, onSaved = null, room 
 
 /*
   «تخمین با هوشواره»: fills unit, weight, calories, protein (and category / veg where the
-  form has them) from the food's name. Shared with the food bank form. The chosen unit is
-  sent along when it was set on purpose (an existing food, or changed by hand).
+  form has them) from the food's name. Shared with the food bank form. The chosen unit and
+  its weight are sent along, and kept, when they were set on purpose (an existing food, a
+  barcode, or changed by hand); numbers read off the pack stay, the estimate then only
+  gives the weight of a unit when it is missing, and the category.
 */
 export function bindEstimate(root, F, units, { keepUnit = false } = {}) {
   const btn = root.querySelector('[data-ai-est]');
@@ -363,13 +365,24 @@ export function bindEstimate(root, F, units, { keepUnit = false } = {}) {
   btn.onclick = async () => {
     const name = F.name.value.trim();
     if (!name) { toast('اول اسم غذا را بنویس'); F.name.focus(); return; }
-    const picked = units.read().unit;
+    const cur = units.picked();
+    const chosen = keepUnit || F.unit.value !== unit0;
+    const unit = chosen ? cur.unit : '';
+    const grams = chosen && cur.unit !== GRAM && cur.grams > 0 ? cur.grams : 0;
+    const ex = units.exact();
     btn.disabled = true;
     btn.innerHTML = `${sparkle()} هوشواره دارد حساب می‌کند…`;
     try {
-      const r = await ask('estimate', { name, unit: keepUnit || F.unit.value !== unit0 ? picked : '' });
+      const per100 = ex && { kcal: Math.round(ex.kcal * 100), protein: Math.round(ex.protein * 1000) / 10 };
+      const r = await ask('estimate', { name, unit, grams, per100 });
       if (!btn.isConnected) return;
-      units.set({ unit: r.unit, grams: r.unit === GRAM ? 1 : r.grams, kcal: r.kcal, protein: r.protein });
+      r.unit = unit || r.unit;
+      const w = r.unit === GRAM ? 1 : r.grams;
+      // the estimate's density, or the pack's, on the weight that was chosen
+      const d = ex || (w > 0 && { kcal: r.kcal / w, protein: r.protein / w });
+      r.grams = r.unit === GRAM ? 1 : grams || r.grams;
+      if (d && r.grams > 0) { r.kcal = d.kcal * r.grams; r.protein = d.protein * r.grams; }
+      units.set({ unit: r.unit, grams: r.grams, kcal: r.kcal, protein: r.protein }, { exact: !!ex });
       if (F.category && r.category) { F.category.value = r.category; F.category.dispatchEvent(new Event('change')); }
       F.veg.checked = !!r.is_veg;
       const note = root.querySelector('.ai-est-note');
