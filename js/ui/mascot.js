@@ -9,7 +9,8 @@
   counting, nothing about the scale.
 
   He keeps quiet most of the time: a line at most every 90 seconds (the big moments excepted),
-  six a day, and the switch in «نمایه» turns him off on this device.
+  six a day, and the switch in «نمایه» turns him off on this device. His voice (recorded with
+  ElevenLabs, see VOICE.md) has its own switch there, off until it is turned on.
 */
 import * as store from '../data/store.js';
 import { entriesOn, streak } from '../domain/stats.js';
@@ -51,6 +52,7 @@ const LINES = {
     '{n} روز پشت‌سرهم! این دیگه یه عادت واقعیه!',
     'فوق‌العاده! {n} روز پیاپی ثبت کردی!',
     '{n} روز بی‌وقفه! نظریه‌ی من ثابت شد: تو می‌تونی!',
+    '{n} روز! یه سال کامل! نظریه‌ی من ثابت شد: تو می‌تونی!',
   ] },
   activity: { mood: 'excited', lines: [
     'حرکت ثبت شد! بدنت الان داره تشکر می‌کنه.',
@@ -80,7 +82,52 @@ const CARE = {
 };
 // The moments that may come right after another line.
 const BIG = new Set(['first', 'meals', 'streak', 'review', 'goal']);
-const STREAKS = [3, 7, 14, 21, 30, 60, 100, 200, 365];
+// Each run of days has its own recording, so each has one fixed line (VOICE.md).
+const STREAK_LINE = { 3: 0, 7: 1, 14: 2, 21: 0, 30: 1, 60: 2, 100: 0, 200: 1, 365: 3 };
+const STREAKS = Object.keys(STREAK_LINE).map(Number);
+
+/*
+  His voice: one recording per line in audio/mascot/, named <moment>-<n> after the line's place
+  in its list (care-<moment>-<n> for the caring lines, streak-<days>, greet-<part of day>-<n>),
+  and a short sound effect under it. Off unless switched on in «نمایه». Recordings are fetched
+  whole (not streamed), so the service worker keeps a copy and they play offline too.
+*/
+const SOUND = 'tanara:mascot:sound';
+export function soundOn() {
+  try { return localStorage.getItem(SOUND) === 'on'; } catch { return false; }
+}
+export function setSound(on) {
+  try { on ? localStorage.setItem(SOUND, 'on') : localStorage.removeItem(SOUND); } catch { /* private mode */ }
+  if (on) speak('greet-back-1'); // a sample, right on the tap that turned it on
+}
+const urls = new Map();
+function load(name) {
+  if (!urls.has(name)) {
+    urls.set(name, fetch(`audio/mascot/${name}.mp3`)
+      .then(r => (r.ok ? r.blob() : Promise.reject(new Error(r.status))))
+      .then(b => URL.createObjectURL(b))
+      .catch(e => { urls.delete(name); throw e; }));
+  }
+  return urls.get(name);
+}
+// Resolves to the playing Audio, or null (sound off, app in the background, not allowed yet).
+async function play(name, volume = 1) {
+  if (!soundOn() || document.hidden) return null;
+  try {
+    const a = new Audio(await load(name));
+    a.volume = volume;
+    await a.play();
+    return a;
+  } catch { return null; }
+}
+let voice = null;
+async function speak(name) {
+  voice?.pause();
+  voice = await play(name);
+  return voice;
+}
+// The bubbling flasks while Hooshvareh thinks in the chat.
+export function thinkingSound() { if (mascotOn()) play('sfx-bubble', 0.3); }
 
 /* ---------- how often: kept on this device, per day ---------- */
 const LOG = 'tanara:mascot:log';
@@ -108,7 +155,7 @@ function mount() {
 }
 function hide() { clearTimeout(hideTimer); el?.classList.remove('show'); }
 
-async function show(mood, text) {
+async function show(mood, text, sound) {
   const b = mount();
   const img = b.querySelector('img');
   img.src = face(mood);
@@ -121,16 +168,27 @@ async function show(mood, text) {
   b.classList.add('show');
   clearTimeout(hideTimer);
   hideTimer = setTimeout(hide, Math.max(3500, text.length * 90));
+  if (!sound || !soundOn()) return;
+  play(sound.sfx, 0.45);
+  await new Promise(r => setTimeout(r, 250));
+  const a = await speak(sound.voice);
+  // stays until he has finished talking
+  if (a) a.addEventListener('ended', () => { if (voice === a) { clearTimeout(hideTimer); hideTimer = setTimeout(hide, 1500); } });
+  if (a) { clearTimeout(hideTimer); hideTimer = setTimeout(hide, 15000); }
 }
 
 function say(kind, n) {
-  const set = (edCare() ? CARE : LINES)[kind];
+  const care = edCare();
+  const set = (care ? CARE : LINES)[kind];
   if (!set) return false;
   const log = readLog();
   if (log.n >= 6) return false;
   if (!BIG.has(kind) && Date.now() - log.last < 90000) return false;
   const mood = Array.isArray(set.mood) ? pick(set.mood) : set.mood;
-  show(mood, pick(set.lines).replace('{n}', fa(n)));
+  const i = kind === 'streak' ? STREAK_LINE[n] : Math.floor(Math.random() * set.lines.length);
+  const sfx = care ? 'sfx-chime' : kind === 'goal' ? 'sfx-gadget' : ['meals', 'streak', 'review'].includes(kind) ? 'sfx-cheer' : 'sfx-pop';
+  const file = kind === 'streak' ? `streak-${n}` : `${care ? 'care-' : ''}${kind}-${i + 1}`;
+  show(mood, set.lines[i].replace('{n}', fa(n)), { sfx, voice: file });
   log.n++;
   log.last = Date.now();
   log.said.push(kind === 'streak' ? `streak${n}` : kind);
@@ -189,11 +247,34 @@ export function greetCard() {
   const key = away ? 'back' : slot(new Date().getHours());
   const g = GREET[key];
   const seed = [...`${t}${key}`].reduce((a, c) => a + c.charCodeAt(0), 0);
-  return `<button type="button" class="greet" data-greet aria-label="گفت‌وگو با هوشواره">
+  const i = seed % g.lines.length;
+  return `<button type="button" class="greet" data-greet data-voice="greet-${key}-${i + 1}" data-once="${t}-${key}" aria-label="گفت‌وگو با هوشواره">
     <img src="${face(g.mood)}" alt="" width="60" height="60">
-    <span>${esc(g.lines[seed % g.lines.length])}</span>
+    <span>${esc(g.lines[i])}</span>
   </button>`;
 }
+/*
+  With sound on, the greeting is said once per part of the day. A phone only lets a page play
+  sound after a tap, so when the app has just opened it waits for the first touch.
+*/
+const GREETED = 'tanara:mascot:greeted';
+let waiting = false;
 export function bindGreet(root) {
-  root.querySelector('[data-greet]')?.addEventListener('click', () => document.querySelector('#nav a[data-route="ai"]')?.click());
+  const g = root.querySelector('[data-greet]');
+  if (!g) return;
+  g.addEventListener('click', () => document.querySelector('#nav a[data-route="ai"]')?.click());
+  const greet = async () => {
+    const now = document.querySelector('[data-greet]');
+    if (!now || !soundOn()) return true;
+    try { if (localStorage.getItem(GREETED) === now.dataset.once) return true; } catch { return true; }
+    if (!(await speak(now.dataset.voice))) return false;
+    try { localStorage.setItem(GREETED, now.dataset.once); } catch { /* private mode */ }
+    return true;
+  };
+  if (waiting) return;
+  greet().then(done => {
+    if (done) return;
+    waiting = true;
+    document.addEventListener('pointerdown', () => { waiting = false; greet(); }, { once: true, capture: true });
+  });
 }

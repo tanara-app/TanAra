@@ -11,7 +11,7 @@ import { today, relLabel, faDMY, weekLabel } from '../lib/dates.js';
 import { toast, confirmBox, sheet, icon } from './dom.js';
 import { pickPhotos, foodPhoto, cameraIcon } from './photo.js';
 import { applySwap } from './plan.js';
-import { face } from './mascot.js';
+import { face, thinkingSound } from './mascot.js';
 import { amountLabel, foodMeta } from './units.js';
 import { saveRecipe } from './recipes.js';
 import { recipeFrom, perUnit } from '../domain/recipe.js';
@@ -548,6 +548,7 @@ async function send() {
   }));
   history.push({ role: 'user', content: text });
   live = { text: '', actions: [], error: null, thread };
+  thinkingSound();
   store.saveChat({ role: 'user', content: text, thread });
   paint(true);
 
