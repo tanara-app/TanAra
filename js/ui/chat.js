@@ -53,6 +53,7 @@ function loadThread() {
 }
 function setThread(id) {
   current = id;
+  limit = PAGE;
   focusArticle(null); // an article's full text only rides along in the conversation opened for it
   try { localStorage.setItem(THREAD_KEY(), id ?? ''); } catch { /* ignore */ }
 }
@@ -291,6 +292,11 @@ function apply(a) {
 
 const sorted = () => [...store.get().chat].sort((a, b) => (a.created_at < b.created_at ? -1 : 1));
 
+// Only the latest messages are drawn; laying out a whole long conversation made the tab slow
+// to open. «پیام‌های قبلی» brings the earlier ones in, a page at a time.
+const PAGE = 20;
+let limit = PAGE;
+
 const YES = { add: 'ثبت', edit: 'اعمال کن', delete: 'حذف کن' };
 const DONE = { add: 'ثبت شد', edit: 'انجام شد', delete: 'حذف شد' };
 function actionsHtml(msgId, actions) {
@@ -373,6 +379,7 @@ function buildShell(root) {
   // keep the latest message in view while the keyboard opens and closes (if it was in view)
   const box = root.querySelector('[data-scroll]');
   stuck = true;
+  limit = PAGE;
   box.addEventListener('scroll', () => { stuck = nearBottom(box, 40); }, { passive: true });
 
   root.querySelector('[data-attach]')?.addEventListener('click', addShots);
@@ -385,6 +392,12 @@ function buildShell(root) {
   };
   root.querySelector('[data-threads]').onclick = openThreads;
   root.querySelector('[data-scroll]').addEventListener('click', e => {
+    if (e.target.closest('[data-more]')) {
+      const box = e.currentTarget, h = box.scrollHeight;
+      limit += PAGE; paint();
+      box.scrollTop += box.scrollHeight - h; // stay on the message that was in view
+      return;
+    }
     const s = e.target.closest('[data-sugg]');
     if (s) { draft = s.textContent; send(); return; }
     const b = e.target.closest('.ai-act [data-yes], .ai-act [data-no]');
@@ -447,8 +460,9 @@ function paint(forceBottom = false) {
   const box = viewRoot.querySelector('[data-scroll]');
   if (!box) return;
   const stick = forceBottom || nearBottom(box) || !box.childElementCount;
-  const msgs = sorted().filter(m => sameThread(m, current));
-  const title = msgs.length ? threadTitle(current, msgs.find(m => m.role === 'user')) : '';
+  const all = sorted().filter(m => sameThread(m, current));
+  const msgs = all.slice(-limit);
+  const title = all.length ? threadTitle(current, all.find(m => m.role === 'user')) : '';
   viewRoot.querySelector('[data-title]').textContent = title;
   box.innerHTML = `
     ${!msgs.length && !liveHtml() ? `<div class="chat-empty">
@@ -456,6 +470,7 @@ function paint(forceBottom = false) {
       <p class="muted small">بپرس، تحلیل بخواه، یا بگو چه خوردی تا برایت ثبتش کنم (با تأیید خودت).</p>
       <div class="chat-sugg">${SUGGESTIONS.map(s => `<button class="chip-btn" data-sugg>${s}</button>`).join('')}</div>
     </div>` : ''}
+    ${all.length > msgs.length ? `<button class="link small chat-more" data-more>پیام‌های قبلی (${fa(all.length - msgs.length)})</button>` : ''}
     ${msgs.map(bubble).join('')}
     ${liveHtml()}`;
   paintSend();

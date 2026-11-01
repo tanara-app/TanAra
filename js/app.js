@@ -33,7 +33,9 @@ nav.innerHTML = Object.entries(ROUTES).map(([k, r]) => `<a href="#/${k}" data-ro
 // «مرور هفته» used to be a tab; it now lives inside «پیشرفت».
 if (location.hash === '#/review') { showReview(); history.replaceState(history.state, '', '#/progress'); }
 
-const route = () => (location.hash.replace('#/', '') in ROUTES ? location.hash.replace('#/', '') : 'today');
+// While history.back() is still on its way to امروز, the hash says the old tab.
+let going = null;
+const route = () => going || (location.hash.replace('#/', '') in ROUTES ? location.hash.replace('#/', '') : 'today');
 
 /*
   Back button: tabs don't pile up in history. From «امروز» a tab is pushed (back returns to
@@ -47,8 +49,11 @@ nav.addEventListener('click', e => {
   const to = a.dataset.route, from = route();
   if (to === from) return;
   if (from === 'today') { location.hash = `#/${to}`; history.replaceState({ tab: true }, ''); }
-  else if (to === 'today' && history.state?.tab) history.back();
+  else if (to === 'today' && history.state?.tab) { going = 'today'; history.back(); }
   else location.replace(`#/${to}`);
+  // Draw now, not on the hashchange: that comes a beat later (history.back() goes through the
+  // browser first), and on a phone that beat was the wait between the tap and the page.
+  show();
 });
 // Opened straight on a tab (reload, shortcut): put امروز underneath so back goes there first.
 if (route() !== 'today' && !history.state) {
@@ -82,10 +87,12 @@ document.addEventListener('focusout', () => setTimeout(trackViewport, 50));
 trackViewport();
 
 let started = false;
+let shown = null; // tab on screen, so the hashchange after a tap doesn't draw it a second time
 function render() {
   if (!started) return;
   const p = store.profile();
   if (!p?.onboarded) {
+    shown = null;
     nav.hidden = true;
     document.body.classList.remove('chat-mode');
     view.classList.remove('chat-view');
@@ -97,6 +104,7 @@ function render() {
   document.body.classList.toggle('chat-mode', r === 'ai');
   view.classList.toggle('chat-view', r === 'ai');
   nav.querySelectorAll('a').forEach(a => a.classList.toggle('on', a.dataset.route === r));
+  shown = r;
   ROUTES[r].render(view);
 }
 
@@ -114,7 +122,8 @@ view.addEventListener('focusout', e => {
   if (pending && !isField(e.relatedTarget)) { pending = false; setTimeout(render, 0); }
 });
 
-window.addEventListener('hashchange', () => { sheet.closeAll({ history: false }); resetWeighDay(); render(); window.scrollTo(0, 0); });
+function show() { sheet.closeAll({ history: false }); resetWeighDay(); render(); window.scrollTo(0, 0); }
+window.addEventListener('hashchange', () => { going = null; if (route() !== shown) show(); });
 store.subscribe(requestRender);
 
 async function start(ns, remote) {

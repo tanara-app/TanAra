@@ -497,6 +497,7 @@ body.kb .nav { display: none; }
 .thread-open b { font-weight: 600; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .thread-open small { color: var(--muted); font-size: .8rem; }
 .thread-row .icon-btn { color: var(--muted); flex: none; }
+.chat-more { align-self: center; }
 .chat-empty { background: var(--surface); border-radius: var(--radius); padding: 16px; }
 .chat-sugg { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 .chip-btn { border: 1px solid var(--line); background: transparent; border-radius: 999px; padding: 7px 12px; font-size: .86rem; cursor: pointer; text-align: right; }
