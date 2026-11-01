@@ -182,9 +182,8 @@ function openArticle(key) {
     body.querySelector('[data-ask]').onclick = () => {
       startChat(`درباره‌ی مقاله‌ی «${d.title}»: `);
       focusArticle(key); // after startChat: opening a conversation clears the previous focus
-      // once the sheet's history entry is gone, so back from the chat isn't a dead step
-      window.addEventListener('popstate', () => location.replace('#/ai'), { once: true });
-      sheet.close();
+      // replace: back from the chat then returns to where the magazine was opened from
+      sheet.closeThen(() => location.replace('#/ai'));
     };
   }, { tall: true });
 }

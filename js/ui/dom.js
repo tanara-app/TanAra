@@ -33,6 +33,7 @@ const stack = [];
 let owed = 0;      // history entries of sheets closed from the UI, not yet popped
 let ignorePops = 0; // popstate events caused by our own history.go
 let goTimer = null;
+let afterPops = []; // waiting for our own history.go to land (see sheet.closeThen)
 
 function settleHistory() {
   clearTimeout(goTimer);
@@ -45,7 +46,10 @@ function settleHistory() {
 }
 
 window.addEventListener('popstate', () => {
-  if (ignorePops) { ignorePops--; return; }
+  if (ignorePops) {
+    if (!--ignorePops) { const run = afterPops; afterPops = []; run.forEach(f => f()); }
+    return;
+  }
   if (stack.length) close(stack[stack.length - 1], false);
 });
 
@@ -131,6 +135,15 @@ export const sheet = {
       if (!h) ctx.ownsHistory = false;
       close(ctx);
     }
+  },
+  /*
+    Close every sheet, then fn — once the sheets' history entries are popped. Going to another
+    tab right after closeAll() lands there first, and the pending history.go(-n) then steps
+    back to the sheet's entry, i.e. the tab that was under the sheet.
+  */
+  closeThen(fn) {
+    this.closeAll();
+    if (owed || ignorePops) afterPops.push(fn); else fn();
   },
   get isOpen() { return stack.length > 0; },
 };

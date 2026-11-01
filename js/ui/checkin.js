@@ -204,9 +204,8 @@ export function openCheckin({ follow = null, onDone = () => {} } = {}) {
         cheer('goal');
       });
       body.querySelector('[data-chat]').onclick = () => {
-        sheet.closeAll();
         startChat('درباره‌ی برنامه‌ی برگشتی که امروز چیدیم می‌خواهم بیشتر حرف بزنم: ');
-        location.hash = '#/ai';
+        sheet.closeThen(() => { location.hash = '#/ai'; });
       };
     };
 
