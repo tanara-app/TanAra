@@ -9,6 +9,7 @@ import { lapse } from '../domain/phase.js';
 import { fa, parseNum } from '../lib/fa.js';
 import { today, addDays, relLabel } from '../lib/dates.js';
 import { icon, toast, confirmBox } from './dom.js';
+import { cheer } from './mascot.js';
 import { dismissed, dismiss } from './notices.js';
 
 let day = today();
@@ -113,6 +114,7 @@ export function bindMeasure(root, rerender) {
     // a field that was emptied takes its value away
     if (kgRaw) store.setWeight(day, kg); else if (exW) store.deleteWeight(day);
     if (cmRaw) store.setWaist(day, cm); else if (exC) store.deleteWaist(day);
+    if (kgRaw || cmRaw) cheer('measure');
     toast(!kgRaw && !cmRaw ? 'ثبت این روز حذف شد' : waistLeft ? 'وزن ثبت شد؛ دور کمر هنوز مانده' : 'ثبت شد');
   };
   root.querySelector('[data-m-del]')?.addEventListener('click', async () => {

@@ -5,6 +5,7 @@ import { adherence } from '../domain/plan.js';
 import { fa, kcal50, signed, esc } from '../lib/fa.js';
 import { today, addDays, weekStart, weekLabel } from '../lib/dates.js';
 import { icon, toast } from './dom.js';
+import { cheer } from './mascot.js';
 import { reviewCard, bindReviewCard } from './aiCards.js';
 
 let ws = null;
@@ -53,7 +54,7 @@ export function renderReview(root) {
       return;
     }
     store.saveReview(next);
-    if (!quiet) toast('ذخیره شد');
+    if (!quiet) { toast('ذخیره شد'); cheer('review'); }
   };
   form.onsubmit = e => { e.preventDefault(); save(false); };
   // also keep notes when the person just leaves the field

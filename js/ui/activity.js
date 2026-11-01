@@ -9,6 +9,7 @@ import { phaseOn } from '../domain/targets.js';
 import { fa, parseNum } from '../lib/fa.js';
 import { weekStart, relLabel } from '../lib/dates.js';
 import { sheet, toast, icon } from './dom.js';
+import { cheer } from './mascot.js';
 
 const run = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="14" cy="4.5" r="1.8"/><path d="M8 21l3-6 3 2v4M6.5 11.5L9 8.5l4 1 2.5 3.5 3 .5M11 15l-1-5"/></svg>';
 const QUICK = [15, 30, 45, 60, 90];
@@ -51,6 +52,7 @@ function openActivity(day) {
       store.setActivity(day, m);
       sheet.close();
       toast(m ? 'ثبت شد' : 'حذف شد');
+      if (m) cheer('activity');
     };
   });
 }

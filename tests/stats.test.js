@@ -1,11 +1,19 @@
 import { suite, test, eq, near } from './harness.js';
-import { totals, vegServings, daysLoggedInWeek, rollingAvg, weekAvg, rate4w, projectWeight, weekSummary, waistSeries, waistToHeight, measureDue, frequentFoods, lastAmountFor, activityWeek } from '../js/domain/stats.js';
+import { totals, vegServings, daysLoggedInWeek, rollingAvg, weekAvg, rate4w, projectWeight, weekSummary, waistSeries, waistToHeight, measureDue, frequentFoods, lastAmountFor, activityWeek, streak } from '../js/domain/stats.js';
 import { upcoming } from '../js/domain/occasions.js';
 import { weekStart, addDays, diffDays } from '../js/lib/dates.js';
 
 const w = (day, kg) => ({ day, kg });
 
 suite('stats', () => {
+  test('streak counts days in a row with something logged, up to the given day', () => {
+    const e = ['2026-10-28', '2026-10-30', '2026-10-31', '2026-11-01', '2026-11-01'].map(day => ({ day }));
+    eq(streak(e, '2026-11-01'), 3);
+    eq(streak(e, '2026-10-28'), 1);
+    eq(streak(e, '2026-11-02'), 0);
+    eq(streak([], '2026-11-01'), 0);
+  });
+
   test('weeks start on Saturday', () => {
     eq(weekStart('2026-10-10'), '2026-10-10'); // a Saturday
     eq(weekStart('2026-10-16'), '2026-10-10'); // the Friday after

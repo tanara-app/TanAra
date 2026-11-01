@@ -26,6 +26,14 @@ export function totals(list) {
 export const VEG_SERVING_G = 80;
 export const vegServings = e => (e.unit === 'گرم' ? (Number(e.qty) || 0) / VEG_SERVING_G : Number(e.qty) || 1);
 
+// Days in a row with something logged, ending on `day` (0 when nothing is logged that day).
+export function streak(entries, day) {
+  const days = new Set(entries.map(e => e.day));
+  let n = 0;
+  for (let d = day; days.has(d); d = addDays(d, -1)) n++;
+  return n;
+}
+
 export function daysLoggedInWeek(entries, ws) {
   const end = addDays(ws, 6);
   return new Set(entries.filter(e => e.day >= ws && e.day <= end).map(e => e.day)).size;

@@ -15,6 +15,7 @@ import { fa, esc, norm } from '../lib/fa.js';
 import { today, diffDays, relLabel } from '../lib/dates.js';
 import { amountLabel } from './units.js';
 import { icon, sheet, toast, confirmBox } from './dom.js';
+import { cheer } from './mascot.js';
 import { openLogSheet, openEntrySheet } from './logFood.js';
 import { shopList, neededFoods } from '../domain/shopping.js';
 import { addToShopping } from './shopping.js';
@@ -186,6 +187,7 @@ function toggle(day, key, optId) {
     // eaten smaller than planned: that version stays with the day, so the card shows what was logged
     if (opt.fit) swaps[optId] = swaps[optId] && !swaps[optId].fit ? { ...opt, base: swaps[optId] } : opt;
     const ids = opt.items.map(i => store.saveEntry(entryOf(day, key, i)).id);
+    cheer('entry');
     picks[key] = [...cur, { o: optId, e: ids, t: optionText(opt) }];
   }
   if (!picks[key].length) delete picks[key];

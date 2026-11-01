@@ -10,6 +10,7 @@ import { sheet, toast, confirmBox, icon } from './dom.js';
 import { openFoodBank, openFoodForm } from './foodBank.js';
 import { foodMeta, amountLabel, unitFields, bindUnitFields, mountAmount } from './units.js';
 import { ask, aiAvailable, sparkle } from '../ai/hooshvareh.js';
+import { cheer } from './mascot.js';
 import { photoItems } from '../domain/photo.js';
 import { pickPhoto, foodPhoto, cameraIcon } from './photo.js';
 import { scanBarcode, barcodeBox, fillFromBarcode, barcodeIcon } from './barcode.js';
@@ -43,7 +44,7 @@ const aiEstBtn = () => (aiAvailable() ? `<button type="button" class="btn ai-btn
 export function openLogSheet({ day = today(), meal = null, onSaved = null, room = null } = {}) {
   let curMeal = meal || (day === today() ? mealForNow() : 'lunch');
   let query = '';
-  const save = e => { const row = store.saveEntry(e); onSaved?.(row); return row; };
+  const save = e => { const row = store.saveEntry(e); onSaved?.(row); cheer('entry'); return row; };
   const seg = () => (room ? `<p class="muted small portion">ثبت در ${room.label}</p>` : mealSeg(curMeal));
   const onMeal = (root, set) => { if (!room) bindMeal(root, set); };
   let chosen = []; // with `room`: the foods to be eaten together (a typed-in one may have no id)

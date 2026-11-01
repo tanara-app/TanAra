@@ -2,7 +2,7 @@
 // changes (log a food, a weight, correct or delete a record, ...) as cards; nothing is
 // written until the card is confirmed.
 import * as store from '../data/store.js';
-import { chat, ask, aiAvailable, md, sparkle, focusArticle } from '../ai/hooshvareh.js';
+import { chat, ask, aiAvailable, md, focusArticle } from '../ai/hooshvareh.js';
 import { MEALS } from '../domain/stats.js';
 import { CATEGORIES } from '../data/seedFoods.js';
 import { SLOTS, planOn, swapsOn, swapItem } from '../domain/plan.js';
@@ -11,6 +11,7 @@ import { today, relLabel, faDMY, weekLabel } from '../lib/dates.js';
 import { toast, confirmBox, sheet, icon } from './dom.js';
 import { pickPhotos, foodPhoto, cameraIcon } from './photo.js';
 import { applySwap } from './plan.js';
+import { face } from './mascot.js';
 import { amountLabel, foodMeta } from './units.js';
 import { saveRecipe } from './recipes.js';
 import { recipeFrom, perUnit } from '../domain/recipe.js';
@@ -320,7 +321,7 @@ function bubble(m) {
 
 function liveHtml() {
   if (!live || !sameThread(live, current)) return '';
-  const body = live.text ? md(live.text) : '<p class="typing"><i></i><i></i><i></i></p>';
+  const body = live.text ? md(live.text) : `<p class="typing"><img class="ai-face" src="img/mascot/face-thinking.webp" alt="" width="34" height="34"><i></i><i></i><i></i></p>`;
   return `<div class="msg ai" data-live>${body}${actionsHtml(null, live.actions)}${live.error ? `<p class="err">${esc(live.error)}</p>` : ''}</div>`;
 }
 
@@ -343,7 +344,7 @@ function buildShell(root) {
   root.innerHTML = `
     <header class="chat-head">
       <button class="icon-btn" data-threads aria-label="گفت‌وگوهای قبلی">${icon.history}</button>
-      <div class="chat-title"><h1><span class="ai-mark">${sparkle(20)}</span> هوشواره</h1><small data-title></small></div>
+      <div class="chat-title"><h1><img class="ai-face" src="${face()}" alt="" width="30" height="30"> هوشواره</h1><small data-title></small></div>
       <button class="icon-btn" data-new aria-label="گفت‌وگوی تازه">${icon.compose}</button>
     </header>
     <div class="chat" data-scroll></div>
@@ -466,6 +467,7 @@ function paint(forceBottom = false) {
   viewRoot.querySelector('[data-title]').textContent = title;
   box.innerHTML = `
     ${!msgs.length && !liveHtml() ? `<div class="chat-empty">
+      <img class="chat-buddy" src="${face('wave')}" alt="" width="110" height="110">
       <p>سلام! من هوشواره‌ام. همه‌ی چیزهایی را که در تن‌آرا ثبت کرده‌ای می‌بینم: غذاها، وزن، مرورهای هفته و انگیزه‌هایت.</p>
       <p class="muted small">بپرس، تحلیل بخواه، یا بگو چه خوردی تا برایت ثبتش کنم (با تأیید خودت).</p>
       <div class="chat-sugg">${SUGGESTIONS.map(s => `<button class="chip-btn" data-sugg>${s}</button>`).join('')}</div>

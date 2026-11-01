@@ -18,6 +18,7 @@ import { SLOTS } from '../domain/plan.js';
 import { fa, esc, parseNum, round50 } from '../lib/fa.js';
 import { today, mealForNow } from '../lib/dates.js';
 import { sheet, toast, confirmBox, choose, icon } from './dom.js';
+import { cheer } from './mascot.js';
 import { foodMeta, mountAmount } from './units.js';
 import { mealSeg, bindMeal } from './logFood.js';
 import { pickPhoto, foodPhoto, cameraIcon } from './photo.js';
@@ -192,6 +193,7 @@ function openCooked(r, onChange) {
     body.querySelector('[data-save]').onclick = () => {
       const saved = cooked() !== (r.cookedGrams || null) ? saveRecipe({ ...r, cookedGrams: cooked() }) : r;
       store.saveEntry({ day: today(), meal, food_id: bankFood(saved)?.id || null, name: r.name, ...amount.get(), is_veg: r.is_veg });
+      cheer('entry');
       sheet.close();
       toast(`${r.name} ثبت شد`);
       onChange?.();

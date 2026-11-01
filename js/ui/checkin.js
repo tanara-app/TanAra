@@ -17,6 +17,7 @@ import { sortedWeights } from '../domain/stats.js';
 import { today, addDays, weekStart, faDM } from '../lib/dates.js';
 import { fa, esc } from '../lib/fa.js';
 import { sheet, toast, confirmBox, icon } from './dom.js';
+import { cheer } from './mascot.js';
 import { dismissed, dismiss } from './notices.js';
 import { startChat } from './chat.js';
 
@@ -200,6 +201,7 @@ export function openCheckin({ follow = null, onDone = () => {} } = {}) {
         store.saveReview({ ...r, next_goal: d.goal });
         e.target.disabled = true;
         toast('هدف این هفته ثبت شد');
+        cheer('goal');
       });
       body.querySelector('[data-chat]').onclick = () => {
         sheet.closeAll();

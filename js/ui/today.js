@@ -20,6 +20,7 @@ import { measureNote, bindMeasureNote } from './measure.js';
 import { shoppingPill, bindShopping } from './shopping.js';
 import { activityPill, bindActivity } from './activity.js';
 import { checkinCard, bindCheckin } from './checkin.js';
+import { greetCard, bindGreet } from './mascot.js';
 
 let day = today();
 export const setDay = d => { day = d; };
@@ -76,6 +77,7 @@ export function renderToday(root) {
       <button type="button" role="tab" data-v="plan" aria-selected="${planMode}" class="${planMode ? 'on' : ''}">رژیم</button>
     </div>
 
+    ${isToday ? greetCard() : ''}
     ${isToday ? measureNote() : ''}
     ${isToday ? motivationCard() : ''}
     ${isToday ? tipCard() : ''}
@@ -150,6 +152,7 @@ export function renderToday(root) {
   const redraw = () => { if (root.querySelector('[data-mode]')) renderToday(root); };
   if (planMode) bindPlan(root, day, redraw);
   bindMotivation(root);
+  bindGreet(root);
   bindPhase(root);
   bindMeasureNote(root);
   bindShopping(root);
