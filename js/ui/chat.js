@@ -468,8 +468,8 @@ function paint(forceBottom = false) {
   box.innerHTML = `
     ${!msgs.length && !liveHtml() ? `<div class="chat-empty">
       <img class="chat-buddy" src="${face('wave')}" alt="" width="110" height="110">
-      <p>سلام! من هوشواره‌ام. همه‌ی چیزهایی را که در تن‌آرا ثبت کرده‌ای می‌بینم: غذاها، وزن، مرورهای هفته و انگیزه‌هایت.</p>
-      <p class="muted small">بپرس، تحلیل بخواه، یا بگو چه خوردی تا برایت ثبتش کنم (با تأیید خودت).</p>
+      <p><b>سلام! من هوشواره‌ام، پروفسورِ کوچولوی آزمایشگاه تن‌آرا.</b> هر چی ثبت کردی جلوی چشممه: غذاها، وزن، مرورهای هفته و انگیزه‌هات. برای من همه‌شون داده‌های هیجان‌انگیزن!</p>
+      <p class="muted small">هر سؤالی داری بپرس، تحلیل بخواه، یا بگو چی خوردی تا برات ثبتش کنم (البته با تأیید خودت).</p>
       <div class="chat-sugg">${SUGGESTIONS.map(s => `<button class="chip-btn" data-sugg>${s}</button>`).join('')}</div>
     </div>` : ''}
     ${all.length > msgs.length ? `<button class="link small chat-more" data-more>پیام‌های قبلی (${fa(all.length - msgs.length)})</button>` : ''}
