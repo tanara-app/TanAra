@@ -16,7 +16,7 @@ import { openUsage } from './usage.js';
 import { openShopping, shoppingLine } from './shopping.js';
 import { aiAvailable } from '../ai/hooshvareh.js';
 import { THEMES, getTheme, setTheme } from './theme.js';
-import { mascotOn, setMascot, soundOn, setSound } from './mascot.js';
+import { MODES, buddyMode, setBuddyMode } from './mascot.js';
 
 let session = { email: null, signOut: null, local: true };
 export const setSession = s => { session = s; };
@@ -70,8 +70,7 @@ export function renderProfile(root) {
       ${row('data-bank', 'بانک غذا', `${fa(s.foods.length)} غذا`)}
       ${row('data-shopping', 'لیست خرید', shoppingLine())}
       ${aiAvailable() ? row('data-usage', 'مصرف هوشواره', 'هر کار هوشواره چقدر هزینه داشته') : ''}
-      ${row('data-mascot', 'جمله‌های تشویقی هوشواره', mascotOn() ? 'روشن؛ بعد از ثبت‌ها و بالای «امروز»' : 'خاموش')}
-      ${mascotOn() ? row('data-sound', 'صدای هایمردینگر', soundOn() ? 'روشن' : 'خاموش') : ''}
+      ${row('data-mascot', 'جمله‌های تشویقی و صدای هوشواره', { off: 'خاموش', text: 'فقط نوشته؛ بعد از ثبت‌ها و بالای «امروز»', voice: 'نوشته و صدای هایمردینگر' }[buddyMode()])}
       ${row('data-theme', 'ظاهر', THEMES.find(t => t.value === getTheme()).label)}
       ${row('data-data', 'داده‌ها و پشتیبان', 'خروجی گرفتن، برگرداندن، غذاهای پیش‌فرض')}
       ${row('data-account', 'حساب', session.local ? 'حالت آزمایشی محلی' : `${esc(session.email || '')}${st.pending ? ` · ${fa(st.pending)} تغییر در صف` : ''}`)}
@@ -96,13 +95,9 @@ export function renderProfile(root) {
     if (t) { setTheme(t); renderProfile(root); }
   };
   root.querySelector('[data-mascot]').onclick = async () => {
-    const v = await choose('جمله‌های تشویقی هوشواره', [{ value: 'on', label: 'روشن' }, { value: 'off', label: 'خاموش' }], mascotOn() ? 'on' : 'off');
-    if (v) { setMascot(v === 'on'); renderProfile(root); }
+    const v = await choose('جمله‌های تشویقی و صدای هوشواره', MODES, buddyMode());
+    if (v) { setBuddyMode(v); renderProfile(root); }
   };
-  root.querySelector('[data-sound]')?.addEventListener('click', async () => {
-    const v = await choose('صدای هایمردینگر', [{ value: 'on', label: 'روشن' }, { value: 'off', label: 'خاموش' }], soundOn() ? 'on' : 'off');
-    if (v) { setSound(v === 'on'); renderProfile(root); }
-  });
   root.querySelector('[data-data]').onclick = openData;
   root.querySelector('[data-account]').onclick = openAccount;
 }

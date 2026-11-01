@@ -9,8 +9,8 @@
   counting, nothing about the scale.
 
   He keeps quiet most of the time: a line at most every 90 seconds (the big moments excepted),
-  six a day, and the switch in «نمایه» turns him off on this device. His voice (recorded with
-  ElevenLabs, see VOICE.md) has its own switch there, off until it is turned on.
+  six a day. One setting in «نمایه» picks, on this device, whether he is off, only writes, or
+  also speaks (his voice is recorded with ElevenLabs, see VOICE.md); it starts on «فقط نوشته».
 */
 import * as store from '../data/store.js';
 import { entriesOn, streak } from '../domain/stats.js';
@@ -99,6 +99,19 @@ export function soundOn() {
 export function setSound(on) {
   try { on ? localStorage.setItem(SOUND, 'on') : localStorage.removeItem(SOUND); } catch { /* private mode */ }
   if (on) speak('greet-back-1'); // a sample, right on the tap that turned it on
+}
+// The one setting in «نمایه»: 'off', 'text' or 'voice'.
+export const MODES = [
+  { value: 'off', label: 'خاموش' },
+  { value: 'text', label: 'فقط نوشته' },
+  { value: 'voice', label: 'نوشته و صدای هایمردینگر' },
+];
+export const buddyMode = () => (!mascotOn() ? 'off' : soundOn() ? 'voice' : 'text');
+export function setBuddyMode(m) {
+  const wasVoice = buddyMode() === 'voice';
+  setMascot(m !== 'off');
+  if (m !== 'voice') setSound(false);
+  else if (!wasVoice) setSound(true);
 }
 const urls = new Map();
 function load(name) {
