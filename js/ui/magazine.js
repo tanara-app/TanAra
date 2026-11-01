@@ -10,6 +10,7 @@ import { today, parse, relLabel, weekStart, addDays, faFull } from '../lib/dates
 import { fa, esc } from '../lib/fa.js';
 import { toast, sheet, icon } from './dom.js';
 import { startChat } from './chat.js';
+import { dismissed, dismiss } from './notices.js';
 
 const CATS = {
   nutrition: 'تغذیه', activity: 'ورزش و تحرک', sleep_stress: 'خواب و استرس', habits: 'روان‌شناسی عادت',
@@ -71,7 +72,7 @@ const meta = n => `${CATS[n.data.category] || 'مجله'} · ${fa(Math.max(1, Nu
 
 export function magCard() {
   const n = weekArticle();
-  if (!n || n.data.read) return '';
+  if (!n || n.data.read || dismissed('mag', n.key)) return '';
   return `<button class="card mag-teaser" data-mag-open="${n.key}">
     <small class="mag-meta"><span class="ai-mark">${sparkle(14)}</span> مقاله‌ی این هفته‌ی مجله · ${meta(n)}</small>
     <b>${esc(n.data.title)}</b>
@@ -80,11 +81,62 @@ export function magCard() {
 }
 
 export function bindMag(root, refresh) {
-  root.querySelector('[data-mag-open]')?.addEventListener('click', e => {
-    openKey = e.currentTarget.dataset.magOpen;
-    location.hash = '#/mag';
-  });
+  const card = root.querySelector('[data-mag-open]');
+  if (card) {
+    card.addEventListener('click', e => {
+      if (card.dataset.swiped) { e.preventDefault(); return; }
+      openKey = card.dataset.magOpen;
+      location.hash = '#/mag';
+    });
+    bindSwipeAway(card, () => dismiss('mag', card.dataset.magOpen));
+  }
   autoDaily(refresh);
+}
+
+// Drag the teaser to the right and it slides off and fades; the article stays unread in the tab.
+function bindSwipeAway(el, onGone) {
+  let x0 = null, y0 = 0, dx = 0, t0 = 0, dragging = false;
+  el.addEventListener('pointerdown', e => {
+    if (!e.isPrimary || e.button > 0) return;
+    x0 = e.clientX; y0 = e.clientY; dx = 0; t0 = Date.now(); dragging = false;
+  });
+  el.addEventListener('pointermove', e => {
+    if (x0 === null) return;
+    const d = e.clientX - x0;
+    if (!dragging) {
+      if (Math.abs(e.clientY - y0) > Math.abs(d) && Math.abs(e.clientY - y0) > 8) { x0 = null; return; }
+      if (d < 8) return;
+      dragging = true;
+      el.setPointerCapture(e.pointerId);
+      el.style.transition = 'none';
+    }
+    dx = Math.max(0, d);
+    el.style.transform = `translateX(${dx}px)`;
+    el.style.opacity = String(Math.max(0, 1 - dx / el.offsetWidth));
+  });
+  const end = () => {
+    if (x0 === null) return;
+    x0 = null;
+    if (!dragging) return;
+    el.dataset.swiped = '1';
+    setTimeout(() => delete el.dataset.swiped, 50);
+    el.style.transition = '';
+    const fast = dx / Math.max(1, Date.now() - t0) > 0.5 && dx > 40;
+    if (!fast && dx < el.offsetWidth * 0.35) { el.style.transform = ''; el.style.opacity = ''; return; }
+    onGone();
+    el.style.transform = `translateX(${el.offsetWidth}px)`;
+    el.style.opacity = '0';
+    el.style.pointerEvents = 'none';
+    setTimeout(() => {
+      el.style.transition = 'height .22s ease, margin .22s ease, padding .22s ease';
+      el.style.height = `${el.offsetHeight}px`;
+      el.style.overflow = 'hidden';
+      requestAnimationFrame(() => { el.style.height = '0'; el.style.margin = '0'; el.style.paddingBlock = '0'; });
+      setTimeout(() => el.remove(), 240);
+    }, 220);
+  };
+  el.addEventListener('pointerup', end);
+  el.addEventListener('pointercancel', end);
 }
 
 /* ---------------- the tab ---------------- */
