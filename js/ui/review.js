@@ -1,5 +1,5 @@
 // Weekly review. The week that just ended comes to «امروز» by itself as a card: its numbers,
-// Hooshvareh's analysis and goal, and one question. Earlier weeks open in a sheet from «پیشرفت».
+// Hooshvareh's analysis and goal. Earlier weeks open in a sheet from «پیشرفت».
 import * as store from '../data/store.js';
 import { weekSummary, weekToReview } from '../domain/stats.js';
 import { adherence } from '../domain/plan.js';
@@ -93,7 +93,6 @@ export function weekCard() {
   if (!w) return '';
   const s = store.get();
   const sum = weekSummary(s.entries, s.weights, w);
-  const r = s.reviews.find(x => x.week_start === w) || {};
   const line = [`${fa(sum.daysLogged)} روز از ۷ ثبت`];
   if (!edCare()) {
     if (sum.avgKcal !== null) line.push(`میانگین ${kcal50(sum.avgKcal)} کالری`);
@@ -105,10 +104,9 @@ export function weekCard() {
     <p class="small">${line.join(' · ')}</p>
     <div class="fold-body mt">
       ${reviewBody(w)}
-      <label class="field mt"><span>این هفته چه چیزی سخت بود؟ <em>اختیاری</em></span><textarea name="week-hard" rows="2">${esc(r.hard || '')}</textarea></label>
     </div>
     <div class="week-foot">
-      <button type="button" class="fold-h link small" aria-expanded="${weekOpen}">${aiAvailable() ? 'تحلیل و هدف این هفته' : 'این هفته چه چیزی سخت بود؟'}${icon.chevD}</button>
+      ${aiAvailable() ? `<button type="button" class="fold-h link small" aria-expanded="${weekOpen}">تحلیل و هدف این هفته${icon.chevD}</button>` : '<span></span>'}
       <button class="btn ghost sm" data-week-done>باشه</button>
     </div>
   </section>`;
@@ -120,12 +118,11 @@ export function bindWeekCard(root, refresh) {
   if (!card || !w) return;
   const saved = () => store.get().reviews.find(x => x.week_start === w) || {};
   const put = patch => { const r = saved(); store.saveReview({ week_start: w, good: r.good || '', hard: r.hard || '', next_goal: r.next_goal || '', ...patch }); };
-  card.querySelector('[name=week-hard]').addEventListener('change', e => put({ hard: e.target.value.trim() }));
   card.querySelector('[data-week-done]').onclick = () => { dismiss('week', w); card.remove(); };
-  card.querySelector('.fold-h').onclick = e => {
+  card.querySelector('.fold-h')?.addEventListener('click', e => {
     weekOpen = card.classList.toggle('folded') === false;
     e.currentTarget.setAttribute('aria-expanded', weekOpen);
-  };
+  });
   bindReviewCard(card, w, refresh, goal => { put({ next_goal: goal }); toast('هدف این هفته ثبت شد'); cheer('review'); });
   autoReview(w, refresh);
 }
