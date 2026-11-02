@@ -272,7 +272,7 @@ export function greetCard() {
   The lines take the place of the greeting for a moment and don't count towards the six a day,
   since they asked for them. Nothing here is about food or the body, so they suit everyone. The
   last one says where the chat is, now that tapping him no longer opens it. Each has a recording
-  poke-<n> (VOICE.md); until there is one, only the little sound plays.
+  poke-<n> (VOICE.md).
 */
 const POKES = [
   { mood: 'surprised', text: 'اوه! داشتم یه فرمول رو حل می‌کردم.' },
@@ -285,7 +285,7 @@ const POKES = [
 ];
 const STAGES = [[0, 1, 2], [3, 4], [5], [6]]; // by how many taps in a row
 const plainSrc = img => img.getAttribute('src').replace('-blink', '');
-let pokes = 0, pokeAt = 0, lastPoke = -1, pokeTimer = 0;
+let pokes = 0, pokeAt = 0, lastPoke = -1, pokeTimer = 0, pokeId = 0;
 
 function poke(g) {
   pokes = Date.now() - pokeAt > 6000 ? 0 : pokes + 1;
@@ -302,17 +302,28 @@ function poke(g) {
   btn.classList.remove('poked');
   void btn.offsetWidth; // restart the hop
   btn.classList.add('poked');
-  voice?.pause();
-  play('sfx-pop', 0.45);
-  speak(`poke-${i + 1}`);
-  clearTimeout(pokeTimer);
-  pokeTimer = setTimeout(() => {
+  const back = () => {
     if (!g.isConnected) return;
     img.src = g.dataset.mood;
     say.textContent = g.dataset.line;
     delete g.dataset.mood;
     delete g.dataset.line;
-  }, Math.max(3500, POKES[i].text.length * 90));
+  };
+  clearTimeout(pokeTimer);
+  pokeTimer = setTimeout(back, Math.max(3500, POKES[i].text.length * 90));
+  voice?.pause();
+  play('sfx-pop', 0.45);
+  const id = ++pokeId;
+  setTimeout(async () => {
+    if (id !== pokeId) return;
+    const a = await speak(`poke-${i + 1}`);
+    if (id !== pokeId) { a?.pause(); return; } // tapped again while it was loading
+    if (!a) return;
+    // the line stays until he has finished saying it
+    clearTimeout(pokeTimer);
+    pokeTimer = setTimeout(back, 15000);
+    a.addEventListener('ended', () => { if (id === pokeId) { clearTimeout(pokeTimer); pokeTimer = setTimeout(back, 800); } });
+  }, 200);
 }
 /*
   With sound on, the greeting is said once per part of the day. A phone only lets a page play
