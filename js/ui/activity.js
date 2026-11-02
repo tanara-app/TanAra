@@ -1,5 +1,5 @@
 /*
-  Activity on «امروز»: a pill with this week's minutes against the goal of the phase, and a
+  Activity on «پیشرفت»: a pill with this week's minutes against the goal of the phase, and a
   small sheet to set the minutes of the day shown. Moving more matters most once the weight is
   off (see ACTIVITY_GOAL in stats.js).
 */

@@ -1,5 +1,5 @@
 /*
-  «لیست خرید»: what has to be bought. Opened from the pill on «امروز» and from «نمایه»; items
+  «لیست خرید»: what has to be bought. Opened from «نمایه»; items
   also arrive from a recipe's ingredients, from a plan food they don't have (the swap sheet)
   and from the chat (propose_shopping).
 
@@ -40,16 +40,9 @@ export function markBought(names) {
 const close = `<button class="icon-btn" data-close aria-label="بستن">${icon.close}</button>`;
 const countText = n => (n ? `${fa(n)} قلم مانده` : 'چیزی برای خرید نمانده');
 
-/* ---------------- on «امروز» and «نمایه» ---------------- */
+/* ---------------- on «نمایه» ---------------- */
 
-export function shoppingPill() {
-  const n = toBuy(shopping()).length;
-  return `<button class="pill pill-btn" data-shop>${icon.cart}<span>لیست خرید${n ? `: <b>${fa(n)}</b> قلم` : ''}</span></button>`;
-}
 export const shoppingLine = () => countText(toBuy(shopping()).length);
-export function bindShopping(root) {
-  root.querySelector('[data-shop]')?.addEventListener('click', () => openShopping());
-}
 
 /* ---------------- the list ---------------- */
 

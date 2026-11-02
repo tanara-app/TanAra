@@ -231,6 +231,9 @@ dl.calc dd { margin: 0; text-align: left; }
 .bar { height: 8px; background: var(--surface-2); border-radius: 8px; overflow: hidden; margin-top: 4px; }
 .bar i { display: block; height: 100%; background: var(--protein); border-radius: 8px; }
 
+.today-more { margin-bottom: 12px; }
+.today-more > summary { background: var(--surface); border-radius: var(--radius); padding: 14px 16px; }
+.today-more > summary h2 { font-size: 1rem; }
 .pills { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
 .pill {
   display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px;

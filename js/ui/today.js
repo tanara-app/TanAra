@@ -1,5 +1,7 @@
 // Today screen, in one of two modes over the same entries: calorie counting (remaining
 // calories/protein, meals, veg counter) or the diet plan (Hooshvareh's options per meal).
+// The numbers come first, then the one card that matters most today; the other cards wait in a
+// fold under the meals, and the next one moves up when the top one is dismissed.
 import * as store from '../data/store.js';
 import { effectiveTargets } from '../domain/targets.js';
 import { phaseNotes, bindPhase, phaseLabel } from './phase.js';
@@ -17,13 +19,23 @@ import { tipCard, bindTip, occasionCard, bindOccasion } from './aiCards.js';
 import { magCard, bindMag } from './magazine.js';
 import { planHtml, bindPlan } from './plan.js';
 import { measureNote, bindMeasureNote } from './measure.js';
-import { shoppingPill, bindShopping } from './shopping.js';
-import { activityPill, bindActivity } from './activity.js';
 import { checkinCard, bindCheckin } from './checkin.js';
 import { greetCard, bindGreet } from './mascot.js';
 
 let day = today();
 export const setDay = d => { day = d; };
+let moreOpen = false;
+
+// Today's cards, most important first: what asks something of them, then what is there to read.
+const dayCards = () => [
+  ['مرحله', phaseNotes()],
+  ['برگشت به مسیر', checkinCard()],
+  ['اندازه‌گیری', measureNote()],
+  ['مناسبت', occasionCard()],
+  ['مقاله‌ی هفته', magCard()],
+  ['نکته‌ی امروز', tipCard()],
+  ['انگیزه‌ها', motivationCard()],
+].filter(([, html]) => html);
 
 function ring(consumed, target) {
   const r = 52, c = 2 * Math.PI * r;
@@ -48,6 +60,7 @@ export function renderToday(root) {
   const plan = planMode ? planHtml(day) : '';
   const counting = !planMode || !!p.planKcal;
   const mealList = !planMode || !plan || !plan.includes('class="meals"');
+  const [top, ...more] = isToday ? dayCards() : [];
 
   // Safety notices only on today's view.
   const notices = [];
@@ -77,15 +90,6 @@ export function renderToday(root) {
       <button type="button" role="tab" data-v="plan" aria-selected="${planMode}" class="${planMode ? 'on' : ''}">رژیم</button>
     </div>
 
-    ${isToday ? greetCard() : ''}
-    ${isToday ? measureNote() : ''}
-    ${isToday ? motivationCard() : ''}
-    ${isToday ? tipCard() : ''}
-    ${isToday ? occasionCard() : ''}
-    ${isToday ? magCard() : ''}
-    ${isToday ? phaseNotes() : ''}
-    ${isToday ? checkinCard() : ''}
-
     ${counting ? `<section class="card summary">
       <div class="ring-wrap">
         ${ring(tot.kcal, t.kcal)}
@@ -109,11 +113,12 @@ export function renderToday(root) {
       <div class="pill">${icon.leaf}<span>سبزی ${isToday ? 'امروز' : ''}: <b>${qtyLabel(Math.round(tot.veg * 2) / 2)}</b> وعده</span></div>
       <div class="pill"><span>این هفته <b>${fa(logged)}</b> روز ثبت کرده‌اید${lightOn(p, sortedWeights(s.weights), today()) ? ' · ثبت سبک' : ''}</span></div>
       ${t.phase !== 'loss' ? `<div class="pill"><span>مرحله: <b>${phaseLabel(p, day)}</b></span></div>` : ''}
-      ${activityPill(day)}
-      ${shoppingPill()}
     </div>
 
     ${notices.map(n => `<div class="note ${n.cls || 'soft'}" data-notice="${n.key}" data-mark="${n.mark}">${n.html}<button class="link small" data-dismiss>باشه</button></div>`).join('')}
+
+    ${isToday ? greetCard() : ''}
+    ${top ? `<div data-day-cards>${top[1]}</div>` : ''}
 
     ${plan}
 
@@ -136,6 +141,10 @@ export function renderToday(root) {
         </div>`;
       }).join('')}
     </section>` : ''}
+    ${more.length ? `<details class="fold today-more"${moreOpen ? ' open' : ''}>
+      <summary><span><h2>بیشتر برای امروز</h2><small>${more.map(([label]) => label).join('، ')}</small></span></summary>
+      <div data-day-cards>${more.map(([, html]) => html).join('')}</div>
+    </details>` : ''}
     ${mealList ? `<div class="fab-space"></div>
     <button class="fab" data-log>${icon.plus}<span>ثبت غذا</span></button>` : ''}`;
 
@@ -155,9 +164,15 @@ export function renderToday(root) {
   bindGreet(root);
   bindPhase(root);
   bindMeasureNote(root);
-  bindShopping(root);
-  bindActivity(root, day);
   bindCheckin(root, redraw);
+  // a card dismissed: draw again, so the next one moves up
+  root.querySelectorAll('[data-day-cards]').forEach(el => new MutationObserver(redraw).observe(el, { childList: true }));
+  const fold = root.querySelector('.today-more');
+  if (fold) fold.ontoggle = () => {
+    moreOpen = fold.open;
+    // a motivation drawn inside the closed fold had no height to take
+    if (fold.open) fold.querySelector('.mot-track')?.dispatchEvent(new Event('scroll'));
+  };
   root.querySelectorAll('[data-dismiss]').forEach(b => b.onclick = () => {
     const n = b.closest('[data-notice]');
     dismiss(n.dataset.notice, n.dataset.mark);

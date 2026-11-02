@@ -15,7 +15,8 @@ import { progressCard, bindProgressCard, maintainCard, bindMaintainCard } from '
 import { renderReview } from './review.js';
 import { phaseNotes, bindPhase } from './phase.js';
 import { checkinEntry, bindCheckin } from './checkin.js';
-import { measureCard, bindMeasure, resetMeasureDay, setMeasureDay, takeJump } from './measure.js';
+import { measureCard, bindMeasure, resetMeasureDay, setMeasureDay, measureDay, takeJump } from './measure.js';
+import { activityPill, bindActivity } from './activity.js';
 
 let rangeKey = '3m';
 let metric = 'weight'; // what the trend card shows; or 'waist'
@@ -142,6 +143,8 @@ export function renderProgress(root) {
 
     ${measureCard()}
 
+    <div class="pills">${activityPill(measureDay())}</div>
+
     ${phaseNotes()}
 
     ${rapid ? `<div class="note doctor"><strong>سرعت کاهش وزن زیاد است</strong><p>سه هفته‌ی پشت‌سرهم بیشتر از ۱٫۵ کیلو در هفته کم کرده‌اید. لطفاً با پزشک‌تان مشورت کنید.</p></div>` : ''}
@@ -172,6 +175,7 @@ export function renderProgress(root) {
   };
   bindSection();
   bindMeasure(root, rerender);
+  bindActivity(root, measureDay());
   const redrawAi = () => { if (root.isConnected && location.hash === '#/progress' && section === 'weight') rerender(); };
   bindProgressCard(root, redrawAi);
   bindMaintainCard(root, redrawAi);

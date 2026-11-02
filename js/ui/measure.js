@@ -15,6 +15,7 @@ import { dismissed, dismiss } from './notices.js';
 let day = today();
 export const resetMeasureDay = () => { day = today(); };
 export const setMeasureDay = d => { day = d; };
+export const measureDay = () => day;
 
 // «پیشرفت» should open on the form, whatever section was open last
 let jump = false;
