@@ -14,6 +14,7 @@ import { renderMagazine } from './ui/magazine.js';
 import { configureAI, sparkle } from './ai/hooshvareh.js';
 import { disable as disableReminders } from './ui/reminders.js';
 import { applyTheme } from './ui/theme.js';
+import { maybeCelebrate } from './ui/celebrate.js';
 
 applyTheme();
 
@@ -106,6 +107,7 @@ function render() {
   nav.querySelectorAll('a').forEach(a => a.classList.toggle('on', a.dataset.route === r));
   shown = r;
   ROUTES[r].render(view);
+  maybeCelebrate();
 }
 
 // Don't redraw under someone's fingers: if a field in the page has focus, wait until they leave it.

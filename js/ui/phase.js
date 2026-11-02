@@ -92,6 +92,8 @@ async function go(action) {
   }
 }
 
+export const toMaintenance = () => go('maintain');
+
 function openGoal() {
   const p = store.profile();
   const now = currentKg();

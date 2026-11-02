@@ -868,3 +868,18 @@ body.kb .toast, body.chat-mode .toast { bottom: calc(var(--nav-h) + var(--safe-b
 .week-foot .fold-h { display: inline-flex; align-items: center; gap: 4px; width: auto; color: var(--accent); }
 .week-foot .btn { margin: 0; }
 .popt-fresh { flex: none; padding: 1px 7px; border-radius: 8px; background: var(--ai-soft); color: var(--ai); font-size: .72rem; font-weight: 600; }
+
+/* the goal weight reached (ui/celebrate.js) */
+.party { position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; padding: 20px 16px; overflow-y: auto; background: var(--bg); animation: party-in .35s ease-out; }
+.party-paper { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.party-body { position: relative; display: grid; gap: 12px; justify-items: center; width: 100%; max-width: 420px; text-align: center; }
+.party-face { width: 180px; height: 180px; filter: drop-shadow(0 8px 16px var(--shadow)); animation: party-hop 1.1s ease-in-out 3; transform-origin: 50% 95%; }
+.party h1 { font-size: 2.6rem; font-weight: 800; color: var(--accent); }
+.party-line { font-size: 1.05rem; font-weight: 600; }
+.party-stats { display: flex; justify-content: center; gap: 10px; width: 100%; }
+.party-stats div { flex: 1; display: grid; gap: 2px; padding: 12px 6px; border-radius: var(--radius); background: var(--surface); }
+.party-stats b { font-size: 1.5rem; font-weight: 800; }
+.party-stats span { color: var(--muted); font-size: .8rem; }
+@keyframes party-in { from { opacity: 0; } }
+@keyframes party-hop { 25% { transform: translateY(-22px) rotate(-5deg); } 50% { transform: none; } 75% { transform: translateY(-14px) rotate(5deg); } }
+@media (prefers-reduced-motion: reduce) { .party, .party-face { animation: none; } }

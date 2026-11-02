@@ -1,5 +1,5 @@
 import { suite, test, eq, ok, near } from './harness.js';
-import { goalReached, goalProgress, breakDue, regain, withPhase, lossStart, BREAK_DAYS, zone, correctionDue, lightDue, lightOn, lapse, milestone, maintainWeeks } from '../js/domain/phase.js';
+import { celebrationDue, goalReached, goalProgress, breakDue, regain, withPhase, lossStart, BREAK_DAYS, zone, correctionDue, lightDue, lightOn, lapse, milestone, maintainWeeks } from '../js/domain/phase.js';
 import { phaseOn, correcting } from '../js/domain/targets.js';
 
 const w = (day, kg) => ({ day, kg });
@@ -40,6 +40,17 @@ suite('phase', () => {
     eq(regain(p, [w('2026-02-01', 81.9)], '2026-02-01'), null);
     near(regain(p, [w('2026-02-01', 82.4)], '2026-02-01').gain, 2.4, 1e-9);
     eq(regain({ maintainFrom: { kg: 80 } }, [w('2026-02-01', 90)], '2026-02-01'), null);  // not in maintenance
+  });
+
+  test('reaching the goal is celebrated once per goal, and not with a possible eating-disorder history', () => {
+    const at = [w('2026-01-08', 79), w('2026-01-10', 79)];
+    const p = { goalKg: 80 };
+    near(celebrationDue(p, at, '2026-01-10').avg, 79, 1e-9);
+    eq(celebrationDue({ ...p, goalCelebrated: 80 }, at, '2026-01-10'), null);
+    near(celebrationDue({ goalKg: 79.5, goalCelebrated: 80 }, at, '2026-01-10').avg, 79, 1e-9); // a new goal
+    eq(celebrationDue({ ...p, edHistory: 'yes' }, at, '2026-01-10'), null);
+    eq(celebrationDue({ ...p, edHistory: 'unsure' }, at, '2026-01-10'), null);
+    eq(celebrationDue({ goalKg: 75 }, at, '2026-01-10'), null); // not there yet
   });
 
   test('changing phase', () => {

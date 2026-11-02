@@ -139,6 +139,13 @@ async function speak(name) {
   voice = await play(name);
   return voice;
 }
+// The goal weight reached (ui/celebrate.js): the cheer, then his line goal-reached (VOICE.md).
+export async function celebrateSound() {
+  if (!mascotOn()) return;
+  play('sfx-cheer', 0.6);
+  await new Promise(r => setTimeout(r, 500));
+  speak('goal-reached');
+}
 // The bubbling flasks while Hooshvareh thinks in the chat.
 export function thinkingSound() { if (mascotOn()) play('sfx-bubble', 0.3); }
 

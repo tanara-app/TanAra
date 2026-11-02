@@ -40,6 +40,13 @@ export function goalReached(p, sorted, day) {
   return avg !== null && avg <= Number(p.goalKg) ? { avg } : null;
 }
 
+// The full-screen celebration of reaching the goal (ui/celebrate.js): once per goal, and never
+// with a possible eating-disorder history. Returns what goalReached does.
+export function celebrationDue(p, sorted, day) {
+  if (['yes', 'unsure'].includes(p?.edHistory) || Number(p?.goalCelebrated) === Number(p?.goalKg)) return null;
+  return goalReached(p, sorted, day);
+}
+
 // How far there is to go, for the progress screen: { left, done (0..1) } or null without a goal.
 export function goalProgress(p, sorted, day) {
   const goal = Number(p?.goalKg);
