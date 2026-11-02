@@ -284,6 +284,7 @@ const POKES = [
   { mood: 'calm', text: 'باشه، تو بردی. سؤالی داشتی، روی همین نوشته بزن.' },
 ];
 const STAGES = [[0, 1, 2], [3, 4], [5], [6]]; // by how many taps in a row
+const plainSrc = img => img.getAttribute('src').replace('-blink', '');
 let pokes = 0, pokeAt = 0, lastPoke = -1, pokeTimer = 0;
 
 function poke(g) {
@@ -293,7 +294,7 @@ function poke(g) {
   const i = stage.length > 1 ? pick(stage.filter(n => n !== lastPoke)) : stage[0];
   lastPoke = i;
   const img = g.querySelector('img'), say = g.querySelector('[data-greet-say] span');
-  g.dataset.mood ??= img.getAttribute('src');
+  g.dataset.mood ??= plainSrc(img);
   g.dataset.line ??= say.textContent;
   img.src = face(POKES[i].mood);
   say.textContent = POKES[i].text;
@@ -339,3 +340,34 @@ export function bindGreet(root) {
     document.addEventListener('pointerdown', () => { waiting = false; greet(); }, { once: true, capture: true });
   });
 }
+
+/*
+  He blinks, every few seconds and now and then twice, wherever he is on screen: the same picture
+  with the eyes closed (<mood>-blink.webp) for a moment. Only the moods that have one, and the
+  sleepy one already has its eyes shut.
+*/
+const BLINKS = new Set(['wave', 'happy', 'calm', 'hello']);
+const BLINK_MS = 130;
+const still = () => { try { return matchMedia('(prefers-reduced-motion: reduce)').matches; } catch { return false; } };
+const kept = [...BLINKS].map(m => Object.assign(new Image(), { src: face(`${m}-blink`) })); // ready, so no flicker
+
+function blinkOnce() {
+  for (const img of document.querySelectorAll('.greet img, .chat-buddy, .buddy.show .buddy-img')) {
+    const src = img.getAttribute('src') || '';
+    const mood = src.match(/mascot\/([a-z]+)\.webp$/)?.[1];
+    if (!BLINKS.has(mood)) continue;
+    const shut = face(`${mood}-blink`);
+    img.src = shut;
+    // unless he got a new face in the meantime
+    setTimeout(() => { if (img.getAttribute('src') === shut) img.src = src; }, BLINK_MS);
+  }
+}
+(function blinkLater() {
+  setTimeout(() => {
+    if (kept.length && !document.hidden && !still()) {
+      blinkOnce();
+      if (Math.random() < 0.15) setTimeout(blinkOnce, BLINK_MS + 140);
+    }
+    blinkLater();
+  }, 2500 + Math.random() * 4500);
+})();

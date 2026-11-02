@@ -5,7 +5,7 @@
    Supabase API calls are never touched. Bump CACHE when the shell list changes.
    Every other cache is cleared on activate (including «tanara-vault», from the removed vault).
    Also shows the push reminders sent by the `remind` Edge Function (see ui/reminders.js). */
-const CACHE = 'tanara-shell-v33';
+const CACHE = 'tanara-shell-v34';
 const SHELL = [
   './', './index.html', './manifest.json', './css/app.css',
   './js/app.js', './js/config.js',
@@ -20,6 +20,7 @@ const SHELL = [
   './favicon-32-v2.png', './icon-192-v2.png', './icon-512-v2.png', './icon-maskable-192-v2.png', './icon-maskable-512-v2.png', './apple-touch-icon-v2.png', './badge-96.png',
   './img/mascot/happy.webp', './img/mascot/surprised.webp', './img/mascot/proud.webp', './img/mascot/wink.webp', './img/mascot/calm.webp', './img/mascot/thinking.webp',
   './img/mascot/caring.webp', './img/mascot/excited.webp', './img/mascot/wave.webp', './img/mascot/hello.webp', './img/mascot/sleepy.webp', './img/mascot/face.webp', './img/mascot/face-thinking.webp',
+  './img/mascot/wave-blink.webp', './img/mascot/happy-blink.webp', './img/mascot/calm-blink.webp', './img/mascot/hello-blink.webp',
 ];
 // fastly.jsdelivr.net: the barcode reader's WebAssembly (pinned version), for phones without a built-in one
 const VENDOR_HOSTS = ['cdn.jsdelivr.net', 'fastly.jsdelivr.net', 'fonts.googleapis.com', 'fonts.gstatic.com'];
