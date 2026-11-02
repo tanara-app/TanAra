@@ -8,7 +8,10 @@
 
   Only fully logged days count for the eating side (at least two different meals, the same
   rule the under-eating check uses), and the first week of use is skipped: the early drop is
-  mostly water and would make the body look hungrier than it is. A steady habit of logging a
+  mostly water and would make the body look hungrier than it is. Four weeks are looked at, or
+  six for someone weighing once a week (the reminder's default): the wider span steadies the
+  trend as much as more weigh-ins would, so nobody is asked to step on the scale more often.
+  A steady habit of logging a
   little less than was eaten moves the result by the same amount, and the target with it, so
   the target stays right in the person's own way of logging.
 */
@@ -18,6 +21,7 @@ import { computeTargets } from './targets.js';
 
 export const ENERGY = {
   WINDOW: 28,      // days looked at, ending yesterday
+  LONG_WINDOW: 42, // … or these, when the 28 hold too few weigh-ins: six weeks of weighing once a week is enough
   SKIP_START: 7,   // days after the start that never count
   MIN_SPAN: 21,    // the window must be at least this long
   MIN_DAYS: 14,    // fully logged days needed in it
@@ -46,8 +50,12 @@ function slope(w) {
 export function measuredTdee(entries, weights, { day, startDate, formula } = {}) {
   const E = ENERGY;
   const to = addDays(day, -1);
-  let from = addDays(day, -E.WINDOW);
-  if (startDate && addDays(startDate, E.SKIP_START) > from) from = addDays(startDate, E.SKIP_START);
+  const since = n => {
+    const d = addDays(day, -n), first = startDate ? addDays(startDate, E.SKIP_START) : d;
+    return first > d ? first : d;
+  };
+  const weighed = from => sortedWeights(weights).filter(x => x.day >= from && x.day <= to);
+  const from = since(weighed(since(E.WINDOW)).length >= E.MIN_WEIGHS ? E.WINDOW : E.LONG_WINDOW);
 
   const byDay = new Map();
   for (const e of entries) {
@@ -58,7 +66,7 @@ export function measuredTdee(entries, weights, { day, startDate, formula } = {})
     byDay.set(e.day, d);
   }
   const full = [...byDay.values()].filter(d => d.meals.size >= 2);
-  const w = sortedWeights(weights).filter(x => x.day >= from && x.day <= to);
+  const w = weighed(from);
   const wSpan = w.length > 1 ? diffDays(w[w.length - 1].day, w[0].day) : 0;
   const span = diffDays(to, from) + 1;
 

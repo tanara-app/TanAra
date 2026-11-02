@@ -72,6 +72,34 @@ suite('energy', () => {
     eq(later.days, 21);
   });
 
+  // weigh-ins a week apart for `weeks` weeks, the last one yesterday, losing 0.5 kg a week
+  const weekly = weeks => Array.from({ length: weeks }, (_, i) => ({ day: addDays(DAY, -1 - 7 * i), kg: 90 + 0.5 * i }));
+
+  test('weighing once a week is enough: it looks six weeks back and gets the same answer', () => {
+    const m = measuredTdee(eat(42, 2000), weekly(6), { day: DAY });
+    ok(m.ready);
+    eq(m.tdee, 2550);
+    eq(m.weighs, 6);
+    eq(m.from, addDays(DAY, -42));
+    eq(m.days, 42);
+  });
+
+  test('a missed week: weekly weighing says how many are still missing', () => {
+    const m = measuredTdee(eat(42, 2000), weekly(5), { day: DAY });
+    eq([m.ready, m.needWeighs, m.weighs], [false, 1, 5]);
+  });
+
+  test('enough weigh-ins in four weeks: older food and weights are left out', () => {
+    const old = [{ day: addDays(DAY, -40), meal: 'lunch', kcal: 5000 }, { day: addDays(DAY, -40), meal: 'dinner', kcal: 5000 }];
+    const m = measuredTdee([...eat(28, 2000), ...old], weigh(100, 0.5), { day: DAY });
+    eq([m.from, m.days, m.tdee], [addDays(DAY, -28), 28, 2550]);
+  });
+
+  test('the first week after starting stays skipped in the six-week look-back too', () => {
+    const m = measuredTdee(eat(42, 2000), weekly(6), { day: DAY, startDate: addDays(DAY, -40) });
+    eq([m.ready, m.from, m.weighs], [false, addDays(DAY, -33), 5]);
+  });
+
   test('a result far from the formula is held within 25% of it', () => {
     const m = measuredTdee(eat(28, 1000), weigh(100, 0), { day: DAY, formula: 2400 });
     eq([m.tdee, m.clamped], [1800, true]);

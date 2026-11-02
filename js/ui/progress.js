@@ -7,7 +7,7 @@ import { rapidLoss } from '../domain/safety.js';
 import { shouldSuggestRecalc, phaseOn, maintenanceKcal } from '../domain/targets.js';
 import { nextTargets, ENERGY } from '../domain/energy.js';
 import { fa, signed, kcal50 } from '../lib/fa.js';
-import { today, addDays, relLabel, faDMY, faFull } from '../lib/dates.js';
+import { today, addDays, diffDays, relLabel, faDMY, faFull } from '../lib/dates.js';
 import { toast, confirmBox } from './dom.js';
 import { weightChart } from './chart.js';
 import { recalcTargets } from './profile.js';
@@ -40,7 +40,7 @@ function energyCard(s, p, latestKg) {
     const need = [m.needDays ? `${fa(m.needDays)} روز ثبت کامل` : null, m.needWeighs ? `${fa(m.needWeighs)} وزن‌کشی` : null].filter(Boolean);
     return fold(need.length ? `هنوز لازم است: ${need.join(' و ')}` : 'وزن‌کشی‌ها باید دست‌کم دو هفته را پوشش بدهند', `
       <div class="bar"><i style="width:${Math.round(Math.min(1, (m.days / ENERGY.MIN_DAYS + m.weighs / ENERGY.MIN_WEIGHS) / 2) * 100)}%"></i></div>
-      <p class="muted small mt">فرمول فقط یک حدس است و برای یک نفر می‌تواند چند صد کالری خطا داشته باشد. بعد از حدود چهار هفته، تن‌آرا مصرف واقعی بدنت را از روی چیزی که خورده‌ای (روزهایی با دست‌کم دو وعده‌ی ثبت‌شده) و روند وزنت حساب می‌کند.</p>`);
+      <p class="muted small mt">فرمول فقط یک حدس است و برای یک نفر می‌تواند چند صد کالری خطا داشته باشد. بعد از چهار تا شش هفته، تن‌آرا مصرف واقعی بدنت را از روی چیزی که خورده‌ای (روزهایی با دست‌کم دو وعده‌ی ثبت‌شده) و روند وزنت حساب می‌کند. هفته‌ای یک وزن‌کشی برایش کافی است.</p>`);
   }
   const loss = phaseOn(p, t) === 'loss';
   const lossTarget = Number(p.targets?.manualKcal) || p.targets?.kcal;
@@ -51,7 +51,7 @@ function energyCard(s, p, latestKg) {
       <div class="tile"><span>اندازه‌گیری‌شده</span><b>${kcal50(m.tdee)}</b><small>کالری در روز</small></div>
       <div class="tile"><span>حدس فرمول</span><b>${kcal50(next.formulaTdee)}</b><small>کالری در روز</small></div>
     </section>
-    <p class="small">در ${fa(m.days)} روزِ کامل ثبت‌شده‌ی چهار هفته‌ی اخیر، میانگین ${kcal50(m.intake)} کالری خورده‌ای و ${moving}.</p>
+    <p class="small">در ${fa(m.days)} روزِ کامل ثبت‌شده‌ی ${fa(Math.round((diffDays(m.to, m.from) + 1) / 7))} هفته‌ی اخیر، میانگین ${kcal50(m.intake)} کالری خورده‌ای و ${moving}.</p>
     ${m.clamped ? '<p class="muted small">عدد خام خیلی از فرمول دور بود (معمولاً یعنی بعضی خوراکی‌ها ثبت نشده)، برای همین حداکثر ۲۵٪ فاصله از فرمول در نظر گرفته شد.</p>' : ''}
     ${differs ? `<div class="ai-goal"><small class="muted">${loss ? 'هدف پیشنهادی (مصرف واقعی منهای ۵۰۰)' : 'سطح نگهداری پیشنهادی'}</small><b>${kcal50(loss ? next.kcal : next.tdee)} کالری${loss && next.hitFloor ? ' (حداقل ایمن)' : ''}</b>
         <button class="btn sm" data-energy-apply>همین را هدف کن</button></div>

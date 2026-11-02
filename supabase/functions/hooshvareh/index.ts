@@ -215,7 +215,7 @@ function sections(c: Ctx) {
     energy: () => {
       const m = c.energy;
       if (!m) return "";
-      if (!m.ready) return `# Measured energy use\nNot enough data yet: it needs ${m.needDays || 0} more fully logged days (at least two meals each) and ${m.needWeighs || 0} more weigh-ins, over three to four weeks. Until then the targets come from a formula${m.formula ? ` (about ${m.formula} kcal/day)` : ""}.`;
+      if (!m.ready) return `# Measured energy use\nNot enough data yet: it needs ${m.needDays || 0} more fully logged days (at least two meals each) and ${m.needWeighs || 0} more weigh-ins, over four weeks, or six when they weigh in once a week (that is enough, they need not weigh more often). Until then the targets come from a formula${m.formula ? ` (about ${m.formula} kcal/day)` : ""}.`;
       return `# Measured energy use (from their own log, ${m.from} to ${m.to})\nabout ${m.tdee} kcal/day: they ate ${m.intake} kcal/day on ${m.days} fully logged days while their weight changed ${r1(m.perWeek)} kg/week (${m.weighs} weigh-ins).${m.formula ? ` The formula had estimated ${m.formula}.` : ""}${m.clamped ? " The raw figure was further from the formula than is plausible (probably gaps in logging), so it is held within 25% of it." : ""} Their current target is based on: ${m.source || "formula"}.`;
     },
 
