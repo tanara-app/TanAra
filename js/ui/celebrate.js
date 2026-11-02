@@ -66,7 +66,7 @@ function show(p, reached) {
   el.innerHTML = `
     ${still ? '' : '<canvas class="party-paper" aria-hidden="true"></canvas>'}
     <div class="party-body">
-      ${mascotOn() ? `<img class="party-face" src="${face('excited')}" alt="" width="180" height="180">` : ''}
+      ${mascotOn() ? `<img class="party-face" src="${face('party')}" alt="" width="200" height="200">` : ''}
       <h1>رسیدی!</h1>
       <p class="party-line">وزن هدفت ${fa(p.goalKg, 1)} کیلو بود و الان میانگین وزنت ${fa(reached.avg, 1)} کیلو است.</p>
       <div class="party-stats">

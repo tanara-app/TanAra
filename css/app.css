@@ -873,7 +873,7 @@ body.kb .toast, body.chat-mode .toast { bottom: calc(var(--nav-h) + var(--safe-b
 .party { position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; padding: 20px 16px; overflow-y: auto; background: var(--bg); animation: party-in .35s ease-out; }
 .party-paper { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; }
 .party-body { position: relative; display: grid; gap: 12px; justify-items: center; width: 100%; max-width: 420px; text-align: center; }
-.party-face { width: 180px; height: 180px; filter: drop-shadow(0 8px 16px var(--shadow)); animation: party-hop 1.1s ease-in-out 3; transform-origin: 50% 95%; }
+.party-face { width: 200px; height: 200px; filter: drop-shadow(0 8px 16px var(--shadow)); animation: party-hop 1.1s ease-in-out 3; transform-origin: 50% 95%; }
 .party h1 { font-size: 2.6rem; font-weight: 800; color: var(--accent); }
 .party-line { font-size: 1.05rem; font-weight: 600; }
 .party-stats { display: flex; justify-content: center; gap: 10px; width: 100%; }
