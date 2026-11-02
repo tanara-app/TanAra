@@ -49,6 +49,12 @@ export function rollingAvg(sorted, day, span = 7) {
   return w.reduce((s, x) => s + Number(x.kg), 0) / w.length;
 }
 
+// The chart's line: the trailing mean at each weigh-in, so weighing once a week draws straight
+// lines between the weigh-ins instead of stairs.
+export function trendLine(sorted, from, to, span = 7) {
+  return sorted.filter(x => x.day >= from && x.day <= to).map(x => ({ day: x.day, kg: rollingAvg(sorted, x.day, span) }));
+}
+
 export function weekAvg(sorted, ws) {
   const end = addDays(ws, 6);
   const w = sorted.filter(x => x.day >= ws && x.day <= end);
@@ -78,6 +84,13 @@ export function projectWeight(sorted, from, to) {
   const rate = rate4w(sorted, from);
   if (rate === null) return { base, rate: null };
   return { base, rate, kg: base + rate * diffDays(to, from) / 7 };
+}
+
+// The week to look back on today: the one that just ended, if it was logged enough to say anything.
+export const REVIEW_MIN_DAYS = 3;
+export function weekToReview(entries, day) {
+  const ws = addDays(weekStart(day), -7);
+  return daysLoggedInWeek(entries, ws) >= REVIEW_MIN_DAYS ? ws : null;
 }
 
 export function weekSummary(entries, weights, ws) {

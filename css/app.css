@@ -821,3 +821,40 @@ body.kb .toast, body.chat-mode .toast { bottom: calc(var(--nav-h) + var(--safe-b
 .tip-title b { flex: 1; font-size: .95rem; }
 .tip-title b b { font-weight: inherit; }
 .fold:not(.folded) .tip-title { margin-bottom: 6px; }
+
+/* «پیشرفت» */
+.trend-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.trend-now { display: grid; gap: 1px; }
+.trend-now > span { color: var(--muted); font-size: .82rem; }
+.trend-now > b { font-size: 2.1rem; font-weight: 800; line-height: 1.2; }
+.trend-now > b small { font-size: .9rem; font-weight: 500; color: var(--muted); }
+.trend-now > small { font-size: .78rem; }
+.trend-stats { display: grid; gap: 8px; }
+.stat { display: grid; justify-items: end; }
+.stat > span { color: var(--muted); font-size: .78rem; }
+.stat > b { font-size: 1.05rem; font-weight: 700; }
+.stat > b small { font-size: .75rem; font-weight: 500; color: var(--muted); }
+.trend-seg { display: grid; grid-template-columns: 2fr 3fr; gap: 8px; margin-top: 12px; }
+.trend-seg .seg button { padding-inline: 2px; }
+.prog-acts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+.prog-act { display: grid; justify-items: start; gap: 3px; padding: 14px; border: 0; border-radius: var(--radius); background: var(--surface); color: inherit; font: inherit; text-align: start; cursor: pointer; }
+.prog-act:active { background: var(--surface-2); }
+.prog-act i { display: grid; place-items: center; width: 38px; height: 38px; margin-bottom: 4px; border-radius: 12px; background: var(--accent-soft); color: var(--accent); }
+.prog-act b { font-weight: 700; }
+.prog-act small { color: var(--muted); font-size: .78rem; }
+.prog-act.due { box-shadow: inset 0 0 0 1.5px var(--accent); }
+.prog-act.due small { color: var(--accent); }
+.ask-card .ai-card-h { margin-bottom: 2px; }
+.ask-row { border-top: 1px solid var(--line); }
+.ask-card .ai-card-h + .ask-row { border-top: 0; }
+.ask-h { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 0; background: none; border: 0; color: inherit; font: inherit; text-align: start; cursor: pointer; }
+.ask-h > span { display: grid; gap: 2px; min-width: 0; }
+.ask-h b { font-weight: 600; }
+.ask-h small { font-size: .8rem; }
+.ask-h > svg { flex: none; color: var(--muted); }
+.ask-row .fold-body { padding-bottom: 12px; }
+.measure-state.due b { color: var(--accent); }
+.set-row.reviews-row { width: 100%; padding: 16px; background: var(--surface); border-radius: var(--radius); border-bottom: 0; }
+.week-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 10px; }
+.week-foot .fold-h { display: inline-flex; align-items: center; gap: 4px; width: auto; color: var(--accent); }
+.week-foot .btn { margin: 0; }

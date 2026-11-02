@@ -1,12 +1,15 @@
-// Weekly review: last week's numbers and three short notes. Shown inside «پیشرفت».
+// Weekly review. The week that just ended comes to «امروز» by itself as a card: its numbers,
+// Hooshvareh's analysis and goal, and one question. Earlier weeks open in a sheet from «پیشرفت».
 import * as store from '../data/store.js';
-import { weekSummary } from '../domain/stats.js';
+import { weekSummary, weekToReview } from '../domain/stats.js';
 import { adherence } from '../domain/plan.js';
 import { fa, kcal50, signed, esc } from '../lib/fa.js';
 import { today, addDays, weekStart, weekLabel } from '../lib/dates.js';
-import { icon, toast } from './dom.js';
+import { icon, toast, sheet } from './dom.js';
 import { cheer } from './mascot.js';
-import { reviewCard, bindReviewCard } from './aiCards.js';
+import { aiAvailable } from '../ai/hooshvareh.js';
+import { head, reviewBody, reviewCard, bindReviewCard, autoReview } from './aiCards.js';
+import { dismissed, dismiss } from './notices.js';
 
 let ws = null;
 
@@ -37,7 +40,6 @@ export function renderReview(root) {
     ${reviewCard(ws)}
 
     <form class="card stack review-form" novalidate>
-      <label class="field"><span>چه چیزی خوب بود؟</span><textarea name="good" rows="3">${esc(r.good || '')}</textarea></label>
       <label class="field"><span>چه چیزی سخت بود؟</span><textarea name="hard" rows="3">${esc(r.hard || '')}</textarea></label>
       <label class="field"><span>هدف هفته‌ی بعد</span><textarea name="next_goal" rows="2" placeholder="یک چیز کوچک و مشخص">${esc(r.next_goal || '')}</textarea></label>
       <button class="btn primary block">ذخیره</button>
@@ -48,8 +50,8 @@ export function renderReview(root) {
   const form = root.querySelector('form');
   const save = (quiet) => {
     const F = form.elements;
-    const next = { week_start: ws, good: F.good.value.trim(), hard: F.hard.value.trim(), next_goal: F.next_goal.value.trim() };
-    if (next.good === (r.good || '') && next.hard === (r.hard || '') && next.next_goal === (r.next_goal || '')) {
+    const next = { week_start: ws, good: r.good || '', hard: F.hard.value.trim(), next_goal: F.next_goal.value.trim() };
+    if (next.hard === (r.hard || '') && next.next_goal === (r.next_goal || '')) {
       if (!quiet) toast('ذخیره شد');
       return;
     }
@@ -64,4 +66,66 @@ export function renderReview(root) {
     form.elements.next_goal.value = goal;
     save(false);
   });
+}
+
+export function openReviews() {
+  ws = null;
+  sheet.open(body => {
+    body.innerHTML = `<div class="sheet-head"><h2>مرور هفته‌ها</h2><button class="icon-btn" data-close aria-label="بستن">${icon.close}</button></div><div data-review></div>`;
+    body.querySelector('[data-close]').onclick = () => sheet.close();
+    renderReview(body.querySelector('[data-review]'));
+  }, { tall: true });
+}
+
+/* ---------------- «امروز»: the week that just ended ---------------- */
+
+const edCare = () => ['yes', 'unsure'].includes(store.profile()?.edHistory);
+const weekDue = () => {
+  const w = weekToReview(store.get().entries, today());
+  return w && !dismissed('week', w) ? w : null;
+};
+
+// Folded to one line of numbers, so it doesn't push the meals down; the rest opens on a tap.
+let weekOpen = false;
+
+export function weekCard() {
+  const w = weekDue();
+  if (!w) return '';
+  const s = store.get();
+  const sum = weekSummary(s.entries, s.weights, w);
+  const r = s.reviews.find(x => x.week_start === w) || {};
+  const line = [`${fa(sum.daysLogged)} روز از ۷ ثبت`];
+  if (!edCare()) {
+    if (sum.avgKcal !== null) line.push(`میانگین ${kcal50(sum.avgKcal)} کالری`);
+    if (sum.avgProtein !== null) line.push(`${fa(Math.round(sum.avgProtein))} گرم پروتئین`);
+    if (sum.weightChange !== null) line.push(`وزن ${signed(sum.weightChange)} کیلو`);
+  }
+  return `<section class="card ai-card fold${weekOpen ? '' : ' folded'}" data-week-card>
+    ${head('مرور هفته‌ی گذشته', `<small class="muted">${weekLabel(w)}</small>`)}
+    <p class="small">${line.join(' · ')}</p>
+    <div class="fold-body mt">
+      ${reviewBody(w)}
+      <label class="field mt"><span>این هفته چه چیزی سخت بود؟ <em>اختیاری</em></span><textarea name="week-hard" rows="2">${esc(r.hard || '')}</textarea></label>
+    </div>
+    <div class="week-foot">
+      <button type="button" class="fold-h link small" aria-expanded="${weekOpen}">${aiAvailable() ? 'تحلیل و هدف این هفته' : 'این هفته چه چیزی سخت بود؟'}${icon.chevD}</button>
+      <button class="btn ghost sm" data-week-done>باشه</button>
+    </div>
+  </section>`;
+}
+
+export function bindWeekCard(root, refresh) {
+  const card = root.querySelector('[data-week-card]');
+  const w = weekDue();
+  if (!card || !w) return;
+  const saved = () => store.get().reviews.find(x => x.week_start === w) || {};
+  const put = patch => { const r = saved(); store.saveReview({ week_start: w, good: r.good || '', hard: r.hard || '', next_goal: r.next_goal || '', ...patch }); };
+  card.querySelector('[name=week-hard]').addEventListener('change', e => put({ hard: e.target.value.trim() }));
+  card.querySelector('[data-week-done]').onclick = () => { dismiss('week', w); card.remove(); };
+  card.querySelector('.fold-h').onclick = e => {
+    weekOpen = card.classList.toggle('folded') === false;
+    e.currentTarget.setAttribute('aria-expanded', weekOpen);
+  };
+  bindReviewCard(card, w, refresh, goal => { put({ next_goal: goal }); toast('هدف این هفته ثبت شد'); cheer('review'); });
+  autoReview(w, refresh);
 }

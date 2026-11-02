@@ -1,29 +1,29 @@
-// Progress: the check-in (weight and waist in one form, see measure.js), one trend card for
-// either of them, the measured energy use, safety + recalc prompts, the history — and the
-// weekly review as a second section of the same tab.
+// Progress answers «where am I?»: the numbers and the chart first, then two buttons that open the
+// forms (measure.js, activity.js), one card for asking Hooshvareh, and the details folded away.
 import * as store from '../data/store.js';
-import { sortedWeights, rollingAvg, rate4w, waistSeries, waistToHeight, WHTR_GOAL } from '../domain/stats.js';
+import { sortedWeights, rate4w, waistSeries, waistToHeight, WHTR_GOAL } from '../domain/stats.js';
 import { rapidLoss } from '../domain/safety.js';
 import { shouldSuggestRecalc, phaseOn, maintenanceKcal } from '../domain/targets.js';
 import { nextTargets, ENERGY } from '../domain/energy.js';
 import { fa, signed, kcal50 } from '../lib/fa.js';
+import { icon } from './dom.js';
 import { today, addDays, diffDays, relLabel, faDMY, faFull } from '../lib/dates.js';
 import { toast, confirmBox } from './dom.js';
 import { weightChart } from './chart.js';
 import { recalcTargets } from './profile.js';
-import { progressCard, bindProgressCard, maintainCard, bindMaintainCard } from './aiCards.js';
-import { renderReview } from './review.js';
+import { head, progressRow, bindProgressCard, maintainRow, bindMaintainRow, bindAskFolds } from './aiCards.js';
+import { openReviews } from './review.js';
 import { phaseNotes, bindPhase } from './phase.js';
-import { checkinEntry, bindCheckin } from './checkin.js';
-import { measureCard, bindMeasure, resetMeasureDay, setMeasureDay, measureDay, takeJump } from './measure.js';
-import { activityPill, bindActivity } from './activity.js';
+import { checkinRow, bindCheckin } from './checkin.js';
+import { openMeasure, measureLine } from './measure.js';
+import { openActivity, activityLine } from './activity.js';
+import { aiAvailable } from '../ai/hooshvareh.js';
 
 let rangeKey = '3m';
 let metric = 'weight'; // what the trend card shows; or 'waist'
 let histAll = false;
-export const resetWeighDay = () => { resetMeasureDay(); histAll = false; };
-let section = 'weight'; // or 'review'
-export const showReview = () => { section = 'review'; };
+let histOpen = false;
+export const resetProgress = () => { histAll = false; histOpen = false; };
 const RANGES = { '1m': ['۱ ماه', 30], '3m': ['۳ ماه', 90], all: ['همه', null] };
 
 /*
@@ -67,29 +67,29 @@ function trendCard(s, p, sorted, t) {
   const series = waist ? waistSeries(s.waists, p).map(w => ({ day: w.day, kg: w.cm })) : sorted;
   const first = series[0], last = series[series.length - 1];
   const from = RANGES[rangeKey][1] ? addDays(t, -RANGES[rangeKey][1]) : (first?.day || t);
-  const change = `<div class="tile"><span>تغییر از روز اول</span><b>${first && first !== last ? signed(last.kg - first.kg) : '—'}</b><small>${first ? `${waist ? 'سانت ' : ''}از ${faDMY(first.day)}` : ''}</small></div>`;
-  let tiles;
+  const change = first && first !== last ? signed(last.kg - first.kg) : '—';
+  const stat = (label, value) => `<div class="stat"><span>${label}</span><b>${value}</b></div>`;
+  let stats;
   if (waist) {
     const ratio = last ? waistToHeight(last.kg, p.heightCm) : null;
-    tiles = `<div class="tile"><span>آخرین اندازه</span><b>${last ? fa(last.kg, 1) : '—'}</b><small>${last ? relLabel(last.day) : 'هنوز ثبت نشده'}</small></div>
-      ${change}
-      <div class="tile wide"><span>نسبت کمر به قد</span><b>${ratio ? fa(ratio, 2) : '—'}</b><small>${ratio ? (ratio < WHTR_GOAL ? 'در محدوده‌ی سالم (زیر ۰٫۵)' : `هدف: زیر ۰٫۵، یعنی دور کمر زیر ${fa(Math.floor(p.heightCm * WHTR_GOAL))} سانت`) : ''}</small></div>`;
+    stats = stat('از شروع', `${change}${change === '—' ? '' : ' <small>سانت</small>'}`) + stat('نسبت کمر به قد', ratio ? `${fa(ratio, 2)} <small>${ratio < WHTR_GOAL ? 'سالم' : `هدف زیر ${fa(WHTR_GOAL, 1)}`}</small>` : '—');
   } else {
-    const avg7 = rollingAvg(sorted, t);
     const rate = rate4w(sorted, t);
-    tiles = `<div class="tile"><span>آخرین وزن</span><b>${last ? fa(last.kg, 1) : '—'}</b><small>${last ? relLabel(last.day) : ''}</small></div>
-      <div class="tile"><span>میانگین ۷ روز اخیر</span><b>${avg7 ? fa(avg7, 1) : '—'}</b><small>کیلو</small></div>
-      ${change}
-      <div class="tile"><span>سرعت ۴ هفته‌ی اخیر</span><b>${rate === null ? '—' : signed(rate)}</b><small>${rate === null ? 'داده‌ی کافی نیست' : 'کیلو در هفته'}</small></div>`;
+    stats = stat('از شروع', `${change}${change === '—' ? '' : ' <small>کیلو</small>'}`) + stat('سرعت ۴ هفته', rate === null ? '—' : `${signed(rate)} <small>در هفته</small>`);
   }
-  return `<section class="card">
-    <div class="seg" data-metric role="tablist" aria-label="نمودار">
-      <button type="button" role="tab" data-v="weight" aria-selected="${!waist}" class="${waist ? '' : 'on'}">وزن</button>
-      <button type="button" role="tab" data-v="waist" aria-selected="${waist}" class="${waist ? 'on' : ''}">دور کمر</button>
+  return `<section class="card trend">
+    <div class="trend-top">
+      <div class="trend-now"><span>${waist ? 'دور کمر' : 'وزن'}</span><b>${last ? fa(last.kg, 1) : '—'} <small>${waist ? 'سانت' : 'کیلو'}</small></b><small class="muted">${last ? relLabel(last.day) : 'هنوز ثبت نشده'}</small></div>
+      <div class="trend-stats">${stats}</div>
     </div>
     ${waist ? weightChart(series, from, t, { label: 'نمودار دور کمر', dot: 'دور کمر (سانتی‌متر)', line: '', span: 1, empty: 'برای دیدن نمودار، دست‌کم دو بار دور کمر را ثبت کن.' }) : weightChart(series, from, t)}
-    <div class="seg small range-seg" data-range>${Object.entries(RANGES).map(([k, [l]]) => `<button data-v="${k}" class="${k === rangeKey ? 'on' : ''}">${l}</button>`).join('')}</div>
-    <section class="tiles mt">${tiles}</section>
+    <div class="trend-seg">
+      <div class="seg small" data-metric role="tablist" aria-label="نمودار">
+        <button type="button" role="tab" data-v="weight" aria-selected="${!waist}" class="${waist ? '' : 'on'}">وزن</button>
+        <button type="button" role="tab" data-v="waist" aria-selected="${waist}" class="${waist ? 'on' : ''}">دور کمر</button>
+      </div>
+      <div class="seg small" data-range>${Object.entries(RANGES).map(([k, [l]]) => `<button data-v="${k}" class="${k === rangeKey ? 'on' : ''}">${l}</button>`).join('')}</div>
+    </div>
   </section>`;
 }
 
@@ -101,15 +101,18 @@ function historyCard(s) {
   for (const w of s.waists) days.set(w.day, { ...days.get(w.day), cm: w.cm });
   const all = [...days.entries()].sort((a, b) => (a[0] < b[0] ? 1 : -1));
   const rows = histAll ? all : all.slice(0, 7);
-  return `<section class="card">
-    <h2 class="card-h">ثبت‌های اخیر</h2>
+  return `<details class="card fold" data-hist${histOpen ? ' open' : ''}>
+    <summary><span><h2>ثبت‌های اخیر</h2><small>${all.length ? `${fa(all.length)} روز اندازه‌گیری` : 'هنوز چیزی ثبت نشده'}</small></span></summary>
     ${all.length ? `<div class="wlist">
       <div class="mrow mhead"><span>روز</span><span>وزن</span><span>دور کمر</span></div>
       ${rows.map(([d, v]) => `<button class="wrow mrow" data-mday="${d}" aria-label="ویرایش ${faFull(d)}"><span>${faFull(d)}</span><b>${v.kg ? fa(v.kg, 1) : '—'}</b><b>${v.cm ? fa(v.cm, 1) : '—'}</b></button>`).join('')}
     </div>
-    ${all.length > rows.length ? `<button class="link small" data-hist-all>نمایش همه (${fa(all.length)})</button>` : ''}` : '<div class="empty">هنوز چیزی ثبت نشده.</div>'}
-  </section>`;
+    ${all.length > rows.length ? `<button class="link small" data-hist-all>نمایش همه (${fa(all.length)})</button>` : ''}` : ''}
+  </details>`;
 }
+
+const SCALE = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="17" height="17" rx="4"/><path d="M8 9a5.5 5.5 0 0 1 8 0l-2.6 2.2h-2.8z"/></svg>';
+const RUN = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="14" cy="4.5" r="1.8"/><path d="M8 21l3-6 3 2v4M6.5 11.5L9 8.5l4 1 2.5 3.5 3 .5M11 15l-1-5"/></svg>';
 
 export function renderProgress(root) {
   const s = store.get();
@@ -118,32 +121,9 @@ export function renderProgress(root) {
   const t = today();
   const latest = sorted[sorted.length - 1];
   const rapid = rapidLoss(s.weights, p.startDate, t);
-  if (takeJump()) section = 'weight';
-
-  const head = `
+  const m = measureLine();
+  root.innerHTML = `
     <header class="page-head"><h1>پیشرفت</h1></header>
-    <div class="seg mode-seg" data-section role="tablist" aria-label="بخش">
-      <button type="button" role="tab" data-v="weight" aria-selected="${section === 'weight'}" class="${section === 'weight' ? 'on' : ''}">اندازه‌ها و روند</button>
-      <button type="button" role="tab" data-v="review" aria-selected="${section === 'review'}" class="${section === 'review' ? 'on' : ''}">مرور هفته</button>
-    </div>`;
-  const bindSection = () => {
-    root.querySelector('[data-section]').onclick = e => {
-      const b = e.target.closest('[data-v]');
-      if (b && b.dataset.v !== section) { section = b.dataset.v; renderProgress(root); window.scrollTo(0, 0); }
-    };
-  };
-  if (section === 'review') {
-    root.innerHTML = `${head}<div data-review></div>`;
-    bindSection();
-    renderReview(root.querySelector('[data-review]'));
-    return;
-  }
-
-  root.innerHTML = `${head}
-
-    ${measureCard()}
-
-    <div class="pills">${activityPill(measureDay())}</div>
 
     ${phaseNotes()}
 
@@ -156,15 +136,23 @@ export function renderProgress(root) {
 
     ${trendCard(s, p, sorted, t)}
 
-    ${maintainCard()}
+    <div class="prog-acts">
+      <button class="prog-act${m.due ? ' due' : ''}" data-measure-open><i>${SCALE}</i><b>ثبت وزن و کمر</b><small>${m.text}</small></button>
+      <button class="prog-act" data-activity-open><i>${RUN}</i><b>ثبت تحرک</b><small>${activityLine()}</small></button>
+    </div>
 
-    ${progressCard()}
-
-    ${checkinEntry()}
+    ${aiAvailable() ? `<section class="card ai-card ask-card">
+      ${head('از هوشواره بپرس')}
+      ${maintainRow()}
+      ${progressRow()}
+      ${checkinRow()}
+    </section>` : ''}
 
     ${energyCard(s, p, latest?.kg)}
 
-    ${historyCard(s)}`;
+    ${historyCard(s)}
+
+    <button class="card set-row reviews-row" data-reviews><span class="grow"><b>مرور هفته‌ها</b><small class="muted">عددها، تحلیل و هدف هر هفته</small></span>${icon.chevL}</button>`;
 
   const rerender = () => renderProgress(root);
   const pick = (sel, set) => {
@@ -173,12 +161,14 @@ export function renderProgress(root) {
       if (b) { set(b.dataset.v); rerender(); }
     };
   };
-  bindSection();
-  bindMeasure(root, rerender);
-  bindActivity(root, measureDay());
-  const redrawAi = () => { if (root.isConnected && location.hash === '#/progress' && section === 'weight') rerender(); };
+  root.querySelector('[data-measure-open]').onclick = () => openMeasure();
+  root.querySelector('[data-activity-open]').onclick = () => openActivity();
+  root.querySelector('[data-reviews]').onclick = () => openReviews();
+  root.querySelector('[data-hist]').ontoggle = e => { histOpen = e.currentTarget.open; };
+  const redrawAi = () => { if (root.isConnected && location.hash === '#/progress') rerender(); };
   bindProgressCard(root, redrawAi);
-  bindMaintainCard(root, redrawAi);
+  bindMaintainRow(root, redrawAi);
+  bindAskFolds(root);
   bindPhase(root);
   bindCheckin(root, rerender);
   root.querySelector('[data-energy-apply]')?.addEventListener('click', async () => {
@@ -190,5 +180,5 @@ export function renderProgress(root) {
   pick('[data-metric]', v => { metric = v; });
   pick('[data-range]', v => { rangeKey = v; });
   root.querySelector('[data-hist-all]')?.addEventListener('click', () => { histAll = true; rerender(); });
-  root.querySelectorAll('[data-mday]').forEach(b => b.onclick = () => { setMeasureDay(b.dataset.mday); rerender(); window.scrollTo({ top: 0, behavior: 'smooth' }); });
+  root.querySelectorAll('[data-mday]').forEach(b => b.onclick = () => openMeasure(b.dataset.mday));
 }

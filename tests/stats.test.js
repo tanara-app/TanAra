@@ -1,5 +1,5 @@
 import { suite, test, eq, near } from './harness.js';
-import { totals, vegServings, daysLoggedInWeek, rollingAvg, weekAvg, rate4w, projectWeight, weekSummary, waistSeries, waistToHeight, measureDue, frequentFoods, lastAmountFor, activityWeek, streak } from '../js/domain/stats.js';
+import { totals, vegServings, daysLoggedInWeek, rollingAvg, weekAvg, rate4w, projectWeight, weekSummary, waistSeries, waistToHeight, measureDue, frequentFoods, lastAmountFor, activityWeek, streak, trendLine, weekToReview } from '../js/domain/stats.js';
 import { upcoming } from '../js/domain/occasions.js';
 import { weekStart, addDays, diffDays } from '../js/lib/dates.js';
 
@@ -51,6 +51,25 @@ suite('stats', () => {
     eq(rate4w([w('2026-01-01', 100), w('2026-01-04', 99)], '2026-01-10'), null); // under a week apart
     const p = projectWeight(s, '2026-01-22', '2026-02-05');
     near(p.kg, p.base - 1, 1e-9);
+  });
+
+  test('the chart line has one point per weigh-in, so weekly weighing draws no stairs', () => {
+    const s = [{ day: '2026-01-01', kg: 90 }, { day: '2026-01-08', kg: 89 }, { day: '2026-01-15', kg: 88 }];
+    eq(trendLine(s, '2026-01-01', '2026-01-20'), [{ day: '2026-01-01', kg: 90 }, { day: '2026-01-08', kg: 89 }, { day: '2026-01-15', kg: 88 }]);
+    // weighing more often than the span: each point is the trailing mean
+    const d = [{ day: '2026-01-01', kg: 90 }, { day: '2026-01-02', kg: 88 }];
+    eq(trendLine(d, '2026-01-01', '2026-01-02')[1].kg, 89);
+    eq(trendLine(s, '2026-01-08', '2026-01-08').length, 1);
+  });
+
+  test('the week to look back on is the one just ended, if at least three days were logged', () => {
+    // 2026-01-03 is a Saturday, so the week before it starts on 2025-12-27
+    const days = ds => ds.map(day => ({ day }));
+    const logged = days(['2025-12-27', '2025-12-28', '2025-12-30']);
+    eq(weekToReview(logged, '2026-01-03'), '2025-12-27');
+    eq(weekToReview(logged, '2026-01-09'), '2025-12-27');  // still it, all through this week
+    eq(weekToReview(logged, '2026-01-10'), null);          // the week after has nothing logged
+    eq(weekToReview(days(['2025-12-27', '2025-12-28']), '2026-01-03'), null);
   });
 
   test('week summary', () => {

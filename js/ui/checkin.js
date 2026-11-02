@@ -20,6 +20,7 @@ import { sheet, toast, confirmBox, icon } from './dom.js';
 import { cheer } from './mascot.js';
 import { dismissed, dismiss } from './notices.js';
 import { startChat } from './chat.js';
+import { askRow, askFold } from './aiCards.js';
 
 const CAUSES = [
   ['حال و روان', ['استرس', 'غم یا دل‌گرفتگی', 'اضطراب و نگرانی', 'بی‌حوصلگی', 'تنهایی', 'خستگی ذهنی', 'عصبانیت']],
@@ -90,15 +91,13 @@ export function checkinCard() {
 
 /* ---------------- Progress: always reachable, and the latest plan ---------------- */
 
-export function checkinEntry() {
+export function checkinRow() {
   if (!aiAvailable()) return '';
   const last = lastCheckin(store.get().ai_notes);
   const recent = last && checkinState(last, today()) !== null ? last : null;
-  return `<section class="card ai-card">
-    ${head('برگشت به مسیر', recent ? `<small class="muted">${faDM(recent.key.slice(8))}</small>` : '')}
-    ${recent?.data?.steps?.length ? `<div class="ai-text"><ol>${recent.data.steps.map(x => `<li>${esc(x)}</li>`).join('')}</ol></div>` : '<p class="muted small">وقتی حس می‌کنی رژیم از دستت در رفته، به هوشواره بگو این روزها چه خبر است؛ کنار ثبت‌هایت می‌گذاردش، ریشه را پیدا می‌کند و یک برنامه‌ی کوچک برای برگشت می‌چیند.</p>'}
-    <button class="btn ${recent ? 'ghost sm' : 'block'}" data-checkin-open>${recent ? 'دوباره با هوشواره بررسی کنیم' : 'از مسیر دور شده‌ام'}</button>
-  </section>`;
+  if (recent?.data?.steps?.length) return askFold('data-ask-fold', 'برگشت به مسیر', `برنامه‌ی ${faDM(recent.key.slice(8))}`, `<div class="ai-text"><ol>${recent.data.steps.map(x => `<li>${esc(x)}</li>`).join('')}</ol></div>
+    <button class="link small" data-checkin-open>دوباره با هوشواره بررسی کنیم</button>`);
+  return `<div class="ask-row">${askRow('data-checkin-open', 'از مسیر دور شده‌ام', 'ریشه را پیدا می‌کنیم و یک برنامه‌ی کوچک برای برگشت می‌چینیم')}</div>`;
 }
 
 export function bindCheckin(root, refresh) {

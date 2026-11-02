@@ -20,6 +20,7 @@ import { magCard, bindMag } from './magazine.js';
 import { planHtml, bindPlan } from './plan.js';
 import { measureNote, bindMeasureNote } from './measure.js';
 import { checkinCard, bindCheckin } from './checkin.js';
+import { weekCard, bindWeekCard } from './review.js';
 import { greetCard, bindGreet } from './mascot.js';
 
 let day = today();
@@ -30,6 +31,7 @@ let moreOpen = false;
 const dayCards = () => [
   ['مرحله', phaseNotes()],
   ['برگشت به مسیر', checkinCard()],
+  ['مرور هفته', weekCard()],
   ['اندازه‌گیری', measureNote()],
   ['مناسبت', occasionCard()],
   ['مقاله‌ی هفته', magCard()],
@@ -180,5 +182,5 @@ export function renderToday(root) {
   });
   // last: generating the tip or today's magazine article redraws this screen
   const redrawAi = () => { if (root.querySelector('[data-mode]') && day === today()) renderToday(root); };
-  if (isToday) { bindTip(redrawAi, root); bindMag(root, redrawAi); bindOccasion(root, redrawAi); }
+  if (isToday) { bindTip(redrawAi, root); bindMag(root, redrawAi); bindOccasion(root, redrawAi); bindWeekCard(root, redrawAi); }
 }

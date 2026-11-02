@@ -30,7 +30,7 @@ async function generate(key, kind, mode, input, toNote, refresh, quiet = false) 
   }
 }
 
-const head = (title, extra = '') => `<div class="ai-card-h"><span class="ai-mark">${sparkle(16)}</span><b>${title}</b>${extra}</div>`;
+export const head = (title, extra = '') => `<div class="ai-card-h"><span class="ai-mark">${sparkle(16)}</span><b>${title}</b>${extra}</div>`;
 const thinking = text => `<p class="muted small ai-wait"><span class="typing"><i></i><i></i><i></i></span> ${text}</p>`;
 
 /* ---------------- Today: tip of the day ---------------- */
@@ -81,19 +81,30 @@ export function bindTip(refresh, root = document) {
 
 /* ---------------- Weekly review: analysis + suggested goal ---------------- */
 
-export function reviewCard(ws) {
+// The analysis and its goal, without a card around them (the week card on «امروز» has its own).
+export function reviewBody(ws) {
   if (!aiAvailable()) return '';
   const key = `review:${ws}`;
   const n = store.note(key);
   const goal = n?.data?.next_goal;
-  return `<section class="card ai-card">
-    ${head('تحلیل هوشواره')}
-    ${busy.has(key) ? thinking('دارم هفته‌ات را بررسی می‌کنم…')
-      : n ? `<div class="ai-text">${md(n.text)}</div>
-        ${goal ? `<div class="ai-goal"><small class="muted">هدف پیشنهادی برای هفته‌ی بعد</small><b>${esc(goal)}</b><button class="btn sm" data-ai-goal>همین را هدف کن</button></div>` : ''}
-        <button class="link small" data-ai-review>تحلیل دوباره</button>`
-      : '<p class="muted small">هوشواره این هفته را با هدف‌هایت مقایسه می‌کند و یک هدف کوچک برای هفته‌ی بعد پیشنهاد می‌دهد.</p><button class="btn block" data-ai-review>تحلیل این هفته</button>'}
-  </section>`;
+  const taken = goal && store.get().reviews.find(r => r.week_start === ws)?.next_goal === goal;
+  return busy.has(key) ? thinking('دارم هفته‌ات را بررسی می‌کنم…')
+    : n ? `<div class="ai-text">${md(n.text)}</div>
+      ${goal ? `<div class="ai-goal"><small class="muted">هدف پیشنهادی برای این هفته</small><b>${esc(goal)}</b>${taken ? '<small class="muted">هدف این هفته‌ات شد</small>' : '<button class="btn sm" data-ai-goal>همین را هدف کن</button>'}</div>` : ''}
+      <button class="link small" data-ai-review>تحلیل دوباره</button>`
+    : '<p class="muted small">هوشواره این هفته را با هدف‌هایت مقایسه می‌کند و یک هدف کوچک برای هفته‌ی بعد پیشنهاد می‌دهد.</p><button class="btn block" data-ai-review>تحلیل این هفته</button>';
+}
+
+export function reviewCard(ws) {
+  if (!aiAvailable()) return '';
+  return `<section class="card ai-card">${head('تحلیل هوشواره')}${reviewBody(ws)}</section>`;
+}
+
+// Written once by itself for the week card on «امروز» (after the first pull, like the tip).
+export function autoReview(ws, refresh) {
+  const key = `review:${ws}`;
+  if (store.note(key) || busy.has(key) || failed.has(key) || !aiOnline() || !store.syncStatus.lastPull) return;
+  generate(key, 'review', 'review', { week_start: ws }, r => ({ text: r.analysis, data: { next_goal: r.next_goal } }), refresh, true);
 }
 
 export function bindReviewCard(root, ws, refresh, useGoal) {
@@ -111,21 +122,26 @@ const latestProgress = () => store.get().ai_notes.filter(n => n.kind === 'progre
 const FOLD = () => store.localKey('progressOpen');
 const progressOpen = () => { try { return localStorage.getItem(FOLD()) === '1'; } catch { return false; } };
 
-export function progressCard() {
+// A row of the «از هوشواره بپرس» card on «پیشرفت»: one that asks, or one that folds what was said.
+export const askRow = (attr, title, sub) => `<button type="button" class="ask-h" ${attr}><span><b>${title}</b><small class="muted">${sub}</small></span>${icon.chevL}</button>`;
+export const askFold = (attr, title, sub, body, open = false) => `<div class="ask-row fold${open ? '' : ' folded'}" ${attr}>
+  <button type="button" class="ask-h fold-h" aria-expanded="${open}"><span><b>${title}</b><small class="muted">${sub}</small></span>${icon.chevD}</button>
+  <div class="fold-body">${body}</div>
+</div>`;
+export function bindAskFolds(root) {
+  root.querySelectorAll('[data-ask-fold] > .fold-h').forEach(b => b.onclick = () => {
+    b.setAttribute('aria-expanded', b.parentElement.classList.toggle('folded') === false);
+  });
+}
+
+export function progressRow() {
   if (!aiAvailable()) return '';
   const key = `progress:${today()}`;
   const n = latestProgress();
   const day = n?.key.slice(9);
-  if (n && !busy.has(key)) return `<section class="card ai-card fold${progressOpen() ? '' : ' folded'}" data-ai-fold>
-    <button type="button" class="ai-card-h fold-h" aria-expanded="${progressOpen()}"><span class="ai-mark">${sparkle(16)}</span><b>تحلیل روند</b><small class="muted">${day === today() ? 'امروز' : faDMY(day)}</small>${icon.chevD}</button>
-    <div class="fold-body"><div class="ai-text">${md(n.text)}</div><button class="link small" data-ai-progress>تحلیل تازه</button></div>
-  </section>`;
-  return `<section class="card ai-card">
-    ${head('تحلیل روند')}
-    ${busy.has(key) ? thinking('دارم روند وزنت را بررسی می‌کنم…')
-      : n ? `<div class="ai-text">${md(n.text)}</div>`
-      : '<p class="muted small">هوشواره روند وزن و غذاخوردنت را کنار هم می‌گذارد و می‌گوید کجای کاری.</p><button class="btn block" data-ai-progress>تحلیل روند من</button>'}
-  </section>`;
+  if (busy.has(key)) return `<div class="ask-row"><div class="ask-h"><span><b>تحلیل روند</b></span></div>${thinking('دارم روند وزنت را بررسی می‌کنم…')}</div>`;
+  if (n) return askFold('data-ai-fold', 'تحلیل روند', day === today() ? 'امروز' : faDMY(day), `<div class="ai-text">${md(n.text)}</div><button class="link small" data-ai-progress>تحلیل تازه</button>`, progressOpen());
+  return `<div class="ask-row">${askRow('data-ai-progress', 'تحلیل روند', 'کجای راهی و قدم بعدی چیست')}</div>`;
 }
 
 export function bindProgressCard(root, refresh) {
@@ -148,20 +164,17 @@ const monthKey = () => `maintain:${today().slice(0, 7)}`;
 // from the fourth week of maintenance on: the first weeks are still the climb
 const maintainShown = () => aiAvailable() && phaseOn(store.profile()) === 'maintain' && (maintainWeeks(store.profile(), today()) ?? 0) >= 3;
 
-export function maintainCard() {
+export function maintainRow() {
   if (!maintainShown()) return '';
   const key = monthKey();
   const n = store.note(key) || store.get().ai_notes.filter(x => x.kind === 'maintain').sort((a, b) => (a.key < b.key ? 1 : -1))[0];
-  return `<section class="card ai-card">
-    ${head('مرور ماهانه‌ی نگهداری', n && !busy.has(key) ? `<small class="muted">${faDMY(n.created_at?.slice(0, 10) || today())}</small>` : '')}
-    ${busy.has(key) ? thinking('دارم ماهِ نگهداری‌ات را مرور می‌کنم…')
-      : n ? `<div class="ai-text">${md(n.text)}</div>${n.key !== key ? '<button class="link small" data-ai-maintain>مرور این ماه</button>' : ''}`
-      : '<p class="muted small">ماهی یک بار، هوشواره نگاه می‌کند وزنت در بازه مانده یا نه، وزن‌کشی و تحرکت چطور بوده، و یک کار برای ماه بعد پیشنهاد می‌دهد.</p><button class="btn block" data-ai-maintain>مرور این ماه</button>'}
-  </section>`;
+  if (busy.has(key)) return `<div class="ask-row"><div class="ask-h"><span><b>مرور ماهانه‌ی نگهداری</b></span></div>${thinking('دارم ماهِ نگهداری‌ات را مرور می‌کنم…')}</div>`;
+  if (n) return askFold('data-ask-fold', 'مرور ماهانه‌ی نگهداری', faDMY(n.created_at?.slice(0, 10) || today()), `<div class="ai-text">${md(n.text)}</div>${n.key !== key ? '<button class="link small" data-ai-maintain>مرور این ماه</button>' : ''}`);
+  return `<div class="ask-row">${askRow('data-ai-maintain', 'مرور ماهانه‌ی نگهداری', 'وزن در بازه، وزن‌کشی و تحرک، و یک کار برای ماه بعد')}</div>`;
 }
 
 // Made once a month by itself (after the first pull, like the tip), or on the button.
-export function bindMaintainCard(root, refresh) {
+export function bindMaintainRow(root, refresh) {
   if (!maintainShown()) return;
   const key = monthKey();
   const run = quiet => generate(key, 'maintain', 'maintain', {}, r => ({ text: r.text }), refresh, quiet);

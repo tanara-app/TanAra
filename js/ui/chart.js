@@ -2,7 +2,7 @@
 // Also draws the waist (rows given as { day, kg: cm }), with its own labels.
 import { fa } from '../lib/fa.js';
 import { diffDays, faShort, faDM, addDays } from '../lib/dates.js';
-import { rollingAvg } from '../domain/stats.js';
+import { trendLine } from '../domain/stats.js';
 
 export function weightChart(sorted, from, to, { label = 'نمودار وزن', dot = 'وزن ثبت‌شده', line: lineLabel = 'میانگین ۷ روزه', empty = 'برای دیدن نمودار، دست‌کم دو روز وزن ثبت کنید.', span: avgSpan = 7 } = {}) {
   const pts = sorted.filter(w => w.day >= from && w.day <= to);
@@ -12,11 +12,7 @@ export function weightChart(sorted, from, to, { label = 'نمودار وزن', d
   const W = 340, H = 200, L = 36, R = 26, T = 12, B = 26;
   const start = pts[0].day, end = to;
   const span = Math.max(1, diffDays(end, start));
-  const avg = [];
-  for (let d = start; d <= end; d = addDays(d, 1)) {
-    const a = rollingAvg(sorted, d, avgSpan);
-    if (a !== null) avg.push({ day: d, kg: a });
-  }
+  const avg = trendLine(sorted, from, to, avgSpan);
   const vals = [...pts.map(p => Number(p.kg)), ...avg.map(a => a.kg)];
   let lo = Math.min(...vals), hi = Math.max(...vals);
   const pad = Math.max(0.5, (hi - lo) * 0.12);

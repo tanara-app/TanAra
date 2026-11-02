@@ -6,7 +6,7 @@ import { $, icon, sheet } from './ui/dom.js';
 import { today } from './lib/dates.js';
 import { renderOnboarding } from './ui/onboarding.js';
 import { renderToday, setDay } from './ui/today.js';
-import { renderProgress, resetWeighDay, showReview } from './ui/progress.js';
+import { renderProgress, resetProgress } from './ui/progress.js';
 import { renderProfile, setSession } from './ui/profile.js';
 import { renderLogin } from './ui/login.js';
 import { renderChat } from './ui/chat.js';
@@ -30,8 +30,8 @@ const ROUTES = {
 
 nav.innerHTML = Object.entries(ROUTES).map(([k, r]) => `<a href="#/${k}" data-route="${k}" aria-label="${r.label}">${r.icon}<span>${r.label}</span></a>`).join('');
 
-// «مرور هفته» used to be a tab; it now lives inside «پیشرفت».
-if (location.hash === '#/review') { showReview(); history.replaceState(history.state, '', '#/progress'); }
+// «مرور هفته» used to be a tab; old links land on «پیشرفت», where the past weeks open from.
+if (location.hash === '#/review') history.replaceState(history.state, '', '#/progress');
 
 // While history.back() is still on its way to امروز, the hash says the old tab.
 let going = null;
@@ -122,7 +122,7 @@ view.addEventListener('focusout', e => {
   if (pending && !isField(e.relatedTarget)) { pending = false; setTimeout(render, 0); }
 });
 
-function show() { sheet.closeAll({ history: false }); resetWeighDay(); render(); window.scrollTo(0, 0); }
+function show() { sheet.closeAll({ history: false }); resetProgress(); render(); window.scrollTo(0, 0); }
 window.addEventListener('hashchange', () => { going = null; if (route() !== shown) show(); });
 store.subscribe(requestRender);
 
