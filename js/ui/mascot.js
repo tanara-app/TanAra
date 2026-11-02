@@ -9,7 +9,7 @@
   counting, nothing about the scale.
 
   He keeps quiet most of the time: a line at most every 90 seconds (the big moments excepted),
-  six a day. One setting in «نمایه» picks, on this device, whether he is off, only writes, or
+  six a day; tapping him gets an answer on top of those (poke). One setting in «نمایه» picks, on this device, whether he is off, only writes, or
   also speaks (his voice is recorded with ElevenLabs, see VOICE.md); it starts on «فقط نوشته».
 */
 import * as store from '../data/store.js';
@@ -261,10 +261,57 @@ export function greetCard() {
   const g = GREET[key];
   const seed = [...`${t}${key}`].reduce((a, c) => a + c.charCodeAt(0), 0);
   const i = seed % g.lines.length;
-  return `<button type="button" class="greet" data-greet data-voice="greet-${key}-${i + 1}" data-once="${t}-${key}" aria-label="گفت‌وگو با هوشواره">
-    <img src="${face(g.mood)}" alt="" width="60" height="60">
-    <span>${esc(g.lines[i])}</span>
-  </button>`;
+  return `<div class="greet" data-greet data-voice="greet-${key}-${i + 1}" data-once="${t}-${key}">
+    <button type="button" class="greet-face" data-greet-face aria-label="هایمردینگر"><img src="${face(g.mood)}" alt="" width="60" height="60"></button>
+    <button type="button" class="greet-say" data-greet-say aria-label="گفت‌وگو با هوشواره"><span>${esc(g.lines[i])}</span></button>
+  </div>`;
+}
+
+/*
+  Tap him and he answers, and more so the more he is tapped: curious, then fussy, then giving up.
+  The lines take the place of the greeting for a moment and don't count towards the six a day,
+  since they asked for them. Nothing here is about food or the body, so they suit everyone. The
+  last one says where the chat is, now that tapping him no longer opens it. Each has a recording
+  poke-<n> (VOICE.md); until there is one, only the little sound plays.
+*/
+const POKES = [
+  { mood: 'surprised', text: 'اوه! داشتم یه فرمول رو حل می‌کردم.' },
+  { mood: 'happy', text: 'سلام! دنبال من می‌گشتی؟' },
+  { mood: 'wink', text: 'یه راز بهت بگم؟ نصف اختراع‌هام اولش منفجر شدن.' },
+  { mood: 'thinking', text: 'هیس! وسط یه آزمایش حساسم.' },
+  { mood: 'surprised', text: 'این دکمه نیست‌ها! من پروفسورم!' },
+  { mood: 'proud', text: 'نظریه‌ی جدید: تو عاشق دست زدن به پروفسوری!' },
+  { mood: 'calm', text: 'باشه، تو بردی. سؤالی داشتی، روی همین نوشته بزن.' },
+];
+const STAGES = [[0, 1, 2], [3, 4], [5], [6]]; // by how many taps in a row
+let pokes = 0, pokeAt = 0, lastPoke = -1, pokeTimer = 0;
+
+function poke(g) {
+  pokes = Date.now() - pokeAt > 6000 ? 0 : pokes + 1;
+  pokeAt = Date.now();
+  const stage = STAGES[Math.min(Math.floor(pokes / 2), STAGES.length - 1)];
+  const i = stage.length > 1 ? pick(stage.filter(n => n !== lastPoke)) : stage[0];
+  lastPoke = i;
+  const img = g.querySelector('img'), say = g.querySelector('[data-greet-say] span');
+  g.dataset.mood ??= img.getAttribute('src');
+  g.dataset.line ??= say.textContent;
+  img.src = face(POKES[i].mood);
+  say.textContent = POKES[i].text;
+  const btn = g.querySelector('[data-greet-face]');
+  btn.classList.remove('poked');
+  void btn.offsetWidth; // restart the hop
+  btn.classList.add('poked');
+  voice?.pause();
+  play('sfx-pop', 0.45);
+  speak(`poke-${i + 1}`);
+  clearTimeout(pokeTimer);
+  pokeTimer = setTimeout(() => {
+    if (!g.isConnected) return;
+    img.src = g.dataset.mood;
+    say.textContent = g.dataset.line;
+    delete g.dataset.mood;
+    delete g.dataset.line;
+  }, Math.max(3500, POKES[i].text.length * 90));
 }
 /*
   With sound on, the greeting is said once per part of the day. A phone only lets a page play
@@ -275,7 +322,8 @@ let waiting = false;
 export function bindGreet(root) {
   const g = root.querySelector('[data-greet]');
   if (!g) return;
-  g.addEventListener('click', () => document.querySelector('#nav a[data-route="ai"]')?.click());
+  g.querySelector('[data-greet-say]').addEventListener('click', () => document.querySelector('#nav a[data-route="ai"]')?.click());
+  g.querySelector('[data-greet-face]').addEventListener('click', () => poke(g));
   const greet = async () => {
     const now = document.querySelector('[data-greet]');
     if (!now || !soundOn()) return true;

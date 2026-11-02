@@ -639,12 +639,21 @@ button.tick::after { content: ''; position: absolute; inset: -12px; }
 @media (prefers-reduced-motion: reduce) { .buddy, .buddy.show { transition: opacity .2s; transform: none; animation: none; } }
 
 .greet {
-  display: flex; align-items: center; gap: 10px; width: 100%; margin: 0 0 12px; padding: 6px 6px 6px 12px;
-  background: var(--surface); border: 0; border-radius: var(--radius); color: var(--text);
-  font: inherit; font-weight: 600; text-align: start; cursor: pointer;
+  display: flex; align-items: center; width: 100%; margin: 0 0 12px; padding: 6px 6px 6px 12px;
+  background: var(--surface); border-radius: var(--radius); color: var(--text);
 }
-.greet img { width: 60px; height: 60px; flex: none; }
-.greet:active { background: var(--surface-2); }
+.greet button { background: none; border: 0; padding: 0; color: inherit; font: inherit; font-weight: 600; text-align: start; cursor: pointer; }
+.greet-face { flex: none; display: block; padding-inline-end: 10px !important; touch-action: manipulation; }
+.greet-say { flex: 1; min-width: 0; align-self: stretch; }
+.greet-say:active { opacity: .7; }
+.greet img { display: block; width: 60px; height: 60px; transform-origin: 50% 95%; animation: buddy-breathe 3.6s ease-in-out infinite, buddy-idle 24s ease-in-out infinite; }
+.greet-face.poked img { animation: buddy-poke .45s ease-out; }
+.chat-buddy { transform-origin: 50% 95%; animation: buddy-breathe 3.6s ease-in-out infinite; }
+/* alive when left alone: he breathes, and every so often has a little look around */
+@keyframes buddy-breathe { 50% { scale: 1.02 .985; } }
+@keyframes buddy-idle { 0%, 88%, 100% { rotate: 0deg; translate: 0 0; } 90% { rotate: -5deg; } 93% { rotate: 5deg; } 95% { rotate: 0deg; translate: 0 -4px; } 97% { translate: 0 0; } }
+@keyframes buddy-poke { 25% { transform: translateY(-9px) rotate(-7deg); } 55% { transform: translateY(0) rotate(5deg) scale(1.05, .95); } 80% { transform: rotate(-2deg); } }
+@media (prefers-reduced-motion: reduce) { .greet img, .greet-face.poked img, .chat-buddy { animation: none; } }
 
 body.kb .toast, body.chat-mode .toast { bottom: calc(var(--nav-h) + var(--safe-b) + 80px); }
 
