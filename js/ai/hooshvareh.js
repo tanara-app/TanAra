@@ -5,6 +5,7 @@
   keep token use low. When the app gains a new kind of data, add it to context() and to
   sections() in the function (and only to the modes that need it), and update HOOSHVAREH.md.
 */
+import { eatingPattern, optionUse } from '../domain/pattern.js';
 import * as store from '../data/store.js';
 import { SUPABASE_URL, SUPABASE_KEY } from '../config.js';
 import { effectiveTargets, computeTargets, phaseOn, maintenanceKcal, rampKcal, correcting } from '../domain/targets.js';
@@ -46,6 +47,14 @@ function planContext(s, t) {
     // today's occasions that off-plan food changed: what is left, and what was taken off for earlier ones
     rooms: Object.keys(SLOTS).filter(k => rooms[k].extras || rooms[k].owed).map(k => ({ slot: SLOTS[k].label, left: rooms[k].left, owed: rooms[k].owed, locked: rooms[k].locked })),
   };
+}
+
+// How they really eat (domain/pattern.js), and which options of the plan they pick.
+function patternContext(s, t) {
+  const m = eatingPattern(s.entries, s.ai_notes, t);
+  if (!m.ready) return null;
+  const { days, eaten, shares, usual } = m;
+  return { days, eaten, shares, usual, use: optionUse(s.ai_notes, s.entries, t) };
 }
 
 // The magazine as Hooshvareh sees it: every article by title. The full text of the latest few
@@ -129,6 +138,7 @@ function context() {
     motivations: s.motivations.map(({ kind, title, note, day, image_path }) => ({ kind, title, note, day, image_path: image_path ? 1 : null })),
     mode: p?.mode === 'plan' ? 'plan' : 'count',
     plan: planContext(s, t),
+    pattern: patternContext(s, t),
     magazine: magazineContext(s),
     focus: focusKey,
     // their own recipes, as one unit of the finished dish and what goes in it

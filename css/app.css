@@ -858,3 +858,4 @@ body.kb .toast, body.chat-mode .toast { bottom: calc(var(--nav-h) + var(--safe-b
 .week-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 10px; }
 .week-foot .fold-h { display: inline-flex; align-items: center; gap: 4px; width: auto; color: var(--accent); }
 .week-foot .btn { margin: 0; }
+.popt-fresh { flex: none; padding: 1px 7px; border-radius: 8px; background: var(--ai-soft); color: var(--ai); font-size: .72rem; font-weight: 600; }

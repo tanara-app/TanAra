@@ -10,6 +10,7 @@ import {
   picksOn, dayAdherence, newFoods, goneFoods, optionText,
   swapItem, restoreItem, sameItems, swapSuggestions, swapsOn, dayPlan, offOn, slotExtras, dayRooms, roomPlan,
 } from '../domain/plan.js';
+import { eatingPattern, markFresh } from '../domain/pattern.js';
 import { ask, aiAvailable, md, sparkle } from '../ai/hooshvareh.js';
 import { fa, esc, norm } from '../lib/fa.js';
 import { today, diffDays, relLabel } from '../lib/dates.js';
@@ -42,15 +43,22 @@ async function generate({ days = PLAN_DAYS, include = [] } = {}) {
   busy = true; refresh();
   try {
     const t = effectiveTargets(store.profile());
-    const input = { kcal: t.kcal, protein: t.protein, budgets: budgets(t.kcal), days, include: include.map(f => f.name) };
+    const s = store.get();
+    const pattern = eatingPattern(s.entries, s.ai_notes, today());
+    const input = shares => ({ kcal: t.kcal, protein: t.protein, budgets: budgets(t.kcal, shares), days, include: include.map(f => f.name) });
+    const own = pattern.ready ? pattern.shares : null;
     let plan = null, raw = null;
-    // the amounts are fitted here; if too few options survive, one more try is worth it
-    for (let i = 0; i < 2 && !plan; i++) {
-      raw = await ask('plan', input);
-      plan = buildPlan(raw, store.get().foods, t.kcal, today());
+    // the amounts are fitted here; if too few options survive, one more try is worth it, and a
+    // last one on the usual shares if their own left an occasion too small for what is in the bank
+    for (let i = 0; i < (own ? 3 : 2) && !plan; i++) {
+      const shares = i < 2 ? own : null;
+      raw = await ask('plan', input(shares));
+      plan = buildPlan(raw, store.get().foods, t.kcal, today(), shares);
     }
     if (!plan) throw new Error('برنامه کامل درنیامد؛ دوباره امتحان کن.');
     plan.days = days;
+    if (plan.shares) plan.fromDays = pattern.days;
+    markFresh(plan, pattern);
     store.saveNote({ key: `plan:${plan.start}`, kind: 'plan', text: String(raw.note || ''), data: plan });
     toast('رژیمت آماده شد');
   } catch (e) {
@@ -58,6 +66,15 @@ async function generate({ days = PLAN_DAYS, include = [] } = {}) {
   } finally {
     busy = false; refresh();
   }
+}
+
+// What the plan will be built on: their own eating, or how much more of it is needed for that.
+function patternLine() {
+  const s = store.get();
+  const m = eatingPattern(s.entries, s.ai_notes, today());
+  return `<p class="note soft small">${m.ready
+    ? `این رژیم از روی ${fa(m.days)} روز ثبت خودت چیده می‌شود: کالری وعده‌ها به عادتت نزدیک می‌ماند و بیشتر گزینه‌ها از غذاهایی است که معمولاً می‌خوری. جمع روز همان هدف کالری‌ات است.`
+    : `با ${fa(m.need)} روز ثبت کامل دیگر، رژیم از روی الگوی غذاخوردن خودت چیده می‌شود. فعلاً سهم وعده‌ها پیش‌فرض است.`}</p>`;
 }
 
 // Likes and limits, asked once before the first plan and editable before every new one.
@@ -69,6 +86,7 @@ function openPrefs(onGo) {
       <div class="sheet-head"><h2>قبل از چیدن رژیم</h2><button class="icon-btn" data-close aria-label="بستن">${icon.close}</button></div>
       <form class="stack" novalidate>
         <p class="muted small">هوشواره برنامه را از غذاهای بانک غذای خودت می‌چیند: برای هر وعده چند گزینه با مقدار مشخص. هر چیزی که این‌جا بنویسی در نظر می‌گیرد.</p>
+        ${patternLine()}
         <label class="field"><span>چه چیزهایی نمی‌خوری یا دوست نداری؟ <em>اختیاری</em></span><textarea name="dislikes" rows="2" placeholder="مثلاً ماهی، بادمجان، شیر">${esc(d.dislikes || '')}</textarea></label>
         <label class="field"><span>حساسیت غذایی <em>اختیاری</em></span><input name="allergies" value="${esc(d.allergies || '')}" placeholder="مثلاً گردو، لاکتوز"></label>
         <label class="field"><span>هر چیز دیگری که باید بداند <em>اختیاری</em></span><textarea name="notes" rows="2" placeholder="مثلاً ناهار سر کارم، صبح‌ها وقت آشپزی ندارم، گیاه‌خوارم">${esc(d.notes || '')}</textarea></label>
@@ -427,7 +445,7 @@ function slotCard(plan, key, day, picks, extras, room, showKcal, only, need) {
     return `<div class="popt${on ? ' on' : ''}${on || opened.has(`${day}|${o.id}`) ? ' open' : ''}" data-slot="${key}" data-opt="${o.id}">
       <button class="tick" aria-pressed="${on}" aria-label="${esc(o.title || optionText(o))}">${on ? icon.check : ''}</button>
       <div class="popt-body">
-        <div class="popt-head${o.title ? '' : ' plain'}"><strong>${esc(o.title || names)}</strong>${on ? '' : icon.chevD}</div>
+        <div class="popt-head${o.title ? '' : ' plain'}"><strong>${esc(o.title || names)}</strong>${o.fresh ? '<small class="popt-fresh">پیشنهاد تازه</small>' : ''}${on ? '' : icon.chevD}</div>
         ${o.title ? `<small class="muted popt-sum">${esc(names)}</small>` : ''}
         <div class="popt-more">
           <ul>${o.items.map(itemLine(only, need, !o.slot)).join('')}</ul>
@@ -530,7 +548,7 @@ export function planHtml(day) {
       ${head('رژیم هوشواره', `<small class="muted">${dayNo <= plan.days ? `روز ${fa(dayNo)} از ${fa(plan.days)}` : 'دوره تمام شده'}</small>`)}
       <div class="bar plan-bar"><i style="width:${a.done / a.of * 100}%"></i></div>
       <p class="small"><b>${fa(a.done)}</b> از ${fa(a.of)} وعده طبق برنامه</p>
-      ${plan.note ? `<details class="plan-note"><summary class="link small">توضیح هوشواره</summary><div class="ai-text small">${md(plan.note)}</div></details>` : ''}
+      ${plan.note || plan.shares ? `<details class="plan-note"><summary class="link small">توضیح هوشواره</summary>${plan.shares ? `<p class="muted small">از روی ${fa(plan.fromDays || 0)} روز ثبت خودت: صبحانه ${fa(Math.round(plan.shares.breakfast * 100))}٪، ناهار ${fa(Math.round(plan.shares.lunch * 100))}٪، شام ${fa(Math.round(plan.shares.dinner * 100))}٪ و میان‌وعده‌ها ${fa(Math.round((plan.shares.snack1 + plan.shares.snack2) * 100))}٪ از کالری روز.</p>` : ''}<div class="ai-text small">${md(plan.note || '')}</div></details>` : ''}
       <div class="plan-links">
         <button class="link small" data-plan-kcal>${showKcal ? 'پنهان کردن کالری' : 'نمایش کالری'}</button>
         ${aiAvailable() && !over ? '<button class="link small" data-plan-redo>برنامه‌ی تازه</button>' : ''}

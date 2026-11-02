@@ -24,7 +24,9 @@ export const SLOTS = {
   dinner: { label: 'شام', meal: 'dinner', share: 0.25 },
 };
 
-export const budgets = kcal => Object.fromEntries(Object.entries(SLOTS).map(([k, s]) => [k, Math.round(kcal * s.share)]));
+// `shares`: a plan fitted to their own eating (see pattern.js) carries its own; otherwise SLOTS.
+export const budgets = (kcal, shares) => Object.fromEntries(Object.entries(SLOTS).map(([k, s]) => [k, Math.round(kcal * (shares?.[k] ?? s.share))]));
+const planBudgets = plan => budgets(plan.kcal, plan.shares);
 
 const GRAM = 'گرم';
 const r1 = x => Math.round(x * 10) / 10;
@@ -92,9 +94,9 @@ export function fitOption(raw, foodsById, budget, id) {
   The model's answer → the plan that is stored. Returns null when a slot ends up with fewer
   than two usable options (a plan without choice isn't worth saving; the caller asks again).
 */
-export function buildPlan(raw, foods, kcal, start) {
+export function buildPlan(raw, foods, kcal, start, shares = null) {
   const byId = new Map(foods.map(f => [f.id, f]));
-  const b = budgets(kcal);
+  const b = budgets(kcal, shares);
   const slots = {};
   for (const key of Object.keys(SLOTS)) {
     const s = raw?.slots?.[key];
@@ -108,10 +110,10 @@ export function buildPlan(raw, foods, kcal, start) {
   const free = (raw?.free || []).map(f => byId.get(f.food_id))
     .filter(f => f && f.kcal * (f.unit === GRAM ? 100 : 1) <= 50 && !seen.has(f.id) && seen.add(f.id)).slice(0, 8)
     .map(f => ({ food_id: f.id, name: f.name }));
-  return { start, days: PLAN_DAYS, kcal, made: new Date().toISOString(), slots, free };
+  return { start, days: PLAN_DAYS, kcal, made: new Date().toISOString(), slots, free, ...(shares ? { shares } : {}) };
 }
 
-export const optionBudget = (plan, key) => budgets(plan.kcal)[key] / plan.slots[key].pick;
+export const optionBudget = (plan, key) => planBudgets(plan)[key] / plan.slots[key].pick;
 
 /* ---------------- swapping one food of an option ---------------- */
 
@@ -245,7 +247,7 @@ export function slotExtras(entries, picks, off, day) {
   still to be picked — nothing more fits there.
 */
 export function slotRoom(plan, key, picks, extras, entries, owed = 0) {
-  const budget = budgets(plan.kcal)[key];
+  const budget = planBudgets(plan)[key];
   const mine = new Set((picks[key] || []).flatMap(p => p.e));
   const kcal = list => list.reduce((t, e) => t + (Number(e.kcal) || 0), 0);
   const eaten = Math.round(kcal(extras) + kcal(entries.filter(e => mine.has(e.id))));
@@ -265,7 +267,7 @@ export function slotRoom(plan, key, picks, extras, entries, owed = 0) {
   other ones. Nothing is carried to the next day.
 */
 export function dayRooms(plan, picks, extras, entries) {
-  const b = budgets(plan.kcal);
+  const b = planBudgets(plan);
   const keys = Object.keys(SLOTS);
   const isOpen = k => (picks[k]?.length || 0) < plan.slots[k].pick;
   const out = {};

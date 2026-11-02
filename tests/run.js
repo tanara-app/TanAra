@@ -7,6 +7,7 @@ import './phase.test.js';
 import './stats.test.js';
 import './safety.test.js';
 import './plan.test.js';
+import './pattern.test.js';
 import './photo.test.js';
 import './recipe.test.js';
 import './shopping.test.js';

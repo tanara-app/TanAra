@@ -104,6 +104,7 @@ type Ctx = {
   today: string; todayFa?: string; now?: string;
   profile?: Record<string, unknown> | null;
   targets?: { kcal: number; protein: number; floor: number };
+  pattern?: { days: number; eaten: Record<string, number>; usual: Record<string, any[]>; use?: { days: number; options: any[] } | null } | null;
   foods?: any[]; entries?: any[]; weights?: any[]; waists?: any[]; reviews?: any[]; motivations?: any[]; notes?: any[];
   phase?: {
     phase: string; goalKg?: number | null; breakUntil?: string | null; maintainFrom?: { day: string; kg: number; kcal?: number } | null; lossWeeks?: number | null; maintenance?: number | null;
@@ -202,6 +203,12 @@ function sections(c: Ctx) {
     targets: () => c.targets ? `# Daily targets\ncalories: ${c.targets.kcal} kcal, protein: ${c.targets.protein} g, safety floor (never go below): ${c.targets.floor} kcal` : "",
     mode: () => `# Mode they are using now\n${c.mode === "plan" ? "رژیم (diet plan)" : "شمارش کالری (calorie counting)"}`,
     plan: () => pl ? `# Current diet plan (you designed it), ${pl.start} to ${pl.end}, for ${pl.kcal} kcal/day\n${(pl.slots || []).map((s: any) => `## ${s.slot} — they pick ${s.pick}\n${s.options.map((o: string, n: number) => `${n + 1}. ${o}`).join("\n")}`).join("\n")}\nFree when hungry: ${(pl.free || []).join("، ") || "-"}\nWhat you told them about it: ${pl.note || "-"}${pl.previous ? `\nPlan before it: from ${pl.previous.start}, ${pl.previous.kcal} kcal/day, ${pl.previous.adherence.done} of ${pl.previous.adherence.of} occasions eaten as planned` : ""}` : "",
+    pattern: () => {
+      const m = c.pattern;
+      if (!m) return "";
+      const use = m.use?.days ? `\nOptions of the current plan, times picked over ${m.use.days} days with a tick: ${m.use.options.map((o: any) => `${o.slot} «${o.title}» ${o.n}`).join("، ")}` : "";
+      return `# How they really eat (the app worked this out from ${m.days} full days they chose for themselves, in the last 60)\nShare of the day's calories: ${Object.entries(m.eaten).map(([k, v]) => `${k} ${v}%`).join(", ")}\nUsual foods, by meal (food: usual amount, times logged):\n${Object.entries(m.usual).map(([k, l]: any) => `${k}: ${l.map((u: any) => `${u.name} ${u.qty} ${u.unit}, ${u.n}×`).join("؛ ")}`).join("\n")}${use}`;
+    },
     adherence: () => pl ? `# Following the plan, last 4 weeks (day | occasions eaten as planned of 5)\n${(pl.days || []).map((d: any) => `${d.day} | ${d.done}/${d.of}`).join("\n") || "none"}${(pl.rooms || []).length ? `\n\n# Today's occasions changed by off-plan food (the app carries calories eaten over an occasion's share on to the later occasions of the same day and shows their options smaller)\n${pl.rooms.map((r: any) => `${r.slot}: ${r.left >= 0 ? `${r.left} kcal left` : `${-r.left} kcal over`}${r.owed ? `, after ${r.owed} kcal taken off for earlier occasions` : ""}${r.locked ? ", options locked" : ""}`).join("\n")}` : ""}` : "",
     weights: () => `# Weigh-ins (day | kg), all\n${[...(c.weights || [])].sort((a, b) => (a.day < b.day ? -1 : 1)).map(w => `${w.day} | ${r1(w.kg)}`).join("\n") || "none yet"}${(c.waists || []).length ? `\n\n# Waist measurements (day | cm)${(c.profile as any)?.heightCm ? `; height ${(c.profile as any).heightCm} cm` : ""}\n${[...c.waists!].sort((a, b) => (a.day < b.day ? -1 : 1)).map(w => `${w.day} | ${r1(w.cm)}`).join("\n")}` : ""}${c.measure?.weigh || c.measure?.waist ? `\n\nDue today in the app's check-in (one form on the Progress screen, «پیشرفت», takes both): ${[c.measure.weigh ? "weight" : "", c.measure.waist ? "waist" : ""].filter(Boolean).join(" and ")}` : ""}`,
     phase: () => {
@@ -687,7 +694,7 @@ const ONE_SHOT: Record<string, OneShot> = {
   plan: {
     effort: "medium",
     max_tokens: 20000,
-    data: (S) => [S.now(), S.profile(), S.targets(), S.phase(), S.energy(), S.mode(), S.foods(), S.plan(), S.adherence(), S.weights(), S.totals(), S.recent(), S.reviews(), S.checkins()],
+    data: (S) => [S.now(), S.profile(), S.targets(), S.phase(), S.energy(), S.mode(), S.foods(), S.plan(), S.pattern(), S.adherence(), S.weights(), S.totals(), S.recent(), S.reviews(), S.checkins()],
     schema: {
       type: "object",
       properties: {
@@ -712,14 +719,16 @@ For each occasion:
 
 ${PLAN_RULES}
 
+If the data has "How they really eat", this plan is for that person, not for an average one. The budgets above already follow their habits, so don't fight them. At each occasion build about two options out of three around the foods they usually have at that meal, near their usual amounts (the app fits the amounts to the budget), and make the rest something new from the bank that suits them. An option of the current plan they never picked (when they have ticked for a while) is not worth keeping as it is. Their habits are where you start, not the goal: the protein target and the vegetables still have to be met, so where their usual food falls short, change it. When an occasion's budget is under about 150 kcal use pick 1 and simple options (a piece of fruit, a small dairy).
+
 free: up to 8 foods from the bank that are so low in calories they can be eaten freely when hungry (raw or cooked non-starchy vegetables, salad without dressing, unsweetened tea, ...). Nothing above roughly 40 kcal per unit.
 
-note: 2–3 short Persian sentences to them: the idea behind this plan. ${i.include?.length ? `They just added these foods to the bank and want them in the plan: ${i.include.map((n: string) => `«${n}»`).join("، ")} — work each into at least one suitable option and say so. Keep the rest close to the current plan in the data.` : "If the data has an earlier plan, look at the weight change over it and how closely it was followed (the adherence table and what they logged), keep what worked, change what they skipped, and say in the note what you changed and why."}`,
+note: 2–3 short Persian sentences to them: the idea behind this plan; if it is built on how they really eat, say in plain words what you took from their habits and what you changed. ${i.include?.length ? `They just added these foods to the bank and want them in the plan: ${i.include.map((n: string) => `«${n}»`).join("، ")} — work each into at least one suitable option and say so. Keep the rest close to the current plan in the data.` : "If the data has an earlier plan, look at the weight change over it and how closely it was followed (the adherence table and what they logged), keep what worked, change what they skipped, and say in the note what you changed and why."}`,
   },
   plan_option: {
     effort: "low",
     shared: (S) => [S.profile(), S.targets(), S.foods()],
-    data: (S) => [S.plan()],
+    data: (S) => [S.plan(), S.pattern()],
     schema: planOption,
     prompt: (i) => `They have none of the current options for «${i.slot}» at hand or don't feel like them. Give ONE more option for that occasion of their diet plan, worth about ${i.kcal} kcal, clearly different from these existing ones:\n${(i.existing || []).map((o: string) => `- ${o}`).join("\n")}\n\n${PLAN_RULES}`,
   },
@@ -1200,7 +1209,7 @@ function runChat(ctx: Ctx, history: any[], images: unknown, use: Use) {
   const S = sections(ctx);
 
   // Cached prefix: tools, prompt, and everything that doesn't change while they chat.
-  const system = systemBlocks(block([S.profile(), S.targets(), S.phase(), S.energy(), S.mode(), S.foods(), S.recipes(), S.magazine(), S.motivations(), S.reviews(), S.checkins(), S.notes(), S.plan(), S.weights(), S.totals(S.yesterday), S.entries(S.detailFrom, S.yesterday)]));
+  const system = systemBlocks(block([S.profile(), S.targets(), S.phase(), S.energy(), S.mode(), S.foods(), S.recipes(), S.magazine(), S.motivations(), S.reviews(), S.checkins(), S.notes(), S.plan(), S.pattern(), S.weights(), S.totals(S.yesterday), S.entries(S.detailFrom, S.yesterday)]));
   // What changes by the minute goes after the conversation, so it never breaks the cache:
   // the next message finds everything up to this one already cached.
   const live = `<live_data>\n${block([S.now(), S.today(), S.standing(), S.activity(), S.occasions(), S.adherence(), S.shopping(), S.focus()])}\n</live_data>`;
