@@ -7,6 +7,7 @@
 */
 import { eatingPattern, optionUse } from '../domain/pattern.js';
 import * as store from '../data/store.js';
+import { SEED_FOODS } from '../data/seedFoods.js';
 import { SUPABASE_URL, SUPABASE_KEY } from '../config.js';
 import { effectiveTargets, computeTargets, phaseOn, maintenanceKcal, rampKcal, correcting } from '../domain/targets.js';
 import { SLOTS, planOn, planEnd, previousPlan, adherence, optionText, picksOn, offOn, slotExtras, dayRooms } from '../domain/plan.js';
@@ -19,6 +20,7 @@ import { perUnit } from '../domain/recipe.js';
 import { shopList, toBuy } from '../domain/shopping.js';
 
 const URL_ = `${SUPABASE_URL}/functions/v1/hooshvareh`;
+const SEED_NAMES = new Set(SEED_FOODS.map(f => f.name));
 let getToken = null; // async () => access token, or null when signed out / local mode
 export function configureAI(fn) { getToken = fn; }
 export const aiAvailable = () => !!getToken;
@@ -122,7 +124,8 @@ function context() {
     now: `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`,
     profile: p,
     targets: p ? effectiveTargets(p) : null,
-    foods: s.foods.map(({ id, name, category, unit, grams, kcal, protein, is_veg, created_at, unit2, grams2 }) => ({ id, name, category, unit, grams, kcal, protein, is_veg, created_at, ...(unit2 ? { unit2, grams2 } : {}) })),
+    // own: added by the person, not one of the app's starter foods; the diet plan favours these
+    foods: s.foods.map(({ id, name, category, unit, grams, kcal, protein, is_veg, created_at, unit2, grams2 }) => ({ id, name, category, unit, grams, kcal, protein, is_veg, created_at, ...(unit2 ? { unit2, grams2 } : {}), ...(SEED_NAMES.has(name) ? {} : { own: true }) })),
     // ids are not shown to the model; the Edge Function needs them to point a correction at a record
     entries: s.entries.map(({ id, day, meal, name, qty, unit, kcal, protein, is_veg, created_at }) => ({ id, day, meal, name, qty, unit, kcal, protein, is_veg, created_at })),
     weights: s.weights.map(({ day, kg }) => ({ day, kg })),
