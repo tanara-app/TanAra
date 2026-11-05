@@ -6,7 +6,7 @@ import { today } from '../lib/dates.js';
 import { toast } from './dom.js';
 
 export function validate(d, needWeight = true) {
-  if (!(d.age >= 18 && d.age <= 100)) return 'سن را بین ۱۸ تا ۱۰۰ وارد کنید.';
+  if (!(d.age >= 16 && d.age <= 100)) return 'سن را بین ۱۶ تا ۱۰۰ وارد کنید.';
   if (!d.sex) return 'جنس را انتخاب کنید.';
   if (!(d.heightCm >= 120 && d.heightCm <= 230)) return 'قد را به سانتی‌متر وارد کنید (مثلاً ۱۷۵).';
   if (needWeight && !(d.weightKg >= 35 && d.weightKg <= 350)) return 'وزن را به کیلوگرم وارد کنید.';
@@ -101,7 +101,7 @@ export function targetsHtml(t) {
 }
 
 const STEPS = [
-  { title: 'سلام! چند سؤال کوتاه', sub: 'برای اینکه هدف‌ها را درست حساب کنیم.', html: d => fieldsHtml.basics(d), check: d => (!(d.age >= 18 && d.age <= 100) ? 'سن را بین ۱۸ تا ۱۰۰ وارد کنید.' : !d.sex ? 'جنس را انتخاب کنید.' : null) },
+  { title: 'سلام! چند سؤال کوتاه', sub: 'برای اینکه هدف‌ها را درست حساب کنیم.', html: d => fieldsHtml.basics(d), check: d => (!(d.age >= 16 && d.age <= 100) ? 'سن را بین ۱۶ تا ۱۰۰ وارد کنید.' : !d.sex ? 'جنس را انتخاب کنید.' : null) },
   { title: 'قد و وزن', sub: 'عددها را تقریبی هم وارد کنید اشکالی ندارد.', html: d => fieldsHtml.body(d), check: d => validate({ ...d, activity: 'x', age: 30, sex: 'm' }) },
   { title: 'روزهای‌تان چقدر پرتحرک است؟', sub: '', html: d => fieldsHtml.activity(d), check: d => (!d.activity ? 'یکی را انتخاب کنید.' : null) },
   { title: 'سلامت', sub: 'این‌ها فقط برای این است که اگر لازم بود، پیشنهاد مشورت با پزشک بدهیم.', html: d => fieldsHtml.health(d), check: () => null },
