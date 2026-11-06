@@ -408,6 +408,10 @@ suite('plan round 2', () => {
     eq([...BANK, ...more].filter(avoidTest({ dislikes: 'سیب' })).map(x => x.id), ['a']); // not the potatoes
     eq(more.filter(avoidTest({ dislikes: 'بادام' })).map(x => x.id), ['al']); // not the peanut butter
     eq(more.filter(avoidTest({ allergies: 'آجیل' })).map(x => x.id), ['pb', 'al']); // a nut allergy takes both
+    const plain = [f('o', 'روغن خورش / غذا', 'قاشق غذاخوری', 120, 0, 'stew'), f('sh', 'سالاد شیرازی (بدون روغن)', 'کاسه', 40, 1, 'veg'),
+      f('ts', 'چای بدون قند', 'استکان', 2, 0, 'drink'), f('tq', 'چای با یک حبه قند', 'استکان', 20, 0, 'drink'), f('bu', 'کره', 'قاشق غذاخوری', 100, 0, 'breakfast')];
+    eq(plain.filter(avoidTest({ dislikes: 'روغن، قند' })).map(x => x.id), ['o', 'tq']); // what a food is «بدون» is not in it
+    eq([...plain, ...more].filter(avoidTest({ dislikes: 'کره' })).map(x => x.id), ['bu']); // butter, not peanut butter
     eq(avoidTest({}), null);
   });
 

@@ -130,7 +130,7 @@ const MAIN = ['breakfast', 'lunch', 'dinner'];
 const GROUPS = [
   [['لاکتوز', 'لبنیات', 'شیر'], ['شیر', 'ماست', 'پنیر', 'کشک', 'دوغ', 'بستنی', 'خامه', 'بورانی', 'قهوه فوری']],
   [['گلوتن', 'گندم'], ['نان', 'ماکارونی', 'رشته', 'جو', 'حلیم', 'بیسکویت', 'کیک', 'پیتزا', 'شیرینی', 'همبرگر', 'کتلت', 'زولبیا', 'سوخاری', 'ماءالشعیر']],
-  [['آجیل', 'مغزها'], ['گردو', 'بادام', 'پسته', 'فندق', 'تخمه', 'بادام زمینی']],
+  [['آجیل', 'مغزها'], ['گردو', 'بادام', 'پسته', 'فندق', 'تخمه', 'بادام زمینی', 'کره بادام زمینی']],
   [['تخم مرغ', 'تخممرغ'], ['تخم مرغ', 'املت', 'نیمرو', 'کوکو', 'کتلت', 'الویه', 'مایونز', 'کیک']],
   [['ماهی', 'غذای دریایی', 'دریایی'], ['ماهی', 'میگو', 'قزل آلا']],
   [['کنجد'], ['کنجد', 'ارده']],
@@ -141,12 +141,14 @@ const GROUPS = [
   they are written (half-space, space or none), so «مرغ» doesn't take the eggs away and
   «تخم مرغ» still finds «تخم‌مرغ».
 */
-const COMPOUNDS = [['تخم', 'مرغ'], ['سیب', 'زمینی'], ['بادام', 'زمینی']]
+const COMPOUNDS = [['تخم', 'مرغ'], ['سیب', 'زمینی'], ['بادام', 'زمینی'], ['کره', 'بادامزمینی']]
   .map(([a, b]) => [new RegExp(`${a}[\\u200c\\s]*${b}`, 'g'), a + b]);
 // letters made uniform, compounds joined, every separator a single space, padded so whole words can be looked up
 const words = t => {
   let x = String(t || '').replace(/ي/g, 'ی').replace(/ك/g, 'ک').replace(/[ۀة]/g, 'ه').replace(/[أإآ]/g, 'ا');
   for (const [re, joined] of COMPOUNDS) x = x.replace(re, joined);
+  // what a food is without is not in it: «سالاد شیرازی (بدون روغن)» has no oil, «چای بدون قند» no sugar
+  x = x.replace(/بدون[^()،,]*/g, ' ');
   return ` ${x.replace(/[\u200c\u200f\-–(),.،؛:«»\/\d۰-۹]+/g, ' ').replace(/\s+/g, ' ').trim()} `;
 };
 
