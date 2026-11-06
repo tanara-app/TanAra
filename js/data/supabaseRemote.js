@@ -1,7 +1,7 @@
 // Supabase adapter for the store. Every table is RLS-locked to the signed-in owner and
 // fills user_id from the JWT, so the client never sends it.
 
-const CONFLICT = { profile: 'user_id', reviews: 'user_id,week_start', weights: 'user_id,day', waists: 'user_id,day', activity: 'user_id,day', foods: 'id', entries: 'id', motivations: 'id', chat: 'id', ai_notes: 'user_id,key' };
+const CONFLICT = { profile: 'user_id', reviews: 'user_id,week_start', weights: 'user_id,day', waists: 'user_id,day', activity: 'user_id,day', foods: 'id', entries: 'id', motivations: 'id', chat: 'id', ai_notes: 'user_id,key', signals: 'user_id,day,kind' };
 const DELETE_KEY = { profile: 'user_id', foods: 'id', entries: 'id', weights: 'day', waists: 'day', activity: 'day', reviews: 'week_start', motivations: 'id', chat: 'id', ai_notes: 'key' };
 const BUCKET = 'motivation'; // private; files live under <user id>/
 const strip = rows => rows.map(({ user_id, ...r }) => r);

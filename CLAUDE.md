@@ -40,5 +40,7 @@ one needs to know goes in this file or in the project docs, not only in your own
 - `supabase/`: migrations and the Edge Functions `hooshvareh` (the AI assistant, Claude via Anthropic API)
   and `remind` (push reminders).
 - `HOOSHVAREH.md`: everything the AI assistant and the app do. Keep it up to date with every new feature.
+- `SIGNALS.md`: the patterns the app records once a day per person (table `signals`, `js/domain/signals.js`), each with its
+  scientific source. Not shown to users, not a diagnosis. If a rule changes, update this file and bump `SIGNALS_VERSION`.
 - `VOICE.md` / `ELEVENLABS.md`: the mascot Heimerdinger's lines and the brief for recording them
   (files in `audio/mascot/`). If a line changes in `js/ui/mascot.js`, update both.
