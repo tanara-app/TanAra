@@ -3,12 +3,13 @@ import { addDays, weekStart } from '../lib/dates.js';
 import { sortedWeights, weekAvg, totals } from './stats.js';
 
 /*
-  Rapid loss: the weekly mean weight dropped by more than 1.5 kg, three weeks in a row.
+  Rapid loss: the weekly mean weight dropped by more than `perWeek` kg (1.5; 1 for a teen, see
+  rapidLimit), three weeks in a row.
   Weeks are Sat→Fri. The first three weeks of use are exempt (early water loss is normal),
   so only drops landing in week 4 or later count. A week needs at least one weigh-in;
   the running week counts only once it has three, so a single low reading can't trigger it.
 */
-export function rapidLoss(weights, startDay, day) {
+export function rapidLoss(weights, startDay, day, perWeek = 1.5) {
   if (!startDay || weights.length < 4) return null;
   const sorted = sortedWeights(weights);
   const first = weekStart(startDay);
@@ -28,9 +29,12 @@ export function rapidLoss(weights, startDay, day) {
     if (weeks[k] === null || weeks[k - 1] === null) return null;
     drops.push(weeks[k - 1] - weeks[k]);
   }
-  if (drops.every(d => d > 1.5)) return { drops, weekIndex: i };
+  if (drops.every(d => d > perWeek)) return { drops, weekIndex: i, perWeek };
   return null;
 }
+
+// kg a week that counts as too fast: stricter for a body that is still growing.
+export const rapidLimit = teen => (teen ? 1 : 1.5);
 
 /*
   Under-eating: three days in a row (before today) each logged as a full day and below the

@@ -100,10 +100,24 @@ The two modes of the app
 - «مجله» is a tab where you publish one researched article a day for them, with links to the sources. The data lists those articles; when they ask about one, answer from its text and sources, and do not invent studies beyond them.
 - When the data has a diet plan, answer questions about what to eat from it, and treat days that followed it as a success even if calories were not counted. You cannot rewrite the plan from the chat, with one exception: when they like an option but don't have or don't want ONE food in it, propose a replacement with propose_plan_swap — a food from their bank that plays the same role in the meal (bread for bread, a protein source for a protein source), one of their own (marked «own») if one fits — and say in a few words why it fits. The app works out the amount itself so the calories stay the same; don't promise an exact amount. If they didn't say whether it is just for today or for good, propose it for today. They can do the same themselves with the swap button beside each food of an option. For a whole different choice in a meal point them to «یک گزینه‌ی دیگر» under that meal, and for a whole new plan to «برنامه‌ی تازه» on the Today screen.`;
 
+// Added to the profile when they are 16 or 17 (the app takes no one younger; targets.teen).
+// The app already uses teen equations and a higher floor for them; this is what changes in
+// what Hooshvareh says. In the data block, not SYSTEM, so the cached prefix stays the same.
+const TEEN = `# They are a teenager (16 or 17): rules on top of everything else
+- Their body is still growing: the targets and the safety floor above already come from equations for teenagers. Never suggest going below the floor, and don't use adult numbers (adult BMI cut-offs, 1200 kcal) with them.
+- No intermittent fasting or time-restricted eating, no skipping meals, no elimination diets (keto, cutting out bread, rice or dairy), no supplements, pills or slimming teas.
+- Keep dairy and iron-rich foods in: at this age calcium (about 1300 mg a day) and iron matter for bones and blood.
+- Weight goals go step by step, about 5% of their weight and then 10%, not an adult BMI figure.
+- Weight dropping more than about 1 kg a week for several weeks is too fast at their age (not 1.5): say so kindly and suggest a doctor.
+- Ramadan fasting is never a way to lose weight; if they fast, help with a full suhoor and an iftar in two small parts, and suggest checking with a doctor first.
+- Dizziness, fainting, periods stopping for months, or making up for eating by vomiting, fasting or extra exercise: say kindly that this needs a doctor or the local health centre (مرکز خدمات جامع سلامت) and suggest telling a parent. For thoughts of self-harm, give 123 (اورژانس اجتماعی) and 115.
+- Praise habits (regular meals, vegetables, moving, sleep), never thinness or a lower number on the scale.
+- If they ask, or it matters, be clear that you are an AI, not a doctor or a person.`;
+
 type Ctx = {
   today: string; todayFa?: string; now?: string;
   profile?: Record<string, unknown> | null;
-  targets?: { kcal: number; protein: number; floor: number };
+  targets?: { kcal: number; protein: number; floor: number; teen?: boolean };
   pattern?: { days: number; eaten: Record<string, number>; usual: Record<string, any[]>; use?: { days: number; options: any[] } | null } | null;
   foods?: any[]; entries?: any[]; weights?: any[]; waists?: any[]; reviews?: any[]; motivations?: any[]; notes?: any[];
   phase?: {
@@ -199,7 +213,7 @@ function sections(c: Ctx) {
     yesterday: addDays(c.today, -1),
     detailFrom,
     now: () => `# Now\ntoday: ${c.today}${c.todayFa ? ` (${c.todayFa})` : ""}${c.now ? `, local time ${c.now}` : ""}`,
-    profile: () => `# Profile (from the onboarding questionnaire)\n${JSON.stringify(c.profile || {})}`,
+    profile: () => `# Profile (from the onboarding questionnaire)\n${JSON.stringify(c.profile || {})}${c.targets?.teen ? `\n\n${TEEN}` : ""}`,
     targets: () => c.targets ? `# Daily targets\ncalories: ${c.targets.kcal} kcal, protein: ${c.targets.protein} g, safety floor (never go below): ${c.targets.floor} kcal` : "",
     mode: () => `# Mode they are using now\n${c.mode === "plan" ? "رژیم (diet plan)" : "شمارش کالری (calorie counting)"}`,
     plan: () => pl ? `# Current diet plan (you designed it), ${pl.start} to ${pl.end}, for ${pl.kcal} kcal/day\n${(pl.slots || []).map((s: any) => `## ${s.slot} — they pick ${s.pick}\n${s.options.map((o: string, n: number) => `${n + 1}. ${o}`).join("\n")}`).join("\n")}\nFree when hungry: ${(pl.free || []).join("، ") || "-"}\nWhat you told them about it: ${pl.note || "-"}${pl.previous ? `\nPlan before it: from ${pl.previous.start}, ${pl.previous.kcal} kcal/day, ${pl.previous.adherence.done} of ${pl.previous.adherence.of} occasions eaten as planned` : ""}` : "",

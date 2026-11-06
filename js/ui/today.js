@@ -3,11 +3,11 @@
 // The numbers come first, then the one card that matters most today; the other cards wait in a
 // fold under the meals, and the next one moves up when the top one is dismissed.
 import * as store from '../data/store.js';
-import { effectiveTargets } from '../domain/targets.js';
+import { effectiveTargets, isTeen } from '../domain/targets.js';
 import { phaseNotes, bindPhase, phaseLabel } from './phase.js';
 import { lightOn } from '../domain/phase.js';
 import { MEALS, entriesOn, totals, daysLoggedInWeek, sortedWeights } from '../domain/stats.js';
-import { underEating, rapidLoss } from '../domain/safety.js';
+import { underEating, rapidLoss, rapidLimit } from '../domain/safety.js';
 import { fa, kcal50, round50, esc, qtyLabel } from '../lib/fa.js';
 import { amountLabel } from './units.js';
 import { today, addDays, relLabel, faDM, weekStart } from '../lib/dates.js';
@@ -71,9 +71,9 @@ export function renderToday(root) {
     if (ue && !dismissed('under', ue.days[0])) {
       notices.push({ key: 'under', mark: ue.days[0], html: `<strong>چند روز است کم خورده‌اید</strong><p>سه روز گذشته کالری‌تان از حداقل ایمن (${fa(t.floor)}) کمتر بوده. کم‌خوری زیاد معمولاً نتیجه‌ی برعکس دارد؛ بدن خسته می‌شود و ادامه دادن سخت‌تر. کمی بیشتر خوردن کاملاً اشکالی ندارد.</p>` });
     }
-    const rl = rapidLoss(s.weights, p.startDate, today());
+    const rl = rapidLoss(s.weights, p.startDate, today(), rapidLimit(isTeen(p)));
     if (rl && !dismissed('rapid', weekStart(today()))) {
-      notices.push({ key: 'rapid', mark: weekStart(today()), cls: 'doctor', html: '<strong>سرعت کاهش وزن زیاد است</strong><p>سه هفته‌ی پشت‌سرهم بیشتر از ۱٫۵ کیلو در هفته کم کرده‌اید. لطفاً با پزشک‌تان مشورت کنید.</p>' });
+      notices.push({ key: 'rapid', mark: weekStart(today()), cls: 'doctor', html: `<strong>سرعت کاهش وزن زیاد است</strong><p>سه هفته‌ی پشت‌سرهم بیشتر از ${fa(rl.perWeek, 1)} کیلو در هفته کم کرده‌اید. لطفاً با پزشک‌تان مشورت کنید.</p>` });
     }
   }
 

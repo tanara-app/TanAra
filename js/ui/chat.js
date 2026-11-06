@@ -2,6 +2,7 @@
 // changes (log a food, a weight, correct or delete a record, ...) as cards; nothing is
 // written until the card is confirmed.
 import * as store from '../data/store.js';
+import { isTeen } from '../domain/targets.js';
 import { chat, ask, aiAvailable, md, focusArticle } from '../ai/hooshvareh.js';
 import { MEALS } from '../domain/stats.js';
 import { CATEGORIES } from '../data/seedFoods.js';
@@ -470,6 +471,7 @@ function paint(forceBottom = false) {
       <img class="chat-buddy" src="${face('wave')}" alt="" width="110" height="110">
       <p><b>سلام! من هایمردینگرم، پروفسورِ کوچولوی آزمایشگاه تن‌آرا و هوشواره‌ی تو.</b> هر چی ثبت کردی جلوی چشممه: غذاها، وزن، مرورهای هفته و انگیزه‌هات. برای من همه‌شون داده‌های هیجان‌انگیزن!</p>
       <p class="muted small">هر سؤالی داری بپرس، تحلیل بخواه، یا بگو چی خوردی تا برات ثبتش کنم (البته با تأیید خودت).</p>
+      ${isTeen(store.profile()) ? '<p class="muted small">یادت باشد من یک هوش مصنوعی‌ام، نه پزشک و نه یک آدم واقعی. برای هر چیزی درباره‌ی سلامتت، با پدر و مادرت و پزشک یا مرکز سلامت محله‌تان هم صحبت کن.</p>' : ''}
       <div class="chat-sugg">${SUGGESTIONS.map(s => `<button class="chip-btn" data-sugg>${s}</button>`).join('')}</div>
     </div>` : ''}
     ${all.length > msgs.length ? `<button class="link small chat-more" data-more>پیام‌های قبلی (${fa(all.length - msgs.length)})</button>` : ''}

@@ -91,11 +91,12 @@ export function targetsHtml(t) {
     <div class="tile big"><span>هدف پروتئین روزانه</span><b>${fa(t.protein)}</b><small>گرم</small></div>
   </div>
   <dl class="calc">
-    <div><dt>سوخت‌وساز پایه</dt><dd>${kcal50(t.bmr)}</dd></div>
+    ${t.teen ? '' : `<div><dt>سوخت‌وساز پایه</dt><dd>${kcal50(t.bmr)}</dd></div>`}
     <div><dt>مصرف روزانه با فعالیت</dt><dd>${kcal50(t.tdee)}</dd></div>
     <div><dt>کسری روزانه</dt><dd>${fa(500)}</dd></div>
     <div><dt>وزن مرجع برای پروتئین</dt><dd>${fa(t.refWeight, 1)} کیلو</dd></div>
   </dl>
+  ${t.teen ? `<p class="muted small">چون هنوز زیر ۱۸ سال هستی، مصرف بدن با فرمول مخصوص نوجوان‌ها حساب شده که انرژی لازم برای رشد را هم در نظر می‌گیرد، و حداقل ایمن کالری هم برای تو بالاتر است (${fa(t.floor)}).</p>` : ''}
   ${t.hitFloor ? `<p class="muted small">عدد محاسبه‌شده از حداقل ایمن (${fa(t.floor)}) کمتر بود، برای همین روی حداقل ایمن گذاشته شد.</p>` : ''}
   <p class="muted small">همه‌ی این عددها تخمینی‌اند و کالری‌ها به نزدیک‌ترین ۵۰ گرد شده‌اند.</p>`;
 }

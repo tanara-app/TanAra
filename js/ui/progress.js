@@ -2,8 +2,8 @@
 // forms (measure.js, activity.js), one card for asking Hooshvareh, and the details folded away.
 import * as store from '../data/store.js';
 import { sortedWeights, rate4w, waistSeries, waistToHeight, WHTR_GOAL } from '../domain/stats.js';
-import { rapidLoss } from '../domain/safety.js';
-import { shouldSuggestRecalc, phaseOn, maintenanceKcal } from '../domain/targets.js';
+import { rapidLoss, rapidLimit } from '../domain/safety.js';
+import { shouldSuggestRecalc, phaseOn, maintenanceKcal, isTeen } from '../domain/targets.js';
 import { nextTargets, ENERGY } from '../domain/energy.js';
 import { fa, signed, kcal50 } from '../lib/fa.js';
 import { icon } from './dom.js';
@@ -120,14 +120,14 @@ export function renderProgress(root) {
   const sorted = sortedWeights(s.weights);
   const t = today();
   const latest = sorted[sorted.length - 1];
-  const rapid = rapidLoss(s.weights, p.startDate, t);
+  const rapid = rapidLoss(s.weights, p.startDate, t, rapidLimit(isTeen(p, t)));
   const m = measureLine();
   root.innerHTML = `
     <header class="page-head"><h1>پیشرفت</h1></header>
 
     ${phaseNotes()}
 
-    ${rapid ? `<div class="note doctor"><strong>سرعت کاهش وزن زیاد است</strong><p>سه هفته‌ی پشت‌سرهم بیشتر از ۱٫۵ کیلو در هفته کم کرده‌اید. لطفاً با پزشک‌تان مشورت کنید.</p></div>` : ''}
+    ${rapid ? `<div class="note doctor"><strong>سرعت کاهش وزن زیاد است</strong><p>سه هفته‌ی پشت‌سرهم بیشتر از ${fa(rapid.perWeek, 1)} کیلو در هفته کم کرده‌اید. لطفاً با پزشک‌تان مشورت کنید.</p></div>` : ''}
 
     ${shouldSuggestRecalc(p, latest?.kg) ? `<div class="note soft">
       <strong>${fa(Math.floor((p.targets.baseWeight - latest.kg)))} کیلو کم کرده‌اید از آخرین محاسبه</strong>

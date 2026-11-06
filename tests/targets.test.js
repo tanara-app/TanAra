@@ -1,5 +1,5 @@
 import { suite, test, eq, ok } from './harness.js';
-import { computeTargets, effectiveTargets, safeFloor, clampKcal, phaseOn, maintenanceKcal, shouldSuggestRecalc, hasMedicalFlag, rampKcal } from '../js/domain/targets.js';
+import { computeTargets, effectiveTargets, safeFloor, clampKcal, ageOn, isTeen, teenEnergy, floorFor, phaseOn, maintenanceKcal, shouldSuggestRecalc, hasMedicalFlag, rampKcal } from '../js/domain/targets.js';
 
 const man = { sex: 'male', age: 35, heightCm: 180, weightKg: 100, activity: 'sedentary' };
 
@@ -22,8 +22,8 @@ suite('targets', () => {
     eq(t.kcal, 1200);
     eq(t.hitFloor, true);
     eq(safeFloor('male'), 1500);
-    eq(clampKcal('female', 900), 1200);
-    eq(clampKcal('male', 1730.4), 1730);
+    eq(clampKcal({ sex: 'female' }, 900), 1200);
+    eq(clampKcal({ sex: 'male' }, 1730.4), 1730);
   });
 
   test('a measured energy use replaces the formula', () => {
@@ -37,7 +37,7 @@ suite('targets', () => {
   test('effective target: manual wins, but not under the floor', () => {
     const p = { sex: 'male', targets: { kcal: 1850, protein: 113, manualKcal: 1300 } };
     eq(effectiveTargets(p, '2026-01-10').kcal, 1500);
-    eq(effectiveTargets({ sex: 'male', targets: { kcal: 1850, protein: 113, manualKcal: 2000, manualProtein: 120 } }, '2026-01-10'), { kcal: 2000, protein: 120, floor: 1500, phase: 'loss', manual: true });
+    eq(effectiveTargets({ sex: 'male', targets: { kcal: 1850, protein: 113, manualKcal: 2000, manualProtein: 120 } }, '2026-01-10'), { kcal: 2000, protein: 120, floor: 1500, phase: 'loss', teen: false, manual: true });
     eq(effectiveTargets(null).kcal, 0);
   });
 
@@ -87,5 +87,30 @@ suite('targets', () => {
     ok(hasMedicalFlag({ conditions: ['diabetes'] }));
     ok(hasMedicalFlag({ conditions: [], medications: 'متفورمین' }));
     ok(hasMedicalFlag({ edHistory: 'unsure' }));
+  });
+
+  test('a teen gets the NASEM 2023 equation and a floor from their own needs', () => {
+    const girl = { sex: 'female', age: 16, heightCm: 170, weightKg: 120, activity: 'sedentary' };
+    const t = computeTargets(girl);
+    eq(t.teen, true);
+    eq(t.tdee, 3200);            // 55.59 − 22.25×16 + 8.43×170 + 17.07×120 + 20 = 3201
+    eq(t.floor, 2700);           // the same at the lowest activity, minus 500
+    eq(t.kcal, 2700);
+    const boy = computeTargets({ sex: 'male', age: 17, heightCm: 175, weightKg: 70, activity: 'light' });
+    eq(boy.tdee, 3050);          // 19.12 + 3.68×17 + 8.62×175 + 20.28×70 + 20 = 3030
+    eq(boy.kcal, 2550);
+    eq(boy.floor, 2350);         // inactive: 2832 − 500
+    eq(Math.round(teenEnergy('female', 16, 170, 60)), 2177);
+    eq(computeTargets({ ...girl, age: 18 }).teen, false);
+  });
+
+  test('the age moves on from sign-up, and at 18 the adult rules come back', () => {
+    const p = { sex: 'female', age: 16, heightCm: 170, startDate: '2026-01-01', targets: { baseWeight: 120 } };
+    eq(ageOn(p, '2027-06-01'), 17);
+    eq(isTeen(p, '2027-06-01'), true);
+    eq(floorFor(p, '2027-06-01'), 2700); // 17: 3201 − 22 − 500 = 2679
+    eq(isTeen(p, '2028-01-02'), false);
+    eq(floorFor(p, '2028-01-02'), 1200);
+    eq(clampKcal(p, 1500) >= 2700, true);
   });
 });

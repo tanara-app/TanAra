@@ -1,7 +1,7 @@
 // Profile & settings: the targets (folded to one line) and the phase up front; everything else is rows
 // that open sheets, in small titled groups so the eye finds the group first and then the row.
 import * as store from '../data/store.js';
-import { effectiveTargets, clampKcal, safeFloor, hasMedicalFlag, ACTIVITY, CONDITIONS, correcting, rampKcal } from '../domain/targets.js';
+import { effectiveTargets, clampKcal, floorFor, hasMedicalFlag, ACTIVITY, CONDITIONS, correcting, rampKcal } from '../domain/targets.js';
 import { sortedWeights } from '../domain/stats.js';
 import { nextTargets } from '../domain/energy.js';
 import { fa, kcal50, parseNum, esc } from '../lib/fa.js';
@@ -164,7 +164,7 @@ function openAccount() {
 }
 
 function openManual(p) {
-  const floor = safeFloor(p.sex);
+  const floor = floorFor(p);
   const eff = effectiveTargets(p);
   sheet.open(body => {
     body.innerHTML = `
@@ -182,7 +182,7 @@ function openManual(p) {
       const k = parseNum(F.kcal.value);
       const pr = parseNum(F.protein.value);
       if (!(k > 0) || !(pr > 0)) return toast('عددها را درست وارد کنید');
-      const kcal = clampKcal(p.sex, k);
+      const kcal = clampKcal(p, k);
       store.saveProfile({ ...p, targets: { ...p.targets, manualKcal: kcal, manualProtein: Math.round(pr) } });
       sheet.close();
       toast(kcal > k ? `روی حداقل ایمن (${fa(kcal)}) گذاشته شد` : 'ذخیره شد');

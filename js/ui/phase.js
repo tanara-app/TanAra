@@ -5,7 +5,7 @@
   «پیشرفت». The rules are in domain/phase.js.
 */
 import * as store from '../data/store.js';
-import { effectiveTargets, phaseOn, maintenanceKcal, rampKcal, correcting, RAMP_STEP, CORRECT_KCAL } from '../domain/targets.js';
+import { effectiveTargets, isTeen, phaseOn, maintenanceKcal, rampKcal, correcting, RAMP_STEP, CORRECT_KCAL } from '../domain/targets.js';
 import { goalReached, goalProgress, breakDue, zone, correctionDue, lightDue, lightOn, lapse, milestone, maintainWeeks, withPhase, BREAK_DAYS, REGAIN_KG, BAND_KG, CORRECT_DAYS } from '../domain/phase.js';
 import { nextTargets } from '../domain/energy.js';
 import { sortedWeights, rollingAvg } from '../domain/stats.js';
@@ -97,12 +97,19 @@ export const toMaintenance = () => go('maintain');
 function openGoal() {
   const p = store.profile();
   const now = currentKg();
+  const bmi25 = Math.round(25 * (p.heightCm / 100) ** 2);
+  // A teen gets step-by-step goals from their own weight: adult BMI cut-offs don't fit their age.
+  const kgNow = now ?? Number(p.targets?.baseWeight);
+  const steps = isTeen(p) && kgNow > 0 ? [0.95, 0.9].map(f => Math.round(kgNow * f)) : null;
+  const hint = steps
+    ? `چون زیر ۱۸ سالی، هدف را مرحله‌به‌مرحله بگذار: قدم اول حدود ۵٪ وزن الانت (${fa(steps[0])} کیلو) و بعد ۱۰٪ (${fa(steps[1])} کیلو). وقتی به هر قدم رسیدی، قدم بعدی را می‌گذاری. عددهای نمایه‌ی توده‌ی بدنی بزرگسال برای سن تو معیار مناسبی نیستند.`
+    : `وقتی میانگین ۷ روزه‌ی وزنت به این عدد برسد، تن‌آرا پیشنهاد می‌دهد به مرحله‌ی نگهداری بروی. برای قد تو، وزن با نمایه‌ی توده‌ی بدنی ۲۵ حدود ${fa(bmi25)} کیلو است؛ هدف می‌تواند بالاتر از آن و مرحله‌به‌مرحله باشد.`;
   sheet.open(body => {
     body.innerHTML = `
       <div class="sheet-head"><h2>وزن هدف</h2><button class="icon-btn" data-close aria-label="بستن">${icon.close}</button></div>
       <form class="stack" novalidate>
-        <label class="field"><span>می‌خواهی به چه وزنی برسی؟ (کیلوگرم)</span><input name="kg" inputmode="decimal" value="${p.goalKg ? fa(p.goalKg, 1) : ''}" placeholder="مثلاً ${fa(Math.round(25 * (p.heightCm / 100) ** 2))}"></label>
-        <p class="muted small">وقتی میانگین ۷ روزه‌ی وزنت به این عدد برسد، تن‌آرا پیشنهاد می‌دهد به مرحله‌ی نگهداری بروی. برای قد تو، وزن با نمایه‌ی توده‌ی بدنی ۲۵ حدود ${fa(Math.round(25 * (p.heightCm / 100) ** 2))} کیلو است؛ هدف می‌تواند بالاتر از آن و مرحله‌به‌مرحله باشد.</p>
+        <label class="field"><span>می‌خواهی به چه وزنی برسی؟ (کیلوگرم)</span><input name="kg" inputmode="decimal" value="${p.goalKg ? fa(p.goalKg, 1) : ''}" placeholder="مثلاً ${fa(steps ? steps[0] : bmi25)}"></label>
+        <p class="muted small">${hint}</p>
         <p class="err" hidden></p>
         <button class="btn primary block big">ذخیره</button>
         ${p.goalKg ? '<button type="button" class="btn danger-ghost block" data-clear>برداشتن وزن هدف</button>' : ''}
