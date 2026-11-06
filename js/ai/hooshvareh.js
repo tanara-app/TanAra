@@ -52,7 +52,7 @@ function planContext(s, t) {
     // in Ramadan, on a day they fast: سحری from the lunch options, افطار from breakfast, شام from dinner
     fastingToday: fast,
     // today's occasions that off-plan food changed: what is left, and what was taken off for earlier ones
-    rooms: Object.keys(SLOTS).filter(k => rooms[k].extras || rooms[k].owed).map(k => ({ slot: shaped.labels?.[k] || SLOTS[k].label, left: rooms[k].left, owed: rooms[k].owed, locked: rooms[k].locked })),
+    rooms: Object.keys(SLOTS).filter(k => rooms[k].extras || rooms[k].owed).map(k => ({ slot: shaped.labels?.[k] || SLOTS[k].label, left: rooms[k].left, owed: rooms[k].owed, back: !!rooms[k].back, locked: rooms[k].locked })),
   };
 }
 
