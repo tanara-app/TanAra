@@ -13,6 +13,7 @@
 */
 import { addDays, diffDays, iso } from '../lib/dates.js';
 import { isTeen } from './targets.js';
+import { isRamadan } from './occasions.js';
 
 export const PLAN_DAYS = 14;
 
@@ -122,39 +123,125 @@ export const isFree = f => {
 // The main meals, where every option must bring real protein.
 const MAIN = ['breakfast', 'lunch', 'dinner'];
 
+/* ---------------- what they must not eat ---------------- */
+
+// A word in «حساسیت غذایی» that stands for a group of foods. Matching is on whole words of the
+// food's name, so «شیر» finds «شیر کم‌چرب» but not «شیرینی».
+const GROUPS = [
+  [['لاکتوز', 'لبنیات', 'شیر'], ['شیر', 'ماست', 'پنیر', 'کشک', 'دوغ', 'بستنی', 'خامه', 'بورانی', 'قهوه فوری']],
+  [['گلوتن', 'گندم'], ['نان', 'ماکارونی', 'رشته', 'جو', 'حلیم', 'بیسکویت', 'کیک', 'پیتزا', 'شیرینی', 'همبرگر', 'کتلت', 'زولبیا', 'سوخاری', 'ماءالشعیر']],
+  [['آجیل', 'مغزها'], ['گردو', 'بادام', 'پسته', 'فندق', 'تخمه', 'بادام زمینی']],
+  [['تخم مرغ', 'تخممرغ'], ['تخم مرغ', 'املت', 'نیمرو', 'کوکو', 'کتلت', 'الویه', 'مایونز', 'کیک']],
+  [['ماهی', 'غذای دریایی', 'دریایی'], ['ماهی', 'میگو', 'قزل آلا']],
+  [['کنجد'], ['کنجد', 'ارده']],
+];
+// letters made uniform, every separator a single space, padded so whole words can be looked up
+const words = t => ` ${String(t || '').replace(/ي/g, 'ی').replace(/ك/g, 'ک').replace(/[ۀة]/g, 'ه').replace(/[أإآ]/g, 'ا')
+  .replace(/[\u200c\u200f\-–(),.،؛:«»\/\d۰-۹]+/g, ' ').replace(/\s+/g, ' ').trim()} `;
+
+/*
+  A test for foods they must not be given: anything named in `allergies` (with the foods of
+  its group: «لاکتوز» → milk, yogurt, cheese…) or in `dislikes` (as written). Returns null when
+  there is nothing to avoid. The model is asked to respect these too; this makes sure.
+*/
+export function avoidTest({ allergies = '', dislikes = '' } = {}) {
+  const split = t => String(t || '').split(/[،,؛;\n|/]+|\sو\s/).map(x => words(x).trim()).filter(x => x.length > 1);
+  const terms = new Set(split(dislikes));
+  for (const a of split(allergies)) {
+    terms.add(a);
+    for (const [names, foods] of GROUPS) if (names.some(n => words(n).trim() === a)) foods.forEach(f => terms.add(words(f).trim()));
+  }
+  if (!terms.size) return null;
+  const list = [...terms].map(t => ` ${t} `);
+  return food => list.some(t => words(food?.name).includes(t));
+}
+
+/*
+  Whether a fitted option may go into the plan (also used for options added later):
+  - nothing they must avoid (`avoid`, see avoidTest);
+  - with kidney disease (`proteinMax`), a main meal at most 1.5 × its share of the protein limit.
+  `rules`: { kcal, shares, protein, proteinMax, avoid }.
+*/
+export function optionAllowed(o, key, pick, rules = {}) {
+  if (rules.avoid && o.items.some(i => rules.avoid(i))) return false;
+  if (rules.proteinMax && rules.protein > 0 && MAIN.includes(key)) {
+    const share = budgets(rules.kcal, rules.shares)[key] / rules.kcal;
+    if (o.protein > 1.5 * rules.protein * share / pick) return false;
+  }
+  return true;
+}
+
+export const needOf = pick => Math.max(2, pick);
+
 /*
   The model's answer → the plan that is stored. Returns null when a slot ends up with fewer
-  than two usable options (a plan without choice isn't worth saving; the caller asks again).
+  than two usable options (a plan without choice isn't worth saving; the caller asks again) —
+  or, with `partial`, the plan anyway with those slots listed in `missing`, so only they need
+  asking for again (see fillSlot).
   `protein` (the day's target): at the main meals, options with less than half of the meal's
   share of it are left out, as long as enough options remain — the options of a meal are meant
-  to be interchangeable, and one with a third of the protein of the others isn't.
+  to be interchangeable, and one with a third of the protein of the others isn't. With
+  `proteinMax` (kidney disease) it is a limit instead (see optionAllowed).
   Option ids carry a mark of this plan, so a day's picks and swaps made on an earlier plan
   never land on an option of a new one made the same day.
 */
-export function buildPlan(raw, foods, kcal, start, shares = null, { protein = 0 } = {}) {
+export function buildPlan(raw, foods, kcal, start, shares = null, { protein = 0, proteinMax = false, avoid = null, partial = false } = {}) {
   const byId = new Map(foods.map(f => [f.id, f]));
   const b = budgets(kcal, shares);
+  const rules = { kcal, shares, protein, proteinMax, avoid };
   const made = new Date().toISOString();
   const mark = Date.now().toString(36);
   const slots = {};
+  const missing = [];
   for (const key of Object.keys(SLOTS)) {
     const s = raw?.slots?.[key];
     const pick = Number(s?.pick) === 2 ? 2 : 1;
-    let options = (s?.options || []).map((o, i) => fitOption(o, byId, b[key] / pick, `${key}-${mark}-${i + 1}`)).filter(Boolean);
-    if (protein > 0 && MAIN.includes(key)) {
+    let options = (s?.options || []).map((o, i) => fitOption(o, byId, b[key] / pick, `${key}-${mark}-${i + 1}`))
+      .filter(o => o && optionAllowed(o, key, pick, rules));
+    if (protein > 0 && !proteinMax && MAIN.includes(key)) {
       const min = 0.5 * protein * (b[key] / kcal) / pick;
       const enough = options.filter(o => o.protein >= min);
-      if (enough.length >= Math.max(2, pick)) options = enough;
+      if (enough.length >= needOf(pick)) options = enough;
     }
-    if (options.length < Math.max(2, pick)) return null;
+    if (options.length < needOf(pick)) {
+      if (!partial) return null;
+      missing.push(key);
+    }
     slots[key] = { pick, options };
   }
   const seen = new Set();
   // «free» means free, whatever the model said
   const free = (raw?.free || []).map(f => byId.get(f.food_id))
-    .filter(f => f && isFree(f) && !seen.has(f.id) && seen.add(f.id)).slice(0, 8)
+    .filter(f => f && isFree(f) && !avoid?.(f) && !seen.has(f.id) && seen.add(f.id)).slice(0, 8)
     .map(f => ({ food_id: f.id, name: f.name }));
-  return { start, days: PLAN_DAYS, kcal, made, slots, free, ...(shares ? { shares } : {}) };
+  return { start, days: PLAN_DAYS, kcal, made, slots, free, ...(shares ? { shares } : {}), ...(partial ? { missing } : {}) };
+}
+
+/*
+  One more option for a slot of a plan being made (or the plan in force): the model's answer
+  fitted and checked like the rest. Null when it doesn't make it.
+*/
+export function extraOption(raw, foods, plan, key, rules = {}, { id = `${key}-x${Date.now().toString(36)}`, budget = null } = {}) {
+  const pick = plan.slots[key].pick;
+  const o = fitOption(raw, new Map(foods.map(f => [f.id, f])), budget ?? planBudgets(plan)[key] / pick, id);
+  return o && optionAllowed(o, key, pick, { ...rules, kcal: plan.kcal, shares: plan.shares }) ? o : null;
+}
+
+/*
+  The plan refitted to a new daily target without asking anyone: every option's amounts
+  refitted to its new budget (same foods). Options that can't get there drop out; null when a
+  slot is left without enough of them. Used when the target moves (the climb into maintenance,
+  a correction, a recalculation).
+*/
+export function rescalePlan(plan, kcal, foodsById) {
+  const b = budgets(kcal, plan.shares);
+  const slots = {};
+  for (const [k, s] of Object.entries(plan.slots)) {
+    const options = s.options.map(o => shrinkOption(o, foodsById, b[k] / s.pick)).filter(Boolean).map(({ fit, ...o }) => o);
+    if (options.length < needOf(s.pick)) return null;
+    slots[k] = { ...s, options };
+  }
+  return { ...plan, kcal, slots };
 }
 
 export const optionBudget = (plan, key) => planBudgets(plan)[key] / plan.slots[key].pick;
@@ -311,6 +398,8 @@ export function slotRoom(plan, key, picks, extras, entries, owed = 0) {
 // Cutting the next meals to nothing after overeating is the restrict-then-overeat cycle (and,
 // on diabetes drugs like glibenclamide, a low-sugar risk); what doesn't fit is let go.
 export const CARRY_MAX = 0.3;
+// How far a fully picked occasion may go over its budget before the rest counts as overeating.
+export const OVER_SLACK = 0.15;
 
 // Whether overeating is taken off later occasions at all: not with a history (or doubt) of an
 // eating disorder, where any making-up is advised against, and not for a teen.
@@ -341,8 +430,9 @@ export function dayRooms(plan, picks, extras, entries, { carry = true } = {}) {
     const owed = Math.min(share, cap(k), Math.max(0, slotRoom(plan, k, picks, extras[k], entries).left));
     const r = out[k] = slotRoom(plan, k, picks, extras[k], entries, owed);
     const off = extras[k].reduce((t, e) => t + (Number(e.kcal) || 0), 0);
-    // picked in full: only what the off-plan food added counts, not an option a little over its budget
-    const more = r.left >= 0 ? 0 : open ? -r.left : Math.min(off, -r.left);
+    // picked in full: what the off-plan food added counts, and what was eaten of the options beyond
+    // OVER_SLACK of the budget (amounts changed in the log) — not an option a little over its budget
+    const more = r.left >= 0 ? 0 : open ? -r.left : Math.max(Math.min(off, -r.left), -r.left - Math.round(b[k] * OVER_SLACK));
     debt = Math.max(0, debt - owed - (open ? 0 : Math.max(0, r.left))) + (carry ? more : 0);
     const others = keys.some((x, m) => m !== n && isOpen(x));
     r.passed = carry && more > 0 && others ? Math.round(more) : 0;
@@ -391,19 +481,24 @@ export function roomPlan(plan, picks, rooms, foodsById) {
 }
 
 // How many of the day's occasions were eaten as planned.
+// (A fasting day has only its three occasions; see fastPlan.)
 export function dayAdherence(plan, picks) {
-  const keys = Object.keys(SLOTS);
+  const keys = Object.keys(SLOTS).filter(k => plan.slots[k].pick > 0);
   return { done: keys.filter(k => (picks[k]?.length || 0) >= plan.slots[k].pick).length, of: keys.length };
 }
 
-// Occasions eaten as planned over a range of days (only days a plan was in force).
+/*
+  Occasions eaten as planned over a range of days: only days a plan was in force and something
+  was logged — a day with nothing at all (travel, a day off the app) says nothing about the plan.
+*/
 export function adherence(notes, entries, from, to) {
   let done = 0, of = 0;
   const days = [];
+  const logged = new Set(entries.map(e => e.day));
   for (let d = from; d <= to; d = addDays(d, 1)) {
     const plan = planOn(notes, d);
-    if (!plan) continue;
-    const a = dayAdherence(plan, picksOn(notes, entries, d));
+    if (!plan || !logged.has(d)) continue;
+    const a = dayAdherence(fastOn(notes, d) ? fastShape(plan) : plan, picksOn(notes, entries, d));
     done += a.done; of += a.of;
     days.push({ day: d, done: a.done, of: a.of });
   }
@@ -458,3 +553,56 @@ export function portionsFor(foods, kcal) {
 export const portionFor = (food, kcal) => portionsFor([food], kcal)[0];
 
 export const optionText = o => o.items.map(i => `${i.qty} ${i.unit} ${i.name}`).join(' + ');
+
+/* ---------------- fasting days (Ramadan) ---------------- */
+
+/*
+  On a day they fast there are three occasions instead of five, made from the plan's own
+  options with their amounts refitted: سحری from the lunch options (40% of the day, logged as
+  breakfast), افطار from the breakfast options (30%, logged as a snack) and شام from the dinner
+  ones (30%). The day's total stays the target. The model is told, so its breakfast options
+  also work as an iftar and its lunch ones before a fast.
+*/
+export const FAST = {
+  breakfast: { label: 'سحری', from: 'lunch', share: 0.4 },
+  snack2: { label: 'افطار', from: 'breakfast', share: 0.3 },
+  dinner: { label: 'شام', from: 'dinner', share: 0.3 },
+};
+const FAST_SHARES = Object.fromEntries(Object.keys(SLOTS).map(k => [k, FAST[k]?.share || 0]));
+
+// The plan's slots as a fasting day counts them (no amounts), for adherence.
+export function fastShape(plan) {
+  const slots = Object.fromEntries(Object.keys(SLOTS).map(k => [k, FAST[k] ? { pick: plan.slots[FAST[k].from].pick, options: [] } : { pick: 0, options: [] }]));
+  return { ...plan, slots, shares: FAST_SHARES, fast: true };
+}
+
+// The plan as a fasting day offers it (see FAST). Options that can't be refitted drop out.
+export function fastPlan(plan, foodsById) {
+  const b = budgets(plan.kcal, FAST_SHARES);
+  const slots = Object.fromEntries(Object.keys(SLOTS).map(k => {
+    const f = FAST[k];
+    if (!f) return [k, { pick: 0, options: [] }];
+    const from = plan.slots[f.from];
+    const options = from.options.filter(o => !o.slot)
+      .map(o => shrinkOption(o, foodsById, b[k] / from.pick)).filter(Boolean)
+      .map(({ fit, ...o }) => ({ ...o, fast: true }));
+    return [k, { pick: from.pick, options }];
+  }));
+  return { ...plan, slots, shares: FAST_SHARES, fast: true, labels: Object.fromEntries(Object.entries(FAST).map(([k, f]) => [k, f.label])) };
+}
+
+// The name of an occasion on the plan as shown (a fasting day renames them).
+export const slotLabel = (plan, key) => plan?.labels?.[key] || SLOTS[key].label;
+
+/*
+  Whether they fast on a day: what they said that day (kept with the day's picks as `fast`), or
+  else what they last said on an earlier day of the same Ramadan. Never outside Ramadan.
+*/
+export function fastOn(notes, day) {
+  if (!isRamadan(day)) return false;
+  for (let d = day, n = 0; n < 31 && isRamadan(d); d = addDays(d, -1), n++) {
+    const f = notes.find(x => x.key === `pick:${d}`)?.data?.fast;
+    if (typeof f === 'boolean') return f;
+  }
+  return false;
+}

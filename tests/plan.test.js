@@ -1,5 +1,5 @@
 import { suite, test, eq, ok, near } from './harness.js';
-import { budgets, fitOption, buildPlan, optionBudget, planOn, previousPlan, planEnd, planDayNo, planOver, picksOn, dayAdherence, adherence, newFoods, goneFoods, optionText, swapItem, restoreItem, sameItems, swapSuggestions, swapsOn, dayPlan, offOn, slotExtras, slotRoom, dayRooms, shrinkOption, roomPlan, portionFor, portionsFor, SLOTS, maxKcal, maxQty, isFree, carriesOver, CARRY_MAX } from '../js/domain/plan.js';
+import { budgets, fitOption, buildPlan, optionBudget, planOn, previousPlan, planEnd, planDayNo, planOver, picksOn, dayAdherence, adherence, newFoods, goneFoods, optionText, swapItem, restoreItem, sameItems, swapSuggestions, swapsOn, dayPlan, offOn, slotExtras, slotRoom, dayRooms, shrinkOption, roomPlan, portionFor, portionsFor, SLOTS, maxKcal, maxQty, isFree, carriesOver, CARRY_MAX, avoidTest, optionAllowed, extraOption, rescalePlan, fastPlan, fastShape, fastOn } from '../js/domain/plan.js';
 
 const food = (id, unit, kcal, protein = 0, extra = {}) => ({ id, name: id, unit, kcal, protein, grams: 100, is_veg: false, created_at: '2026-01-01T00:00:00Z', ...extra });
 const FOODS = [
@@ -98,7 +98,7 @@ suite('plan', () => {
     eq(Object.keys(picks).sort(), ['lunch', 'snack1']);
     eq(dayAdherence(plan, picks), { done: 1, of: 5 }); // lunch yes; snack1 has one of its two
     const a = adherence(notes, entries, '2026-02-01', '2026-02-02');
-    eq([a.done, a.of, a.days.length], [1, 10, 2]);
+    eq([a.done, a.of, a.days.length], [1, 5, 1]); // 02-01 has nothing logged: not counted
     eq(adherence(notes, entries, '2026-01-01', '2026-01-05').of, 0);
   });
 
@@ -381,5 +381,84 @@ suite('plan safeguards', () => {
   test('a swap never piles up fruit either', () => {
     const opt = fitOption(o(['bread', 2], ['cheese', 2]), by, 380, 'x');
     eq(swapItem(opt, 0, by.get('apple')).items[0].qty, 2);
+  });
+});
+
+suite('plan round 2', () => {
+  const f = (id, name, unit, kcal, protein, category) => ({ id, name, unit, kcal, protein, grams: 100, is_veg: false, category });
+  const BANK = [
+    f('b', 'نان سنگک', 'کف‌دست', 110, 4, 'grain'), f('c', 'پنیر سفید', 'قوطی کبریت', 80, 5, 'breakfast'), f('w', 'گردو (مغز کامل)', 'عدد', 30, 0.5, 'nuts'),
+    f('m', 'شیر کم‌چرب', 'لیوان', 105, 8, 'dairy'), f('s', 'شیرینی تر (خامه‌ای)', 'عدد', 150, 2, 'sweet'), f('e', 'املت گوجه (۲ تخم‌مرغ)', 'پرس', 220, 13, 'breakfast'),
+    f('ch', 'سینه مرغ', 'کف‌دست', 165, 31, 'protein'), f('r', 'برنج سفید', 'کفگیر', 180, 3, 'grain'), f('y', 'ماست کم‌چرب', 'لیوان', 110, 7, 'dairy'),
+    f('a', 'سیب', 'عدد', 80, 0, 'fruit'),
+  ];
+  const by = new Map(BANK.map(x => [x.id, x]));
+  const o = (...it) => ({ title: 't', items: it.map(([food_id, qty]) => ({ food_id, qty })) });
+
+  test('allergies are matched on whole words and by group; dislikes as written', () => {
+    const lact = avoidTest({ allergies: 'لاکتوز' });
+    eq(BANK.filter(lact).map(x => x.id), ['c', 'm', 's', 'y']); // the cream pastry by «خامه»
+    eq(BANK.filter(avoidTest({ dislikes: 'شیر' })).map(x => x.id), ['m']); // whole words: not «شیرینی»
+    eq(BANK.filter(avoidTest({ allergies: 'تخم مرغ، گردو' })).map(x => x.id), ['w', 'e']);
+    eq(BANK.filter(avoidTest({ dislikes: 'مرغ' })).map(x => x.id), ['e', 'ch']);
+    eq(avoidTest({}), null);
+  });
+
+  const raw = () => ({ slots: {
+    breakfast: { pick: 1, options: [o(['b', 2], ['c', 2], ['w', 3]), o(['e', 1], ['b', 2.5]), o(['b', 2], ['c', 3])] },
+    snack1: { pick: 1, options: [o(['y', 1], ['a', 1]), o(['m', 2])] },
+    lunch: { pick: 1, options: [o(['r', 2], ['ch', 1.5]), o(['r', 2.5], ['ch', 1]), o(['r', 2], ['ch', 2.5])] },
+    snack2: { pick: 1, options: [o(['y', 1], ['a', 1]), o(['m', 2])] },
+    dinner: { pick: 1, options: [o(['b', 2], ['ch', 1.5]), o(['b', 3], ['c', 2]), o(['r', 1.5], ['ch', 1.5])] },
+  }, free: [] });
+
+  test('a plan never keeps an option with a food they must avoid', () => {
+    const p = buildPlan(raw(), BANK, 2000, '2026-02-01', null, { avoid: avoidTest({ allergies: 'گردو' }) });
+    ok(p.slots.breakfast.options.every(x => !x.items.some(i => i.food_id === 'w')), 'no walnuts');
+  });
+
+  test('kidney disease: a main meal far above its share of the protein limit is left out', () => {
+    const rules = { kcal: 2000, protein: 59, proteinMax: true };
+    const p = buildPlan(raw(), BANK, 2000, '2026-02-01', null, { ...rules, partial: true });
+    for (const k of ['lunch', 'dinner']) ok(p.slots[k].options.every(x => x.protein <= 1.5 * 59 * (k === 'lunch' ? 0.3 : 0.25)), k);
+    ok(p.missing.includes('lunch'), 'lunch is short and asked for again');
+    const low = extraOption(o(['r', 2.5], ['y', 1]), BANK, p, 'lunch', rules);
+    ok(low && optionAllowed(low, 'lunch', 1, rules), 'a moderate one is taken');
+    eq(extraOption(o(['ch', 3], ['r', 1]), BANK, p, 'lunch', rules), null);
+  });
+
+  test('the plan refitted to a new target keeps its options', () => {
+    const p = buildPlan(raw(), BANK, 2000, '2026-02-01');
+    const up = rescalePlan(p, 2300, by);
+    eq(up.kcal, 2300);
+    eq(up.slots.lunch.options[0].id, p.slots.lunch.options[0].id);
+    ok(up.slots.lunch.options.every(x => x.kcal >= 690 * 0.85 && x.kcal <= maxKcal(690) && !x.fit), 'fitted to 690');
+  });
+
+  test('a fasting day: سحری from lunch, افطار from breakfast, شام from dinner, three to count', () => {
+    const p = buildPlan(raw(), BANK, 2000, '2027-02-01');
+    const fp = fastPlan(p, by);
+    eq(Object.keys(fp.slots).filter(k => fp.slots[k].pick > 0), ['breakfast', 'snack2', 'dinner']);
+    eq(fp.slots.breakfast.options[0].items.map(i => i.food_id), p.slots.lunch.options[0].items.map(i => i.food_id));
+    ok(fp.slots.breakfast.options.every(x => x.kcal <= maxKcal(800) && x.kcal >= 680 && x.fast), 'سحری is 40%');
+    eq([fp.labels.breakfast, fp.labels.snack2], ['سحری', 'افطار']);
+    eq(dayAdherence(fastShape(p), { breakfast: [{}], dinner: [{}] }), { done: 2, of: 3 });
+    // said once, it holds for the next days of Ramadan; never outside it
+    const notes = [{ key: 'pick:2027-02-10', kind: 'pick', data: { slots: {}, fast: true } }, { key: 'pick:2027-02-13', kind: 'pick', data: { slots: {}, fast: false } }];
+    eq(['2027-02-09', '2027-02-10', '2027-02-12', '2027-02-14', '2027-03-12'].map(d => fastOn(notes, d)), [false, true, true, false, false]);
+  });
+
+  test('eating well past a picked option counts as overeating; a little over does not', () => {
+    const p = buildPlan(raw(), BANK, 2000, '2026-02-01');
+    const opt = p.slots.lunch.options[0];
+    const day = '2026-02-03';
+    const es = [{ id: 'l', day, meal: 'lunch', kcal: opt.kcal + 400, created_at: 'x' }];
+    const picks = { lunch: [{ o: opt.id, e: ['l'] }] };
+    const none = { breakfast: [], snack1: [], lunch: [], snack2: [], dinner: [] };
+    let r = dayRooms(p, picks, none, es);
+    ok(r.lunch.passed > 0 && r.dinner.owed > 0, 'carried on');
+    es[0].kcal = opt.kcal + 40;
+    r = dayRooms(p, picks, none, es);
+    eq(r.dinner.owed, 0);
   });
 });

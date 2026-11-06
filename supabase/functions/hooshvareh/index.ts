@@ -737,7 +737,9 @@ ${PLAN_RULES}
 
 If the data has "How they really eat", this plan is for that person, not for an average one. The budgets above already follow their habits, so don't fight them. At each occasion build about two options out of three around the foods they usually have at that meal, near their usual amounts (the app fits the amounts to the budget), and make the rest something new from the bank that suits them, their own foods first. An option of the current plan they never picked (when they have ticked for a while) is not worth keeping as it is. Their habits are where you start, not the goal: the protein target and the vegetables still have to be met, so where their usual food falls short, change it. When an occasion's budget is under about 150 kcal use pick 1 and simple options (a piece of fruit, a small dairy).
 
-free: up to 8 foods from the bank that are so low in calories they can be eaten freely when hungry: non-starchy vegetables (raw or cooked), salad without dressing, and drinks with next to no calories (unsweetened tea, water). No fruit, nuts, dates, sugar, biscuits or anything sweetened, however small one piece is — the app drops them.
+${i.ramadan ? `Ramadan falls within this plan. On a day they fast the app shows three occasions made from these same options, amounts refitted: سحری from the LUNCH options (40% of the day), افطار from the BREAKFAST options (30%), شام from the DINNER options (30%). So make most breakfast options work as an Iranian iftar too (e.g. نان و پنیر و سبزی، عدسی، آش، حلیم، شیر، with a date or tea where the bank has them), and most lunch options filling and fine before a long fast (protein and whole grains or legumes, not salty or very sweet). Say this in the note in one sentence.
+
+` : ""}free: up to 8 foods from the bank that are so low in calories they can be eaten freely when hungry: non-starchy vegetables (raw or cooked), salad without dressing, and drinks with next to no calories (unsweetened tea, water). No fruit, nuts, dates, sugar, biscuits or anything sweetened, however small one piece is — the app drops them.
 
 note: 2–3 short Persian sentences to them: the idea behind this plan, naming a few of their own foods it uses; if it is built on how they really eat, say in plain words what you took from their habits and what you changed. ${i.include?.length ? `They just added these foods to the bank and want them in the plan: ${i.include.map((n: string) => `«${n}»`).join("، ")} — work each into at least one suitable option and say so. Keep the rest close to the current plan in the data.` : "If the data has an earlier plan, look at the weight change over it and how closely it was followed (the adherence table and what they logged), keep what worked, change what they skipped, and say in the note what you changed and why."}`,
   },
@@ -746,7 +748,7 @@ note: 2–3 short Persian sentences to them: the idea behind this plan, naming a
     shared: (S) => [S.profile(), S.targets(), S.foods()],
     data: (S) => [S.plan(), S.pattern()],
     schema: planOption,
-    prompt: (i) => `They have none of the current options for «${i.slot}» at hand or don't feel like them. Give ONE more option for that occasion of their diet plan, worth about ${i.kcal} kcal, clearly different from these existing ones:\n${(i.existing || []).map((o: string) => `- ${o}`).join("\n")}\n\n${PLAN_RULES}`,
+    prompt: (i) => `${i.fill ? `A new diet plan is being made and «${i.slot}» needs one more option.` : `They have none of the current options for «${i.slot}» at hand or don't feel like them.`} Give ONE more option for that occasion of their diet plan, worth about ${i.kcal} kcal, clearly different from these existing ones:\n${(i.existing || []).map((o: string) => `- ${o}`).join("\n")}\n\n${PLAN_RULES}`,
   },
   plan_swap: {
     effort: "low",

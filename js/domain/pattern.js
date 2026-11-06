@@ -10,7 +10,7 @@
   The total stays the target, whatever the habit: this moves calories between meals, nothing else.
 */
 import { addDays } from '../lib/dates.js';
-import { SLOTS, planOn, picksOn, planEnd } from './plan.js';
+import { SLOTS, planOn, picksOn, planEnd, fastOn } from './plan.js';
 
 export const PATTERN = {
   WINDOW: 60,    // days looked at, ending yesterday
@@ -62,6 +62,7 @@ export function eatingPattern(entries, notes, day) {
   for (const [d, es] of byDay) {
     if (new Set(es.map(e => e.meal)).size < 2) continue;
     if (Object.keys(picksOn(notes, es, d)).length) continue;
+    if (fastOn(notes, d)) continue; // a fasting day says nothing about their usual meals
     days++;
     for (const e of es) byMeal[e.meal] = (byMeal[e.meal] || 0) + (Number(e.kcal) || 0);
   }

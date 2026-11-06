@@ -37,3 +37,8 @@ export function upcoming(day, motivations = [], ahead = AHEAD) {
   }
   return out.sort((a, b) => a.inDays - b.inDays);
 }
+
+// Whether a day falls in Ramadan (Umm al-Qura calendar). False where the calendar isn't supported.
+export function isRamadan(day) {
+  try { return md(day, 'islamic-umalqura').m === 9; } catch { return false; }
+}

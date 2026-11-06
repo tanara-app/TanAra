@@ -9,11 +9,13 @@ import {
   SLOTS, PLAN_DAYS, budgets, buildPlan, fitOption, optionBudget, planOn, planEnd, planDayNo, planOver,
   picksOn, dayAdherence, newFoods, goneFoods, optionText,
   swapItem, restoreItem, sameItems, swapSuggestions, swapsOn, dayPlan, offOn, slotExtras, dayRooms, roomPlan, carriesOver, CARRY_MAX,
+  avoidTest, extraOption, rescalePlan, fastPlan, fastOn, slotLabel, needOf, OVER_SLACK,
 } from '../domain/plan.js';
+import { isRamadan } from '../domain/occasions.js';
 import { eatingPattern, markFresh } from '../domain/pattern.js';
 import { ask, aiAvailable, md, sparkle } from '../ai/hooshvareh.js';
 import { fa, esc, norm } from '../lib/fa.js';
-import { today, diffDays, relLabel } from '../lib/dates.js';
+import { today, diffDays, relLabel, addDays } from '../lib/dates.js';
 import { amountLabel } from './units.js';
 import { icon, sheet, toast, confirmBox } from './dom.js';
 import { cheer } from './mascot.js';
@@ -45,16 +47,21 @@ async function generate({ days = PLAN_DAYS, include = [] } = {}) {
     const t = effectiveTargets(store.profile());
     const s = store.get();
     const pattern = eatingPattern(s.entries, s.ai_notes, today());
-    const input = shares => ({ kcal: t.kcal, protein: t.protein, proteinMax: !!t.proteinMax, budgets: budgets(t.kcal, shares), days, include: include.map(f => f.name) });
+    // Ramadan within the period: the model shapes the options so they also work on fasting days
+    const ramadan = Array.from({ length: days }, (_, n) => addDays(today(), n)).some(isRamadan);
+    const input = shares => ({ kcal: t.kcal, protein: t.protein, proteinMax: !!t.proteinMax, budgets: budgets(t.kcal, shares), days, ramadan, include: include.map(f => f.name) });
     const own = pattern.ready ? pattern.shares : null;
+    const rules = planRules(t);
     let plan = null, raw = null;
-    // the amounts are fitted here; if too few options survive, one more try is worth it, and a
-    // last one on the usual shares if their own left an occasion too small for what is in the bank
+    // the amounts are fitted here. An occasion or two left short get just their missing options
+    // (a small request each); with more than that the whole plan is asked again — one more time,
+    // and a last one on the usual shares if their own left an occasion too small for the bank
     for (let i = 0; i < (own ? 3 : 2) && !plan; i++) {
       const shares = i < 2 ? own : null;
       raw = await ask('plan', input(shares));
-      // with a protein limit (kidney disease) there is no floor to hold the options to
-      plan = buildPlan(raw, store.get().foods, t.kcal, today(), shares, { protein: t.proteinMax ? 0 : t.protein });
+      const p = buildPlan(raw, store.get().foods, t.kcal, today(), shares, { ...rules, partial: true });
+      if (p.missing.length <= 2) for (const key of p.missing) await fillSlot(p, key, rules);
+      if (!p.missing.length) { delete p.missing; plan = p; }
     }
     if (!plan) throw new Error('برنامه کامل درنیامد؛ دوباره امتحان کن.');
     plan.days = days;
@@ -108,6 +115,24 @@ function openPrefs(onGo) {
   }, { tall: true });
 }
 
+// What every option of a new plan (or one added to it) is checked against: the protein target
+// (a limit with kidney disease) and the foods they must avoid.
+function planRules(t = effectiveTargets(store.profile())) {
+  return { protein: t.protein, proteinMax: !!t.proteinMax, avoid: avoidTest(store.profile()?.planPrefs || {}) };
+}
+
+// Asks for options for one short occasion of a plan being made, up to three times; drops it from `missing` once it has enough.
+async function fillSlot(plan, key, rules) {
+  const slot = plan.slots[key];
+  const budget = budgets(plan.kcal, plan.shares)[key] / slot.pick;
+  for (let n = 0; n < 3 && slot.options.length < needOf(slot.pick); n++) {
+    const raw = await ask('plan_option', { fill: true, slot: SLOTS[key].label, kcal: Math.round(budget), existing: slot.options.map(optionText) });
+    const o = extraOption(raw, store.get().foods, plan, key, rules, { id: `${key}-f${Date.now().toString(36)}${n}` });
+    if (o) slot.options.push(o);
+  }
+  if (slot.options.length >= needOf(slot.pick)) plan.missing = plan.missing.filter(k => k !== key);
+}
+
 /*
   One more option for an occasion. With `fit` ({ day, kcal }) it is sized to what off-plan food
   left of that occasion and kept with that day only; otherwise it joins the plan.
@@ -119,7 +144,7 @@ async function oneMore(plan, key, fit = null) {
     const slot = plan.slots[key];
     const budget = fit ? fit.kcal : optionBudget(plan, key);
     const raw = await ask('plan_option', { slot: SLOTS[key].label, kcal: Math.round(budget), existing: slot.options.map(optionText) });
-    const opt = fitOption(raw, new Map(store.get().foods.map(f => [f.id, f])), budget, `${key}-x${Date.now().toString(36)}`);
+    const opt = extraOption(raw, store.get().foods, plan, key, planRules(), { budget });
     if (!opt) throw new Error('گزینه‌ی مناسبی پیدا نشد؛ دوباره امتحان کن.');
     if (fit) {
       const s = store.get();
@@ -141,10 +166,17 @@ async function oneMore(plan, key, fit = null) {
 
 /* ---------------- ticking options ---------------- */
 
-function savePicks(day, picks, swaps = swapsOn(notes(), day), off = offOn(notes(), day)) {
+// `fast`: whether they said they fast that day (Ramadan); kept as it was unless given.
+function savePicks(day, picks, swaps = swapsOn(notes(), day), off = offOn(notes(), day), fast = notes().find(n => n.key === `pick:${day}`)?.data?.fast) {
   const alive = new Set(store.get().entries.map(e => e.id));
   off = Object.fromEntries(Object.entries(off).filter(([id]) => alive.has(id)));
-  store.saveNote({ key: `pick:${day}`, kind: 'pick', text: '', data: { slots: picks, ...(Object.keys(swaps).length ? { swaps } : {}), ...(Object.keys(off).length ? { off } : {}) } });
+  store.saveNote({ key: `pick:${day}`, kind: 'pick', text: '', data: { slots: picks, ...(Object.keys(swaps).length ? { swaps } : {}), ...(Object.keys(off).length ? { off } : {}), ...(typeof fast === 'boolean' ? { fast } : {}) } });
+}
+
+// Fasting or not on a day of Ramadan. Ticks stay; ones made for the other shape show as from an earlier plan.
+function setFast(day, fast) {
+  const s = store.get();
+  savePicks(day, picksOn(s.ai_notes, s.entries, day), undefined, undefined, fast);
 }
 
 // Remembers which occasion's «+» logged an off-plan entry, so it counts against that one.
@@ -170,21 +202,24 @@ function dayView(day) {
   const ticked = new Set(Object.values(picks).flatMap(l => l.map(p => p.o)));
   // a cut-down version is only kept while it is ticked
   const swaps = Object.fromEntries(Object.entries(swapsOn(s.ai_notes, day)).map(([id, o]) => [id, o.fit && !ticked.has(id) ? o.base : o]).filter(([, o]) => o));
-  const base = dayPlan(planOn(s.ai_notes, day), swaps);
-  if (!base) return null;
+  const stored = dayPlan(planOn(s.ai_notes, day), swaps);
+  if (!stored) return null;
+  const byId = new Map(s.foods.map(f => [f.id, f]));
+  const base = fastOn(s.ai_notes, day) ? fastPlan(stored, byId) : stored;
   const extras = slotExtras(s.entries, picks, offOn(s.ai_notes, day), day);
   const rooms = dayRooms(base, picks, extras, s.entries, { carry: carriesOver(store.profile(), day) });
-  return { plan: roomPlan(base, picks, rooms, new Map(s.foods.map(f => [f.id, f]))), picks, extras, rooms };
+  return { plan: roomPlan(base, picks, rooms, byId), picks, extras, rooms };
 }
 
-function toggle(day, key, optId) {
+// `again`: the same option once more, in an occasion where two are eaten (two glasses of دوغ).
+function toggle(day, key, optId, again = false) {
   const s = store.get();
   const v = dayView(day);
   if (!v) return;
   const { plan, picks } = v;
   const swaps = { ...swapsOn(s.ai_notes, day) };
   const cur = picks[key] || [];
-  const had = cur.find(p => p.o === optId);
+  const had = !again && cur.find(p => p.o === optId);
   const remove = p => p.e.forEach(id => { if (s.entries.some(e => e.id === id)) store.deleteEntry(id); });
   // unticked, a cut-down option goes back to what it was
   const unfit = id => { if (swaps[id]?.fit) { if (swaps[id].base) swaps[id] = swaps[id].base; else delete swaps[id]; } };
@@ -307,14 +342,15 @@ function openSwap(day, key, optId, index) {
       const drawResults = () => {
         const s = store.get();
         const used = new Set(first.shown.items.map(i => i.food_id));
-        const can = s.foods.filter(f => !used.has(f.id) && f.kcal > 0);
+        const avoid = avoidTest(store.profile()?.planPrefs || {});
+        const can = s.foods.filter(f => !used.has(f.id) && f.kcal > 0 && !avoid?.(f));
         if (query) {
           const q = norm(query);
           const hits = can.filter(f => norm(f.name).includes(q)).sort((a, b) => norm(a.name).indexOf(q) - norm(b.name).indexOf(q));
           list.innerHTML = hits.length ? hits.map(f => row(f)).join('') : '<div class="empty">در بانک غذا پیدا نشد.</div>';
           return;
         }
-        const near = swapSuggestions(first.shown, index, s.foods, s.entries);
+        const near = swapSuggestions(first.shown, index, s.foods.filter(f => !avoid?.(f)), s.entries);
         list.innerHTML = `
           ${near.length ? `<h3 class="list-h">هم‌دسته در بانک غذا</h3>${near.map(f => row(f)).join('')}` : ''}
           ${Array.isArray(ai) ? `<h3 class="list-h">پیشنهاد هوشواره</h3>${ai.map(x => row(x.food, x.why)).join('')}` : ''}
@@ -341,7 +377,9 @@ function openSwap(day, key, optId, index) {
           const r = await ask('plan_swap', { slot: SLOTS[key].label, option: optionText(first.shown), food: old.name, kcal: base.kcal });
           const s = store.get();
           const used = new Set(first.shown.items.map(i => i.food_id));
+          const avoid = avoidTest(store.profile()?.planPrefs || {});
           ai = (r.foods || []).map(x => ({ food: s.foods.find(f => f.id === x.food_id), why: String(x.why || '').slice(0, 60) }))
+            .filter(x => !avoid?.(x.food))
             .filter(x => x.food && x.food.kcal > 0 && !used.has(x.food.id) && used.add(x.food.id));
           if (!ai.length) { ai = null; toast('هوشواره جایگزین مناسبی در بانک غذا پیدا نکرد.'); }
         } catch (err) {
@@ -410,9 +448,9 @@ const r10 = x => Math.round(x / 10) * 10;
 // Under an occasion that off-plan food touched — its own, or an earlier one's that went over
 // (`room.owed`): what is left of its calories, or that it is used up.
 // `cut`: options were made smaller to fit; `over`: how many could not be.
-function roomNote(key, room, cut, over) {
+function roomNote(plan, key, room, cut, over) {
   const left = r10(room.left);
-  const label = SLOTS[key].label;
+  const label = slotLabel(plan, key);
   const owed = r10(room.owed) > 0 ? `<b>${fa(r10(room.owed))}</b> کالری اضافه‌ی وعده‌های ${room.back ? 'دیگر' : 'قبل'} از سهم ${label} کم شد. ` : '';
   const state = left > 0 ? `${room.locked ? 'فقط ' : ''}<b>${fa(left)}</b> کالری از سهم ${label} مانده`
     : left < 0 ? `<b>${fa(-left)}</b> کالری از سهم ${label} بیشتر شده` : `سهم ${label} پر شده`;
@@ -442,17 +480,23 @@ function slotCard(plan, key, day, picks, extras, room, showKcal, only, need) {
   // ticked before the plan was replaced: still shown, so it can be unticked
   const orphans = mine.filter(p => !known.has(p.o));
   const isOn = o => mine.some(p => p.o === o.id);
+  const times = o => mine.filter(p => p.o === o.id).length;
   const option = o => {
     const on = isOn(o);
+    // two to pick and only this one so far: the same once more
+    const again = on && slot.pick === 2 && mine.length < 2 && !room.locked
+      ? `<button class="link small" data-again="${o.id}">یکی دیگر هم از همین</button>` : '';
     const names = o.items.map(i => i.name).join('، ');
     // a div, not a button: the swap buttons sit inside it. The tick is the real control.
     return `<div class="popt${on ? ' on' : ''}${on || opened.has(`${day}|${o.id}`) ? ' open' : ''}" data-slot="${key}" data-opt="${o.id}">
       <button class="tick" aria-pressed="${on}" aria-label="${esc(o.title || optionText(o))}">${on ? icon.check : ''}</button>
       <div class="popt-body">
-        <div class="popt-head${o.title ? '' : ' plain'}"><strong>${esc(o.title || names)}</strong>${o.fresh ? '<small class="popt-fresh">پیشنهاد تازه</small>' : ''}${on ? '' : icon.chevD}</div>
+        <div class="popt-head${o.title ? '' : ' plain'}"><strong>${esc(o.title || names)}${times(o) > 1 ? ` ×${fa(times(o))}` : ''}</strong>${o.fresh ? '<small class="popt-fresh">پیشنهاد تازه</small>' : ''}${on ? '' : icon.chevD}</div>
         ${o.title ? `<small class="muted popt-sum">${esc(names)}</small>` : ''}
         <div class="popt-more">
-          <ul>${o.items.map(itemLine(only, need, !o.slot)).join('')}</ul>
+          <ul>${o.items.map(itemLine(only, need, !o.slot && !o.fast)).join('')}</ul>
+          ${o.fast ? `<small class="was">اندازه‌ی روز روزه · ${only}</small>` : ''}
+          ${again}
           ${o.slot || o.fit ? `<small class="was">${o.fit ? 'کوچک‌شده' : 'برای باقی‌مانده‌ی سهم این وعده'} · ${only}</small>` : ''}
           ${showKcal ? `<small class="muted">${fa(o.kcal)} کالری · ${fa(Math.round(o.protein))} گرم پروتئین</small>` : ''}
         </div>
@@ -460,12 +504,13 @@ function slotCard(plan, key, day, picks, extras, room, showKcal, only, need) {
     </div>`;
   };
   const wait = busySlots.has(key) ? '<p class="muted small ai-wait"><span class="typing"><i></i><i></i><i></i></span> دارم یک گزینه‌ی دیگر پیدا می‌کنم…</p>' : '';
-  const more = !aiAvailable() || wait ? '' : `<button class="link small ai-more" data-more="${key}">${sparkle(14)} هیچ‌کدام را ندارم؛ یک گزینه‌ی دیگر</button>`;
+  const more = !aiAvailable() || wait || plan.fast ? '' : `<button class="link small ai-more" data-more="${key}">${sparkle(14)} هیچ‌کدام را ندارم؛ یک گزینه‌ی دیگر</button>`;
   const rest = offer.filter(o => !isOn(o));
   const left = r10(room.left);
   // what is left is too little for a whole option: Hooshvareh can size one to it
-  const touched = extras.length || r10(room.owed) > 0; // off-plan food changed what this occasion has
-  const fit = touched && !full && !room.locked && !wait && aiAvailable() && left >= 50 && !rest.length
+  // off-plan food changed what this occasion has, or the picked options were eaten well past it
+  const touched = extras.length || r10(room.owed) > 0 || (full && room.left < -room.budget * OVER_SLACK);
+  const fit = !plan.fast && touched && !full && !room.locked && !wait && aiAvailable() && left >= 50 && !rest.length
     ? `<button class="link small ai-more" data-fit="${key}" data-kcal="${left}">${sparkle(14)} هوشواره گزینه‌ای برای همین ${fa(left)} کالری بچیند</button>` : '';
   const unfolded = shown.has(`${day}|${key}`);
   const options = room.locked ? slot.options.filter(isOn).map(option).join('')
@@ -475,9 +520,9 @@ function slotCard(plan, key, day, picks, extras, room, showKcal, only, need) {
       <div class="fold"${unfolded ? '' : ' hidden'}>${rest.map(option).join('')}${more}</div>` : ''}`;
   return `<div class="meal card slot${full ? ' full' : ''}${room.locked ? ' locked' : ''}">
     <div class="meal-head">
-      <h2>${SLOTS[key].label}</h2>
+      <h2>${slotLabel(plan, key)}</h2>
       <span class="muted">${full ? icon.check : room.locked ? icon.lock : offer.length ? pickWord(slot.pick) : 'گزینه‌ای جا نمی‌شود'}</span>
-      <button class="icon-btn sm" data-add="${SLOTS[key].meal}" data-key="${key}" aria-label="ثبت چیزی خارج از برنامه در ${SLOTS[key].label}">${icon.plus}</button>
+      <button class="icon-btn sm" data-add="${SLOTS[key].meal}" data-key="${key}" aria-label="ثبت چیزی خارج از برنامه در ${slotLabel(plan, key)}">${icon.plus}</button>
     </div>
     ${options}
     ${orphans.map(p => `<button class="popt on" data-slot="${key}" data-opt="${esc(p.o)}" aria-pressed="true">
@@ -487,7 +532,7 @@ function slotCard(plan, key, day, picks, extras, room, showKcal, only, need) {
       <button class="entry" data-entry="${e.id}">
         <span class="ename">${esc(e.name)}</span><span class="eqty">${amountLabel(Number(e.qty), e.unit)}</span><span class="ekcal">${fa(Math.round(e.kcal))}</span>
       </button>`).join('')}` : ''}
-    ${touched ? `${roomNote(key, room, rest.some(o => o.fit), over)}${fit}` : ''}
+    ${touched ? `${roomNote(plan, key, room, rest.some(o => o.fit), over)}${fit}` : ''}
     ${wait}${full || room.locked ? '' : more}
   </div>`;
 }
@@ -521,7 +566,7 @@ export function planHtml(day) {
   const fresh = isToday && !over ? newFoods(plan, s.foods) : [];
   const gone = isToday && !over ? goneFoods(plan, s.foods) : [];
   const dayNo = planDayNo(plan, day);
-  const keys = Object.keys(SLOTS);
+  const keys = Object.keys(SLOTS).filter(k => plan.slots[k].pick > 0); // a fasting day has three
   const need = neededFoods(shopList(s.ai_notes)); // foods of the plan waiting on the shopping list
   const card = k => slotCard(plan, k, day, picks, extras[k], rooms[k], showKcal, onlyWord(day), need);
 
@@ -534,8 +579,8 @@ export function planHtml(day) {
     </div>` : ''}
     ${isToday && !over && !busy && Math.abs(plan.kcal - effectiveTargets(p, day).kcal) >= 100 ? `<div class="note soft">
       <strong>هدف کالری‌ات عوض شده</strong>
-      <p>این برنامه برای ${fa(plan.kcal)} کالری چیده شده، ولی هدف الانت ${fa(effectiveTargets(p, day).kcal)} است. هوشواره می‌تواند برنامه‌ای با هدف تازه بچیند.</p>
-      ${aiAvailable() ? '<button class="btn sm" data-plan-new>برنامه با هدف تازه</button>' : ''}
+      <p>این برنامه برای ${fa(plan.kcal)} کالری چیده شده، ولی هدف الانت ${fa(effectiveTargets(p, day).kcal)} است. اپ می‌تواند مقدار همین گزینه‌ها را با هدف تازه جور کند (بدون هوشواره)، یا هوشواره برنامه‌ی تازه بچیند.</p>
+      <div class="row gap"><button class="btn primary sm" data-plan-rescale>جور کردن مقدارها</button>${aiAvailable() ? '<button class="btn sm" data-plan-new>برنامه‌ی تازه</button>' : ''}</div>
     </div>` : ''}
     ${fresh.length && !busy ? `<div class="note soft" data-fresh>
       <strong>غذای تازه در بانک غذا</strong>
@@ -552,6 +597,8 @@ export function planHtml(day) {
       ${head('رژیم هوشواره', `<small class="muted">${dayNo <= plan.days ? `روز ${fa(dayNo)} از ${fa(plan.days)}` : 'دوره تمام شده'}</small>`)}
       <div class="bar plan-bar"><i style="width:${a.done / a.of * 100}%"></i></div>
       <p class="small"><b>${fa(a.done)}</b> از ${fa(a.of)} وعده طبق برنامه</p>
+      ${isRamadan(day) ? `<label class="check fast-check"><input type="checkbox" data-fast ${plan.fast ? 'checked' : ''}><span>${isToday ? 'امروز' : 'این روز'} روزه‌ام<small class="muted">سه وعده: سحری، افطار و شام، از همین گزینه‌ها با مقدار جورشده. جمع روز همان هدف کالری است.</small></span></label>
+        ${plan.fast && (p.conditions || []).includes('diabetes') ? '<p class="note doctor small">با دیابت، روزه گرفتن و مقدار داروها را حتماً با پزشکت هماهنگ کن؛ اگر قندت افت کرد یا حالت بد شد روزه را بشکن.</p>' : ''}` : ''}
       ${plan.note || plan.shares ? `<details class="plan-note"><summary class="link small">توضیح هوشواره</summary>${plan.shares ? `<p class="muted small">از روی ${fa(plan.fromDays || 0)} روز ثبت خودت: صبحانه ${fa(Math.round(plan.shares.breakfast * 100))}٪، ناهار ${fa(Math.round(plan.shares.lunch * 100))}٪، شام ${fa(Math.round(plan.shares.dinner * 100))}٪ و میان‌وعده‌ها ${fa(Math.round((plan.shares.snack1 + plan.shares.snack2) * 100))}٪ از کالری روز.</p>` : ''}<div class="ai-text small">${md(plan.note || '')}</div></details>` : ''}
       <div class="plan-links">
         <button class="link small" data-plan-kcal>${showKcal ? 'پنهان کردن کالری' : 'نمایش کالری'}</button>
@@ -595,8 +642,20 @@ export function bindPlan(root, day, redraw) {
   root.querySelector('[data-plan-fresh]')?.addEventListener('click', refreshPlan);
   root.querySelector('[data-plan-gone]')?.addEventListener('click', refreshPlan);
   root.querySelector('[data-plan-skip]')?.addEventListener('click', () => markSeen(fresh));
+  root.querySelector('[data-fast]')?.addEventListener('change', e => setFast(day, e.target.checked));
+  // the target moved (the climb into maintenance, a recalculation): same options, refitted here
+  root.querySelector('[data-plan-rescale]')?.addEventListener('click', () => {
+    const cur = notes().find(n => n.key === plan.key);
+    const kcal = effectiveTargets(store.profile(), day).kcal;
+    const next = cur && rescalePlan(cur.data, kcal, new Map(store.get().foods.map(f => [f.id, f])));
+    if (!next) return toast('همه‌ی وعده‌ها با هدف تازه جور نشد؛ برنامه‌ی تازه بچین.');
+    store.saveNote({ key: cur.key, kind: 'plan', text: cur.text, data: next });
+    toast('مقدارها با هدف تازه جور شد');
+  });
   root.querySelector('[data-plan-keep]')?.addEventListener('click', () => markSeen(gone));
   root.querySelectorAll('[data-opt]').forEach(b => b.onclick = e => {
+    const again = e.target.closest('[data-again]');
+    if (again) return toggle(day, b.dataset.slot, b.dataset.opt, true);
     const swap = e.target.closest('[data-swap]');
     if (swap) return openSwap(day, b.dataset.slot, b.dataset.opt, Number(swap.dataset.swap));
     // the tick picks; anywhere else on an option not yet picked unfolds its foods
@@ -616,7 +675,8 @@ export function bindPlan(root, day, redraw) {
   // «+» says how much of a food fits what is left of the occasion, instead of asking
   root.querySelectorAll('.slot [data-add]').forEach(b => b.onclick = () => {
     const k = b.dataset.key;
-    const room = { kcal: dayView(day)?.rooms[k]?.left ?? 0, label: SLOTS[k].label };
+    const v = dayView(day);
+    const room = { kcal: v?.rooms[k]?.left ?? 0, label: slotLabel(v?.plan, k) };
     openLogSheet({ day, meal: b.dataset.add, room, onSaved: row => placeExtra(day, k, row) });
   });
   root.querySelectorAll('.slot [data-entry]').forEach(b => b.onclick = () => openEntrySheet(s.entries.find(e => e.id === b.dataset.entry)));
