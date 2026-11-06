@@ -123,60 +123,12 @@ export const isFree = f => {
 // The main meals, where every option must bring real protein.
 const MAIN = ['breakfast', 'lunch', 'dinner'];
 
-/* ---------------- what they must not eat ---------------- */
-
-// A word in «حساسیت غذایی» that stands for a group of foods. Matching is on whole words of the
-// food's name, so «شیر» finds «شیر کم‌چرب» but not «شیرینی».
-const GROUPS = [
-  [['لاکتوز', 'لبنیات', 'شیر'], ['شیر', 'ماست', 'پنیر', 'کشک', 'دوغ', 'بستنی', 'خامه', 'بورانی', 'قهوه فوری']],
-  [['گلوتن', 'گندم'], ['نان', 'ماکارونی', 'رشته', 'جو', 'حلیم', 'بیسکویت', 'کیک', 'پیتزا', 'شیرینی', 'همبرگر', 'کتلت', 'زولبیا', 'سوخاری', 'ماءالشعیر']],
-  [['آجیل', 'مغزها'], ['گردو', 'بادام', 'پسته', 'فندق', 'تخمه', 'بادام زمینی', 'کره بادام زمینی']],
-  [['تخم مرغ', 'تخممرغ'], ['تخم مرغ', 'املت', 'نیمرو', 'کوکو', 'کتلت', 'الویه', 'مایونز', 'کیک']],
-  [['ماهی', 'غذای دریایی', 'دریایی'], ['ماهی', 'میگو', 'قزل آلا']],
-  [['کنجد'], ['کنجد', 'ارده']],
-];
 /*
-  Names written as two words that are one food, and a different food from either word alone:
-  «تخم‌مرغ» is not «مرغ», «سیب‌زمینی» is not «سیب». They are joined into one word whichever way
-  they are written (half-space, space or none), so «مرغ» doesn't take the eggs away and
-  «تخم مرغ» still finds «تخم‌مرغ».
-*/
-const COMPOUNDS = [['تخم', 'مرغ'], ['سیب', 'زمینی'], ['بادام', 'زمینی'], ['کره', 'بادامزمینی']]
-  .map(([a, b]) => [new RegExp(`${a}[\\u200c\\s]*${b}`, 'g'), a + b]);
-// letters made uniform, compounds joined, every separator a single space, padded so whole words can be looked up
-const words = t => {
-  let x = String(t || '').replace(/ي/g, 'ی').replace(/ك/g, 'ک').replace(/[ۀة]/g, 'ه').replace(/[أإآ]/g, 'ا');
-  for (const [re, joined] of COMPOUNDS) x = x.replace(re, joined);
-  // what a food is without is not in it: «سالاد شیرازی (بدون روغن)» has no oil, «چای بدون قند» no sugar
-  x = x.replace(/بدون[^()،,]*/g, ' ');
-  return ` ${x.replace(/[\u200c\u200f\-–(),.،؛:«»\/\d۰-۹]+/g, ' ').replace(/\s+/g, ' ').trim()} `;
-};
-
-/*
-  A test for foods they must not be given: anything named in `allergies` (with the foods of
-  its group: «لاکتوز» → milk, yogurt, cheese…) or in `dislikes` (as written). Returns null when
-  there is nothing to avoid. The model is asked to respect these too; this makes sure.
-*/
-export function avoidTest({ allergies = '', dislikes = '' } = {}) {
-  const split = t => String(t || '').split(/[،,؛;\n|/]+|\sو\s/).map(x => words(x).trim()).filter(x => x.length > 1);
-  const terms = new Set(split(dislikes));
-  for (const a of split(allergies)) {
-    terms.add(a);
-    for (const [names, foods] of GROUPS) if (names.some(n => words(n).trim() === a)) foods.forEach(f => terms.add(words(f).trim()));
-  }
-  if (!terms.size) return null;
-  const list = [...terms].map(t => ` ${t} `);
-  return food => list.some(t => words(food?.name).includes(t));
-}
-
-/*
-  Whether a fitted option may go into the plan (also used for options added later):
-  - nothing they must avoid (`avoid`, see avoidTest);
-  - with kidney disease (`proteinMax`), a main meal at most 1.5 × its share of the protein limit.
-  `rules`: { kcal, shares, protein, proteinMax, avoid }.
+  Whether a fitted option may go into the plan (also used for options added later): with kidney
+  disease (`proteinMax`), a main meal at most 1.5 × its share of the protein limit.
+  `rules`: { kcal, shares, protein, proteinMax }. (Allergies and dislikes are left to the model.)
 */
 export function optionAllowed(o, key, pick, rules = {}) {
-  if (rules.avoid && o.items.some(i => rules.avoid(i))) return false;
   if (rules.proteinMax && rules.protein > 0 && MAIN.includes(key)) {
     const share = budgets(rules.kcal, rules.shares)[key] / rules.kcal;
     if (o.protein > 1.5 * rules.protein * share / pick) return false;
@@ -198,10 +150,10 @@ export const needOf = pick => Math.max(2, pick);
   Option ids carry a mark of this plan, so a day's picks and swaps made on an earlier plan
   never land on an option of a new one made the same day.
 */
-export function buildPlan(raw, foods, kcal, start, shares = null, { protein = 0, proteinMax = false, avoid = null, partial = false } = {}) {
+export function buildPlan(raw, foods, kcal, start, shares = null, { protein = 0, proteinMax = false, partial = false } = {}) {
   const byId = new Map(foods.map(f => [f.id, f]));
   const b = budgets(kcal, shares);
-  const rules = { kcal, shares, protein, proteinMax, avoid };
+  const rules = { kcal, shares, protein, proteinMax };
   const made = new Date().toISOString();
   const mark = Date.now().toString(36);
   const slots = {};
@@ -225,7 +177,7 @@ export function buildPlan(raw, foods, kcal, start, shares = null, { protein = 0,
   const seen = new Set();
   // «free» means free, whatever the model said
   const free = (raw?.free || []).map(f => byId.get(f.food_id))
-    .filter(f => f && isFree(f) && !avoid?.(f) && !seen.has(f.id) && seen.add(f.id)).slice(0, 8)
+    .filter(f => f && isFree(f) && !seen.has(f.id) && seen.add(f.id)).slice(0, 8)
     .map(f => ({ food_id: f.id, name: f.name }));
   return { start, days: PLAN_DAYS, kcal, made, slots, free, ...(shares ? { shares } : {}), ...(partial ? { missing } : {}) };
 }

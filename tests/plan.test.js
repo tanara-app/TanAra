@@ -1,5 +1,5 @@
 import { suite, test, eq, ok, near } from './harness.js';
-import { budgets, fitOption, buildPlan, optionBudget, planOn, previousPlan, planEnd, planDayNo, planOver, picksOn, dayAdherence, adherence, newFoods, goneFoods, optionText, swapItem, restoreItem, sameItems, swapSuggestions, swapsOn, dayPlan, offOn, slotExtras, slotRoom, dayRooms, shrinkOption, roomPlan, portionFor, portionsFor, SLOTS, maxKcal, maxQty, isFree, carriesOver, CARRY_MAX, avoidTest, optionAllowed, extraOption, rescalePlan, fastPlan, fastShape, fastOn } from '../js/domain/plan.js';
+import { budgets, fitOption, buildPlan, optionBudget, planOn, previousPlan, planEnd, planDayNo, planOver, picksOn, dayAdherence, adherence, newFoods, goneFoods, optionText, swapItem, restoreItem, sameItems, swapSuggestions, swapsOn, dayPlan, offOn, slotExtras, slotRoom, dayRooms, shrinkOption, roomPlan, portionFor, portionsFor, SLOTS, maxKcal, maxQty, isFree, carriesOver, CARRY_MAX, optionAllowed, extraOption, rescalePlan, fastPlan, fastShape, fastOn } from '../js/domain/plan.js';
 
 const food = (id, unit, kcal, protein = 0, extra = {}) => ({ id, name: id, unit, kcal, protein, grams: 100, is_veg: false, created_at: '2026-01-01T00:00:00Z', ...extra });
 const FOODS = [
@@ -395,26 +395,6 @@ suite('plan round 2', () => {
   const by = new Map(BANK.map(x => [x.id, x]));
   const o = (...it) => ({ title: 't', items: it.map(([food_id, qty]) => ({ food_id, qty })) });
 
-  test('allergies are matched on whole words and by group; dislikes as written', () => {
-    const lact = avoidTest({ allergies: 'لاکتوز' });
-    eq(BANK.filter(lact).map(x => x.id), ['c', 'm', 's', 'y']); // the cream pastry by «خامه»
-    eq(BANK.filter(avoidTest({ dislikes: 'شیر' })).map(x => x.id), ['m']); // whole words: not «شیرینی»
-    eq(BANK.filter(avoidTest({ allergies: 'تخم مرغ، گردو' })).map(x => x.id), ['w', 'e']);
-    // «مرغ» is the chicken, not the eggs; «تخم مرغ» finds «تخم‌مرغ» however it is written
-    eq(BANK.filter(avoidTest({ dislikes: 'مرغ' })).map(x => x.id), ['ch']);
-    eq(BANK.filter(avoidTest({ dislikes: 'تخم مرغ' })).map(x => x.id), ['e']);
-    eq(BANK.filter(avoidTest({ dislikes: 'تخممرغ' })).map(x => x.id), ['e']);
-    const more = [f('p', 'سیب‌زمینی سرخ‌کرده', 'کفگیر', 230, 3, 'sweet'), f('pb', 'کره بادام‌زمینی', 'قاشق غذاخوری', 95, 4, 'breakfast'), f('al', 'بادام', 'مشت', 165, 6, 'nuts')];
-    eq([...BANK, ...more].filter(avoidTest({ dislikes: 'سیب' })).map(x => x.id), ['a']); // not the potatoes
-    eq(more.filter(avoidTest({ dislikes: 'بادام' })).map(x => x.id), ['al']); // not the peanut butter
-    eq(more.filter(avoidTest({ allergies: 'آجیل' })).map(x => x.id), ['pb', 'al']); // a nut allergy takes both
-    const plain = [f('o', 'روغن خورش / غذا', 'قاشق غذاخوری', 120, 0, 'stew'), f('sh', 'سالاد شیرازی (بدون روغن)', 'کاسه', 40, 1, 'veg'),
-      f('ts', 'چای بدون قند', 'استکان', 2, 0, 'drink'), f('tq', 'چای با یک حبه قند', 'استکان', 20, 0, 'drink'), f('bu', 'کره', 'قاشق غذاخوری', 100, 0, 'breakfast')];
-    eq(plain.filter(avoidTest({ dislikes: 'روغن، قند' })).map(x => x.id), ['o', 'tq']); // what a food is «بدون» is not in it
-    eq([...plain, ...more].filter(avoidTest({ dislikes: 'کره' })).map(x => x.id), ['bu']); // butter, not peanut butter
-    eq(avoidTest({}), null);
-  });
-
   const raw = () => ({ slots: {
     breakfast: { pick: 1, options: [o(['b', 2], ['c', 2], ['w', 3]), o(['e', 1], ['b', 2.5]), o(['b', 2], ['c', 3])] },
     snack1: { pick: 1, options: [o(['y', 1], ['a', 1]), o(['m', 2])] },
@@ -422,11 +402,6 @@ suite('plan round 2', () => {
     snack2: { pick: 1, options: [o(['y', 1], ['a', 1]), o(['m', 2])] },
     dinner: { pick: 1, options: [o(['b', 2], ['ch', 1.5]), o(['b', 3], ['c', 2]), o(['r', 1.5], ['ch', 1.5])] },
   }, free: [] });
-
-  test('a plan never keeps an option with a food they must avoid', () => {
-    const p = buildPlan(raw(), BANK, 2000, '2026-02-01', null, { avoid: avoidTest({ allergies: 'گردو' }) });
-    ok(p.slots.breakfast.options.every(x => !x.items.some(i => i.food_id === 'w')), 'no walnuts');
-  });
 
   test('kidney disease: a main meal far above its share of the protein limit is left out', () => {
     const rules = { kcal: 2000, protein: 59, proteinMax: true };

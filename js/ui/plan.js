@@ -9,7 +9,7 @@ import {
   SLOTS, PLAN_DAYS, budgets, buildPlan, fitOption, optionBudget, planOn, planEnd, planDayNo, planOver,
   picksOn, dayAdherence, newFoods, goneFoods, optionText,
   swapItem, restoreItem, sameItems, swapSuggestions, swapsOn, dayPlan, offOn, slotExtras, dayRooms, roomPlan, carriesOver, CARRY_MAX,
-  avoidTest, extraOption, rescalePlan, fastPlan, fastOn, slotLabel, needOf, OVER_SLACK,
+  extraOption, rescalePlan, fastPlan, fastOn, slotLabel, needOf, OVER_SLACK,
 } from '../domain/plan.js';
 import { isRamadan } from '../domain/occasions.js';
 import { eatingPattern, markFresh } from '../domain/pattern.js';
@@ -116,9 +116,9 @@ function openPrefs(onGo) {
 }
 
 // What every option of a new plan (or one added to it) is checked against: the protein target
-// (a limit with kidney disease) and the foods they must avoid.
+// (a limit with kidney disease).
 function planRules(t = effectiveTargets(store.profile())) {
-  return { protein: t.protein, proteinMax: !!t.proteinMax, avoid: avoidTest(store.profile()?.planPrefs || {}) };
+  return { protein: t.protein, proteinMax: !!t.proteinMax };
 }
 
 // Asks for options for one short occasion of a plan being made, up to three times; drops it from `missing` once it has enough.
@@ -342,15 +342,14 @@ function openSwap(day, key, optId, index) {
       const drawResults = () => {
         const s = store.get();
         const used = new Set(first.shown.items.map(i => i.food_id));
-        const avoid = avoidTest(store.profile()?.planPrefs || {});
-        const can = s.foods.filter(f => !used.has(f.id) && f.kcal > 0 && !avoid?.(f));
+        const can = s.foods.filter(f => !used.has(f.id) && f.kcal > 0);
         if (query) {
           const q = norm(query);
           const hits = can.filter(f => norm(f.name).includes(q)).sort((a, b) => norm(a.name).indexOf(q) - norm(b.name).indexOf(q));
           list.innerHTML = hits.length ? hits.map(f => row(f)).join('') : '<div class="empty">در بانک غذا پیدا نشد.</div>';
           return;
         }
-        const near = swapSuggestions(first.shown, index, s.foods.filter(f => !avoid?.(f)), s.entries);
+        const near = swapSuggestions(first.shown, index, s.foods, s.entries);
         list.innerHTML = `
           ${near.length ? `<h3 class="list-h">هم‌دسته در بانک غذا</h3>${near.map(f => row(f)).join('')}` : ''}
           ${Array.isArray(ai) ? `<h3 class="list-h">پیشنهاد هوشواره</h3>${ai.map(x => row(x.food, x.why)).join('')}` : ''}
@@ -377,9 +376,7 @@ function openSwap(day, key, optId, index) {
           const r = await ask('plan_swap', { slot: SLOTS[key].label, option: optionText(first.shown), food: old.name, kcal: base.kcal });
           const s = store.get();
           const used = new Set(first.shown.items.map(i => i.food_id));
-          const avoid = avoidTest(store.profile()?.planPrefs || {});
           ai = (r.foods || []).map(x => ({ food: s.foods.find(f => f.id === x.food_id), why: String(x.why || '').slice(0, 60) }))
-            .filter(x => !avoid?.(x.food))
             .filter(x => x.food && x.food.kcal > 0 && !used.has(x.food.id) && used.add(x.food.id));
           if (!ai.length) { ai = null; toast('هوشواره جایگزین مناسبی در بانک غذا پیدا نکرد.'); }
         } catch (err) {
