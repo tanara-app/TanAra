@@ -432,15 +432,6 @@ export function deleteThread(thread) {
   enqueue({ op: 'deleteWhere', table: 'chat', col: 'thread', val: thread });
 }
 
-/*
-  Observations (domain/signals.js) for one day: written to the server only, never kept on the
-  device or shown, so they don't weigh on the app. Nothing happens without a server.
-*/
-export function saveSignals(day, rows, version) {
-  if (!remote || !rows.length) return;
-  enqueue({ op: 'upsert', table: 'signals', row: rows.map(r => ({ day, kind: r.kind, data: r.data, version })) });
-}
-
 export const note = key => state.ai_notes.find(n => n.key === key) || null;
 
 export function saveNote(n) {

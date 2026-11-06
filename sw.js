@@ -5,14 +5,14 @@
    Supabase API calls are never touched. Bump CACHE when the shell list changes.
    Every other cache is cleared on activate (including «tanara-vault», from the removed vault).
    Also shows the push reminders sent by the `remind` Edge Function (see ui/reminders.js). */
-const CACHE = 'tanara-shell-v38';
+const CACHE = 'tanara-shell-v39';
 const SHELL = [
   './', './index.html', './manifest.json', './css/app.css',
   './js/app.js', './js/config.js',
   './js/lib/fa.js', './js/lib/dates.js',
   './js/domain/targets.js', './js/domain/stats.js', './js/domain/safety.js', './js/domain/plan.js',
-  './js/domain/energy.js', './js/domain/phase.js', './js/domain/photo.js', './js/domain/recipe.js', './js/domain/shopping.js', './js/domain/barcode.js', './js/domain/occasions.js', './js/domain/drift.js', './js/domain/pattern.js', './js/domain/signals.js',
-  './js/data/store.js', './js/data/supabaseRemote.js', './js/data/seedFoods.js', './js/data/observe.js',
+  './js/domain/energy.js', './js/domain/phase.js', './js/domain/photo.js', './js/domain/recipe.js', './js/domain/shopping.js', './js/domain/barcode.js', './js/domain/occasions.js', './js/domain/drift.js', './js/domain/pattern.js',
+  './js/data/store.js', './js/data/supabaseRemote.js', './js/data/seedFoods.js',
   './js/ui/dom.js', './js/ui/onboarding.js', './js/ui/today.js', './js/ui/logFood.js', './js/ui/foodBank.js',
   './js/ui/progress.js', './js/ui/review.js', './js/ui/profile.js', './js/ui/login.js', './js/ui/chart.js', './js/ui/notices.js', './js/ui/motivation.js',
   './js/ai/hooshvareh.js', './js/ui/chat.js', './js/ui/aiCards.js', './js/ui/units.js', './js/ui/plan.js', './js/ui/magazine.js',

@@ -15,7 +15,6 @@ import { configureAI, sparkle } from './ai/hooshvareh.js';
 import { disable as disableReminders } from './ui/reminders.js';
 import { applyTheme } from './ui/theme.js';
 import { maybeCelebrate } from './ui/celebrate.js';
-import { recordSignals } from './data/observe.js';
 
 applyTheme();
 
@@ -139,7 +138,7 @@ async function start(ns, remote) {
   started = true;
   render();
   if (remote) {
-    store.pull().then(() => recordSignals());
+    store.pull();
     window.addEventListener('online', () => store.pull());
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') store.pull(); });
   }
@@ -149,7 +148,7 @@ async function start(ns, remote) {
 let lastDay = new Date().toDateString();
 setInterval(() => {
   const d = new Date().toDateString();
-  if (d !== lastDay) { lastDay = d; setDay(today()); requestRender(); recordSignals(); }
+  if (d !== lastDay) { lastDay = d; setDay(today()); requestRender(); }
 }, 60000);
 
 /*
