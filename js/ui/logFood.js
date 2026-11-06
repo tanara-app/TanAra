@@ -200,8 +200,12 @@ export function openLogSheet({ day = today(), meal = null, onSaved = null, room 
       });
     }
 
-    function drawQty(food) {
-      if (room) {
+    /*
+      `eaten`: from the plan's «+», what was actually eaten (more than fits, often): the usual
+      amount picker, whatever is left of the occasion. Back goes to the portions.
+    */
+    function drawQty(food, eaten = false) {
+      if (room && !eaten) {
         if (!chosen.some(c => c.id === food.id)) chosen.push(food);
         return drawPortions();
       }
@@ -227,7 +231,8 @@ export function openLogSheet({ day = today(), meal = null, onSaved = null, room 
       });
       const amount = mountAmount(body.querySelector('[data-amount]'), () => food,
         lastAmountFor(store.get().entries, food, curMeal), { onEditFood: edit });
-      body.querySelector('[data-back]').onclick = drawList;
+      body.querySelector('[data-back]').onclick = eaten ? drawPortions : drawList;
+      if (eaten) body.querySelector('[data-amount]').insertAdjacentHTML('beforebegin', `<p class="muted small portion">هر مقداری که واقعاً خورده‌ای را ثبت کن؛ اگر از سهم ${room.label} بیشتر شود، اپ خودش حساب می‌کند.</p>`);
       body.querySelectorAll('[data-edit]').forEach(b => b.onclick = edit);
       body.querySelector('[data-save]').onclick = () => {
         const a = amount.get();
@@ -326,7 +331,8 @@ export function openLogSheet({ day = today(), meal = null, onSaved = null, room 
             <span class="grow"><b>${esc(f.name)}</b>
               <small class="muted">${!a ? `حتی ${qtyLabel(0.25)} ${esc(f.unit)} هم جا نمی‌شود`
                 : ps[i].free ? `${amountLabel(a.qty, a.unit)} · کالری ندارد و از سهم کم نمی‌کند`
-                : `تا <b>${amountLabel(a.qty, a.unit)}</b>${g} · ${fa(Math.round(a.kcal))} کالری`}</small></span>
+                : `تا <b>${amountLabel(a.qty, a.unit)}</b>${g} · ${fa(Math.round(a.kcal))} کالری`}</small>
+              ${f.id ? `<button type="button" class="link small eaten-btn" data-eaten="${i}">بیشتر خورده‌ام؛ مقدار واقعی</button>` : ''}</span>
             ${f.id ? `<button class="icon-btn sm" data-fix="${i}" aria-label="ویرایش ${esc(f.name)}">${icon.edit}</button>` : ''}
             <button class="icon-btn sm" data-drop="${i}" aria-label="برداشتن ${esc(f.name)}">${icon.close}</button>
           </div>`;
@@ -339,6 +345,7 @@ export function openLogSheet({ day = today(), meal = null, onSaved = null, room 
       body.querySelector('[data-back]').onclick = drawList;
       body.querySelector('[data-beside]').onclick = () => { query = ''; drawList(); };
       body.querySelectorAll('[data-drop]').forEach(b => b.onclick = () => { chosen.splice(Number(b.dataset.drop), 1); drawPortions(); });
+      body.querySelectorAll('[data-eaten]').forEach(b => b.onclick = () => drawQty(chosen[Number(b.dataset.eaten)], true));
       body.querySelectorAll('[data-fix]').forEach(b => b.onclick = () => openFoodForm(chosen[Number(b.dataset.fix)], drawPortions));
       body.querySelector('[data-save]').onclick = () => {
         chosen.forEach((f, i) => all[i] && save({ day, meal: curMeal, food_id: f.id || null, name: f.name, ...all[i], is_veg: !!f.is_veg }));

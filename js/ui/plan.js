@@ -8,7 +8,7 @@ import { effectiveTargets, hasMedicalFlag } from '../domain/targets.js';
 import {
   SLOTS, PLAN_DAYS, budgets, buildPlan, fitOption, optionBudget, planOn, planEnd, planDayNo, planOver,
   picksOn, dayAdherence, newFoods, goneFoods, optionText,
-  swapItem, restoreItem, sameItems, swapSuggestions, swapsOn, dayPlan, offOn, slotExtras, dayRooms, roomPlan,
+  swapItem, restoreItem, sameItems, swapSuggestions, swapsOn, dayPlan, offOn, slotExtras, dayRooms, roomPlan, carriesOver, CARRY_MAX,
 } from '../domain/plan.js';
 import { eatingPattern, markFresh } from '../domain/pattern.js';
 import { ask, aiAvailable, md, sparkle } from '../ai/hooshvareh.js';
@@ -45,7 +45,7 @@ async function generate({ days = PLAN_DAYS, include = [] } = {}) {
     const t = effectiveTargets(store.profile());
     const s = store.get();
     const pattern = eatingPattern(s.entries, s.ai_notes, today());
-    const input = shares => ({ kcal: t.kcal, protein: t.protein, budgets: budgets(t.kcal, shares), days, include: include.map(f => f.name) });
+    const input = shares => ({ kcal: t.kcal, protein: t.protein, proteinMax: !!t.proteinMax, budgets: budgets(t.kcal, shares), days, include: include.map(f => f.name) });
     const own = pattern.ready ? pattern.shares : null;
     let plan = null, raw = null;
     // the amounts are fitted here; if too few options survive, one more try is worth it, and a
@@ -53,7 +53,8 @@ async function generate({ days = PLAN_DAYS, include = [] } = {}) {
     for (let i = 0; i < (own ? 3 : 2) && !plan; i++) {
       const shares = i < 2 ? own : null;
       raw = await ask('plan', input(shares));
-      plan = buildPlan(raw, store.get().foods, t.kcal, today(), shares);
+      // with a protein limit (kidney disease) there is no floor to hold the options to
+      plan = buildPlan(raw, store.get().foods, t.kcal, today(), shares, { protein: t.proteinMax ? 0 : t.protein });
     }
     if (!plan) throw new Error('برنامه کامل درنیامد؛ دوباره امتحان کن.');
     plan.days = days;
@@ -172,7 +173,7 @@ function dayView(day) {
   const base = dayPlan(planOn(s.ai_notes, day), swaps);
   if (!base) return null;
   const extras = slotExtras(s.entries, picks, offOn(s.ai_notes, day), day);
-  const rooms = dayRooms(base, picks, extras, s.entries);
+  const rooms = dayRooms(base, picks, extras, s.entries, { carry: carriesOver(store.profile(), day) });
   return { plan: roomPlan(base, picks, rooms, new Map(s.foods.map(f => [f.id, f]))), picks, extras, rooms };
 }
 
@@ -415,7 +416,10 @@ function roomNote(key, room, cut, over) {
   const owed = r10(room.owed) > 0 ? `<b>${fa(r10(room.owed))}</b> کالری اضافه‌ی وعده‌های ${room.back ? 'دیگر' : 'قبل'} از سهم ${label} کم شد. ` : '';
   const state = left > 0 ? `${room.locked ? 'فقط ' : ''}<b>${fa(left)}</b> کالری از سهم ${label} مانده`
     : left < 0 ? `<b>${fa(-left)}</b> کالری از سهم ${label} بیشتر شده` : `سهم ${label} پر شده`;
-  const on = room.passed > 0 ? 'این اضافه از سهم وعده‌های دیگر کم شد.' : '';
+  const on = room.passed > 0 ? (room.dropped > 0
+      ? `بخشی از این اضافه از سهم وعده‌های دیگر کم شد (از هر وعده حداکثر ${fa(Math.round(CARRY_MAX * 100))}٪)؛ بقیه‌اش را رها کن و وعده‌ی بعدی را حذف نکن.`
+      : 'این اضافه از سهم وعده‌های دیگر کم شد.')
+    : room.kept ? 'وعده‌های بعدی سر جایشان هستند؛ مثل همیشه بخورشان.' : '';
   const then = room.locked ? `؛ گزینه‌های این وعده قفل شد. ${on}${room.extras ? `${on ? ' ' : ''}اگر ثبت خارج از برنامه را برداری، دوباره باز می‌شوند.` : ''}`
     : on ? `؛ ${on}`
     : cut ? `؛ مقدار گزینه‌ها به همین اندازه کم شد${over ? ` (${fa(over)} گزینه آن‌قدر کوچک نمی‌شود و کنار رفت)` : ''}.`
@@ -472,12 +476,12 @@ function slotCard(plan, key, day, picks, extras, room, showKcal, only, need) {
   return `<div class="meal card slot${full ? ' full' : ''}${room.locked ? ' locked' : ''}">
     <div class="meal-head">
       <h2>${SLOTS[key].label}</h2>
-      <span class="muted">${full ? icon.check : room.locked ? icon.lock : pickWord(slot.pick)}</span>
+      <span class="muted">${full ? icon.check : room.locked ? icon.lock : offer.length ? pickWord(slot.pick) : 'گزینه‌ای جا نمی‌شود'}</span>
       <button class="icon-btn sm" data-add="${SLOTS[key].meal}" data-key="${key}" aria-label="ثبت چیزی خارج از برنامه در ${SLOTS[key].label}">${icon.plus}</button>
     </div>
     ${options}
     ${orphans.map(p => `<button class="popt on" data-slot="${key}" data-opt="${esc(p.o)}" aria-pressed="true">
-      <span class="tick">${icon.check}</span><span class="popt-body"><strong>از برنامه‌ی قبلی</strong><small class="muted">${esc(p.t || '')}</small></span>
+      <span class="tick">${icon.check}</span><span class="popt-body"><strong>از برنامه‌ی قبلی</strong><small class="muted">${esc(p.t || '').replace(/\d+(\.\d+)?/g, m => fa(Number(m)))}</small></span>
     </button>`).join('')}
     ${extras.length ? `<h3 class="list-h">خارج از برنامه</h3>${extras.map(e => `
       <button class="entry" data-entry="${e.id}">

@@ -1,5 +1,5 @@
 import { suite, test, eq, ok, near } from './harness.js';
-import { budgets, fitOption, buildPlan, optionBudget, planOn, previousPlan, planEnd, planDayNo, planOver, picksOn, dayAdherence, adherence, newFoods, goneFoods, optionText, swapItem, restoreItem, sameItems, swapSuggestions, swapsOn, dayPlan, offOn, slotExtras, slotRoom, dayRooms, shrinkOption, roomPlan, portionFor, portionsFor, SLOTS } from '../js/domain/plan.js';
+import { budgets, fitOption, buildPlan, optionBudget, planOn, previousPlan, planEnd, planDayNo, planOver, picksOn, dayAdherence, adherence, newFoods, goneFoods, optionText, swapItem, restoreItem, sameItems, swapSuggestions, swapsOn, dayPlan, offOn, slotExtras, slotRoom, dayRooms, shrinkOption, roomPlan, portionFor, portionsFor, SLOTS, maxKcal, maxQty, isFree, carriesOver, CARRY_MAX } from '../js/domain/plan.js';
 
 const food = (id, unit, kcal, protein = 0, extra = {}) => ({ id, name: id, unit, kcal, protein, grams: 100, is_veg: false, created_at: '2026-01-01T00:00:00Z', ...extra });
 const FOODS = [
@@ -65,7 +65,7 @@ suite('plan', () => {
     eq(optionBudget(plan, 'snack1'), 100);
     eq(optionBudget(plan, 'lunch'), 600);
     for (const k of Object.keys(SLOTS)) {
-      for (const o of plan.slots[k].options) ok(Math.abs(o.kcal / optionBudget(plan, k) - 1) <= 0.15, `${k} ${o.kcal}`);
+      for (const o of plan.slots[k].options) ok(o.kcal >= optionBudget(plan, k) * 0.85 && o.kcal <= maxKcal(optionBudget(plan, k)), `${k} ${o.kcal}`);
     }
     eq(plan.free, [{ food_id: 'salad', name: 'salad' }]);
     eq([plan.start, plan.days, plan.kcal], ['2026-02-01', 14, 2000]);
@@ -265,10 +265,16 @@ suite('plan', () => {
     r = dayRooms(plan, picks, { ...none, breakfast: [big] }, [big, l]);
     near(r.snack1.owed + r.snack2.owed + r.dinner.owed, 80, 2);
 
-    // more than the rest of the day holds: everything after is used up
+    // more than the rest of the day holds: each later meal gives up at most 30%, the rest is let go
     const huge = e('h', 'breakfast', plan.kcal);
     r = dayRooms(plan, {}, { ...none, breakfast: [huge] }, [huge]);
-    ok(['snack1', 'lunch', 'snack2', 'dinner'].every(k => r[k].locked && r[k].left <= 0), 'all locked');
+    ok(['snack1', 'lunch', 'snack2', 'dinner'].every(k => !r[k].locked && r[k].owed <= Math.round(b[k] * CARRY_MAX) && r[k].left >= b[k] * 0.69), 'none emptied');
+    ok(r.breakfast.passed > 0 && r.breakfast.dropped > 0, 'part of it is dropped');
+
+    // with an eating-disorder history (or a teen) nothing is carried at all
+    r = dayRooms(plan, {}, { ...none, breakfast: [big] }, [big], { carry: false });
+    eq([sumOf(r, 'owed'), r.breakfast.passed, r.breakfast.kept, r.breakfast.locked], [0, 0, true, true]);
+    eq([carriesOver({ edHistory: 'no', age: 30 }), carriesOver({ edHistory: 'unsure', age: 30 }), carriesOver({ edHistory: 'no', age: 16 })], [true, false, false]);
 
     // over at dinner: nothing after it, so the earlier ones still open take it, by what they have left
     const late = e('d', 'dinner', b.dinner + 300);
@@ -310,5 +316,70 @@ suite('plan', () => {
     eq(portionsFor([byId.get('rice'), food('tea', 'لیوان', 0)], 200), [{ qty: 2, free: false, capped: false }, { qty: 1, free: true, capped: false }]);
     // one food alone is the same as portionFor
     eq(portionsFor([byId.get('rice')], 260), [portionFor(byId.get('rice'), 260)]);
+  });
+});
+
+suite('plan safeguards', () => {
+  const f = (id, unit, kcal, protein, category, extra = {}) => ({ id, name: id, unit, kcal, protein, grams: 100, is_veg: false, category, ...extra });
+  const BANK = [
+    f('bread', 'کف‌دست', 110, 4, 'grain'), f('cheese', 'قوطی کبریت', 80, 5, 'breakfast'), f('chicken', 'کف‌دست', 165, 31, 'protein'),
+    f('soup', 'لیوان', 150, 3, 'legume'), f('apple', 'عدد', 80, 0, 'fruit'), f('yogurt', 'لیوان', 110, 7, 'dairy'),
+    f('sugar', 'عدد', 16, 0, 'sweet'), f('biscuit', 'عدد', 22, 0.5, 'sweet'), f('walnut', 'عدد', 30, 0.5, 'nuts'),
+    f('melon', 'لیوان', 50, 1, 'fruit'), f('cucumber', 'عدد', 15, 0.5, 'veg', { is_veg: true }), f('tea', 'استکان', 2, 0, 'drink'),
+    f('cake', 'عدد', 150, 2, 'sweet'),
+  ];
+  const by = new Map(BANK.map(x => [x.id, x]));
+  const o = (...items) => ({ title: 't', items: items.map(([food_id, qty]) => ({ food_id, qty })) });
+
+  test('«free» is only vegetables and drinks with next to no calories, not small sweet pieces', () => {
+    eq(BANK.filter(isFree).map(x => x.id), ['cucumber', 'tea']);
+  });
+
+  test('fruit and sweets are not piled up to reach a budget', () => {
+    eq([maxQty(by.get('apple')), maxQty(by.get('cake')), maxQty(by.get('bread'))], [2, 1.5, Infinity]);
+    const a = fitOption(o(['apple', 1]), by, 200, 'a'); // would be 2.5 apples
+    ok(!a || a.items[0].qty <= 2, 'at most two apples');
+    eq(fitOption(o(['apple', 1], ['yogurt', 1]), by, 200, 'a').items.map(i => i.qty), [1, 1]);
+  });
+
+  const day = (protein) => ({
+    slots: {
+      breakfast: { pick: 1, options: [o(['bread', 2], ['cheese', 2]), o(['soup', 3]), o(['bread', 1], ['chicken', 1])] },
+      snack1: { pick: 1, options: [o(['apple', 1], ['yogurt', 0.5]), o(['yogurt', 1.5])] },
+      lunch: { pick: 1, options: [o(['bread', 2], ['chicken', 2]), o(['soup', 4]), o(['bread', 3], ['chicken', 1])] },
+      snack2: { pick: 1, options: [o(['apple', 1], ['yogurt', 0.5]), o(['yogurt', 1.5])] },
+      dinner: { pick: 1, options: [o(['bread', 2], ['chicken', 1.5]), o(['soup', 3]), o(['bread', 1], ['chicken', 2])] },
+    },
+    free: [{ food_id: 'sugar' }, { food_id: 'cucumber' }, { food_id: 'walnut' }],
+  });
+
+  test('main-meal options far below the others in protein are left out while enough remain', () => {
+    const p = buildPlan(day(), BANK, 2000, '2026-02-01', null, { protein: 104 });
+    for (const k of ['breakfast', 'lunch', 'dinner']) ok(p.slots[k].options.every(x => !x.items.some(i => i.food_id === 'soup')), `${k}: soup alone is gone`);
+    eq(p.free.map(x => x.food_id), ['cucumber']);
+    // without a protein figure (kidney disease) nothing is filtered
+    const q = buildPlan(day(), BANK, 2000, '2026-02-01');
+    ok(q.slots.lunch.options.some(x => x.items[0].food_id === 'soup'), 'kept');
+  });
+
+  test('option ids differ between two plans made the same day', async () => {
+    const a = buildPlan(day(), BANK, 2000, '2026-02-01');
+    await new Promise(r => setTimeout(r, 5));
+    const b = buildPlan(day(), BANK, 2000, '2026-02-01');
+    ok(a.slots.breakfast.options[0].id !== b.slots.breakfast.options[0].id, 'unique');
+    ok(a.slots.breakfast.options[0].id.startsWith('breakfast-'), 'still names its slot');
+  });
+
+  test('a snack logged in the morning counts for the morning snack', () => {
+    const at = (h) => { const d = new Date(2026, 1, 3, h); return d.toISOString(); };
+    const es = [{ id: 'm', day: '2026-02-03', meal: 'snack', kcal: 100, created_at: at(10) }, { id: 'e', day: '2026-02-03', meal: 'snack', kcal: 100, created_at: at(18) },
+      { id: 'later', day: '2026-02-03', meal: 'snack', kcal: 100, created_at: new Date(2026, 1, 5, 9).toISOString() }];
+    const x = slotExtras(es, {}, {}, '2026-02-03');
+    eq([x.snack1.map(i => i.id), x.snack2.map(i => i.id)], [['m'], ['e', 'later']]);
+  });
+
+  test('a swap never piles up fruit either', () => {
+    const opt = fitOption(o(['bread', 2], ['cheese', 2]), by, 380, 'x');
+    eq(swapItem(opt, 0, by.get('apple')).items[0].qty, 2);
   });
 });

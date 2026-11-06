@@ -10,7 +10,7 @@ import * as store from '../data/store.js';
 import { SEED_FOODS } from '../data/seedFoods.js';
 import { SUPABASE_URL, SUPABASE_KEY } from '../config.js';
 import { effectiveTargets, computeTargets, phaseOn, maintenanceKcal, rampKcal, correcting } from '../domain/targets.js';
-import { SLOTS, planOn, planEnd, previousPlan, adherence, optionText, picksOn, offOn, slotExtras, dayRooms } from '../domain/plan.js';
+import { SLOTS, planOn, planEnd, previousPlan, adherence, optionText, picksOn, offOn, slotExtras, dayRooms, carriesOver } from '../domain/plan.js';
 import { measuredTdee } from '../domain/energy.js';
 import { lossStart, zone, maintainWeeks, lightOn } from '../domain/phase.js';
 import { sortedWeights, measureDue, activityWeek, weekStart, ACTIVITY_GOAL } from '../domain/stats.js';
@@ -41,7 +41,7 @@ function planContext(s, t) {
   const prev = previousPlan(s.ai_notes, plan);
   const from = addDays(t, -27);
   const picks = picksOn(s.ai_notes, s.entries, t);
-  const rooms = dayRooms(plan, picks, slotExtras(s.entries, picks, offOn(s.ai_notes, t), t), s.entries);
+  const rooms = dayRooms(plan, picks, slotExtras(s.entries, picks, offOn(s.ai_notes, t), t), s.entries, { carry: carriesOver(s.profile?.data, t) });
   return {
     ...brief(plan), note: plan.note,
     previous: prev ? { start: prev.start, kcal: prev.kcal, adherence: (({ done, of }) => ({ done, of }))(adherence(s.ai_notes, s.entries, prev.start, addDays(plan.start, -1))) } : null,

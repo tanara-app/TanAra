@@ -88,7 +88,7 @@ export function medicalNoteHtml() {
 export function targetsHtml(t) {
   return `<div class="targets">
     <div class="tile big"><span>هدف کالری روزانه</span><b>${kcal50(t.kcal)}</b><small>کیلوکالری</small></div>
-    <div class="tile big"><span>هدف پروتئین روزانه</span><b>${fa(t.protein)}</b><small>گرم</small></div>
+    <div class="tile big"><span>${t.proteinMax ? 'حداکثر پروتئین روزانه' : 'هدف پروتئین روزانه'}</span><b>${fa(t.protein)}</b><small>گرم</small></div>
   </div>
   <dl class="calc">
     ${t.teen ? '' : `<div><dt>سوخت‌وساز پایه</dt><dd>${kcal50(t.bmr)}</dd></div>`}

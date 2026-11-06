@@ -342,6 +342,7 @@ dl.calc dd { margin: 0; text-align: left; }
 .portion-row .grow { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .portion-row small b { color: var(--text); }
 .portion-row .icon-btn.sm { background: var(--surface); flex: none; }
+.portion-row .eaten-btn { align-self: flex-start; padding: 2px 0; }
 .chosen-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; background: var(--surface-2); border-radius: var(--radius); padding: 8px 12px; }
 .chosen-bar span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .qty-box .field input { background: var(--surface) !important; }

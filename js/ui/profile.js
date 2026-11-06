@@ -68,7 +68,7 @@ export function renderProfile(root) {
       <summary><span><h2>هدف‌های روزانه</h2><small>${kcal50(eff.kcal)} کالری · ${fa(eff.protein)} گرم پروتئین</small></span></summary>
       <div class="targets">
         <div class="tile big"><span>کالری</span><b>${kcal50(eff.kcal)}</b><small>${correcting(p) ? 'اصلاح کوتاه' : rampKcal(p) ? 'رو به نگهداری' : eff.phase !== 'loss' ? 'سطح نگهداری' : p.targets?.manualKcal ? 'دستی' : p.targets?.source === 'measured' ? 'از مصرف واقعی بدنت' : 'محاسبه‌شده'}</small></div>
-        <div class="tile big"><span>پروتئین</span><b>${fa(eff.protein)}</b><small>گرم${p.targets?.manualProtein ? ' · دستی' : ''}</small></div>
+        <div class="tile big"><span>${eff.proteinMax ? 'پروتئین (حداکثر، برای کلیه)' : 'پروتئین'}</span><b>${fa(eff.protein)}</b><small>گرم${p.targets?.manualProtein ? ' · دستی' : ''}</small></div>
       </div>
       <p class="muted small">آخرین محاسبه با وزن ${fa(p.targets?.baseWeight, 1)} کیلو${p.targets?.computedAt ? `، ${faDMY(p.targets.computedAt)}` : ''}.</p>
       <div class="row gap">

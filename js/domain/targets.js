@@ -73,11 +73,21 @@ export function floorFor(p, day = today()) {
 // Weight at which BMI = 25 for this height.
 export const refWeight = heightCm => 25 * (heightCm / 100) ** 2;
 
+/*
+  Protein a day, per kg of the reference weight: 1.4 keeps muscle while losing. With kidney
+  disease a high protein intake loads the kidneys, so the target becomes a limit of 0.8 g/kg
+  (the usual advice for chronic kidney disease without dialysis; their nephrologist may set
+  another figure, which they can enter by hand).
+*/
+export const PROTEIN_PER_KG = 1.4;
+export const KIDNEY_PROTEIN_PER_KG = 0.8;
+export const kidney = p => (p?.conditions || []).includes('kidney');
+
 // measuredTdee: what the body really used, worked out from the log (see energy.js). When
 // given, it replaces the formula's estimate.
 // For a teen (see above) the formula and the floor are the teen ones. startDate, when given,
 // moves the age on from the one given at sign-up.
-export function computeTargets({ sex, age: age0, heightCm, weightKg, activity, measuredTdee, startDate }) {
+export function computeTargets({ sex, age: age0, heightCm, weightKg, activity, measuredTdee, startDate, conditions }) {
   const age = ageOn({ age: age0, startDate });
   const teen = age < ADULT_AGE;
   const bmr = 10 * weightKg + 6.25 * heightCm - 5 * age + (sex === 'male' ? 5 : -161);
@@ -93,7 +103,8 @@ export function computeTargets({ sex, age: age0, heightCm, weightKg, activity, m
     measured,
     kcal: Math.max(floor, raw),
     hitFloor: raw < floor,
-    protein: Math.round(1.4 * refWeight(heightCm)),
+    protein: Math.round((kidney({ conditions }) ? KIDNEY_PROTEIN_PER_KG : PROTEIN_PER_KG) * refWeight(heightCm)),
+    proteinMax: kidney({ conditions }),
     refWeight: Math.round(refWeight(heightCm) * 10) / 10,
     floor,
     teen,
@@ -150,8 +161,11 @@ export function effectiveTargets(p, day = today()) {
   const kcal = phase === 'loss' ? loss
     : correcting(p, day) ? Math.max(floor, round50(maintenanceKcal(p) - CORRECT_KCAL))
     : rampKcal(p, day) ?? full;
-  const protein = Number(t.manualProtein) || t.protein || 0;
-  return { kcal, protein, floor, phase, teen: isTeen(p, day), manual: !!(t.manualKcal || t.manualProtein) };
+  const manualProtein = Number(t.manualProtein);
+  // targets set before kidney disease was entered (or before this rule) still get the limit
+  const limit = kidney(p) && Number(p.heightCm) > 0 ? Math.round(KIDNEY_PROTEIN_PER_KG * refWeight(Number(p.heightCm))) : 0;
+  const protein = manualProtein || (limit ? Math.min(limit, t.protein || limit) : t.protein || 0);
+  return { kcal, protein, proteinMax: !manualProtein && !!limit, floor, phase, teen: isTeen(p, day), manual: !!(t.manualKcal || t.manualProtein) };
 }
 
 export const clampKcal = (p, kcal) => Math.max(floorFor(p), Math.round(kcal));

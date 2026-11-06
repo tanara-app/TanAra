@@ -37,8 +37,20 @@ suite('targets', () => {
   test('effective target: manual wins, but not under the floor', () => {
     const p = { sex: 'male', targets: { kcal: 1850, protein: 113, manualKcal: 1300 } };
     eq(effectiveTargets(p, '2026-01-10').kcal, 1500);
-    eq(effectiveTargets({ sex: 'male', targets: { kcal: 1850, protein: 113, manualKcal: 2000, manualProtein: 120 } }, '2026-01-10'), { kcal: 2000, protein: 120, floor: 1500, phase: 'loss', teen: false, manual: true });
+    eq(effectiveTargets({ sex: 'male', targets: { kcal: 1850, protein: 113, manualKcal: 2000, manualProtein: 120 } }, '2026-01-10'), { kcal: 2000, protein: 120, proteinMax: false, floor: 1500, phase: 'loss', teen: false, manual: true });
     eq(effectiveTargets(null).kcal, 0);
+  });
+
+  test('kidney disease: protein becomes a limit of 0.8 g per kg of the reference weight', () => {
+    const k = { sex: 'male', age: 50, heightCm: 172, weightKg: 118, activity: 'sedentary' };
+    const plain = computeTargets(k);
+    const kid = computeTargets({ ...k, conditions: ['kidney'] });
+    eq([plain.protein, plain.proteinMax, kid.protein, kid.proteinMax], [104, false, 59, true]);
+    // targets saved before the condition was entered still get the limit; a hand-set figure wins
+    const old = { sex: 'male', heightCm: 172, conditions: ['kidney'], targets: { kcal: 2000, protein: 104 } };
+    eq([effectiveTargets(old).protein, effectiveTargets(old).proteinMax], [59, true]);
+    eq(effectiveTargets({ ...old, targets: { ...old.targets, manualProtein: 70 } }).protein, 70);
+    eq(effectiveTargets({ ...old, conditions: [] }).protein, 104);
   });
 
   test('phase: maintenance and a diet break lift the target to maintenance', () => {
