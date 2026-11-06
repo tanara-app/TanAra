@@ -135,9 +135,20 @@ const GROUPS = [
   [['ماهی', 'غذای دریایی', 'دریایی'], ['ماهی', 'میگو', 'قزل آلا']],
   [['کنجد'], ['کنجد', 'ارده']],
 ];
-// letters made uniform, every separator a single space, padded so whole words can be looked up
-const words = t => ` ${String(t || '').replace(/ي/g, 'ی').replace(/ك/g, 'ک').replace(/[ۀة]/g, 'ه').replace(/[أإآ]/g, 'ا')
-  .replace(/[\u200c\u200f\-–(),.،؛:«»\/\d۰-۹]+/g, ' ').replace(/\s+/g, ' ').trim()} `;
+/*
+  Names written as two words that are one food, and a different food from either word alone:
+  «تخم‌مرغ» is not «مرغ», «سیب‌زمینی» is not «سیب». They are joined into one word whichever way
+  they are written (half-space, space or none), so «مرغ» doesn't take the eggs away and
+  «تخم مرغ» still finds «تخم‌مرغ».
+*/
+const COMPOUNDS = [['تخم', 'مرغ'], ['سیب', 'زمینی'], ['بادام', 'زمینی']]
+  .map(([a, b]) => [new RegExp(`${a}[\\u200c\\s]*${b}`, 'g'), a + b]);
+// letters made uniform, compounds joined, every separator a single space, padded so whole words can be looked up
+const words = t => {
+  let x = String(t || '').replace(/ي/g, 'ی').replace(/ك/g, 'ک').replace(/[ۀة]/g, 'ه').replace(/[أإآ]/g, 'ا');
+  for (const [re, joined] of COMPOUNDS) x = x.replace(re, joined);
+  return ` ${x.replace(/[\u200c\u200f\-–(),.،؛:«»\/\d۰-۹]+/g, ' ').replace(/\s+/g, ' ').trim()} `;
+};
 
 /*
   A test for foods they must not be given: anything named in `allergies` (with the foods of

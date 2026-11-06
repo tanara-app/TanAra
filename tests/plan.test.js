@@ -400,7 +400,14 @@ suite('plan round 2', () => {
     eq(BANK.filter(lact).map(x => x.id), ['c', 'm', 's', 'y']); // the cream pastry by «خامه»
     eq(BANK.filter(avoidTest({ dislikes: 'شیر' })).map(x => x.id), ['m']); // whole words: not «شیرینی»
     eq(BANK.filter(avoidTest({ allergies: 'تخم مرغ، گردو' })).map(x => x.id), ['w', 'e']);
-    eq(BANK.filter(avoidTest({ dislikes: 'مرغ' })).map(x => x.id), ['e', 'ch']);
+    // «مرغ» is the chicken, not the eggs; «تخم مرغ» finds «تخم‌مرغ» however it is written
+    eq(BANK.filter(avoidTest({ dislikes: 'مرغ' })).map(x => x.id), ['ch']);
+    eq(BANK.filter(avoidTest({ dislikes: 'تخم مرغ' })).map(x => x.id), ['e']);
+    eq(BANK.filter(avoidTest({ dislikes: 'تخممرغ' })).map(x => x.id), ['e']);
+    const more = [f('p', 'سیب‌زمینی سرخ‌کرده', 'کفگیر', 230, 3, 'sweet'), f('pb', 'کره بادام‌زمینی', 'قاشق غذاخوری', 95, 4, 'breakfast'), f('al', 'بادام', 'مشت', 165, 6, 'nuts')];
+    eq([...BANK, ...more].filter(avoidTest({ dislikes: 'سیب' })).map(x => x.id), ['a']); // not the potatoes
+    eq(more.filter(avoidTest({ dislikes: 'بادام' })).map(x => x.id), ['al']); // not the peanut butter
+    eq(more.filter(avoidTest({ allergies: 'آجیل' })).map(x => x.id), ['pb', 'al']); // a nut allergy takes both
     eq(avoidTest({}), null);
   });
 
