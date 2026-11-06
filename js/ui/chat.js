@@ -6,12 +6,12 @@ import { isTeen } from '../domain/targets.js';
 import { chat, ask, aiAvailable, md, focusArticle } from '../ai/hooshvareh.js';
 import { MEALS } from '../domain/stats.js';
 import { CATEGORIES } from '../data/seedFoods.js';
-import { SLOTS, planOn, swapsOn, swapItem } from '../domain/plan.js';
+import { SLOTS, planOn, swapsOn, swapItem, swapAllowed } from '../domain/plan.js';
 import { fa, esc, qtyLabel, norm } from '../lib/fa.js';
 import { today, relLabel, faDMY, weekLabel } from '../lib/dates.js';
 import { toast, confirmBox, sheet, icon } from './dom.js';
 import { pickPhotos, foodPhoto, cameraIcon } from './photo.js';
-import { applySwap } from './plan.js';
+import { applySwap, planRules } from './plan.js';
 import { face, thinkingSound } from './mascot.js';
 import { amountLabel, foodMeta } from './units.js';
 import { saveRecipe } from './recipes.js';
@@ -107,14 +107,18 @@ const isISO = d => typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d);
 // the option by its number, the food to replace by its name.
 function swapTarget(a) {
   const s = store.get();
-  const stored = planOn(s.ai_notes, today())?.slots[a.slot]?.options[Number(a.option) - 1];
+  const plan = planOn(s.ai_notes, today());
+  const stored = plan?.slots[a.slot]?.options[Number(a.option) - 1];
   const food = s.foods.find(f => f.id === a.food_id);
   if (!stored || !food) return null;
   const shown = swapsOn(s.ai_notes, today())[stored.id] || stored;
   const is = i => norm(i.name) === norm(a.from);
   const index = stored.items.findIndex(is) >= 0 ? stored.items.findIndex(is) : shown.items.findIndex(is);
   if (index < 0 || shown.items.some(i => i.food_id === food.id)) return null;
-  return { opt: stored.id, index, food, item: swapItem(shown, index, food, stored.items[index].kcal).items[index] };
+  const next = swapItem(shown, index, food, stored.items[index].kcal);
+  // with kidney disease, not a swap that takes the option past the protein limit
+  if (!swapAllowed(next, a.slot, plan, planRules())) return null;
+  return { opt: stored.id, index, food, item: next.items[index] };
 }
 
 // A proposal as it arrives: a swap gets the amount the app worked out, so the card can show it.

@@ -9,7 +9,7 @@ import {
   SLOTS, PLAN_DAYS, budgets, buildPlan, fitOption, optionBudget, planOn, planEnd, planDayNo, planOver,
   picksOn, dayAdherence, newFoods, goneFoods, optionText,
   swapItem, restoreItem, sameItems, swapSuggestions, swapsOn, dayPlan, offOn, slotExtras, dayRooms, roomPlan, carriesOver, CARRY_MAX,
-  extraOption, rescalePlan, fastPlan, fastOn, slotLabel, needOf, OVER_SLACK,
+  extraOption, rescalePlan, fastPlan, fastOn, slotLabel, needOf, OVER_SLACK, swapAllowed,
 } from '../domain/plan.js';
 import { isRamadan } from '../domain/occasions.js';
 import { eatingPattern, markFresh } from '../domain/pattern.js';
@@ -116,9 +116,9 @@ function openPrefs(onGo) {
 }
 
 // What every option of a new plan (or one added to it) is checked against: the protein target
-// (a limit with kidney disease).
-function planRules(t = effectiveTargets(store.profile())) {
-  return { protein: t.protein, proteinMax: !!t.proteinMax };
+// (a limit with kidney disease), and the safety floor no day of the plan may go under.
+export function planRules(t = effectiveTargets(store.profile())) {
+  return { protein: t.protein, proteinMax: !!t.proteinMax, floor: t.floor };
 }
 
 // Asks for options for one short occasion of a plan being made, up to three times; drops it from `missing` once it has enough.
@@ -205,8 +205,9 @@ function dayView(day) {
   const stored = dayPlan(planOn(s.ai_notes, day), swaps);
   if (!stored) return null;
   const byId = new Map(s.foods.map(f => [f.id, f]));
-  const base = fastOn(s.ai_notes, day) ? fastPlan(stored, byId) : stored;
-  const extras = slotExtras(s.entries, picks, offOn(s.ai_notes, day), day);
+  const fast = fastOn(s.ai_notes, day);
+  const base = fast ? fastPlan(stored, byId, planRules(effectiveTargets(store.profile(), day))) : stored;
+  const extras = slotExtras(s.entries, picks, offOn(s.ai_notes, day), day, { fast });
   const rooms = dayRooms(base, picks, extras, s.entries, { carry: carriesOver(store.profile(), day) });
   return { plan: roomPlan(base, picks, rooms, byId), picks, extras, rooms };
 }
@@ -272,6 +273,8 @@ export function applySwap({ day, slot: key, opt: optId, index, food, scope = 'da
   const at = optionOn(day, key, optId);
   if (!at?.stored.items[index]) return null;
   const { plan, stored } = at;
+  // with kidney disease, a food that takes the option past the protein limit is not swapped in
+  if (food && !swapAllowed(swapItem(at.shown, index, food, sized(at.shown, stored, index)), key, plan, planRules(effectiveTargets(store.profile(), day)))) return null;
   const swaps = { ...swapsOn(notes(), day) };
   let next;
   if (scope === 'plan' && food) {
@@ -318,6 +321,9 @@ function openSwap(day, key, optId, index) {
   sheet.open(body => {
     const close = `<button class="icon-btn" data-close aria-label="بستن">${icon.close}</button>`;
     const preview = f => swapItem(first.shown, index, f, base.kcal);
+    // with kidney disease, foods that would take the option past the protein limit aren't offered
+    const rules = planRules(effectiveTargets(store.profile(), day));
+    const fits = f => swapAllowed(preview(f), key, first.plan, rules);
     const row = (f, why = '') => {
       const i = preview(f).items[index];
       return `<button class="food-row" data-food="${f.id}">
@@ -342,14 +348,14 @@ function openSwap(day, key, optId, index) {
       const drawResults = () => {
         const s = store.get();
         const used = new Set(first.shown.items.map(i => i.food_id));
-        const can = s.foods.filter(f => !used.has(f.id) && f.kcal > 0);
+        const can = s.foods.filter(f => !used.has(f.id) && f.kcal > 0 && fits(f));
         if (query) {
           const q = norm(query);
           const hits = can.filter(f => norm(f.name).includes(q)).sort((a, b) => norm(a.name).indexOf(q) - norm(b.name).indexOf(q));
           list.innerHTML = hits.length ? hits.map(f => row(f)).join('') : '<div class="empty">در بانک غذا پیدا نشد.</div>';
           return;
         }
-        const near = swapSuggestions(first.shown, index, s.foods, s.entries);
+        const near = swapSuggestions(first.shown, index, s.foods.filter(fits), s.entries);
         list.innerHTML = `
           ${near.length ? `<h3 class="list-h">هم‌دسته در بانک غذا</h3>${near.map(f => row(f)).join('')}` : ''}
           ${Array.isArray(ai) ? `<h3 class="list-h">پیشنهاد هوشواره</h3>${ai.map(x => row(x.food, x.why)).join('')}` : ''}
@@ -377,7 +383,7 @@ function openSwap(day, key, optId, index) {
           const s = store.get();
           const used = new Set(first.shown.items.map(i => i.food_id));
           ai = (r.foods || []).map(x => ({ food: s.foods.find(f => f.id === x.food_id), why: String(x.why || '').slice(0, 60) }))
-            .filter(x => x.food && x.food.kcal > 0 && !used.has(x.food.id) && used.add(x.food.id));
+            .filter(x => x.food && x.food.kcal > 0 && fits(x.food) && !used.has(x.food.id) && used.add(x.food.id));
           if (!ai.length) { ai = null; toast('هوشواره جایگزین مناسبی در بانک غذا پیدا نکرد.'); }
         } catch (err) {
           ai = null; toast(err.message);
@@ -574,10 +580,10 @@ export function planHtml(day) {
       <p>وزنت را ثبت کن تا هوشواره برنامه‌ی دوره‌ی بعد را با نتیجه‌ی این دو هفته تنظیم کند. تا آن موقع همین برنامه سر جایش است.</p>
       <div class="row gap"><button class="btn primary sm" data-plan-new>برنامه‌ی دوره‌ی بعد</button><a class="btn sm" href="#/progress">ثبت وزن</a></div>
     </div>` : ''}
-    ${isToday && !over && !busy && Math.abs(plan.kcal - effectiveTargets(p, day).kcal) >= 100 ? `<div class="note soft">
+    ${isToday && !busy && Math.abs(plan.kcal - effectiveTargets(p, day).kcal) >= 100 ? `<div class="note soft">
       <strong>هدف کالری‌ات عوض شده</strong>
       <p>این برنامه برای ${fa(plan.kcal)} کالری چیده شده، ولی هدف الانت ${fa(effectiveTargets(p, day).kcal)} است. اپ می‌تواند مقدار همین گزینه‌ها را با هدف تازه جور کند (بدون هوشواره)، یا هوشواره برنامه‌ی تازه بچیند.</p>
-      <div class="row gap"><button class="btn primary sm" data-plan-rescale>جور کردن مقدارها</button>${aiAvailable() ? '<button class="btn sm" data-plan-new>برنامه‌ی تازه</button>' : ''}</div>
+      <div class="row gap"><button class="btn primary sm" data-plan-rescale>جور کردن مقدارها</button>${aiAvailable() && !over ? '<button class="btn sm" data-plan-new>برنامه‌ی تازه</button>' : ''}</div>
     </div>` : ''}
     ${fresh.length && !busy ? `<div class="note soft" data-fresh>
       <strong>غذای تازه در بانک غذا</strong>
@@ -595,7 +601,8 @@ export function planHtml(day) {
       <div class="bar plan-bar"><i style="width:${a.done / a.of * 100}%"></i></div>
       <p class="small"><b>${fa(a.done)}</b> از ${fa(a.of)} وعده طبق برنامه</p>
       ${isRamadan(day) ? `<label class="check fast-check"><input type="checkbox" data-fast ${plan.fast ? 'checked' : ''}><span>${isToday ? 'امروز' : 'این روز'} روزه‌ام<small class="muted">سه وعده: سحری، افطار و شام، از همین گزینه‌ها با مقدار جورشده. جمع روز همان هدف کالری است.</small></span></label>
-        ${plan.fast && (p.conditions || []).includes('diabetes') ? '<p class="note doctor small">با دیابت، روزه گرفتن و مقدار داروها را حتماً با پزشکت هماهنگ کن؛ اگر قندت افت کرد یا حالت بد شد روزه را بشکن.</p>' : ''}` : ''}
+        ${plan.fast && (p.conditions || []).includes('diabetes') ? '<p class="note doctor small">با دیابت، روزه گرفتن و مقدار داروها را حتماً با پزشکت هماهنگ کن؛ اگر قندت افت کرد یا حالت بد شد روزه را بشکن.</p>' : ''}
+        ${plan.fast && (p.conditions || []).includes('kidney') ? '<p class="note doctor small">با بیماری کلیه، روزه گرفتن (و کم‌آبی‌اش) را حتماً با پزشکت هماهنگ کن.</p>' : ''}` : ''}
       ${plan.note || plan.shares ? `<details class="plan-note"><summary class="link small">توضیح هوشواره</summary>${plan.shares ? `<p class="muted small">از روی ${fa(plan.fromDays || 0)} روز ثبت خودت: صبحانه ${fa(Math.round(plan.shares.breakfast * 100))}٪، ناهار ${fa(Math.round(plan.shares.lunch * 100))}٪، شام ${fa(Math.round(plan.shares.dinner * 100))}٪ و میان‌وعده‌ها ${fa(Math.round((plan.shares.snack1 + plan.shares.snack2) * 100))}٪ از کالری روز.</p>` : ''}<div class="ai-text small">${md(plan.note || '')}</div></details>` : ''}
       <div class="plan-links">
         <button class="link small" data-plan-kcal>${showKcal ? 'پنهان کردن کالری' : 'نمایش کالری'}</button>
@@ -643,8 +650,8 @@ export function bindPlan(root, day, redraw) {
   // the target moved (the climb into maintenance, a recalculation): same options, refitted here
   root.querySelector('[data-plan-rescale]')?.addEventListener('click', () => {
     const cur = notes().find(n => n.key === plan.key);
-    const kcal = effectiveTargets(store.profile(), day).kcal;
-    const next = cur && rescalePlan(cur.data, kcal, new Map(store.get().foods.map(f => [f.id, f])));
+    const t = effectiveTargets(store.profile(), day);
+    const next = cur && rescalePlan(cur.data, t.kcal, new Map(store.get().foods.map(f => [f.id, f])), planRules(t));
     if (!next) return toast('همه‌ی وعده‌ها با هدف تازه جور نشد؛ برنامه‌ی تازه بچین.');
     store.saveNote({ key: cur.key, kind: 'plan', text: cur.text, data: next });
     toast('مقدارها با هدف تازه جور شد');

@@ -64,18 +64,45 @@ export function maxQty(food) {
 // above, every occasion 15% over would eat most of the day's deficit, so the limit is 10% — or
 // 25 kcal for a small snack, where one half-unit step is already more than 10%.
 export const FIT_LOW = 0.85;
+// The main meals, where every option must bring real protein.
+const MAIN = ['breakfast', 'lunch', 'dinner'];
 export const maxKcal = budget => Math.max(budget * 1.1, budget + 25);
+/*
+  With the target at (or near) the safety floor, 85% of every occasion's budget would be a day
+  under the floor — someone eating exactly as the plan says would then get the app's own
+  under-eating warning. So the main meals get a higher lower limit (`low`, per occasion), enough
+  that even the smallest option of every occasion still adds up to the floor; the snacks keep
+  theirs, since with half-unit steps (half a glass of milk) a small budget can't be hit closer.
+  The upper limit moves up with it. Null when the floor is no question (the usual case).
+  Stored with the plan as `low` (with the `floor` it came from).
+*/
+export function lowsFor(kcal, floor, shares) {
+  if (!(Number(floor) > 0) || !(kcal > 0)) return null;
+  const b = budgets(kcal, shares);
+  const keys = Object.keys(b);
+  const main = k => MAIN.includes(k);
+  const snacks = keys.filter(k => !main(k)).reduce((t, k) => t + b[k] * FIT_LOW, 0);
+  const mains = keys.filter(main).reduce((t, k) => t + b[k], 0);
+  const low = mains > 0 ? (floor - snacks) / mains : 0;
+  if (!(low > FIT_LOW)) return null;
+  return Object.fromEntries(keys.map(k => [k, main(k) ? Math.min(1.1, low) : FIT_LOW]));
+}
+const lowOf = (lows, key) => lows?.[key] ?? FIT_LOW;
+const highOf = (budget, low) => Math.max(maxKcal(budget), budget * (low + 0.2));
+// where the fitting aims: the budget, or the middle of the band once its lower limit has risen
+const aimOf = (budget, low) => (low > FIT_LOW ? (budget * low + highOf(budget, low)) / 2 : budget);
 // Salad and greens barely count, so their amount is left as the model gave it.
 const isFixed = food => food.is_veg && food.kcal * (food.unit === GRAM ? 100 : 1) <= 50;
 
 /*
   One option from the model's { title, items: [{ food_id, qty }] }. Unknown foods are dropped.
   If the total is more than 10% off the budget, the amounts are scaled toward it and then
-  nudged one measurable step at a time (half a unit, 10 g) while that gets closer — each food
+  nudged one measurable step at a time (half a unit, 10 g; or one food up and another down)
+  while that gets closer — inside the limits first, then to the budget — each food
   staying between half and double its scaled share, so the meal keeps its shape. Returns null
-  when it still can't get within 15%.
+  when it still can't get within 15% (`low`: the lower limit, see lowsFor).
 */
-export function fitOption(raw, foodsById, budget, id) {
+export function fitOption(raw, foodsById, budget, id, low = FIT_LOW) {
   const picked = (raw?.items || [])
     .map(i => ({ food: foodsById.get(i.food_id), qty: Number(i.qty) }))
     .filter(i => i.food && i.qty > 0)
@@ -84,31 +111,40 @@ export function fitOption(raw, foodsById, budget, id) {
   let items = picked.map(i => item(i.food, i.qty));
   let kcal = sum(items, 'kcal');
   if (!(kcal > 0)) return null;
-  if (Math.abs(kcal / budget - 1) > 0.1) {
+  const aim = aimOf(budget, low);
+  if (Math.abs(kcal / aim - 1) > 0.1 || kcal < budget * low || kcal > highOf(budget, low)) {
     const fixed = sum(items.filter((_, n) => isFixed(picked[n].food)), 'kcal');
-    const factor = Math.max(0.1, (budget - fixed) / Math.max(1, kcal - fixed));
+    const factor = Math.max(0.1, (aim - fixed) / Math.max(1, kcal - fixed));
     const base = picked.map(i => (isFixed(i.food) ? i.qty : Math.min(i.qty * factor, maxQty(i.food))));
     const qty = base.map((q, n) => roundQty(q, picked[n].food.unit));
     const total = q => q.reduce((t, x, n) => t + x * picked[n].food.kcal, 0);
+    // how bad a total is: outside the limits above all, then how far from the aim
+    const lo = budget * low, hi = highOf(budget, low);
+    const err = t => (t < lo ? lo - t : t > hi ? t - hi : 0) * 10 + Math.abs(t - aim);
+    const can = (n, next) => {
+      const f = picked[n].food;
+      return !isFixed(f) && next >= step(f.unit) && next >= base[n] / 2 && next <= Math.min(Math.max(base[n] * 2, step(f.unit)), maxQty(f));
+    };
+    // one step of one food, or one food a step up and another a step down (coarse steps, like a
+    // ladle of rice, can step right over the limits one at a time)
+    const moves = [];
+    qty.forEach((_, n) => { [1, -1].forEach(d => moves.push([[n, d]])); qty.forEach((__, m) => { if (m !== n) moves.push([[n, 1], [m, -1]]); }); });
     for (let guard = 0; guard < 40; guard++) {
+      const now = total(qty);
       let best = null;
-      qty.forEach((q, n) => {
-        const f = picked[n].food;
-        if (isFixed(f)) return;
-        for (const d of [step(f.unit), -step(f.unit)]) {
-          const next = q + d;
-          if (next < step(f.unit) || next < base[n] / 2 || next > Math.min(Math.max(base[n] * 2, step(f.unit)), maxQty(f))) continue;
-          const err = Math.abs(total(qty) + d * f.kcal - budget);
-          if (!best || err < best.err) best = { n, next, err };
-        }
-      });
-      if (!best || best.err >= Math.abs(total(qty) - budget)) break;
-      qty[best.n] = best.next;
+      for (const mv of moves) {
+        const next = mv.map(([n, d]) => [n, qty[n] + d * step(picked[n].food.unit)]);
+        if (!next.every(([n, q]) => can(n, q))) continue;
+        const e = err(now + next.reduce((t, [n, q]) => t + (q - qty[n]) * picked[n].food.kcal, 0));
+        if (!best || e < best.e) best = { next, e };
+      }
+      if (!best || best.e >= err(now) - 1e-9) break;
+      best.next.forEach(([n, q]) => { qty[n] = q; });
     }
     items = picked.map((i, n) => item(i.food, qty[n]));
     kcal = sum(items, 'kcal');
   }
-  if (kcal / budget < FIT_LOW || kcal > maxKcal(budget)) return null;
+  if (kcal < budget * low || kcal > highOf(budget, low)) return null;
   return { id, title: String(raw.title || '').trim().slice(0, 60), items, kcal, protein: r1(sum(items, 'protein')) };
 }
 
@@ -120,8 +156,6 @@ export const isFree = f => {
   return per <= 5 || (!!f.is_veg && per <= 50);
 };
 
-// The main meals, where every option must bring real protein.
-const MAIN = ['breakfast', 'lunch', 'dinner'];
 
 /*
   Whether a fitted option may go into the plan (also used for options added later): with kidney
@@ -149,10 +183,12 @@ export const needOf = pick => Math.max(2, pick);
   `proteinMax` (kidney disease) it is a limit instead (see optionAllowed).
   Option ids carry a mark of this plan, so a day's picks and swaps made on an earlier plan
   never land on an option of a new one made the same day.
+  `floor`: the safety floor, which no day of the plan may go under (see lowsFor).
 */
-export function buildPlan(raw, foods, kcal, start, shares = null, { protein = 0, proteinMax = false, partial = false } = {}) {
+export function buildPlan(raw, foods, kcal, start, shares = null, { protein = 0, proteinMax = false, partial = false, floor = 0 } = {}) {
   const byId = new Map(foods.map(f => [f.id, f]));
   const b = budgets(kcal, shares);
+  const lows = lowsFor(kcal, floor, shares);
   const rules = { kcal, shares, protein, proteinMax };
   const made = new Date().toISOString();
   const mark = Date.now().toString(36);
@@ -161,7 +197,7 @@ export function buildPlan(raw, foods, kcal, start, shares = null, { protein = 0,
   for (const key of Object.keys(SLOTS)) {
     const s = raw?.slots?.[key];
     const pick = Number(s?.pick) === 2 ? 2 : 1;
-    let options = (s?.options || []).map((o, i) => fitOption(o, byId, b[key] / pick, `${key}-${mark}-${i + 1}`))
+    let options = (s?.options || []).map((o, i) => fitOption(o, byId, b[key] / pick, `${key}-${mark}-${i + 1}`, lowOf(lows, key)))
       .filter(o => o && optionAllowed(o, key, pick, rules));
     if (protein > 0 && !proteinMax && MAIN.includes(key)) {
       const min = 0.5 * protein * (b[key] / kcal) / pick;
@@ -179,7 +215,7 @@ export function buildPlan(raw, foods, kcal, start, shares = null, { protein = 0,
   const free = (raw?.free || []).map(f => byId.get(f.food_id))
     .filter(f => f && isFree(f) && !seen.has(f.id) && seen.add(f.id)).slice(0, 8)
     .map(f => ({ food_id: f.id, name: f.name }));
-  return { start, days: PLAN_DAYS, kcal, made, slots, free, ...(shares ? { shares } : {}), ...(partial ? { missing } : {}) };
+  return { start, days: PLAN_DAYS, kcal, made, slots, free, ...(lows ? { low: lows, floor } : {}), ...(shares ? { shares } : {}), ...(partial ? { missing } : {}) };
 }
 
 /*
@@ -188,7 +224,8 @@ export function buildPlan(raw, foods, kcal, start, shares = null, { protein = 0,
 */
 export function extraOption(raw, foods, plan, key, rules = {}, { id = `${key}-x${Date.now().toString(36)}`, budget = null } = {}) {
   const pick = plan.slots[key].pick;
-  const o = fitOption(raw, new Map(foods.map(f => [f.id, f])), budget ?? planBudgets(plan)[key] / pick, id);
+  // sized to what off-plan food left (`budget`), the floor is no longer the question
+  const o = fitOption(raw, new Map(foods.map(f => [f.id, f])), budget ?? planBudgets(plan)[key] / pick, id, budget == null ? lowOf(plan.low, key) : FIT_LOW);
   return o && optionAllowed(o, key, pick, { ...rules, kcal: plan.kcal, shares: plan.shares }) ? o : null;
 }
 
@@ -196,18 +233,28 @@ export function extraOption(raw, foods, plan, key, rules = {}, { id = `${key}-x$
   The plan refitted to a new daily target without asking anyone: every option's amounts
   refitted to its new budget (same foods). Options that can't get there drop out; null when a
   slot is left without enough of them. Used when the target moves (the climb into maintenance,
-  a correction, a recalculation).
+  a correction, a recalculation). `rules` ({ protein, proteinMax, floor }): bigger amounts mean
+  more protein, so with kidney disease the limit is checked again; and the floor sets the
+  lower limits for the new target (lowsFor).
 */
-export function rescalePlan(plan, kcal, foodsById) {
+export function rescalePlan(plan, kcal, foodsById, rules = {}) {
   const b = budgets(kcal, plan.shares);
+  const lows = lowsFor(kcal, rules.floor, plan.shares);
+  const check = { ...rules, kcal, shares: plan.shares };
   const slots = {};
   for (const [k, s] of Object.entries(plan.slots)) {
-    const options = s.options.map(o => shrinkOption(o, foodsById, b[k] / s.pick)).filter(Boolean).map(({ fit, ...o }) => o);
+    const options = s.options.map(o => shrinkOption(o, foodsById, b[k] / s.pick, lowOf(lows, k))).filter(Boolean).map(({ fit, ...o }) => o)
+      .filter(o => optionAllowed(o, k, s.pick, check));
     if (options.length < needOf(s.pick)) return null;
     slots[k] = { ...s, options };
   }
-  return { ...plan, kcal, slots };
+  const { low: _, floor: __, ...rest } = plan;
+  return { ...rest, kcal, slots, ...(lows ? { low: lows, floor: rules.floor } : {}) };
 }
+
+// Whether an option with a food swapped in still keeps the plan's rules (the kidney protein limit).
+export const swapAllowed = (option, key, plan, rules = {}) =>
+  optionAllowed(option, key, plan.slots[key]?.pick || 1, { ...rules, kcal: plan.kcal, shares: plan.shares });
 
 export const optionBudget = (plan, key) => planBudgets(plan)[key] / plan.slots[key].pick;
 
@@ -323,15 +370,18 @@ export const offOn = (notes, day) => notes.find(n => n.key === `pick:${day}`)?.d
   The day's entries that no ticked option accounts for, per occasion: { [slot]: [entries] }.
   An entry goes to the occasion whose «+» logged it (`off`) while it is still in that meal;
   otherwise to the last occasion of its meal — except a snack logged on its own day before
-  3 pm, which is the morning one (both snacks log as «میان‌وعده»).
+  3 pm, which is the morning one (both snacks log as «میان‌وعده»). On a fasting day (`fast`)
+  there is no morning snack: one logged before noon was eaten at سحری, any later at افطار.
 */
 const SNACK_SPLIT_HOUR = 15;
-function snackSlot(e) {
+const FAST_SPLIT_HOUR = 12;
+function snackSlot(e, fast) {
   const at = new Date(e.created_at);
-  if (Number.isNaN(at.getTime()) || iso(at) !== e.day) return null;
+  if (Number.isNaN(at.getTime()) || iso(at) !== e.day) return fast ? 'snack2' : null;
+  if (fast) return at.getHours() < FAST_SPLIT_HOUR ? 'breakfast' : 'snack2';
   return at.getHours() < SNACK_SPLIT_HOUR ? 'snack1' : 'snack2';
 }
-export function slotExtras(entries, picks, off, day) {
+export function slotExtras(entries, picks, off, day, { fast = false } = {}) {
   const planned = plannedEntryIds(picks);
   const keys = Object.keys(SLOTS);
   const lastOf = {};
@@ -339,7 +389,7 @@ export function slotExtras(entries, picks, off, day) {
   const out = Object.fromEntries(keys.map(k => [k, []]));
   entries.filter(e => e.day === day && !planned.has(e.id) && lastOf[e.meal])
     .sort((x, y) => (x.created_at < y.created_at ? -1 : 1))
-    .forEach(e => out[SLOTS[off[e.id]]?.meal === e.meal ? off[e.id] : (e.meal === 'snack' && snackSlot(e)) || lastOf[e.meal]].push(e));
+    .forEach(e => out[SLOTS[off[e.id]]?.meal === e.meal ? off[e.id] : (e.meal === 'snack' && snackSlot(e, fast)) || lastOf[e.meal]].push(e));
   return out;
 }
 
@@ -374,7 +424,10 @@ export const carriesOver = (p, day) => !['yes', 'unsure'].includes(p?.edHistory)
   slotRoom for every occasion of a day, with what off-plan food took beyond an occasion's
   calories carried on to the ones after it: the excess is shared between the later occasions
   still to be picked, by the size of their budgets (`owed`), so no single meal pays for all of
-  it, and none gives up more than CARRY_MAX of its budget. An occasion eaten under its budget
+  it, and none gives up more than CARRY_MAX of its budget. Before that, an earlier occasion
+  still open (nothing or too little eaten there, and its time has gone, since a later one has
+  food) takes what it has left: a skipped breakfast pays for an over-full lunch before dinner
+  is cut, so the day doesn't end far under the target (`back`). An occasion eaten under its budget
   pays the debt off by that much; whatever an occasion can't absorb moves on; an occasion is
   never charged past what it has left. What the later occasions can't take falls back on
   earlier ones still to be picked (`back`), within the same limit; what is still left after
@@ -398,19 +451,33 @@ export function dayRooms(plan, picks, extras, entries, { carry = true } = {}) {
     // picked in full: what the off-plan food added counts, and what was eaten of the options beyond
     // OVER_SLACK of the budget (amounts changed in the log) — not an option a little over its budget
     const more = r.left >= 0 ? 0 : open ? -r.left : Math.max(Math.min(off, -r.left), -r.left - Math.round(b[k] * OVER_SLACK));
-    debt = Math.max(0, debt - owed - (open ? 0 : Math.max(0, r.left))) + (carry ? more : 0);
+    // earlier occasions still open give what they have left first, each by how much that is
+    let rest = carry ? more : 0;
+    const before = keys.slice(0, n).filter(x => isOpen(x) && out[x].left > 0);
+    const spare = before.reduce((t, x) => t + out[x].left, 0);
+    if (rest > 0 && spare > 0) {
+      const all = rest;
+      before.forEach(x => {
+        const take = Math.round(Math.min(out[x].left, all * out[x].left / spare));
+        rest -= take;
+        out[x] = { ...slotRoom(plan, x, picks, extras[x], entries, out[x].owed + take), passed: out[x].passed, kept: out[x].kept, back: (out[x].back || 0) + take };
+      });
+      rest = Math.max(0, rest);
+    }
+    debt = Math.max(0, debt - owed - (open ? 0 : Math.max(0, r.left))) + rest;
     const others = keys.some((x, m) => m !== n && isOpen(x));
     r.passed = carry && more > 0 && others ? Math.round(more) : 0;
     r.kept = !carry && more > 0 && others;
   });
   const back = keys.filter(k => isOpen(k) && out[k].left > 0 && out[k].owed < cap(k));
   const room = back.reduce((t, k) => t + Math.min(out[k].left, cap(k) - out[k].owed), 0);
+  // (earlier occasions already gave all they had above; this is for later ones within the limit)
   let dropped = debt;
   if (debt > 0 && room > 0) back.forEach(k => {
     const can = Math.min(out[k].left, cap(k) - out[k].owed);
     const take = Math.round(Math.min(can, debt * can / room));
     dropped -= take;
-    out[k] = { ...slotRoom(plan, k, picks, extras[k], entries, out[k].owed + take), passed: out[k].passed, kept: out[k].kept, back: take };
+    out[k] = { ...slotRoom(plan, k, picks, extras[k], entries, out[k].owed + take), passed: out[k].passed, kept: out[k].kept, back: (out[k].back || 0) + take };
   });
   if (dropped > 0) keys.forEach(k => { if (out[k].passed) out[k].dropped = Math.round(dropped); });
   return out;
@@ -420,9 +487,9 @@ export function dayRooms(plan, picks, extras, entries, { carry = true } = {}) {
   The option cut down to about `kcal`: same foods, amounts refitted in measurable steps (see
   fitOption). Null when it can't get there, or a food of it has left the bank or changed unit.
 */
-export function shrinkOption(option, foodsById, kcal) {
+export function shrinkOption(option, foodsById, kcal, low = FIT_LOW) {
   if (option.items.some(i => foodsById.get(i.food_id)?.unit !== i.unit)) return null;
-  const o = fitOption({ title: option.title, items: option.items.map(i => ({ food_id: i.food_id, qty: i.qty })) }, foodsById, kcal, option.id);
+  const o = fitOption({ title: option.title, items: option.items.map(i => ({ food_id: i.food_id, qty: i.qty })) }, foodsById, kcal, option.id, low);
   if (!o) return null;
   o.items.forEach((i, n) => { if (option.items[n].was) i.was = option.items[n].was; });
   return { ...option, ...o, fit: true };
@@ -541,15 +608,22 @@ export function fastShape(plan) {
   return { ...plan, slots, shares: FAST_SHARES, fast: true };
 }
 
-// The plan as a fasting day offers it (see FAST). Options that can't be refitted drop out.
-export function fastPlan(plan, foodsById) {
+/*
+  The plan as a fasting day offers it (see FAST). Options that can't be refitted drop out, and
+  with kidney disease (`rules`: { protein, proteinMax }) so do those that a bigger share (سحری
+  is 40% of the day, lunch 30%) takes past the protein limit for that share.
+*/
+export function fastPlan(plan, foodsById, rules = {}) {
   const b = budgets(plan.kcal, FAST_SHARES);
+  // the plan's floor, if it had one, worked out again for three occasions
+  const lows = plan.floor ? lowsFor(plan.kcal, plan.floor, FAST_SHARES) : null;
+  const limit = (k, pick) => (rules.proteinMax && rules.protein > 0 ? 1.5 * rules.protein * FAST[k].share / pick : Infinity);
   const slots = Object.fromEntries(Object.keys(SLOTS).map(k => {
     const f = FAST[k];
     if (!f) return [k, { pick: 0, options: [] }];
     const from = plan.slots[f.from];
     const options = from.options.filter(o => !o.slot)
-      .map(o => shrinkOption(o, foodsById, b[k] / from.pick)).filter(Boolean)
+      .map(o => shrinkOption(o, foodsById, b[k] / from.pick, lowOf(lows, k))).filter(o => o && o.protein <= limit(k, from.pick))
       .map(({ fit, ...o }) => ({ ...o, fast: true }));
     return [k, { pick: from.pick, options }];
   }));

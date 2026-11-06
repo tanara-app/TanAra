@@ -42,8 +42,9 @@ function planContext(s, t) {
   const from = addDays(t, -27);
   const picks = picksOn(s.ai_notes, s.entries, t);
   const fast = fastOn(s.ai_notes, t);
-  const shaped = fast ? fastPlan(plan, new Map(s.foods.map(f => [f.id, f]))) : plan;
-  const rooms = dayRooms(shaped, picks, slotExtras(s.entries, picks, offOn(s.ai_notes, t), t), s.entries, { carry: carriesOver(s.profile?.data, t) });
+  const et = effectiveTargets(s.profile?.data, t);
+  const shaped = fast ? fastPlan(plan, new Map(s.foods.map(f => [f.id, f])), { protein: et.protein, proteinMax: !!et.proteinMax }) : plan;
+  const rooms = dayRooms(shaped, picks, slotExtras(s.entries, picks, offOn(s.ai_notes, t), t, { fast }), s.entries, { carry: carriesOver(s.profile?.data, t) });
   return {
     ...brief(plan), note: plan.note,
     previous: prev ? { start: prev.start, kcal: prev.kcal, adherence: (({ done, of }) => ({ done, of }))(adherence(s.ai_notes, s.entries, prev.start, addDays(plan.start, -1))) } : null,

@@ -1,5 +1,5 @@
 import { suite, test, eq, ok, near } from './harness.js';
-import { budgets, fitOption, buildPlan, optionBudget, planOn, previousPlan, planEnd, planDayNo, planOver, picksOn, dayAdherence, adherence, newFoods, goneFoods, optionText, swapItem, restoreItem, sameItems, swapSuggestions, swapsOn, dayPlan, offOn, slotExtras, slotRoom, dayRooms, shrinkOption, roomPlan, portionFor, portionsFor, SLOTS, maxKcal, maxQty, isFree, carriesOver, CARRY_MAX, optionAllowed, extraOption, rescalePlan, fastPlan, fastShape, fastOn } from '../js/domain/plan.js';
+import { budgets, fitOption, buildPlan, optionBudget, planOn, previousPlan, planEnd, planDayNo, planOver, picksOn, dayAdherence, adherence, newFoods, goneFoods, optionText, swapItem, restoreItem, sameItems, swapSuggestions, swapsOn, dayPlan, offOn, slotExtras, slotRoom, dayRooms, shrinkOption, roomPlan, portionFor, portionsFor, SLOTS, maxKcal, maxQty, isFree, carriesOver, CARRY_MAX, optionAllowed, extraOption, rescalePlan, fastPlan, fastShape, fastOn, lowsFor, swapAllowed } from '../js/domain/plan.js';
 
 const food = (id, unit, kcal, protein = 0, extra = {}) => ({ id, name: id, unit, kcal, protein, grams: 100, is_veg: false, created_at: '2026-01-01T00:00:00Z', ...extra });
 const FOODS = [
@@ -441,10 +441,76 @@ suite('plan round 2', () => {
     const es = [{ id: 'l', day, meal: 'lunch', kcal: opt.kcal + 400, created_at: 'x' }];
     const picks = { lunch: [{ o: opt.id, e: ['l'] }] };
     const none = { breakfast: [], snack1: [], lunch: [], snack2: [], dinner: [] };
-    let r = dayRooms(p, picks, none, es);
+    // breakfast and the morning snack eaten as planned: the later ones pay
+    const early = ['breakfast', 'snack1'];
+    const ate = early.map(k => ({ id: k, day, meal: SLOTS[k].meal, kcal: budgets(p.kcal)[k], created_at: k }));
+    early.forEach(k => { picks[k] = [{ o: `${k}-1`, e: [k] }]; });
+    let r = dayRooms(p, picks, none, [...es, ...ate]);
     ok(r.lunch.passed > 0 && r.dinner.owed > 0, 'carried on');
     es[0].kcal = opt.kcal + 40;
-    r = dayRooms(p, picks, none, es);
+    r = dayRooms(p, picks, none, [...es, ...ate]);
     eq(r.dinner.owed, 0);
+  });
+
+  test('a skipped earlier meal pays for an over-full later one before the next meals are cut', () => {
+    const p = buildPlan(raw(), BANK, 2000, '2026-02-01');
+    const b = budgets(p.kcal);
+    const day = '2026-02-03';
+    const big = { id: 'l', day, meal: 'lunch', kcal: b.lunch + 300, created_at: 'x' };
+    const none = { breakfast: [], snack1: [], lunch: [big], snack2: [], dinner: [] };
+    let r = dayRooms(p, {}, none, [big]);
+    eq([r.snack2.owed, r.dinner.owed, r.lunch.passed], [0, 0, 300]);
+    near(r.breakfast.back + r.snack1.back, 300, 2);
+    ok(r.breakfast.back > r.snack1.back, 'by what each has left');
+    // more than they have left: the rest goes on to the later ones, within the limit
+    big.kcal = b.lunch + b.breakfast + b.snack1 + 200;
+    r = dayRooms(p, {}, none, [big]);
+    eq([r.breakfast.left, r.snack1.left], [0, 0]);
+    near(r.snack2.owed + r.dinner.owed, 200, 2);
+  });
+
+  test('at the safety floor even the smallest choice of every occasion adds up to the floor', () => {
+    eq([lowsFor(2000, 1200), lowsFor(1200, 0)], [null, null]);
+    const l = lowsFor(1200, 1200);
+    eq([l.snack1, l.snack2], [0.85, 0.85]);
+    near(l.lunch, (1200 - 240 * 0.85) / 960, 0.001);
+    const day = p => Object.values(p.slots).filter(sl => sl.pick > 0).reduce((t, sl) => t + Math.min(...sl.options.map(x => x.kcal)) * sl.pick, 0);
+    const before = buildPlan(raw(), BANK, 1200, '2026-02-01', null, { partial: true });
+    const p = buildPlan(raw(), BANK, 1200, '2026-02-01', null, { floor: 1200, partial: true });
+    eq([p.missing, p.floor], [[], 1200]);
+    ok(day(before) < 1200, `without the rule the day could be ${day(before)}`);
+    ok(day(p) >= 1200, `day ${day(p)}`);
+    // far above the floor nothing changes
+    eq(buildPlan(raw(), BANK, 2000, '2026-02-01', null, { floor: 1200 }).low, undefined);
+    // refitted down to the floor, the new limits hold
+    const q = buildPlan(raw(), BANK, 1500, '2026-02-01');
+    const down = rescalePlan(q, 1200, by, { floor: 1200 });
+    if (down) { eq(down.floor, 1200); ok(day(down) >= 1200, `refitted day ${day(down)}`); }
+    // and a fasting day of a plan at the floor
+    const fp = fastPlan({ ...p, start: '2027-02-01' }, by);
+    if (['breakfast', 'snack2', 'dinner'].every(k => fp.slots[k].options.length)) ok(day(fp) >= 1200, `fasting day ${day(fp)}`);
+  });
+
+  test('kidney disease: the protein limit holds when the plan is refitted, a food swapped, or a fasting day', () => {
+    const p = buildPlan(raw(), BANK, 2000, '2026-02-01');
+    const rules = { protein: 59, proteinMax: true };
+    const up = rescalePlan(p, 2600, by, rules);
+    if (up) for (const k of ['breakfast', 'lunch', 'dinner']) ok(up.slots[k].options.every(x => optionAllowed(x, k, up.slots[k].pick, { ...rules, kcal: 2600 })), k);
+    else ok(true, 'too few left: a new plan is asked for');
+    const lunch = p.slots.lunch.options[0];
+    const chicken = swapItem(lunch, 0, by.get('ch'), lunch.kcal); // rice → chicken, all protein
+    eq(swapAllowed(chicken, 'lunch', p, rules), chicken.protein <= 1.5 * 59 * 0.3);
+    eq(swapAllowed(chicken, 'lunch', p, {}), true);
+    const fp = fastPlan(p, by, rules);
+    ok(fp.slots.breakfast.options.every(x => x.protein <= 1.5 * 59 * 0.4), 'سحری within its share');
+  });
+
+  test('a fasting day: a snack before noon was سحری, any later افطار', () => {
+    const day = '2027-02-10';
+    const at = h => new Date(2027, 1, 10, h).toISOString();
+    const es = [{ id: 's', day, meal: 'snack', kcal: 200, created_at: at(4) }, { id: 'i', day, meal: 'snack', kcal: 150, created_at: at(18) }];
+    const x = slotExtras(es, {}, {}, day, { fast: true });
+    eq([x.breakfast.map(e => e.id), x.snack1, x.snack2.map(e => e.id)], [['s'], [], ['i']]);
+    eq(slotExtras(es, {}, {}, day).snack1.map(e => e.id), ['s']);
   });
 });
