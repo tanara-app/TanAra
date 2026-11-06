@@ -29,7 +29,11 @@ one needs to know goes in this file or in the project docs, not only in your own
 - For `ClaudeAccount` git reports "dubious ownership". Run git as `git -c safe.directory='*' …` instead of
   changing the global git config.
 - Both Claudes work directly in this shared folder (no other copy). The dev server is `tanara-static`
-  in `.claude/launch.json` (port 5173); both accounts use it.
+  in `.claude/launch.json` (port 5173); both accounts use it. Open it at `http://127.0.0.1:5173`,
+  never `localhost:5173`: an old `http.server 5173` without `--bind` (started on 2026-10-30 from
+  `m.b.a`, from another folder) answered `localhost` with 404 for every page. If "Port in use"
+  comes up, the server is probably already running under the other account; just navigate to
+  `127.0.0.1:5173`.
 - Tests: `node tests/run.js` (or open `tests/index.html` in the browser).
 - The user speaks Persian; answer in Persian.
 
