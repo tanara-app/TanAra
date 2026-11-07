@@ -1,69 +1,92 @@
 /*
-  Magazine: one article a week (Saturday → Friday) that Hooshvareh researches with real web search (trusted
-  health sources only — the list is MAG_DOMAINS in the Edge Function) and writes for this
-  person. Articles are ai_notes: 'mag:<day>' for the weekly one, 'mag:<day>:<n>' for one
-  asked for by topic (it then takes that week's place); everything shown is in note.data.
+  Magazine: one article a week (Saturday → Friday) for everyone in the app. The `magazine` Edge
+  Function writes it on Saturday morning with real web search (trusted health sources only:
+  MAG_DOMAINS there) and keeps it in the shared `magazine` table; `remind` pushes it to every
+  device with notifications on. Shared, it costs one article a week in all, not one per person,
+  so it is general: what it means for each person is a question to Hooshvareh in the chat.
+  The app copies each ready article into its own ai_notes as 'mag:<week>:all' (read state and
+  the chat's view of the magazine work from there). Older personal articles ('mag:<day>' and
+  'mag:<day>:<n>', from before the magazine was shared) stay in the list. The owner
+  (usage_members.admin) can write the week's article before Saturday's run, optionally on a topic.
 */
 import * as store from '../data/store.js';
-import { ask, aiAvailable, aiOnline, md, sparkle, focusArticle } from '../ai/hooshvareh.js';
-import { today, parse, relLabel, weekStart, addDays, faFull } from '../lib/dates.js';
+import { aiAvailable, aiOnline, authToken, md, sparkle, focusArticle } from '../ai/hooshvareh.js';
+import { SUPABASE_URL, SUPABASE_KEY } from '../config.js';
+import { today, relLabel, weekStart, addDays, faFull } from '../lib/dates.js';
 import { fa, esc } from '../lib/fa.js';
 import { toast, sheet, icon } from './dom.js';
 import { startChat } from './chat.js';
 import { dismissed, dismiss } from './notices.js';
 
+const URL_ = `${SUPABASE_URL}/functions/v1/magazine`;
 const CATS = {
   nutrition: 'تغذیه', activity: 'ورزش و تحرک', sleep_stress: 'خواب و استرس', habits: 'روان‌شناسی عادت',
   myths: 'باورهای رایج', body: 'بدن و متابولیسم', practical: 'زندگی روزمره', maintain: 'نگه داشتن وزن',
 };
 const EVIDENCE = { strong: 'شواهد قوی', moderate: 'شواهد متوسط', limited: 'شواهد محدود' };
+const PULL_EVERY = 15 * 60e3;
 
-const busy = new Map();   // note key → topic asked for ('' for the weekly one)
-const failed = new Map(); // note key → error message; the weekly one then waits for a manual retry
-let openKey = null;       // article to open as soon as the tab is shown
+let openKey = null;     // article to open as soon as the tab is shown
+let pulledAt = 0, pulling = null;
+let owner = null;       // can this account write the week's article early (null: not asked yet)
+let writing = null;     // the topic ('' for none) while the owner's request runs
+let failure = null;     // what went wrong with the owner's last request
 
 const articles = () => store.get().ai_notes.filter(n => n.kind === 'mag' && n.data?.title).sort((a, b) => (a.key < b.key ? 1 : -1));
 const dayOf = n => n.key.slice(4, 14);
-const dailyKey = () => `mag:${today()}`;
-// the section of the week rotates through the categories
-const categoryFor = day => Object.keys(CATS)[Math.round(parse(weekStart(day)).getTime() / 6048e5) % Object.keys(CATS).length];
-
-// At most one article a week, whether it wrote itself or was asked for by topic (about four a month).
+const sharedKey = week => `mag:${week}:all`;
 const weekArticle = () => articles().find(n => dayOf(n) >= weekStart(today()));
-const weekTaken = () => !!weekArticle() || busy.size > 0;
+const sharedThisWeek = () => !!store.note(sharedKey(weekStart(today())));
 const nextWeek = () => faFull(addDays(weekStart(today()), 7));
 
-async function generate(key, topic, refresh, quiet = false) {
-  if (weekTaken()) return;
-  busy.set(key, topic);
-  failed.delete(key);
+// Copies the shared articles this app doesn't have yet into ai_notes, unread. After the first
+// pull, so another device's copy (and its read mark) isn't overwritten.
+function pullShared(refresh, force = false) {
+  if (pulling) return pulling;
+  if (!aiOnline() || !store.syncStatus.lastPull || (!force && Date.now() - pulledAt < PULL_EVERY)) return Promise.resolve();
+  pulling = (async () => {
+    const rows = await store.sharedMagazine();
+    if (!rows) return;
+    pulledAt = Date.now();
+    let added = false;
+    for (const r of rows) {
+      const key = sharedKey(r.week);
+      if (store.note(key) || !r.data?.title) continue;
+      store.saveNote({ key, kind: 'mag', text: `${r.data.title} — ${r.data.summary || ''}`, data: { ...r.data, read: false } });
+      added = true;
+    }
+    if (added) refresh();
+  })().finally(() => { pulling = null; });
+  if (owner === null) store.isUsageAdmin().then(a => { owner = a; if (a) refresh(); });
+  return pulling;
+}
+
+// The owner writes this week's article now (Saturday's run then has nothing to do).
+async function writeNow(topic, refresh) {
+  writing = topic;
+  failure = null;
   refresh();
   try {
-    const r = await ask('magazine', { category: categoryFor(today()), topic, previous: articles().map(n => n.data.title) });
-    store.saveNote({ key, kind: 'mag', text: `${r.title} — ${r.summary}`, data: { ...r, read: false } });
+    const token = await authToken();
+    if (!token) throw new Error('دوباره وارد شو.');
+    let res;
+    try {
+      res = await fetch(URL_, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, apikey: SUPABASE_KEY },
+        body: JSON.stringify({ topic }),
+      });
+    } catch { throw new Error('به هوشواره وصل نشد. اینترنت را بررسی کن.'); }
+    const j = await res.json().catch(() => null);
+    if (!res.ok) throw new Error(j?.error && /[؀-ۿ]/.test(j.error) ? j.error : 'مقاله آماده نشد؛ دوباره امتحان کن.');
+    await pullShared(refresh, true);
   } catch (e) {
-    failed.set(key, e.message);
-    if (!quiet) toast(e.message);
+    failure = e.message;
+    toast(e.message);
   } finally {
-    busy.delete(key);
+    writing = null;
     refresh();
   }
-}
-
-// An article is the costliest thing Hooshvareh does (web searches and a long text), so the
-// weekly one stops writing itself while the last two weekly articles sit unread; it starts
-// again once one of them is opened, and the button writes this week's at any time.
-const UNREAD_PAUSE = 2;
-function paused() {
-  const daily = articles().filter(n => n.key.length === 14).slice(0, UNREAD_PAUSE);
-  return daily.length === UNREAD_PAUSE && daily.every(n => !n.data.read);
-}
-
-// Writes this week's article once, after the first pull (so another device's isn't duplicated).
-function autoDaily(refresh) {
-  const key = dailyKey();
-  if (weekTaken() || failed.has(key) || !aiOnline() || !store.syncStatus.lastPull || paused()) return;
-  generate(key, '', refresh, true);
 }
 
 const meta = n => `${CATS[n.data.category] || 'مجله'} · ${fa(Math.max(1, Number(n.data.minutes) || 3))} دقیقه`;
@@ -90,7 +113,7 @@ export function bindMag(root, refresh) {
     });
     bindSwipeAway(card, () => dismiss('mag', card.dataset.magOpen));
   }
-  autoDaily(refresh);
+  pullShared(refresh);
 }
 
 // Drag the teaser to the right and it slides off and fades; the article stays unread in the tab.
@@ -143,7 +166,7 @@ function bindSwipeAway(el, onGone) {
 
 const waiting = topic => `<section class="card ai-card">
   <p class="muted small ai-wait"><span class="typing"><i></i><i></i><i></i></span> ${topic ? `دارم درباره‌ی «${esc(topic)}» در منابع معتبر می‌گردم…` : 'دارم برای مقاله‌ی این هفته در منابع معتبر می‌گردم…'}</p>
-  <p class="muted small">جست‌وجو و نوشتن حدود یک دقیقه طول می‌کشد.</p>
+  <p class="muted small">جست‌وجو و نوشتن حدود یک دقیقه طول می‌کشد. بعد برای همه‌ی اعضا فرستاده می‌شود.</p>
 </section>`;
 
 function row(n, lead) {
@@ -157,33 +180,33 @@ function row(n, lead) {
 
 export function renderMagazine(root) {
   const list = articles();
-  const key = dailyKey();
   const ok = aiAvailable();
-  const free = !weekTaken();
+  const early = ok && owner && !sharedThisWeek() && writing === null;
 
   root.innerHTML = `
     <header class="page-head mag-head">
       <h1>مجله</h1>
-      <p class="muted small">هر هفته یک مقاله که هوشواره از منابع معتبر علمی جمع می‌کند و برای خودت می‌نویسد.</p>
+      <p class="muted small">هر هفته یک مقاله که هوشواره از منابع معتبر علمی جمع می‌کند و برای همه‌ی اعضای تن‌آرا می‌فرستد.</p>
     </header>
 
-    ${!ok ? '<div class="note soft"><p>مجله فقط وقتی وارد حساب شده‌ای ساخته می‌شود.</p></div>' : ''}
-    ${[...busy].map(([, topic]) => waiting(topic)).join('')}
-    ${ok && free ? `<section class="card">
-      <p class="muted small">${failed.get(key) ? esc(failed.get(key)) : navigator.onLine === false ? 'برای مقاله‌ی این هفته به اینترنت وصل شو.' : paused() ? 'دو مقاله‌ی آخر را هنوز نخوانده‌ای، برای همین مقاله‌ی این هفته خودکار نوشته نشد. هر وقت خواستی با این دکمه بنویسش، یا موضوعش را خودت بگو.' : 'مقاله‌ی این هفته هنوز آماده نشده.'}</p>
-      <button class="btn block" data-daily>مقاله‌ی این هفته را بنویس</button>
+    ${!ok ? '<div class="note soft"><p>مجله فقط وقتی وارد حساب شده‌ای می‌رسد.</p></div>' : ''}
+    ${writing !== null ? waiting(writing) : ''}
+    ${early ? `<section class="card">
+      <p class="muted small">${failure ? esc(failure) : 'مقاله‌ی این هفته هنوز نوشته نشده؛ شنبه صبح خودکار نوشته می‌شود. می‌توانی همین حالا بنویسی‌اش، یا موضوعش را خودت بگویی. هر دو برای همه‌ی اعضا فرستاده می‌شود.'}</p>
+      <button class="btn block" data-now>مقاله‌ی این هفته را همین حالا بنویس</button>
+      <button class="btn block ai-btn mag-ask" data-topic>${sparkle(18)} مقاله‌ی این هفته درباره‌ی موضوع دلخواه</button>
     </section>` : ''}
+    ${ok && !early && writing === null && !weekArticle() ? `<p class="muted small">مقاله‌ی این هفته هنوز نرسیده؛ هوشواره هر شنبه صبح یکی برای همه می‌نویسد.</p>` : ''}
 
-    ${list.map((n, i) => row(n, i === 0)).join('') || (busy.size || !ok ? '' : '<div class="empty">هنوز مقاله‌ای نیست.</div>')}
+    ${list.map((n, i) => row(n, i === 0)).join('') || (writing !== null || !ok ? '' : '<div class="empty">هنوز مقاله‌ای نیست.</div>')}
 
-    ${ok && free ? `<button class="btn block ai-btn mag-ask" data-topic>${sparkle(18)} مقاله‌ی این هفته درباره‌ی موضوع دلخواه</button>` : ''}
-    ${ok && !busy.size && weekArticle() ? `<p class="muted small mag-next">هر هفته یک مقاله؛ مقاله‌ی بعدی از ${nextWeek()}.</p>` : ''}`;
+    ${ok && writing === null && weekArticle() ? `<p class="muted small mag-next">هر هفته یک مقاله برای همه؛ مقاله‌ی بعدی از ${nextWeek()}.</p>` : ''}`;
 
   const refresh = () => { if (root.isConnected && location.hash === '#/mag') renderMagazine(root); };
   root.querySelectorAll('[data-open]').forEach(b => b.onclick = () => openArticle(b.dataset.open));
-  root.querySelector('[data-daily]')?.addEventListener('click', () => generate(key, '', refresh));
+  root.querySelector('[data-now]')?.addEventListener('click', () => writeNow('', refresh));
   root.querySelector('[data-topic]')?.addEventListener('click', () => askTopic(refresh));
-  autoDaily(refresh);
+  pullShared(refresh);
 
   if (openKey) { const k = openKey; openKey = null; openArticle(k); }
 }
@@ -194,7 +217,7 @@ function askTopic(refresh) {
       <div class="sheet-head"><h2>موضوع دلخواه</h2><button class="icon-btn" data-close aria-label="بستن">${icon.close}</button></div>
       <form class="stack" novalidate>
         <label class="field"><span>درباره‌ی چه چیزی بخوانی؟</span><textarea name="topic" rows="3" maxlength="300" placeholder="مثلاً: روزه‌داری متناوب واقعاً بهتر از رژیم معمولی است؟"></textarea></label>
-        <p class="muted small">هوشواره فقط در منابع معتبر (سازمان جهانی بهداشت، NIH، کاکرین، مجله‌های پزشکی و…) می‌گردد و لینک منبع‌ها را زیر مقاله می‌گذارد.</p>
+        <p class="muted small">هوشواره فقط در منابع معتبر (سازمان جهانی بهداشت، NIH، کاکرین، مجله‌های پزشکی و…) می‌گردد و لینک منبع‌ها را زیر مقاله می‌گذارد. مقاله برای همه‌ی اعضا فرستاده می‌شود، پس چیزی شخصی ننویس.</p>
         <button class="btn primary block">بنویس</button>
       </form>`;
     body.querySelector('[data-close]').onclick = () => sheet.close();
@@ -203,7 +226,7 @@ function askTopic(refresh) {
       const topic = e.target.elements.topic.value.trim();
       if (topic.length < 3) return toast('موضوع را بنویس');
       sheet.close();
-      generate(`mag:${today()}:${Date.now()}`, topic, refresh);
+      writeNow(topic, refresh);
     };
   });
 }
@@ -222,6 +245,7 @@ function openArticle(key) {
         <p class="mag-lede">${esc(d.summary || '')}</p>
         <div class="ai-text mag-body">${md(d.body, { headings: true })}</div>
         ${d.key_points?.length ? `<div class="mag-points"><b>خلاصه در سه خط</b><ul>${d.key_points.map(k => `<li>${esc(k)}</li>`).join('')}</ul></div>` : ''}
+        ${d.try_this ? `<div class="card ai-card mag-you"><div class="ai-card-h"><span class="ai-mark">${sparkle(16)}</span><b>این هفته امتحان کن</b></div><p>${esc(d.try_this)}</p></div>` : ''}
         ${d.for_you ? `<div class="card ai-card mag-you"><div class="ai-card-h"><span class="ai-mark">${sparkle(16)}</span><b>برای خودِ تو</b></div><p>${esc(d.for_you)}</p></div>` : ''}
         <div class="mag-sources">
           <b>منابع</b>

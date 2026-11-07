@@ -13,6 +13,8 @@
     weigh  at a chosen morning time, if the last weigh-in is `every` days old or more
            (the text also asks for the waist when that is two weeks old, and is warmer after
            a long gap: stopping weighing is how regain usually starts)
+    mag    the week's shared magazine article (table magazine), once per device, between 9:00
+           and 22:00, to everyone with a subscription
   Times are in the person's own time zone (reminders.tz). The texts are fixed: no AI call.
 
   Deployed with verify_jwt off: the cron call carries no JWT, so each path checks its own
@@ -176,22 +178,33 @@ async function latest(table: string, user: string) {
   return data?.[0]?.day as string | undefined;
 }
 
+// This week's magazine article (table magazine, written by the `magazine` function), once it is
+// ready: everyone gets it, whether or not they turned the other reminders on.
+async function newArticle(): Promise<(Note & { week: string }) | null> {
+  const week = (() => { const d = localNow("Asia/Tehran").day; return addDays(d, -((new Date(d + "T12:00:00Z").getUTCDay() + 1) % 7)); })();
+  const { data } = await admin.from("magazine").select("week,data").eq("week", week).eq("status", "ready").maybeSingle();
+  const title = String(data?.data?.title || "");
+  return title ? { week, tag: "mag", url: "./#/mag", title: "مقاله‌ی این هفته‌ی مجله", body: title } : null;
+}
+
 async function runDue(k: Keys) {
   const { data: subs, error } = await admin.from("push_subs").select("*");
   if (error) throw error;
   const byUser = new Map<string, Sub[]>();
   for (const s of (subs || []) as Sub[]) (byUser.get(s.user_id) || byUser.set(s.user_id, []).get(s.user_id)!).push(s);
   let sent = 0;
+  const mag = await newArticle();
 
   for (const [user, list] of byUser) {
     const { data: prof } = await admin.from("profile").select("data").eq("user_id", user).maybeSingle();
     const data = prof?.data as any;
     const r = data?.reminders;
-    if (!r) continue;
-    const now = localNow(String(r.tz || "Asia/Tehran"));
+    const now = localNow(String(r?.tz || "Asia/Tehran"));
     const notes: Record<string, Note> = {};
+    // the week's shared magazine article, once per device, in the day (not at night)
+    if (mag && now.min >= 9 * 60 && now.min < 22 * 60) notes.mag = mag;
 
-    if (r.log?.on && inWindow(now.min, minutes(r.log.at, 21 * 60)) && !(await lightOn(data, user, now.day))) {
+    if (r?.log?.on && inWindow(now.min, minutes(r.log.at, 21 * 60)) && !(await lightOn(data, user, now.day))) {
       const { data: rows } = await admin.from("entries").select("meal").eq("user_id", user).eq("day", now.day);
       const meals = new Set((rows || []).map(x => x.meal)).size;
       if (meals < 2) notes.log = {
@@ -199,7 +212,7 @@ async function runDue(k: Keys) {
         body: meals ? "ثبت امروزت هنوز کامل نیست. بقیه‌ی چیزهایی که خوردی را هم اضافه کن؛ یک دقیقه بیشتر وقت نمی‌گیرد." : "امروز هنوز چیزی ثبت نکرده‌ای. همین حالا بنویس چه خوردی؛ دو دقیقه بیشتر وقت نمی‌گیرد.",
       };
     }
-    if (r.weigh?.on && inWindow(now.min, minutes(r.weigh.at, 8 * 60))) {
+    if (r?.weigh?.on && inWindow(now.min, minutes(r.weigh.at, 8 * 60))) {
       const every = Math.max(1, Number(r.weigh.every) || 7);
       const lastW = await latest("weights", user);
       if (!lastW || daysBetween(now.day, lastW) >= every) {
@@ -216,12 +229,14 @@ async function runDue(k: Keys) {
     }
 
     for (const [kind, note] of Object.entries(notes)) {
+      // the magazine is marked with its week, the reminders with the day
+      const mark = kind === "mag" ? mag!.week : now.day;
       for (const sub of list) {
-        if (sub.sent?.[kind] === now.day) continue;
+        if (sub.sent?.[kind] === mark) continue;
         const status = await push(sub, note, k);
         if (status >= 200 && status < 300) {
           sent++;
-          sub.sent = { ...(sub.sent || {}), [kind]: now.day };
+          sub.sent = { ...(sub.sent || {}), [kind]: mark };
           await admin.from("push_subs").update({ sent: sub.sent }).eq("endpoint", sub.endpoint);
         }
       }

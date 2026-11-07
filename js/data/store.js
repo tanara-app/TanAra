@@ -539,6 +539,14 @@ export async function shareDecide(food, share, fields = {}, targets = []) {
     return res.error ? { error: res.error } : { made: res.data };
   } catch (e) { return { error: { message: String(e) } }; }
 }
+// The shared magazine's ready articles ({ week, data }, newest first), or null when they can't be read.
+export async function sharedMagazine() {
+  if (!remote) return null;
+  try {
+    const res = await remote.magazine();
+    return res && !res.error ? res.data : null;
+  } catch { return null; }
+}
 // Every member's rows (with user_id and name) since an ISO time, or null.
 export async function aiUsageAll(since) {
   if (!remote) return null;

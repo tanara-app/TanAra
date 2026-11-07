@@ -147,5 +147,9 @@ export function createSupabaseRemote(sb) {
     shareDecide(food, share, fields, targets) {
       return sb.rpc('food_share_decide', { food, share, fields, targets });
     },
+    // The shared weekly magazine (20261108_magazine_shared.sql): the finished articles, newest first.
+    magazine() {
+      return sb.from('magazine').select('week,data').eq('status', 'ready').order('week', { ascending: false }).limit(60);
+    },
   };
 }
