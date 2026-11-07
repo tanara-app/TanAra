@@ -502,6 +502,8 @@ export function importData(obj) {
 // Neither is part of the synced state: a subscription belongs to one browser, and the usage
 // rows are written by the Edge Function and only read here when the person asks.
 export const canPush = () => !!remote;
+export const sendFeedback = (report, blobs) => (remote ? remote.sendFeedback(report, blobs) : Promise.resolve({ error: { message: 'local' } }));
+export const myFeedback = () => (remote ? remote.myFeedback() : Promise.resolve({ data: [] }));
 export const savePush = sub => (remote ? remote.savePush(sub) : Promise.resolve({ error: { message: 'local' } }));
 export const removePush = endpoint => (remote ? remote.removePush(endpoint) : Promise.resolve({}));
 // Rows of ai_usage since an ISO time, or null when they can't be read.

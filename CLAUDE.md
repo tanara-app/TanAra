@@ -16,7 +16,9 @@ So at the start of every session:
 2. Run `git status`. Uncommitted or untracked files may be the other Claude's unfinished work.
    Don't edit, commit or delete them unless the user says so; ask first.
 3. Read `HOOSHVAREH.md` for the current feature list before adding or changing anything.
-4. Commit only the files you changed, never `git add -A`. Before pushing, fetch again and merge or rebase
+4. Check for new user reports (bugs, complaints, ideas sent from «نمایه» ← «گزارش خرابی و انتقاد») and show
+   them to the user before anything else, as `FEEDBACK.md` says. Mark the ones you showed as `seen`.
+5. Commit only the files you changed, never `git add -A`. Before pushing, fetch again and merge or rebase
    if `origin/main` moved.
 
 Memory files under `~/.claude/` are per account, so the other Claude can't see yours. Anything the other
@@ -33,7 +35,8 @@ one needs to know goes in this file or in the project docs, not only in your own
   never `localhost:5173`: an old `http.server 5173` without `--bind` (started on 2026-10-30 from
   `m.b.a`, from another folder) answered `localhost` with 404 for every page. If "Port in use"
   comes up, the server is probably already running under the other account; just navigate to
-  `127.0.0.1:5173`.
+  `127.0.0.1:5173`. On 2026-11-08 `127.0.0.1:5173` itself answered 404 for every page (another
+  folder's server); then use `tanara-5180` (`http://127.0.0.1:5180`).
 - Tests: `node tests/run.js` (or open `tests/index.html` in the browser).
 - The user speaks Persian; answer in Persian.
 
@@ -43,6 +46,7 @@ one needs to know goes in this file or in the project docs, not only in your own
   tested in `tests/`), `js/data/` (local store and Supabase sync), `sw.js` (service worker).
 - `supabase/`: migrations and the Edge Functions `hooshvareh` (the AI assistant, Claude via Anthropic API)
   and `remind` (push reminders).
+- `FEEDBACK.md`: how to read users' reports (table `feedback`, photos via `tools/feedback-photos.mjs`).
 - `HOOSHVAREH.md`: everything the AI assistant and the app do. Keep it up to date with every new feature.
 - `VOICE.md` / `ELEVENLABS.md`: the mascot Heimerdinger's lines and the brief for recording them
   (files in `audio/mascot/`). If a line changes in `js/ui/mascot.js`, update both.

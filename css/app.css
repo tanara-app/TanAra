@@ -884,3 +884,16 @@ body.kb .toast, body.chat-mode .toast { bottom: calc(var(--nav-h) + var(--safe-b
 @keyframes party-in { from { opacity: 0; } }
 @keyframes party-hop { 25% { transform: translateY(-22px) rotate(-5deg); } 50% { transform: none; } 75% { transform: translateY(-14px) rotate(5deg); } }
 @media (prefers-reduced-motion: reduce) { .party, .party-face { animation: none; } }
+
+/* «گزارش خرابی و انتقاد» (profile) */
+.fb-shots img { width: 64px; height: 64px; border-radius: 12px; object-fit: cover; display: block; }
+.fb-shots .shot-more { width: 64px; height: 64px; display: grid; place-items: center; }
+.fb-list { display: grid; }
+.fb-item { padding: 10px 0; border-bottom: 1px solid var(--line); }
+.fb-item:last-child { border-bottom: 0; }
+.fb-item .row { align-items: center; gap: 8px; }
+.fb-item b { font-size: .85rem; font-weight: 600; }
+.fb-item p { margin: 4px 0 0; font-size: .9rem; white-space: pre-line; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.fb-item .fb-ans { color: var(--accent); }
+.fb-st { flex: none; font-size: .75rem; padding: 2px 9px; border-radius: 999px; background: var(--surface-2); color: var(--muted); }
+.fb-st.st-planned, .fb-st.st-done { background: var(--accent-soft); color: var(--accent); }

@@ -108,6 +108,25 @@ export function createSupabaseRemote(sb) {
       return sb.from('push_subs').delete().eq('endpoint', endpoint);
     },
 
+    // «گزارش خرابی و انتقاد»: photos first (private `feedback` bucket, under <user id>/<report id>/),
+    // then the row. Straight to the server, not through the offline queue.
+    async sendFeedback({ kind, body, context }, blobs) {
+      const { data: { session } } = await sb.auth.getSession();
+      if (!session) return { error: { message: 'no session' } };
+      const id = crypto.randomUUID();
+      const images = [];
+      for (const [i, blob] of blobs.entries()) {
+        const path = `${session.user.id}/${id}/${i + 1}.jpg`;
+        const { error } = await sb.storage.from('feedback').upload(path, blob, { contentType: 'image/jpeg' });
+        if (error) return { error };
+        images.push(path);
+      }
+      return sb.from('feedback').insert({ id, kind, body, context, images });
+    },
+    myFeedback() {
+      return sb.from('feedback').select('id,kind,body,images,status,answer,created_at').order('created_at', { ascending: false }).limit(30);
+    },
+
     // What Hooshvareh's calls used since an ISO time (rows written by the Edge Function).
     usage(since) {
       return sb.from('ai_usage').select('at,mode,input,cache_read,cache_write,output,searches').gte('at', since).order('at').limit(5000);

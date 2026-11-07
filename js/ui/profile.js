@@ -17,6 +17,7 @@ import { openShopping, shoppingLine } from './shopping.js';
 import { aiAvailable } from '../ai/hooshvareh.js';
 import { THEMES, getTheme, setTheme } from './theme.js';
 import { MODES, buddyMode, setBuddyMode } from './mascot.js';
+import { openFeedback, feedbackLine } from './feedback.js';
 
 let session = { email: null, signOut: null, local: true };
 export const setSession = s => { session = s; };
@@ -49,6 +50,7 @@ const ICON = {
   bell: svg('<path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M10 21h4"/>'),
   theme: svg('<circle cx="12" cy="12" r="8.5"/><path d="M12 3.5v17a8.5 8.5 0 0 0 0-17z" fill="currentColor"/>'),
   data: svg('<ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/>'),
+  report: svg('<path d="M5 21V4"/><path d="M5 4h12l-2.5 4.5L17 13H5"/>'),
   account: svg('<circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M17 6l3 3M15 8l2 2"/>'),
 };
 const row = (attr, ic, title, sub) => `<button class="set-row" ${attr}><i class="set-ic">${ICON[ic]}</i><span class="grow"><b>${title}</b>${sub ? `<small class="muted">${sub}</small>` : ''}</span>${icon.chevL}</button>`;
@@ -91,6 +93,8 @@ export function renderProfile(root) {
     ${group('تنظیمات', `
       ${row('data-reminders', 'bell', 'یادآورها', remindersLine())}
       ${row('data-theme', 'theme', 'ظاهر', THEMES.find(t => t.value === getTheme()).label)}`)}
+    ${group('پشتیبانی', `
+      ${row('data-feedback', 'report', 'گزارش خرابی و انتقاد', feedbackLine())}`)}
     ${group('حساب و داده‌ها', `
       ${row('data-data', 'data', 'داده‌ها و پشتیبان', 'خروجی و برگرداندن')}
       ${row('data-account', 'account', 'حساب', session.local ? 'حالت آزمایشی محلی' : `${esc(session.email || '')}${st.pending ? ` · ${fa(st.pending)} تغییر در صف` : ''}`)}`)}
@@ -118,6 +122,7 @@ export function renderProfile(root) {
     const v = await choose('جمله‌ها و صدای هوشواره', MODES, buddyMode());
     if (v) { setBuddyMode(v); renderProfile(root); }
   };
+  root.querySelector('[data-feedback]').onclick = openFeedback;
   root.querySelector('[data-data]').onclick = openData;
   root.querySelector('[data-account]').onclick = openAccount;
 }
