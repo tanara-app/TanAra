@@ -14,6 +14,7 @@ import './shopping.test.js';
 import './barcode.test.js';
 import './drift.test.js';
 import './health.test.js';
+import './foodMatch.test.js';
 
 const results = await run();
 const failed = results.filter(r => !r.ok);

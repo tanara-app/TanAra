@@ -902,3 +902,9 @@ body.kb .toast, body.chat-mode .toast { bottom: calc(var(--nav-h) + var(--safe-b
 .fb-item .fb-ans { color: var(--accent); }
 .fb-st { flex: none; font-size: .75rem; padding: 2px 9px; border-radius: 999px; background: var(--surface-2); color: var(--muted); }
 .fb-st.st-planned, .fb-st.st-done { background: var(--accent-soft); color: var(--accent); }
+
+/* «غذاهای تازه‌ی خانواده» (owner only) */
+.share-item { display: flex; flex-direction: column; gap: 3px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.share-item:last-child { border-bottom: 0; }
+.share-item .row { margin-top: 6px; }
+.share-like { color: var(--accent); font-size: .8rem; }

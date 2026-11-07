@@ -139,5 +139,13 @@ export function createSupabaseRemote(sb) {
     usageAll(since) {
       return sb.rpc('ai_usage_all', { since });
     },
+    // «غذاهای تازه‌ی خانواده», the owner only (20261108_food_share.sql): every member's foods,
+    // and one decision: send a food (with the owner's corrections) to these members, or keep it out.
+    shareFoods() {
+      return sb.rpc('food_share_all');
+    },
+    shareDecide(food, share, fields, targets) {
+      return sb.rpc('food_share_decide', { food, share, fields, targets });
+    },
   };
 }

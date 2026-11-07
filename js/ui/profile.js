@@ -13,6 +13,7 @@ import { openMotivationList } from './motivation.js';
 import { phaseCard, bindPhase } from './phase.js';
 import { remindersLine, bindReminders } from './reminders.js';
 import { openUsage } from './usage.js';
+import { shareAdmin, shareLine, checkShare, openFoodShare } from './foodShare.js';
 import { openShopping, shoppingLine } from './shopping.js';
 import { aiAvailable } from '../ai/hooshvareh.js';
 import { THEMES, getTheme, setTheme } from './theme.js';
@@ -43,6 +44,7 @@ const svg = d => `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" st
 const ICON = {
   me: svg('<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>'),
   mots: svg('<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/>'),
+  share: svg('<circle cx="7" cy="8" r="3"/><circle cx="17" cy="8" r="3"/><path d="M2 20a5 5 0 0 1 10 0M12 20a5 5 0 0 1 10 0"/>'),
   bank: svg('<path d="M3 11h18a9 9 0 0 1-18 0z"/><path d="M8 7c0-1.5 1-2 1-3.5M12 7c0-1.5 1-2 1-3.5M16 7c0-1.5 1-2 1-3.5"/>'),
   cart: svg('<circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2.5 3.5h3l2.4 11.2a1.5 1.5 0 0 0 1.5 1.2h8.3a1.5 1.5 0 0 0 1.5-1.1L21 8H6.6"/>'),
   voice: svg('<path d="M4 5h16v11H9l-5 4z"/><path d="M9 10.5h6"/>'),
@@ -86,6 +88,7 @@ export function renderProfile(root) {
       ${row('data-mots', 'mots', 'انگیزه‌ها', s.motivations.length ? `${fa(s.motivations.length)} مورد` : 'هنوز خالی')}`)}
     ${group('ابزارها', `
       ${row('data-bank', 'bank', 'بانک غذا', `${fa(s.foods.length)} غذا`)}
+      ${shareAdmin() ? row('data-share', 'share', 'غذاهای تازه‌ی خانواده', shareLine()) : ''}
       ${row('data-shopping', 'cart', 'لیست خرید', shoppingLine())}`)}
     ${group('هوشواره', `
       ${row('data-mascot', 'voice', 'جمله‌ها و صدای هوشواره', MODES.find(m => m.value === buddyMode()).label)}
@@ -113,6 +116,10 @@ export function renderProfile(root) {
   bindReminders(root);
   root.querySelector('[data-usage]')?.addEventListener('click', openUsage);
   root.querySelector('[data-bank]').onclick = () => openFoodBank();
+  // the owner only: is it them, and how many members' foods wait (asked once, then on each close)
+  const again = () => { if (root.isConnected) renderProfile(root); };
+  checkShare(again);
+  root.querySelector('[data-share]')?.addEventListener('click', () => openFoodShare(() => checkShare(again, true)));
   root.querySelector('[data-shopping]').onclick = () => openShopping();
   root.querySelector('[data-theme]').onclick = async () => {
     const t = await choose('ظاهر', THEMES, getTheme());

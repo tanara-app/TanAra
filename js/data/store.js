@@ -523,6 +523,22 @@ export async function isUsageAdmin() {
     return !!(res && !res.error && res.data);
   } catch { return false; }
 }
+// «غذاهای تازه‌ی خانواده» (owner only): every member's foods, or null when they can't be read.
+export async function shareFoods() {
+  if (!remote) return null;
+  try {
+    const res = await remote.shareFoods();
+    return res && !res.error ? res.data : null;
+  } catch { return null; }
+}
+// { made } copies, or { error }. Straight to the server; the copies reach each bank on its next pull.
+export async function shareDecide(food, share, fields = {}, targets = []) {
+  if (!remote) return { error: { message: 'local' } };
+  try {
+    const res = await remote.shareDecide(food, share, fields, targets);
+    return res.error ? { error: res.error } : { made: res.data };
+  } catch (e) { return { error: { message: String(e) } }; }
+}
 // Every member's rows (with user_id and name) since an ISO time, or null.
 export async function aiUsageAll(since) {
   if (!remote) return null;
