@@ -46,3 +46,17 @@ one needs to know goes in this file or in the project docs, not only in your own
 - `HOOSHVAREH.md`: everything the AI assistant and the app do. Keep it up to date with every new feature.
 - `VOICE.md` / `ELEVENLABS.md`: the mascot Heimerdinger's lines and the brief for recording them
   (files in `audio/mascot/`). If a line changes in `js/ui/mascot.js`, update both.
+
+## Sensitive data never goes in git
+
+The GitHub repo is public. Users' emails, names, family relations, health data, API keys, tokens,
+passwords and service_role keys must never go in a tracked file, a commit message, a PR or anything
+pushed. Keep them in git-ignored, permission-restricted files (`.claude/private/`) or in Supabase
+secrets, and check the diff for them before every commit.
+
+## App users (private)
+
+Who each account in the app is lives in `.claude/private/USERS.md`, readable only by `m.b.a` and
+`ClaudeAccount` and ignored by git. Read it when you need to know who a user is. Never copy its
+contents into a tracked file, a commit, the app, or anything published. When a new account shows up
+in `auth.users`, ask the user who it is and add a row there.
