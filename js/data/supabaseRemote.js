@@ -147,6 +147,13 @@ export function createSupabaseRemote(sb) {
     shareDecide(food, share, fields, targets) {
       return sb.rpc('food_share_decide', { food, share, fields, targets });
     },
+    // every account, with its name and when it joined; and the shared foods a newer one is missing
+    shareMembers() {
+      return sb.rpc('food_share_members');
+    },
+    shareCatchUp(member, foods) {
+      return sb.rpc('food_share_catch_up', { member, foods });
+    },
     // The shared weekly magazine (20261108_magazine_shared.sql): the finished articles, newest first.
     magazine() {
       return sb.from('magazine').select('week,data').eq('status', 'ready').order('week', { ascending: false }).limit(60);

@@ -1,5 +1,5 @@
 import { suite, test, eq } from './harness.js';
-import { words, foodKey, similar, similarIn } from '../js/domain/foodMatch.js';
+import { words, foodKey, similar, similarIn, missingFor } from '../js/domain/foodMatch.js';
 
 const f = (name, o = {}) => ({ id: name, name, barcode: null, ...o });
 
@@ -36,5 +36,18 @@ suite('food match', () => {
   test('a food is not similar to itself in its own bank', () => {
     const a = f('زیتون');
     eq(similarIn(a, [a, f('زیتون پرورده'), f('گردو')]).map(x => x.name), ['زیتون پرورده']);
+  });
+
+  test('a member who joined later misses the foods shared before, unless they have one like it', () => {
+    const at = (d, o) => ({ ...f(o.name), user_id: o.user_id, decision: o.decision, decided_at: d });
+    const all = [
+      at('2026-11-01T10:00:00Z', { name: 'گلابی', user_id: 'mom', decision: 'shared' }),
+      at('2026-11-01T10:00:00Z', { name: 'مربای آلبالو', user_id: 'mom', decision: 'shared' }),
+      at('2026-11-01T10:00:00Z', { name: 'زیتون', user_id: 'mom', decision: 'declined' }),
+      at('2026-11-09T10:00:00Z', { name: 'صمون', user_id: 'mom', decision: 'shared' }),
+      at(null, { name: 'مربا آلبالو', user_id: 'dad', decision: null }),
+    ];
+    eq(missingFor({ id: 'dad', joined: '2026-11-07T00:00:00Z' }, all).map(x => x.name), ['گلابی']);
+    eq(missingFor({ id: 'mom', joined: '2026-10-01T00:00:00Z' }, all), []);
   });
 });

@@ -547,6 +547,22 @@ export async function sharedMagazine() {
     return res && !res.error ? res.data : null;
   } catch { return null; }
 }
+// Every account as { user_id, name, joined }, or null.
+export async function shareMembers() {
+  if (!remote) return null;
+  try {
+    const res = await remote.shareMembers();
+    return res && !res.error ? res.data : null;
+  } catch { return null; }
+}
+// Copy foods already shared with everyone into one member's bank: { made } or { error }.
+export async function shareCatchUp(member, foods) {
+  if (!remote) return { error: { message: 'local' } };
+  try {
+    const res = await remote.shareCatchUp(member, foods);
+    return res.error ? { error: res.error } : { made: res.data };
+  } catch (e) { return { error: { message: String(e) } }; }
+}
 // Every member's rows (with user_id and name) since an ISO time, or null.
 export async function aiUsageAll(since) {
   if (!remote) return null;

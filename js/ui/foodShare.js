@@ -12,7 +12,7 @@ import { fa, esc, parseNum } from '../lib/fa.js';
 import { iso, faDMY } from '../lib/dates.js';
 import { sheet, toast, icon } from './dom.js';
 import { foodMeta } from './units.js';
-import { foodKey, similarIn } from '../domain/foodMatch.js';
+import { foodKey, similarIn, missingFor } from '../domain/foodMatch.js';
 
 const SEED = new Set(SEED_FOODS.map(f => foodKey(f.name)));
 const WAIT = '<p class="muted small ai-wait"><span class="typing"><i></i><i></i><i></i></span> در حال خواندن…</p>';
@@ -20,6 +20,7 @@ const WAIT = '<p class="muted small ai-wait"><span class="typing"><i></i><i></i>
 let admin = null; // null: not asked yet on this device session
 let waiting = null; // how many foods wait, once read
 let asking = null;
+let people = []; // every account: { id, name, joined }
 
 export const shareAdmin = () => admin === true;
 export const shareLine = () => (waiting == null ? 'غذاهای اعضا، برای بانک همه' : waiting ? `${fa(waiting)} غذا منتظر تأیید` : 'غذای تازه‌ای نیست');
@@ -30,11 +31,18 @@ export function checkShare(onChange, again = false) {
   asking = (async () => {
     const was = [admin, waiting];
     if (admin == null) admin = await store.isUsageAdmin();
-    if (admin) { const all = await store.shareFoods(); waiting = all ? pending(all).length : null; }
+    if (admin) {
+      const [all, ms] = await Promise.all([store.shareFoods(), store.shareMembers()]);
+      if (ms) people = ms.map(m => ({ id: m.user_id, name: m.name, joined: m.joined }));
+      waiting = all ? pending(all).length + (ms ? newcomers(all).length : 0) : null;
+    }
     asking = null;
     if (was[0] !== admin || was[1] !== waiting) onChange?.();
   })();
 }
+
+// Members who joined after foods were shared and are missing some of them.
+const newcomers = all => people.map(m => ({ m, miss: missingFor(m, all) })).filter(x => x.miss.length);
 
 const pending = all => all.filter(f => !f.decided && !SEED.has(foodKey(f.name)))
   .sort((a, b) => b.created_at.localeCompare(a.created_at));
@@ -49,18 +57,35 @@ export function openFoodShare(onDone) {
     const box = body.querySelector('[data-list]');
     let all = [];
     const load = async () => {
-      const rows = await store.shareFoods();
+      const [rows, ms] = await Promise.all([store.shareFoods(), store.shareMembers()]);
       if (!box.isConnected) return;
-      if (!rows) { box.innerHTML = '<p class="muted small">فهرست باز نشد؛ اینترنت را نگاه کن و دوباره باز کن.</p>'; return; }
+      if (ms) people = ms.map(m => ({ id: m.user_id, name: m.name, joined: m.joined }));
+      if (!rows || !ms) { box.innerHTML = '<p class="muted small">فهرست باز نشد؛ اینترنت را نگاه کن و دوباره باز کن.</p>'; return; }
       all = rows;
       paint();
     };
     const paint = () => {
       const list = pending(all);
-      waiting = list.length;
-      box.innerHTML = list.length ? list.map(f => item(f, all)).join('') : '<div class="empty">غذای تازه‌ای منتظر تأیید نیست.</div>';
+      const fresh = newcomers(all);
+      waiting = list.length + fresh.length;
+      box.innerHTML = fresh.map(({ m, miss }) => `
+        <div class="share-new">
+          <b>${esc(m.name)} تازه آمده</b>
+          <small class="muted">${fa(miss.length)} غذا را که قبل از آمدنش برای همه فرستاده شده ندارد: ${miss.slice(0, 4).map(f => `«${esc(f.name)}»`).join('، ')}${miss.length > 4 ? ' و…' : ''}</small>
+          <button class="btn sm primary" data-catch="${m.id}">غذاهای تأییدشده را به ${esc(m.name)} بده</button>
+        </div>`).join('')
+        + (list.length ? list.map(f => item(f, all)).join('') : '<div class="empty">غذای تازه‌ای منتظر تأیید نیست.</div>');
     };
     box.onclick = async e => {
+      const c = e.target.closest('[data-catch]');
+      if (c) {
+        const m = people.find(x => x.id === c.dataset.catch);
+        c.disabled = true;
+        const r = await store.shareCatchUp(m.id, missingFor(m, all).map(f => f.id));
+        if (r.error) { c.disabled = false; return toast('ثبت نشد؛ دوباره امتحان کن'); }
+        toast(`${fa(r.made)} غذا به بانک ${m.name} اضافه شد`);
+        return load();
+      }
       const b = e.target.closest('[data-ok],[data-no]');
       if (!b) return;
       const food = all.find(f => f.id === (b.dataset.ok || b.dataset.no));
@@ -84,14 +109,8 @@ export function openFoodShare(onDone) {
   }, { tall: true, onClose: () => onDone?.() });
 }
 
-function members(all) {
-  const m = new Map();
-  for (const f of all) if (!m.has(f.user_id)) m.set(f.user_id, f.member);
-  return [...m].map(([id, name]) => ({ id, name }));
-}
-
 function item(f, all) {
-  const has = members(all).filter(m => m.id !== f.user_id)
+  const has = people.filter(m => m.id !== f.user_id)
     .map(m => ({ m, like: similarIn(f, all.filter(x => x.user_id === m.id)) }))
     .filter(x => x.like.length);
   return `
@@ -109,7 +128,7 @@ function openSend(food, all, onSent) {
   const per100 = food.unit === GRAM;
   const k = per100 ? 100 : 1;
   const show = x => String(Math.round(Number(x) * k * 10) / 10);
-  const others = members(all).filter(m => m.id !== food.user_id)
+  const others = people.filter(m => m.id !== food.user_id)
     .map(m => ({ ...m, like: similarIn(food, all.filter(x => x.user_id === m.id)) }));
   const per = per100 ? 'هر ۱۰۰ گرم' : `هر ${esc(food.unit)}`;
   sheet.open(body => {

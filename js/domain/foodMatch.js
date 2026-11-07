@@ -38,3 +38,14 @@ export function similar(a, b) {
 }
 
 export const similarIn = (food, bank) => bank.filter(f => f.id !== food.id && similar(food, f));
+
+/*
+  The foods shared with everyone before this member joined, which they have nothing similar to.
+  member: { id, joined }; all: every member's foods with user_id, decision and decided_at.
+*/
+export function missingFor(member, all) {
+  const mine = all.filter(f => f.user_id === member.id);
+  const joined = new Date(member.joined);
+  return all.filter(f => f.decision === 'shared' && f.user_id !== member.id
+    && new Date(f.decided_at) < joined && !similarIn(f, mine).length);
+}
