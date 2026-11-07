@@ -3,7 +3,7 @@
 // The numbers come first, then the one card that matters most today; the other cards wait in a
 // fold under the meals, and the next one moves up when the top one is dismissed.
 import * as store from '../data/store.js';
-import { effectiveTargets, isTeen } from '../domain/targets.js';
+import { effectiveTargets, isTeen, proteinFor } from '../domain/targets.js';
 import { phaseNotes, bindPhase, phaseLabel } from './phase.js';
 import { lightOn } from '../domain/phase.js';
 import { MEALS, entriesOn, totals, daysLoggedInWeek, sortedWeights } from '../domain/stats.js';
@@ -75,6 +75,11 @@ export function renderToday(root) {
     if (rl && !dismissed('rapid', weekStart(today()))) {
       notices.push({ key: 'rapid', mark: weekStart(today()), cls: 'doctor', html: `<strong>سرعت کاهش وزن زیاد است</strong><p>سه هفته‌ی پشت‌سرهم بیشتر از ${fa(rl.perWeek, 1)} کیلو در هفته کم کرده‌اید. لطفاً با پزشک‌تان مشورت کنید.</p>` });
     }
+    // «بیماری کلیه» used to be one choice; it became two that the diet treats very differently
+    if ((p.conditions || []).includes('kidney') && !p.kidneyAsked) {
+      notices.push({ key: 'kidney', mark: '1', cls: 'doctor', keep: true, html: `<strong>مشکل کلیه‌تان کدام است؟</strong><p>«بیماری کلیه» را تیک زده بودید. حالا دو گزینه است، چون رژیم هر کدام فرق دارد: با سنگ کلیه پروتئین کافی لازم است و آب زیاد، ولی با کم شدن کارکرد کلیه (به تشخیص پزشک) پروتئین باید محدود شود.</p>
+        <div class="row gap"><button class="btn primary sm" data-kidney="stones">فقط سنگ کلیه</button><button class="btn sm" data-kidney="kidney">کارکرد کلیه‌ام کم شده</button><button class="btn sm" data-kidney="both">هر دو</button></div>` });
+    }
   }
 
   root.innerHTML = `
@@ -117,7 +122,7 @@ export function renderToday(root) {
       ${t.phase !== 'loss' ? `<div class="pill"><span>مرحله: <b>${phaseLabel(p, day)}</b></span></div>` : ''}
     </div>
 
-    ${notices.map(n => `<div class="note ${n.cls || 'soft'}" data-notice="${n.key}" data-mark="${n.mark}">${n.html}<button class="link small" data-dismiss>باشه</button></div>`).join('')}
+    ${notices.map(n => `<div class="note ${n.cls || 'soft'}" data-notice="${n.key}" data-mark="${n.mark}">${n.html}${n.keep ? '' : '<button class="link small" data-dismiss>باشه</button>'}</div>`).join('')}
 
     ${isToday ? greetCard() : ''}
     ${top ? `<div data-day-cards>${top[1]}</div>` : ''}
@@ -175,6 +180,17 @@ export function renderToday(root) {
     // a motivation drawn inside the closed fold had no height to take
     if (fold.open) fold.querySelector('.mot-track')?.dispatchEvent(new Event('scroll'));
   };
+  root.querySelectorAll('[data-kidney]').forEach(b => b.onclick = () => {
+    const pr = store.profile();
+    const v = b.dataset.kidney;
+    const rest = (pr.conditions || []).filter(c => c !== 'kidney' && c !== 'stones');
+    const conditions = [...rest, ...(v === 'stones' ? ['stones'] : v === 'kidney' ? ['kidney'] : ['kidney', 'stones'])];
+    // the protein goes with the choice (unless they set it by hand): a limit only with reduced function
+    const next = { ...pr, conditions, kidneyAsked: true };
+    if (pr.targets && !pr.targets.manualProtein && Number(pr.heightCm) > 0) next.targets = { ...pr.targets, protein: proteinFor(next) };
+    store.saveProfile(next);
+    renderToday(root);
+  });
   root.querySelectorAll('[data-dismiss]').forEach(b => b.onclick = () => {
     const n = b.closest('[data-notice]');
     dismiss(n.dataset.notice, n.dataset.mark);

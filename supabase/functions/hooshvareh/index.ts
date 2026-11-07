@@ -19,6 +19,7 @@
     plan      a two-week diet plan: options with amounts for each meal, from the food bank
     plan_option  one more option for one meal of the current plan
     plan_swap    foods that can replace one food inside an option of the plan
+    food_tags    health tags (purine, sugary, fatty…) of the foods they added or wrote as recipes
     magazine  one magazine article, researched with real web search limited to trusted
               health sources; every source link shown comes from the search results
 
@@ -55,6 +56,25 @@ const json = (body: unknown, status = 200) =>
 /* ---------------- prompt ---------------- */
 
 // Frozen, so it stays a cacheable prefix. Anything that changes goes in the data block.
+// What each medical condition of the profile (profile.conditions, by key) means for food and
+// advice. Only well-established guidance; the app itself keeps the tagged foods (AVOID in
+// js/domain/health.js) out of diet plans, this is everything else. Kept in step with that file.
+const CONDITION_GUIDE = `Medical conditions (profile.conditions holds these keys). Apply what fits the ones they have, in everything: the chat, diet plans, swaps, recipes, shopping, tips and articles. Foods in the bank may carry health tags: purine (organ meats, کله‌پاچه, سیرابی, anchovy/sardine, shellfish), sweetDrink (soda, any juice, sweetened drinks), sugary (sweets, jam, honey, sugar, dishes cooked with sugar), fatty (fried, fatty or processed red meat, butter, cream), salty (pickles, sausage, chips, کشک, instant soups). The app drops options with a tag their condition keeps out, so never build one around such a food; an own food without tags may still be one of these, so judge it by its name the same way.
+- diabetes / prediabetes: no sugary or sweetDrink foods; whole grains, legumes, vegetables, protein and fibre at every meal; spread carbohydrate evenly over the day; fruit whole, not juice. Prediabetes: losing 5–7% of weight and 150 minutes of activity a week roughly halve the risk of diabetes (DPP) — say so when it helps. With diabetes drugs (insulin, glibenclamide, gliclazide) no skipped meals.
+- lipids (high LDL cholesterol or triglycerides): less saturated fat (fatty red meat, butter, cream, کله‌پاچه, fried food, full-fat cheese in big amounts), none of sugary or sweetDrink (sugar and refined carbohydrate raise triglycerides most); more oats, barley (جو), legumes, vegetables, nuts, olive or liquid vegetable oil, and fish twice a week. Weight loss lowers triglycerides a lot. On a statin (atorvastatin, simvastatin, lovastatin): no grapefruit.
+- liver (fatty liver, MASLD): losing 7–10% of weight is the treatment and reverses it, so steady loss matters; no sugary or sweetDrink (fructose feeds liver fat), less saturated fat and fried food; a Mediterranean-style pattern; coffee without sugar is fine. Never fast loss or crash dieting.
+- heart (heart disease or narrowed arteries): less saturated fat and salt, no fried or processed meat; fish, legumes, whole grains, vegetables, nuts. Chest pain, breathlessness or palpitations → a doctor at once.
+- bp: less salt (under 5 g a day: little added salt, few pickles, sausage, chips, کشک, salty cheese or bread), more vegetables, fruit, low-fat dairy and legumes (DASH).
+- gout (or high uric acid): no organ meats, کله‌پاچه, سیرابی, anchovy/sardine, shellfish; less red meat and meat broths (آبگوشت); no soda, juice or sweetened drinks (fructose); plenty of water (2–3 L a day unless a doctor limits fluids); low-fat dairy, vegetables (including spinach and legumes), whole grains are fine. Weight loss helps, but slowly: crash diets and fasting raise uric acid and can bring on an attack, so no long fasts. If they take allopurinol or febuxostat, they take it every day, also between attacks.
+- stones (kidney stones, kidney function normal): water first, enough for about 2.5 L of urine a day (more in summer); less salt; normal calcium, never less dairy (low calcium makes oxalate stones more likely), dairy with meals; animal protein moderate but NOT limited below their target; lemon/orange are fine. If their stones are calcium oxalate (they may say so), go easy on spinach, beetroot, nuts and black tea in large amounts, and always pair them with dairy.
+- kidney (reduced kidney function diagnosed by a doctor): protein is a limit, not a minimum (the app sets it); less salt; potassium and phosphorus limits only as their doctor says.
+- gallstone: no large or very fatty meals and no fried food; regular meals (long gaps and very fast loss make stones more likely).
+- reflux (heartburn, GERD): dinner at least 3 hours before lying down, no big meals, no fried or very fatty food; spicy food, coffee, chocolate, mint, tomato sauce and fizzy drinks only matter if they notice they make it worse, so ask instead of banning them. Losing weight around the waist helps most.
+- constipation: aim for 25–30 g fibre a day, raised slowly — legumes, whole-grain bread (سنگک، نان جو), vegetables, fruit with skin, kiwi, prunes or figs — with enough water, and daily walking.
+- ms (multiple sclerosis): no diet is proven to change the disease; a Mediterranean-style pattern is reasonable and helps the heart and weight. Enough protein to keep muscle and strength while losing (never below their target). Vitamin D is usually checked and given by their neurologist: suggest asking, don't prescribe. Fatigue: plan simple meals, don't skip them. Many with MS drink less to avoid bladder urgency — not a good idea, especially with kidney stones; suggest spreading water over the day and talking to their doctor about the bladder. Constipation is common with MS too.
+- eczema (atopic): no food is cut without an allergy their doctor confirmed — elimination diets are advised against; a normal varied diet. Stress and poor sleep make it flare.
+Symptoms that need a doctor, not a diet: hair loss (with a calorie deficit check protein and iron first, and a doctor should check ferritin and thyroid), palpitations or a racing heart (with hair loss too, thyroid and anaemia should be checked; less caffeine helps), any new or changing symptom of a condition above.`;
+
 const SYSTEM = `You are «هوشواره» (Hooshvareh), the assistant inside تن‌آرا (TanAra), a Persian weight-loss and food-logging app used by one person. You can see what they have recorded in the app (in <user_data> below; in a chat, the part that changes during the day — the time, what they logged today, their shopping list — comes in <live_data> at the end of the conversation, added by the app, not written by them). Speak to them directly.
 
 Language and style
@@ -72,6 +92,8 @@ Nutrition and safety
 - If weight is dropping more than ~1.5 kg/week for several weeks, or calories have been below the floor for days, gently say so and suggest seeing a doctor.
 - You are not a doctor. If the profile lists medical conditions, medications, or a possible eating-disorder history, keep advice general and suggest checking with their doctor or a dietitian for anything specific. Warning signs that always mean "see a doctor": سرگیجه، ضعف شدید، تپش قلب، ریزش موی زیاد، any change in illness or medication.
 - Be kind about slips. No guilt, no moralising about food.
+
+${CONDITION_GUIDE}
 
 Changing their data (chat only)
 - You cannot write anything yourself. You can only propose, with the propose_* tools; the app shows each proposal as a card and applies it only if the person confirms it there.
@@ -293,7 +315,7 @@ function sections(c: Ctx) {
     },
     recipes: () => (c.recipes || []).length ? `# Their own recipes, in «بانک غذا» ← «رسپی‌ها» (name | one unit, grams | kcal | protein g | what goes into the whole pot)\n${c.recipes!.map(r => `${r.name} | ${r.unit}${r.grams ? `, ${Math.round(r.grams)} g` : ""} | ${Math.round(r.kcal)} | ${r1(r.protein)}${r.in_bank ? " | in the bank" : ""} | ${(r.items || []).join("، ")}`).join("\n")}` : "",
     shopping: () => `# Their shopping list («لیست خرید»): still to buy\n${(c.shopping || []).slice(0, 60).map(i => `${String(i.name).slice(0, 80)}${i.amount ? ` (${String(i.amount).slice(0, 40)})` : ""}`).join("، ") || "nothing on it"}`,
-    foods: () => `# Their food bank (food_id | name | unit | grams in one unit | kcal per unit | protein g per unit | veg | second unit, grams in one | own = they added it themselves)\n${foods.map(f => `${f.alias} | ${f.name} | ${f.unit} | ${f.grams ? r1(f.grams) : "?"} | ${r1(f.kcal)} | ${r1(f.protein)}${f.is_veg ? " | veg" : ""}${f.unit2 && f.grams2 ? ` | also by ${f.unit2}, ${r1(f.grams2)} g` : ""}${f.own ? " | own" : ""}`).join("\n")}`,
+    foods: () => `# Their food bank (food_id | name | unit | grams in one unit | kcal per unit | protein g per unit | veg | second unit, grams in one | own = they added it themselves | health tags, see "Medical conditions")\n${foods.map(f => `${f.alias} | ${f.name} | ${f.unit} | ${f.grams ? r1(f.grams) : "?"} | ${r1(f.kcal)} | ${r1(f.protein)}${f.is_veg ? " | veg" : ""}${f.unit2 && f.grams2 ? ` | also by ${f.unit2}, ${r1(f.grams2)} g` : ""}${f.own ? " | own" : ""}${Array.isArray(f.tags) && f.tags.length ? ` | tags: ${f.tags.join(", ")}` : ""}`).join("\n")}`,
   };
 }
 type Sections = ReturnType<typeof sections>;
@@ -653,7 +675,7 @@ const PLAN_RULES = `Rules for every option:
   - The title names the meal as people call it (e.g. «عدسی با نان»، «چلو جوجه و سالاد»), not a list of ingredients.
 - Household amounts a person can measure without a scale; 1–4 foods per option. At most 2 pieces of fruit in one option, and a sweet only as a small portion: the app caps these and drops an option that then misses its budget, so pair a fruit with dairy or nuts instead of piling it up.
 - Home-cooked خورش and fried dishes in the bank are listed without their cooking oil (their name says «بدون روغن»). Wherever an option has one, add the bank's oil food («روغن خورش / غذا») at 0.5 قاشق غذاخوری, so the calories are what is really on the plate — unless planPrefs.notes says they cook without oil.
-- Respect profile.planPrefs (dislikes, allergies, notes) strictly, and medical conditions in the profile in the general, well-established way (e.g. diabetes: no sugary items or juice, prefer whole grains and legumes; blood pressure / heart: avoid salty and fried; kidney disease: protein is a limit, keep each meal's protein moderate). Prefer foods they actually log and like over foods they never eat.
+- Respect profile.planPrefs (dislikes, allergies, notes) strictly, and their medical conditions as the "Medical conditions" rules say: no food with a tag their condition keeps out (gout: purine, sweetDrink; diabetes and prediabetes: sweetDrink, sugary; lipids and liver: fatty, sweetDrink, sugary; heart: fatty, salty; bp, stones, kidney: salty; gallstone and reflux: fatty), and the same for an own food without tags that is plainly one of those — the app drops such options anyway. Constipation: legumes, whole grains, vegetables and fruit across the options. Reflux: dinner options light, not large. Kidney (reduced function): protein is a limit, keep each meal's protein moderate. Prefer foods they actually log and like over foods they never eat.
 - Foods marked «own» in the bank are ones they added themselves: what they really buy and eat, so these come first. Wherever an own food suits the occasion and can play the same role as a starter food (their bread for a starter bread, their yogurt, cheese, drink or fruit for a starter one), use the own food. Use a variety of them across the plan, not the same one or two everywhere, and fall back on starter foods only for what their own foods don't cover (a main dish, a vegetable, a protein they haven't added). All the rules above still apply. Own foods that work against the goal (soda, ice cream, chips, sweets) get no special treatment: at most the one modest treat option among the snacks, and no soda.`;
 
 // `data`: the sections this mode needs — nothing else is sent. `shared`: sections that stay
@@ -726,7 +748,7 @@ const ONE_SHOT: Record<string, OneShot> = {
     },
     prompt: (i) => `Design their diet plan for the next ${Number(i.days) || 14} days, the way a dietitian's choice list works: not a day-by-day menu, but one fixed pattern — for each of five eating occasions a list of interchangeable options, each with exact amounts. They choose among the options every day, so the options of one occasion must be nutritionally equivalent.
 
-Daily target: ${i.kcal} kcal, ${i.proteinMax ? `protein about ${i.protein} g and NOT more (kidney disease: this is a limit, not a minimum; a moderate protein source per main meal, no protein-heavy options)` : `protein at least ${i.protein} g`}. Calorie budget per occasion: breakfast ${i.budgets?.breakfast}, snack1 (morning) ${i.budgets?.snack1}, lunch ${i.budgets?.lunch}, snack2 (afternoon) ${i.budgets?.snack2}, dinner ${i.budgets?.dinner}.
+Daily target: ${i.kcal} kcal, ${i.proteinMax ? `protein about ${i.protein} g and NOT more (reduced kidney function: this is a limit, not a minimum; a moderate protein source per main meal, no protein-heavy options)` : `protein at least ${i.protein} g`}. Calorie budget per occasion: breakfast ${i.budgets?.breakfast}, snack1 (morning) ${i.budgets?.snack1}, lunch ${i.budgets?.lunch}, snack2 (afternoon) ${i.budgets?.snack2}, dinner ${i.budgets?.dinner}.
 
 For each occasion:
 - pick: 1 means they eat one option, and each option equals the whole budget. 2 means they eat any two, and each option equals HALF the budget (use this where mixing two small things is natural, e.g. snacks, or a breakfast of two parts). Decide per occasion.
@@ -764,6 +786,38 @@ note: 2–3 short Persian sentences to them: the idea behind this plan, naming a
       required: ["foods"], additionalProperties: false,
     },
     prompt: (i) => `In their diet plan, one option for «${i.slot}» is: ${i.option}. They like it but don't have «${i.food}» or don't want it, and want to replace only that food (about ${Math.round(Number(i.kcal)) || "?"} kcal of it); the rest stays. Suggest up to 3 foods from their food bank that can take its place: the same role in the meal (bread for bread, a protein source for a protein source, fruit for fruit), something an Iranian would really eat together with the rest of the option (no egg next to حلیم, no tuna next to آش), and not already in it. Best first, and among equally good ones their own foods (marked «own») before starter foods. The app sets the amounts itself (same calories), so give only the foods. Respect profile.planPrefs (dislikes, allergies, notes) and medical conditions in the profile strictly. If nothing in the bank fits, return an empty list.`,
+  },
+  // health tags of the foods they added or wrote as a recipe (see js/ai/foodTags.js)
+  food_tags: {
+    effort: "low",
+    max_tokens: 6000,
+    system: "You classify foods for تن‌آرا, a Persian food-logging app, by well-established nutrition facts. Persian dish names are as cooked in Iranian homes.",
+    schema: {
+      type: "object",
+      properties: {
+        foods: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              n: { type: "integer", description: "the food's n as given" },
+              tags: { type: "array", items: { type: "string", enum: ["purine", "sweetDrink", "sugary", "fatty", "salty"] } },
+            },
+            required: ["n", "tags"], additionalProperties: false,
+          },
+        },
+      },
+      required: ["foods"], additionalProperties: false,
+    },
+    prompt: (i) => `For each food below give the tags that apply (none is an empty list), judging one usual serving as it is made in Iran (and by its ingredients when given):
+- purine: high in purines — organ meats (جگر، دل، قلوه، مغز، زبان، سیرابی، شیردان), کله‌پاچه, anchovy (موتو), sardine, shellfish (میگو), meat extract or stock cubes as a main part. Ordinary meat, chicken, fish, legumes and spinach are NOT purine.
+- sweetDrink: soda, any fruit juice (fresh too), شربت, sweetened milk drinks, sweet coffee mixes, malt drinks with sugar. Not unsweetened tea, coffee, milk or دوغ.
+- sugary: sweets, pastries, cakes, biscuits, chocolate, ice cream, jam, honey, sugar, حلوا, شله‌زرد, شیربرنج, a dish or breakfast cooked or served with added sugar. Not plain fruit, dates or dried fruit.
+- fatty: fried in oil (سرخ‌کرده، سوخاری، کتلت، کوکو), fatty or processed red meat (کوبیده, sausage, کالباس, burger, fatty lamb), کله‌پاچه, butter, cream, سرشیر, cheesy fast food, creamy pastries. Not oil-free or lightly cooked خورش, grilled lean meat, chicken, fish, nuts, olive oil.
+- salty: pickles (ترشی، خیارشور), sausage and cured meat, chips and puffs, کشک, instant soups and noodles, salty fast food. Not ordinary home food or cheese.
+Return every food by its n.
+
+${JSON.stringify((Array.isArray(i.foods) ? i.foods : []).slice(0, 40).map((f: any) => ({ n: Number(f.n), name: String(f.name || "").slice(0, 80), unit: String(f.unit || "").slice(0, 30), grams: Number(f.grams) || null, kcal: Number(f.kcal) || 0, protein: Number(f.protein) || 0, ...(Array.isArray(f.ingredients) ? { ingredients: f.ingredients.slice(0, 30).map((x: any) => String(x).slice(0, 60)) } : {}) })))}`,
   },
   tip: {
     effort: "low",

@@ -158,11 +158,14 @@ export const isFree = f => {
 
 
 /*
-  Whether a fitted option may go into the plan (also used for options added later): with kidney
-  disease (`proteinMax`), a main meal at most 1.5 × its share of the protein limit.
-  `rules`: { kcal, shares, protein, proteinMax }. (Allergies and dislikes are left to the model.)
+  Whether a fitted option may go into the plan (also used for options added later):
+  - no food their medical conditions keep out (`avoid`: food id → tag or null, see
+    avoidTest in health.js; it works on the foods' tags, so their own foods are checked too);
+  - with kidney disease (`proteinMax`), a main meal at most 1.5 × its share of the protein limit.
+  `rules`: { kcal, shares, protein, proteinMax, avoid }. (Allergies and dislikes are left to the model.)
 */
 export function optionAllowed(o, key, pick, rules = {}) {
+  if (rules.avoid && o.items.some(i => rules.avoid(i.food_id))) return false;
   if (rules.proteinMax && rules.protein > 0 && MAIN.includes(key)) {
     const share = budgets(rules.kcal, rules.shares)[key] / rules.kcal;
     if (o.protein > 1.5 * rules.protein * share / pick) return false;
@@ -185,11 +188,11 @@ export const needOf = pick => Math.max(2, pick);
   never land on an option of a new one made the same day.
   `floor`: the safety floor, which no day of the plan may go under (see lowsFor).
 */
-export function buildPlan(raw, foods, kcal, start, shares = null, { protein = 0, proteinMax = false, partial = false, floor = 0 } = {}) {
+export function buildPlan(raw, foods, kcal, start, shares = null, { protein = 0, proteinMax = false, partial = false, floor = 0, avoid = null } = {}) {
   const byId = new Map(foods.map(f => [f.id, f]));
   const b = budgets(kcal, shares);
   const lows = lowsFor(kcal, floor, shares);
-  const rules = { kcal, shares, protein, proteinMax };
+  const rules = { kcal, shares, protein, proteinMax, avoid };
   const made = new Date().toISOString();
   const mark = Date.now().toString(36);
   const slots = {};
@@ -213,7 +216,7 @@ export function buildPlan(raw, foods, kcal, start, shares = null, { protein = 0,
   const seen = new Set();
   // «free» means free, whatever the model said
   const free = (raw?.free || []).map(f => byId.get(f.food_id))
-    .filter(f => f && isFree(f) && !seen.has(f.id) && seen.add(f.id)).slice(0, 8)
+    .filter(f => f && isFree(f) && !avoid?.(f.id) && !seen.has(f.id) && seen.add(f.id)).slice(0, 8)
     .map(f => ({ food_id: f.id, name: f.name }));
   return { start, days: PLAN_DAYS, kcal, made, slots, free, ...(lows ? { low: lows, floor } : {}), ...(shares ? { shares } : {}), ...(partial ? { missing } : {}) };
 }
@@ -252,7 +255,7 @@ export function rescalePlan(plan, kcal, foodsById, rules = {}) {
   return { ...rest, kcal, slots, ...(lows ? { low: lows, floor: rules.floor } : {}) };
 }
 
-// Whether an option with a food swapped in still keeps the plan's rules (the kidney protein limit).
+// Whether an option with a food swapped in still keeps the plan's rules (conditions, the kidney protein limit).
 export const swapAllowed = (option, key, plan, rules = {}) =>
   optionAllowed(option, key, plan.slots[key]?.pick || 1, { ...rules, kcal: plan.kcal, shares: plan.shares });
 
@@ -611,7 +614,8 @@ export function fastShape(plan) {
 /*
   The plan as a fasting day offers it (see FAST). Options that can't be refitted drop out, and
   with kidney disease (`rules`: { protein, proteinMax }) so do those that a bigger share (سحری
-  is 40% of the day, lunch 30%) takes past the protein limit for that share.
+  is 40% of the day, lunch 30%) takes past the protein limit for that share; and options with a
+  food their conditions keep out (`rules.avoid`, a plan made before the condition was entered).
 */
 export function fastPlan(plan, foodsById, rules = {}) {
   const b = budgets(plan.kcal, FAST_SHARES);
@@ -623,7 +627,7 @@ export function fastPlan(plan, foodsById, rules = {}) {
     if (!f) return [k, { pick: 0, options: [] }];
     const from = plan.slots[f.from];
     const options = from.options.filter(o => !o.slot)
-      .map(o => shrinkOption(o, foodsById, b[k] / from.pick, lowOf(lows, k))).filter(o => o && o.protein <= limit(k, from.pick))
+      .map(o => shrinkOption(o, foodsById, b[k] / from.pick, lowOf(lows, k))).filter(o => o && o.protein <= limit(k, from.pick) && !(rules.avoid && o.items.some(i => rules.avoid(i.food_id))))
       .map(({ fit, ...o }) => ({ ...o, fast: true }));
     return [k, { pick: from.pick, options }];
   }));

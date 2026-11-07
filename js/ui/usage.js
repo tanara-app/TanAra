@@ -11,7 +11,7 @@ import { sheet, icon } from './dom.js';
 // Change these when the model or its prices change.
 const PRICE = { input: 2, cache_read: 0.2, cache_write: 2.5, output: 10, search: 0.01 };
 const MODES = {
-  chat: 'گفت‌وگو', magazine: 'مجله', plan: 'چیدن رژیم', plan_option: 'گزینه‌ی دیگر رژیم', plan_swap: 'جایگزین در رژیم', tip: 'نکته‌ی امروز',
+  chat: 'گفت‌وگو', magazine: 'مجله', plan: 'چیدن رژیم', plan_option: 'گزینه‌ی دیگر رژیم', plan_swap: 'جایگزین در رژیم', food_tags: 'برچسب سلامت غذاها', tip: 'نکته‌ی امروز',
   review: 'تحلیل هفته', progress: 'تحلیل روند', maintain: 'مرور ماهانه‌ی نگهداری', checkin: 'برگشت به مسیر', occasion: 'برنامه‌ی مناسبت', estimate: 'تخمین غذا', photo: 'عکس غذا', label: 'برچسب بسته', recipe: 'رسپی', shop: 'لیست خرید', quote: 'جمله‌ی انگیزشی', title: 'اسم گفت‌وگو',
 };
 const DAYS = 30;

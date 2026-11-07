@@ -12,14 +12,28 @@ export const ACTIVITY = {
   active: { label: 'فعال', factor: 1.55, hint: 'ورزش متوسط ۳ تا ۵ روز در هفته' },
 };
 
+/*
+  Medical conditions they can tick. What each changes: the foods kept out of a diet plan
+  (AVOID in health.js), the protein limit (only `kidney`: reduced kidney function, not stones),
+  reminders on fasting days (plan.js), and Hooshvareh's rules for each (CONDITION_GUIDE in the
+  Edge Function). `kidney` was once «بیماری کلیه» for both; `kidneyAsked` in the profile marks
+  that they have said which they meant (see today.js).
+*/
 export const CONDITIONS = {
   diabetes: 'دیابت',
-  kidney: 'بیماری کلیه',
-  heart: 'بیماری قلبی',
-  liver: 'بیماری کبد',
-  gout: 'نقرس',
-  gallstone: 'سنگ صفرا',
+  prediabetes: 'قند مرزی (پیش‌دیابت)',
+  lipids: 'چربی خون بالا (کلسترول یا تری‌گلیسرید)',
+  heart: 'بیماری قلبی یا گرفتگی عروق',
   bp: 'فشار خون',
+  liver: 'کبد چرب یا بیماری کبد',
+  gout: 'نقرس یا اسید اوریک بالا',
+  stones: 'سنگ کلیه',
+  kidney: 'کم شدن کارکرد کلیه (به تشخیص پزشک)',
+  gallstone: 'سنگ صفرا',
+  reflux: 'سوزش معده یا ریفلاکس',
+  constipation: 'یبوست',
+  ms: 'ام‌اس',
+  eczema: 'اگزما',
 };
 
 export const safeFloor = sex => (sex === 'male' ? 1500 : 1200);
@@ -82,6 +96,8 @@ export const refWeight = heightCm => 25 * (heightCm / 100) ** 2;
 export const PROTEIN_PER_KG = 1.4;
 export const KIDNEY_PROTEIN_PER_KG = 0.8;
 export const kidney = p => (p?.conditions || []).includes('kidney');
+// The day's protein for this height: a target, or with reduced kidney function a limit.
+export const proteinFor = p => Math.round((kidney(p) ? KIDNEY_PROTEIN_PER_KG : PROTEIN_PER_KG) * refWeight(Number(p.heightCm)));
 
 // measuredTdee: what the body really used, worked out from the log (see energy.js). When
 // given, it replaces the formula's estimate.
@@ -103,7 +119,7 @@ export function computeTargets({ sex, age: age0, heightCm, weightKg, activity, m
     measured,
     kcal: Math.max(floor, raw),
     hitFloor: raw < floor,
-    protein: Math.round((kidney({ conditions }) ? KIDNEY_PROTEIN_PER_KG : PROTEIN_PER_KG) * refWeight(heightCm)),
+    protein: proteinFor({ conditions, heightCm }),
     proteinMax: kidney({ conditions }),
     refWeight: Math.round(refWeight(heightCm) * 10) / 10,
     floor,

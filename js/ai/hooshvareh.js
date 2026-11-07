@@ -17,6 +17,7 @@ import { sortedWeights, measureDue, activityWeek, weekStart, ACTIVITY_GOAL } fro
 import { upcoming } from '../domain/occasions.js';
 import { today, parse, addDays, diffDays } from '../lib/dates.js';
 import { perUnit } from '../domain/recipe.js';
+import { tagsOf, TAGS_KEY } from '../domain/health.js';
 import { shopList, toBuy } from '../domain/shopping.js';
 
 const URL_ = `${SUPABASE_URL}/functions/v1/hooshvareh`;
@@ -120,6 +121,8 @@ function energyContext(s, p, t) {
 
 function context() {
   const s = store.get();
+  const tagNote = s.ai_notes.find(n => n.key === TAGS_KEY)?.data || {};
+  const recipeOf = f => s.ai_notes.find(n => n.kind === 'recipe' && n.data?.food_id === f.id)?.data || null;
   const p = store.profile();
   const t = today();
   const d = new Date();
@@ -130,7 +133,12 @@ function context() {
     profile: p,
     targets: p ? effectiveTargets(p) : null,
     // own: added by the person, not one of the app's starter foods; the diet plan favours these
-    foods: s.foods.map(({ id, name, category, unit, grams, kcal, protein, is_veg, created_at, unit2, grams2 }) => ({ id, name, category, unit, grams, kcal, protein, is_veg, created_at, ...(unit2 ? { unit2, grams2 } : {}), ...(SEED_NAMES.has(name) ? {} : { own: true }) })),
+    // tags: what the food is for their medical conditions (js/domain/health.js), when known
+    foods: s.foods.map(f => {
+      const { id, name, category, unit, grams, kcal, protein, is_veg, created_at, unit2, grams2 } = f;
+      const tags = tagsOf(f, tagNote, SEED_NAMES, recipeOf);
+      return { id, name, category, unit, grams, kcal, protein, is_veg, created_at, ...(unit2 ? { unit2, grams2 } : {}), ...(SEED_NAMES.has(name) ? {} : { own: true }), ...(tags?.length ? { tags } : {}) };
+    }),
     // ids are not shown to the model; the Edge Function needs them to point a correction at a record
     entries: s.entries.map(({ id, day, meal, name, qty, unit, kcal, protein, is_veg, created_at }) => ({ id, day, meal, name, qty, unit, kcal, protein, is_veg, created_at })),
     weights: s.weights.map(({ day, kg }) => ({ day, kg })),
@@ -156,7 +164,7 @@ function context() {
     // «برگشت به مسیر»: what they said when the diet slipped, what was planned, how it went
     checkins: s.ai_notes.filter(n => n.kind === 'checkin' && n.data).sort((a, b) => (a.key < b.key ? -1 : 1)).slice(-5)
       .map(({ key, data: d }) => ({ day: key.slice(8), signs: d.signs, mood: d.mood, causes: d.causes, said: d.said, cause: d.cause, steps: d.steps, goal: d.goal, outcome: d.outcome || null })),
-    notes: s.ai_notes.filter(n => !['thread', 'plan', 'pick', 'mag', 'recipe', 'shop', 'checkin'].includes(n.kind)).map(({ key, text, created_at }) => ({ key, text, created_at })),
+    notes: s.ai_notes.filter(n => !['thread', 'plan', 'pick', 'mag', 'recipe', 'shop', 'checkin', 'tags'].includes(n.kind)).map(({ key, text, created_at }) => ({ key, text, created_at })),
   };
 }
 

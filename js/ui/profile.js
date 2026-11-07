@@ -213,7 +213,8 @@ function openEdit(p) {
       const err = validate(d, false);
       if (err) { const el = form.querySelector('.err'); el.textContent = err; el.hidden = false; return; }
       const { weightKg, ...clean } = d;
-      store.saveProfile(clean);
+      // the health list they just saw has «سنگ کلیه» apart from reduced kidney function
+      store.saveProfile({ ...clean, kidneyAsked: true });
       const t = recalcTargets();
       sheet.close();
       if (hasMedicalFlag(clean) && !hasMedicalFlag(p)) {

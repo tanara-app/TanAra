@@ -4,7 +4,7 @@
   removes them), so the calorie-counting mode always shows the same day.
 */
 import * as store from '../data/store.js';
-import { effectiveTargets, hasMedicalFlag } from '../domain/targets.js';
+import { effectiveTargets, hasMedicalFlag, CONDITIONS } from '../domain/targets.js';
 import {
   SLOTS, PLAN_DAYS, budgets, buildPlan, fitOption, optionBudget, planOn, planEnd, planDayNo, planOver,
   picksOn, dayAdherence, newFoods, goneFoods, optionText,
@@ -14,6 +14,8 @@ import {
 import { isRamadan } from '../domain/occasions.js';
 import { eatingPattern, markFresh } from '../domain/pattern.js';
 import { ask, aiAvailable, md, sparkle } from '../ai/hooshvareh.js';
+import { planAvoid, ensureTags } from '../ai/foodTags.js';
+import { TAG_SAYS, avoidedTags } from '../domain/health.js';
 import { fa, esc, norm } from '../lib/fa.js';
 import { today, diffDays, relLabel, addDays } from '../lib/dates.js';
 import { amountLabel } from './units.js';
@@ -51,6 +53,8 @@ async function generate({ days = PLAN_DAYS, include = [] } = {}) {
     const ramadan = Array.from({ length: days }, (_, n) => addDays(today(), n)).some(isRamadan);
     const input = shares => ({ kcal: t.kcal, protein: t.protein, proteinMax: !!t.proteinMax, budgets: budgets(t.kcal, shares), days, ramadan, include: include.map(f => f.name) });
     const own = pattern.ready ? pattern.shares : null;
+    // their own foods get their health tags first, so the conditions' rules hold for them too
+    await ensureTags();
     const rules = planRules(t);
     let plan = null, raw = null;
     // the amounts are fitted here. An occasion or two left short get just their missing options
@@ -116,9 +120,10 @@ function openPrefs(onGo) {
 }
 
 // What every option of a new plan (or one added to it) is checked against: the protein target
-// (a limit with kidney disease), and the safety floor no day of the plan may go under.
+// (a limit with kidney disease), the safety floor no day of the plan may go under, and the
+// foods their medical conditions keep out (by the foods' health tags, see foodTags.js).
 export function planRules(t = effectiveTargets(store.profile())) {
-  return { protein: t.protein, proteinMax: !!t.proteinMax, floor: t.floor };
+  return { protein: t.protein, proteinMax: !!t.proteinMax, floor: t.floor, avoid: planAvoid() };
 }
 
 // Asks for options for one short occasion of a plan being made, up to three times; drops it from `missing` once it has enough.
@@ -473,8 +478,36 @@ function roomNote(plan, key, room, cut, over) {
   and amounts unfold) or ticked; once the choice is made the other options fold away behind a
   link, and when off-plan food has used the occasion up they are not offered at all.
 */
+/*
+  A plan made before a condition was entered (or before their own foods had their health tags)
+  may still hold a food the condition keeps out: the option says so, and a swap fixes it.
+*/
+/*
+  A few habits each condition needs that a list of options can't carry (well-established
+  advice only; more of it comes from Hooshvareh in chat and in the plan's note).
+*/
+const CONDITION_TIPS = {
+  stones: 'برای سنگ کلیه: روزی دست‌کم ۲٫۵ لیتر آب در طول روز بنوش، نمک را کم کن، ولی لبنیات و کلسیم را کم نکن؛ کم کردن کلسیم خطر سنگ را بیشتر می‌کند.',
+  gout: 'برای نقرس: آب زیاد بنوش؛ جگر، دل و قلوه، کله‌پاچه، سیرابی، نوشابه و آبمیوه را کنار بگذار و گوشت قرمز را کم کن. لبنیات کم‌چرب کمک می‌کند.',
+  reflux: 'برای سوزش معده: شام را دست‌کم ۳ ساعت قبل از خواب بخور و وعده‌ها را خیلی بزرگ نکن. اگر غذای تند، قهوه، شکلات یا نعناع سوزشت را بیشتر می‌کند، همان‌ها را کم کن.',
+  constipation: 'برای یبوست: از گزینه‌هایی با حبوبات، نان سبوس‌دار، سبزی و میوه بیشتر انتخاب کن و آب کافی بنوش؛ پیاده‌روی هم کمک می‌کند.',
+  ms: 'با ام‌اس، آب را برای کم کردن دفعات دستشویی کم نکن (مخصوصاً اگر سنگ کلیه هم داری)، و ویتامین D را با پزشکت چک کن.',
+};
+function conditionTips(p) {
+  const tips = (p?.conditions || []).map(c => CONDITION_TIPS[c]).filter(Boolean);
+  return tips.length ? `<details class="plan-note"><summary class="link small">نکته‌های سلامت</summary>${tips.map(t => `<p class="small">${t}</p>`).join('')}</details>` : '';
+}
+
+function avoidNote(o, avoid) {
+  const bad = avoid && o.items.map(i => [i, avoid(i.food_id)]).find(([, t]) => t);
+  if (!bad) return '';
+  const conds = avoidedTags(store.profile()?.conditions || []).get(bad[1]) || [];
+  return `<small class="note doctor small">«${esc(bad[0].name)}» ${TAG_SAYS[bad[1]]} و با ${conds.map(c => CONDITIONS[c]).join(' و ')} جور نیست؛ بهتر است جایگزینش کنی.</small>`;
+}
+
 function slotCard(plan, key, day, picks, extras, room, showKcal, only, need) {
   const slot = plan.slots[key];
+  const avoid = planAvoid();
   const mine = picks[key] || [];
   const full = mine.length >= slot.pick;
   const known = new Set(slot.options.map(o => o.id));
@@ -498,6 +531,7 @@ function slotCard(plan, key, day, picks, extras, room, showKcal, only, need) {
         ${o.title ? `<small class="muted popt-sum">${esc(names)}</small>` : ''}
         <div class="popt-more">
           <ul>${o.items.map(itemLine(only, need, !o.slot && !o.fast)).join('')}</ul>
+          ${avoidNote(o, avoid)}
           ${o.fast ? `<small class="was">اندازه‌ی روز روزه · ${only}</small>` : ''}
           ${again}
           ${o.slot || o.fit ? `<small class="was">${o.fit ? 'کوچک‌شده' : 'برای باقی‌مانده‌ی سهم این وعده'} · ${only}</small>` : ''}
@@ -602,7 +636,9 @@ export function planHtml(day) {
       <p class="small"><b>${fa(a.done)}</b> از ${fa(a.of)} وعده طبق برنامه</p>
       ${isRamadan(day) ? `<label class="check fast-check"><input type="checkbox" data-fast ${plan.fast ? 'checked' : ''}><span>${isToday ? 'امروز' : 'این روز'} روزه‌ام<small class="muted">سه وعده: سحری، افطار و شام، از همین گزینه‌ها با مقدار جورشده. جمع روز همان هدف کالری است.</small></span></label>
         ${plan.fast && (p.conditions || []).includes('diabetes') ? '<p class="note doctor small">با دیابت، روزه گرفتن و مقدار داروها را حتماً با پزشکت هماهنگ کن؛ اگر قندت افت کرد یا حالت بد شد روزه را بشکن.</p>' : ''}
-        ${plan.fast && (p.conditions || []).includes('kidney') ? '<p class="note doctor small">با بیماری کلیه، روزه گرفتن (و کم‌آبی‌اش) را حتماً با پزشکت هماهنگ کن.</p>' : ''}` : ''}
+        ${plan.fast && (p.conditions || []).includes('kidney') ? '<p class="note doctor small">با کم شدن کارکرد کلیه، روزه گرفتن (و کم‌آبی‌اش) را حتماً با پزشکت هماهنگ کن.</p>' : ''}
+        ${plan.fast && (p.conditions || []).some(c => c === 'stones' || c === 'gout') ? `<p class="note doctor small">با ${(p.conditions || []).includes('gout') ? 'نقرس' : 'سنگ کلیه'}، کم‌آبیِ روزه خطر ${(p.conditions || []).includes('gout') ? 'حمله‌ی نقرس' : 'سنگ'} را بیشتر می‌کند: روزه گرفتن را با پزشکت هماهنگ کن و از افطار تا سحر آب زیاد بنوش.</p>` : ''}` : ''}
+      ${conditionTips(p)}
       ${plan.note || plan.shares ? `<details class="plan-note"><summary class="link small">توضیح هوشواره</summary>${plan.shares ? `<p class="muted small">از روی ${fa(plan.fromDays || 0)} روز ثبت خودت: صبحانه ${fa(Math.round(plan.shares.breakfast * 100))}٪، ناهار ${fa(Math.round(plan.shares.lunch * 100))}٪، شام ${fa(Math.round(plan.shares.dinner * 100))}٪ و میان‌وعده‌ها ${fa(Math.round((plan.shares.snack1 + plan.shares.snack2) * 100))}٪ از کالری روز.</p>` : ''}<div class="ai-text small">${md(plan.note || '')}</div></details>` : ''}
       <div class="plan-links">
         <button class="link small" data-plan-kcal>${showKcal ? 'پنهان کردن کالری' : 'نمایش کالری'}</button>
@@ -619,10 +655,17 @@ export function planHtml(day) {
     </section>` : ''}`;
 }
 
+let tagging = false; // their own foods are getting their health tags (see foodTags.js)
+
 export function bindPlan(root, day, redraw) {
   refresh = redraw;
   const s = store.get();
   const plan = dayView(day)?.plan;
+  // a food added since the plan was made may break a condition: its tags come in the background
+  if (plan && !tagging) {
+    tagging = true;
+    ensureTags().then(n => { if (n) refresh(); }).finally(() => { tagging = false; });
+  }
   const startNew = () => openPrefs(() => generate());
 
   root.querySelectorAll('[data-plan-new]').forEach(b => b.onclick = startNew);
