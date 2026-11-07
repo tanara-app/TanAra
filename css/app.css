@@ -702,6 +702,11 @@ body.kb .toast, body.chat-mode .toast { bottom: calc(var(--nav-h) + var(--safe-b
 .usage-list .wrow span { display: grid; }
 .usage-bar { height: 4px; margin: 0 0 8px; }
 .usage-bar i { background: var(--ai); }
+.usage-who { margin-bottom: 12px; }
+.usage-member > summary { list-style: none; cursor: pointer; }
+.usage-member > summary::-webkit-details-marker { display: none; }
+.usage-member[open] { background: var(--surface-2); border-radius: 12px; padding: 4px 8px 2px; margin: 0 -8px 8px; }
+.usage-member .usage-list { padding-inline-start: 10px; }
 
 /* recipes (a tab of the food bank) */
 .sheet [data-tab] { margin-bottom: 12px; }

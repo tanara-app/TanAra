@@ -515,3 +515,19 @@ export async function aiUsage(since) {
     return res && !res.error ? res.data : null;
   } catch { return null; }
 }
+// The owner's view: true when this account may read everyone's usage.
+export async function isUsageAdmin() {
+  if (!remote) return false;
+  try {
+    const res = await remote.usageAdmin();
+    return !!(res && !res.error && res.data);
+  } catch { return false; }
+}
+// Every member's rows (with user_id and name) since an ISO time, or null.
+export async function aiUsageAll(since) {
+  if (!remote) return null;
+  try {
+    const res = await remote.usageAll(since);
+    return res && !res.error ? res.data : null;
+  } catch { return null; }
+}

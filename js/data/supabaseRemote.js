@@ -131,5 +131,13 @@ export function createSupabaseRemote(sb) {
     usage(since) {
       return sb.from('ai_usage').select('at,mode,input,cache_read,cache_write,output,searches').gte('at', since).order('at').limit(5000);
     },
+    // The app owner only: is this account allowed to see everyone's usage, and everyone's rows
+    // with the member's name (security-definer functions in 20261108_usage_admin.sql).
+    usageAdmin() {
+      return sb.rpc('is_usage_admin');
+    },
+    usageAll(since) {
+      return sb.rpc('ai_usage_all', { since });
+    },
   };
 }
