@@ -20,6 +20,17 @@ export function activityLine() {
   return `این هفته ${fa(activityWeek(store.get().activity, weekStart(t)))} از ${fa(goal)} دقیقه`;
 }
 
+/*
+  What some conditions need before or during exercise (ACSM pre-participation screening, the
+  MS Society on heat, gout flares). Shown under the goal.
+*/
+const MOVE_TIPS = {
+  heart: 'با بیماری قلبی یا گرفتگی عروق، پیاده‌روی آرام را می‌توانی شروع کنی؛ برای ورزش تندتر از آن اول با پزشکت هماهنگ کن. اگر درد یا فشار قفسه‌ی سینه، تنگی نفس غیرعادی یا سرگیجه داشتی، همان لحظه دست نگه دار و به پزشک خبر بده.',
+  ms: 'با ام‌اس، ورزش منظم به خستگی و قدرت کمک می‌کند. گرما علائم را موقتاً بدتر می‌کند: در هوای خنک یا ساعت خنک روز ورزش کن، آب همراهت باشد و هر وقت خسته شدی استراحت کن.',
+  gout: 'در روزهای حمله‌ی نقرس به مفصل دردناک استراحت بده و بعد کم‌کم برگرد؛ موقع ورزش آب کافی بنوش.',
+};
+const moveTips = p => (p?.conditions || []).map(c => MOVE_TIPS[c]).filter(Boolean).map(t => `<p class="note doctor small">${t}</p>`).join('');
+
 export function openActivity(on = today()) {
   let day = on;
   sheet.open(body => {
@@ -41,6 +52,7 @@ export function openActivity(on = today()) {
           <p class="muted small">${phase === 'maintain'
             ? `در نگهداری هدف حدود ${fa(goal)} دقیقه در هفته است: کسانی که وزن کم‌شده را سال‌ها نگه می‌دارند معمولاً زیاد تحرک دارند. لازم نیست یک‌جا باشد؛ چند تکه‌ی ده‌دقیقه‌ای هم حساب است.`
             : `دست‌کم ${fa(goal)} دقیقه در هفته، توصیه‌ی سازمان جهانی بهداشت است. بیشتر از کالری‌سوزی، برای سلامت و نگه داشتن عضله و بعداً نگه داشتن وزن مهم است.`}</p>
+          ${moveTips(store.profile())}
           <button class="btn primary block big">ذخیره</button>
         </form>`;
       const input = body.querySelector('[name=m]');

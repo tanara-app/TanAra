@@ -120,7 +120,7 @@ export function renderProgress(root) {
   const sorted = sortedWeights(s.weights);
   const t = today();
   const latest = sorted[sorted.length - 1];
-  const rapid = rapidLoss(s.weights, p.startDate, t, rapidLimit(isTeen(p, t)));
+  const rapid = rapidLoss(s.weights, p.startDate, t, rapidLimit(isTeen(p, t), p.conditions));
   const m = measureLine();
   root.innerHTML = `
     <header class="page-head"><h1>پیشرفت</h1></header>

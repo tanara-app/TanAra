@@ -71,7 +71,7 @@ export function renderToday(root) {
     if (ue && !dismissed('under', ue.days[0])) {
       notices.push({ key: 'under', mark: ue.days[0], html: `<strong>چند روز است کم خورده‌اید</strong><p>سه روز گذشته کالری‌تان از حداقل ایمن (${fa(t.floor)}) کمتر بوده. کم‌خوری زیاد معمولاً نتیجه‌ی برعکس دارد؛ بدن خسته می‌شود و ادامه دادن سخت‌تر. کمی بیشتر خوردن کاملاً اشکالی ندارد.</p>` });
     }
-    const rl = rapidLoss(s.weights, p.startDate, today(), rapidLimit(isTeen(p)));
+    const rl = rapidLoss(s.weights, p.startDate, today(), rapidLimit(isTeen(p), p.conditions));
     if (rl && !dismissed('rapid', weekStart(today()))) {
       notices.push({ key: 'rapid', mark: weekStart(today()), cls: 'doctor', html: `<strong>سرعت کاهش وزن زیاد است</strong><p>سه هفته‌ی پشت‌سرهم بیشتر از ${fa(rl.perWeek, 1)} کیلو در هفته کم کرده‌اید. لطفاً با پزشک‌تان مشورت کنید.</p>` });
     }

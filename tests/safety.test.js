@@ -1,5 +1,5 @@
 import { suite, test, eq, ok } from './harness.js';
-import { rapidLoss, underEating } from '../js/domain/safety.js';
+import { rapidLoss, underEating, rapidLimit } from '../js/domain/safety.js';
 import { addDays } from '../js/lib/dates.js';
 
 const START = '2026-01-03'; // a Saturday
@@ -53,5 +53,8 @@ suite('safety', () => {
     const t = '2026-02-10';
     const e = [...day(addDays(t, -1), ['lunch', 'dinner'], 750), ...day(addDays(t, -2), ['lunch', 'dinner'], 500), ...day(addDays(t, -3), ['lunch', 'dinner'], 500), ...day(t, ['lunch', 'dinner'], 100)];
     eq(underEating(e, 1500, t), null);
+  });
+  test('gout, gallstones and fatty liver lower the rapid-loss limit to 1 kg a week', () => {
+    eq([rapidLimit(false), rapidLimit(true), rapidLimit(false, ['gout']), rapidLimit(false, ['liver']), rapidLimit(false, ['gallstone']), rapidLimit(false, ['ms', 'stones'])], [1.5, 1, 1, 1, 1, 1.5]);
   });
 });
