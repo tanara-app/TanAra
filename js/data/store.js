@@ -590,3 +590,26 @@ export async function aiUsageAll(since) {
     return res && !res.error ? res.data : null;
   } catch { return null; }
 }
+// «خانواده»: send this member's weekly rows ({ ok } or { error }), take them all back, and read
+// everyone's rows from a week on (null when they can't be read: offline, or no server).
+export async function familySave(rows) {
+  if (!remote) return { error: { message: 'local' } };
+  try {
+    const res = await remote.familySave(rows);
+    return res.error ? { error: res.error } : { ok: true };
+  } catch (e) { return { error: { message: String(e) } }; }
+}
+export async function familyLeave() {
+  if (!remote) return { ok: true };
+  try {
+    const res = await remote.familyLeave();
+    return res.error ? { error: res.error } : { ok: true };
+  } catch (e) { return { error: { message: String(e) } }; }
+}
+export async function familyBoard(since) {
+  if (!remote) return null;
+  try {
+    const res = await remote.familyBoard(since);
+    return res && !res.error ? res.data : null;
+  } catch { return null; }
+}

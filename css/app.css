@@ -912,3 +912,32 @@ body.kb .toast, body.chat-mode .toast { bottom: calc(var(--nav-h) + var(--safe-b
 .share-new .btn { align-self: flex-start; }
 .share-sent { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 10px; }
 .share-sent summary { cursor: pointer; font-weight: 600; padding: 4px 0; }
+
+/* «پیشرفت»: «من | خانواده» (ui/family.js) */
+.prog-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.prog-tab { min-width: 150px; }
+.prog-tab button { flex: 1; }
+.nav a { position: relative; }
+.nav a.news::after {
+  content: ''; position: absolute; top: 8px; inset-inline-start: calc(50% + 8px);
+  width: 8px; height: 8px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 2px var(--nav-bg);
+}
+.fam-card > h2 { margin-bottom: 10px; }
+.fam-card summary h2 { margin: 0; }
+.fam-team { margin-bottom: 14px; }
+.fam-team-top { display: flex; justify-content: space-between; align-items: baseline; font-size: .85rem; color: var(--muted); }
+.fam-team-top b { color: var(--text, inherit); font-size: 1.05rem; }
+.fam-team-top small { color: var(--muted); font-weight: 500; }
+.fam-team.done .fam-team-top b { color: var(--accent); }
+.fam-team .bar { height: 10px; }
+.fam-team .bar i, .fam-row .bar i { background: var(--accent); }
+.fam-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.fam-row { display: grid; grid-template-columns: 24px 64px 1fr 44px; align-items: center; gap: 10px; }
+.fam-row .bar { margin: 0; }
+.fam-row.me .fam-name { color: var(--accent); }
+.fam-rank { width: 24px; height: 24px; display: grid; place-items: center; border-radius: 50%; background: var(--surface-2); font-size: .78rem; font-weight: 700; }
+.fam-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fam-score { text-align: end; }
+.fam-how-link { display: block; margin: 4px auto 0; }
+.fam-how { margin: 4px 0 10px; padding-inline-start: 18px; display: grid; gap: 6px; }
+.fam-how + p { margin-bottom: 14px; }

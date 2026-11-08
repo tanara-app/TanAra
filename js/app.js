@@ -15,6 +15,7 @@ import { configureAI, sparkle } from './ai/hooshvareh.js';
 import { disable as disableReminders } from './ui/reminders.js';
 import { applyTheme } from './ui/theme.js';
 import { maybeCelebrate } from './ui/celebrate.js';
+import { startFamily } from './ui/family.js';
 
 applyTheme();
 
@@ -139,6 +140,7 @@ async function start(ns, remote) {
   render();
   if (remote) {
     store.pull();
+    startFamily();
     window.addEventListener('online', () => store.pull());
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') store.pull(); });
   }

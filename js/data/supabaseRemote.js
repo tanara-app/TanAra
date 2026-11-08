@@ -158,6 +158,16 @@ export function createSupabaseRemote(sb) {
     shareUndo(food, members) {
       return sb.rpc('food_share_undo', { food, members });
     },
+    // «خانواده» (20261108_family_week.sql): this member's weekly habit rows, and everyone's with names.
+    familySave(rows) {
+      return sb.from('family_week').upsert(rows.map(r => ({ ...r, updated_at: new Date().toISOString() })), { onConflict: 'user_id,week' });
+    },
+    familyLeave() {
+      return sb.from('family_week').delete().not('user_id', 'is', null);
+    },
+    familyBoard(since) {
+      return sb.rpc('family_board', { since });
+    },
     // The shared weekly magazine (20261108_magazine_shared.sql): the finished articles, newest first.
     magazine() {
       return sb.from('magazine').select('week,data').eq('status', 'ready').order('week', { ascending: false }).limit(60);

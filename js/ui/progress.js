@@ -18,11 +18,13 @@ import { checkinRow, bindCheckin } from './checkin.js';
 import { openMeasure, measureLine } from './measure.js';
 import { openActivity, activityLine } from './activity.js';
 import { aiAvailable } from '../ai/hooshvareh.js';
+import { familyView, bindFamily } from './family.js';
 
 let rangeKey = '3m';
 let metric = 'weight'; // what the trend card shows; or 'waist'
 let histAll = false;
 let histOpen = false;
+let tab = 'me'; // «من» or «خانواده» (family.js); kept while the app is open
 export const resetProgress = () => { histAll = false; histOpen = false; };
 const RANGES = { '1m': ['۱ ماه', 30], '3m': ['۳ ماه', 90], all: ['همه', null] };
 
@@ -122,8 +124,21 @@ export function renderProgress(root) {
   const latest = sorted[sorted.length - 1];
   const rapid = rapidLoss(s.weights, p.startDate, t, rapidLimit(isTeen(p, t), p.conditions));
   const m = measureLine();
+  const seg = `<div class="seg small prog-tab" data-tab role="tablist" aria-label="پیشرفت چه کسی">
+      <button type="button" role="tab" data-v="me" aria-selected="${tab === 'me'}" class="${tab === 'me' ? 'on' : ''}">من</button>
+      <button type="button" role="tab" data-v="family" aria-selected="${tab === 'family'}" class="${tab === 'family' ? 'on' : ''}">خانواده</button>
+    </div>`;
+  if (tab === 'family') {
+    root.innerHTML = `<header class="page-head prog-head"><h1>پیشرفت</h1>${seg}</header>${familyView()}`;
+    root.querySelector('[data-tab]').onclick = e => {
+      const b = e.target.closest('[data-v]');
+      if (b && b.dataset.v !== tab) { tab = b.dataset.v; renderProgress(root); }
+    };
+    bindFamily(root, () => { if (root.isConnected && location.hash === '#/progress' && tab === 'family') renderProgress(root); });
+    return;
+  }
   root.innerHTML = `
-    <header class="page-head"><h1>پیشرفت</h1></header>
+    <header class="page-head prog-head"><h1>پیشرفت</h1>${seg}</header>
 
     ${phaseNotes()}
 
@@ -177,6 +192,7 @@ export function renderProgress(root) {
     toast('هدف‌ها به‌روز شد');
   });
   root.querySelector('[data-recalc]')?.addEventListener('click', () => { recalcTargets(); toast('هدف‌ها به‌روز شد'); });
+  pick('[data-tab]', v => { tab = v; });
   pick('[data-metric]', v => { metric = v; });
   pick('[data-range]', v => { rangeKey = v; });
   root.querySelector('[data-hist-all]')?.addEventListener('click', () => { histAll = true; rerender(); });
