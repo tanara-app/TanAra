@@ -154,6 +154,10 @@ export function createSupabaseRemote(sb) {
     shareCatchUp(member, foods) {
       return sb.rpc('food_share_catch_up', { member, foods });
     },
+    // take back a shared food's copies from these members (null: everyone)
+    shareUndo(food, members) {
+      return sb.rpc('food_share_undo', { food, members });
+    },
     // The shared weekly magazine (20261108_magazine_shared.sql): the finished articles, newest first.
     magazine() {
       return sb.from('magazine').select('week,data').eq('status', 'ready').order('week', { ascending: false }).limit(60);

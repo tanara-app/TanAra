@@ -563,6 +563,14 @@ export async function shareCatchUp(member, foods) {
     return res.error ? { error: res.error } : { made: res.data };
   } catch (e) { return { error: { message: String(e) } }; }
 }
+// Take back a shared food's copies from these members (null: everyone): { gone } or { error }.
+export async function shareUndo(food, members = null) {
+  if (!remote) return { error: { message: 'local' } };
+  try {
+    const res = await remote.shareUndo(food, members);
+    return res.error ? { error: res.error } : { gone: res.data };
+  } catch (e) { return { error: { message: String(e) } }; }
+}
 // Every member's rows (with user_id and name) since an ISO time, or null.
 export async function aiUsageAll(since) {
   if (!remote) return null;

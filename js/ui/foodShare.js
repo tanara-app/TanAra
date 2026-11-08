@@ -74,7 +74,8 @@ export function openFoodShare(onDone) {
           <small class="muted">${fa(miss.length)} غذا را که قبل از آمدنش برای همه فرستاده شده ندارد: ${miss.slice(0, 4).map(f => `«${esc(f.name)}»`).join('، ')}${miss.length > 4 ? ' و…' : ''}</small>
           <button class="btn sm primary" data-catch="${m.id}">غذاهای تأییدشده را به ${esc(m.name)} بده</button>
         </div>`).join('')
-        + (list.length ? list.map(f => item(f, all)).join('') : '<div class="empty">غذای تازه‌ای منتظر تأیید نیست.</div>');
+        + (list.length ? list.map(f => item(f, all)).join('') : '<div class="empty">غذای تازه‌ای منتظر تأیید نیست.</div>')
+        + sentList(all);
     };
     box.onclick = async e => {
       const c = e.target.closest('[data-catch]');
@@ -85,6 +86,14 @@ export function openFoodShare(onDone) {
         if (r.error) { c.disabled = false; return toast('ثبت نشد؛ دوباره امتحان کن'); }
         toast(`${fa(r.made)} غذا به بانک ${m.name} اضافه شد`);
         return load();
+      }
+      const u = e.target.closest('[data-undo]');
+      if (u) {
+        const food = all.find(f => f.id === u.dataset.undo);
+        return food && openUndo(food, all, gone => {
+          toast(gone ? `از بانک ${fa(gone)} نفر برداشته شد` : 'برداشته شد');
+          load();
+        });
       }
       const b = e.target.closest('[data-ok],[data-no]');
       if (!b) return;
@@ -107,6 +116,58 @@ export function openFoodShare(onDone) {
     };
     load();
   }, { tall: true, onClose: () => onDone?.() });
+}
+
+// Who has a copy of a shared food: [{ id, name, copy }].
+const holders = (food, all) => all.filter(c => c.source === food.id)
+  .map(c => ({ id: c.user_id, name: c.member, copy: c }));
+
+// «تأییدشده‌ها»: what was sent, to whom, newest first, each with «برگرداندن…».
+function sentList(all) {
+  const sent = all.filter(f => f.decision === 'shared')
+    .sort((a, b) => String(b.decided_at).localeCompare(String(a.decided_at)));
+  if (!sent.length) return '';
+  return `<details class="share-sent"><summary>تأییدشده‌ها (${fa(sent.length)})</summary>${sent.map(f => {
+    const hs = holders(f, all);
+    return `
+    <div class="share-item">
+      <b>${esc(f.name)}</b>
+      <small class="muted">از ${esc(f.member)} · ${f.decided_at ? faDMY(iso(new Date(f.decided_at))) : ''}</small>
+      <small class="muted">${hs.length ? `در بانک: ${hs.map(h => esc(h.name)).join('، ')}` : 'در بانک کس دیگری نیست'}</small>
+      <div class="row gap"><button class="btn sm ghost" data-undo="${f.id}">برگرداندن…</button></div>
+    </div>`;
+  }).join('')}</details>`;
+}
+
+// Take a shared food back from the members ticked (all of them at first).
+function openUndo(food, all, onDone) {
+  const hs = holders(food, all);
+  sheet.open(body => {
+    body.innerHTML = `
+      <div class="sheet-head"><h2>برگرداندن «${esc(food.name)}»</h2><button class="icon-btn" data-close aria-label="بستن">${icon.close}</button></div>
+      <form class="stack" novalidate>
+        <p class="muted small">غذا از بانک کسانی که تیک دارند برداشته می‌شود، حتی اگر خودشان عوضش کرده باشند. وعده‌هایی که قبلاً با آن ثبت شده دست نمی‌خورند. نسخه‌ی اصلی در بانک ${esc(food.member)} می‌ماند.${hs.length ? ' اگر از بانک همه برداشته شود، غذا دوباره به فهرست منتظر تأیید برمی‌گردد.' : ''}</p>
+        ${hs.length ? `<div class="field"><span>از بانک چه کسانی برداشته شود</span>
+          ${hs.map(h => `<label class="check"><input type="checkbox" name="from" value="${h.id}" checked><span>${esc(h.name)}<small class="muted">${esc(h.copy.name)}</small></span></label>`).join('')}
+        </div>` : ''}
+        <p class="err" hidden></p>
+        <button class="btn primary block big" data-go>${hs.length ? 'برگرداندن' : 'برگرداندن به فهرست منتظر'}</button>
+      </form>`;
+    const form = body.querySelector('form');
+    const err = form.querySelector('.err');
+    body.querySelector('[data-close]').onclick = () => sheet.close();
+    form.onsubmit = async e => {
+      e.preventDefault();
+      const from = [...form.querySelectorAll('[name=from]:checked')].map(x => x.value);
+      if (hs.length && !from.length) { err.textContent = 'دست‌کم یک نفر را تیک بزن.'; err.hidden = false; return; }
+      const btn = body.querySelector('[data-go]');
+      btn.disabled = true;
+      const r = await store.shareUndo(food.id, from.length === hs.length ? null : from);
+      if (r.error) { btn.disabled = false; err.textContent = 'انجام نشد؛ دوباره امتحان کن.'; err.hidden = false; return; }
+      sheet.close();
+      onDone(r.gone);
+    };
+  });
 }
 
 function item(f, all) {
