@@ -164,7 +164,8 @@ export function renderOnboarding(root, onDone) {
         targets: { kcal: t.kcal, protein: t.protein, baseWeight: d.weightKg, computedAt: start, tdee: t.tdee, source: 'formula' },
       });
       store.setWeight(start, d.weightKg);
-      if (!store.get().foods.length) store.seedFoods();
+      // foods shared with everyone may already be here; the starter foods still belong in the bank
+      store.restoreDefaultFoods();
       toast('آماده‌ست!');
       onDone();
     };

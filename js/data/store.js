@@ -60,7 +60,7 @@ export function init(namespace, remoteAdapter) {
   // copies of files from the removed «صندوقچه»; gone at once, without waiting for the new service worker
   try { caches.delete('tanara-vault').catch(() => {}); } catch { /* no Cache API */ }
   fillFoodGrams();
-  if (!remote) fillFoodUnit2();
+  if (!remote) { fillFoodUnit2(); fillSeedFoods(); }
 }
 
 export function clearLocal() {
@@ -137,6 +137,7 @@ export async function pull() {
   emit();
   fillFoodGrams();
   fillFoodUnit2();
+  fillSeedFoods();
 }
 
 /* ---------------- writes ---------------- */
@@ -247,8 +248,17 @@ function fillFoodUnit2() {
   if (remote) { queue.push({ op: 'upsert', table: 'foods', row: rows.map(r => ({ ...r })) }); persist(); flush(); }
 }
 
-export function seedFoods() {
-  return addFoods(SEED_FOODS);
+/*
+  A member who joins after foods were shared with everyone gets those copies before finishing
+  onboarding, and onboarding used to seed only an empty bank — so their bank stayed at the one
+  or two shared foods and every diet plan came out empty. An onboarded bank with no starter
+  food at all and only a few foods gets the starter foods once (after a pull when signed in).
+*/
+function fillSeedFoods() {
+  if (!profile()?.onboarded || state.foods.length >= 10) return;
+  const seed = new Set(SEED_FOODS.map(f => f.name));
+  if (state.foods.some(f => seed.has(f.name))) return;
+  restoreDefaultFoods();
 }
 
 export function restoreDefaultFoods() {
