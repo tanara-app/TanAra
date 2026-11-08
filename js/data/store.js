@@ -515,13 +515,14 @@ export async function aiUsage(since) {
     return res && !res.error ? res.data : null;
   } catch { return null; }
 }
-// The owner's view: true when this account may read everyone's usage.
+// The owner's view: true when this account may read everyone's usage;
+// null when it can't be asked now (offline), so the caller can ask again later.
 export async function isUsageAdmin() {
   if (!remote) return false;
   try {
     const res = await remote.usageAdmin();
-    return !!(res && !res.error && res.data);
-  } catch { return false; }
+    return res && !res.error ? !!res.data : null;
+  } catch { return null; }
 }
 // «غذاهای تازه‌ی خانواده» (owner only): every member's foods, or null when they can't be read.
 export async function shareFoods() {

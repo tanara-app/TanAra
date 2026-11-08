@@ -1,5 +1,5 @@
 import { suite, test, eq } from './harness.js';
-import { words, foodKey, similar, similarIn, missingFor } from '../js/domain/foodMatch.js';
+import { words, foodKey, similar, similarIn, missingFor, everyoneHas, groupSimilar } from '../js/domain/foodMatch.js';
 
 const f = (name, o = {}) => ({ id: name, name, barcode: null, ...o });
 
@@ -18,7 +18,6 @@ suite('food match', () => {
   test('the same food under another spelling is similar', () => {
     eq(similar(f('نان بادام کریسپی'), f('نان کریسپی بادام (Crispy almond bread)')), true);
     eq(similar(f('مربا آلبالو'), f('مربای آلبالو ( مجید )')), true);
-    eq(similar(f('صمون'), f('صمون عراقی')), true);
     eq(similar(f('قورمه سبزی'), f('قورمه‌سبزی')), true);
   });
 
@@ -26,7 +25,12 @@ suite('food match', () => {
     eq(similar(f('نان'), f('نان سنگک')), false);
     eq(similar(f('مربا هویج'), f('مربا آلبالو')), false);
     eq(similar(f('قیمه با روغن زیتون'), f('قیمه (بدون روغن رو)')), false);
-    eq(similar(f('صمون'), f('صمون عراقی کنجدی تازه')), false);
+    eq(similar(f('صمون'), f('صمون عراقی')), false);
+    eq(similar(f('مربا'), f('مربا آلبالو')), false);
+    eq(similar(f('بادام'), f('بادام زمینی')), false);
+    eq(similar(f('بادام'), f('نان بادام کریسپی')), false);
+    eq(similar(f('بادام زمینی'), f('کره بادام‌زمینی')), false);
+    eq(similar(f('سس مایونز'), f('سس مایونز تیفانی')), true);
   });
 
   test('the same barcode is similar whatever the name', () => {
@@ -34,8 +38,8 @@ suite('food match', () => {
   });
 
   test('a food is not similar to itself in its own bank', () => {
-    const a = f('زیتون');
-    eq(similarIn(a, [a, f('زیتون پرورده'), f('گردو')]).map(x => x.name), ['زیتون پرورده']);
+    const a = f('نان سنگک');
+    eq(similarIn(a, [a, f('نان سنگک کنجدی'), f('گردو')]).map(x => x.name), ['نان سنگک کنجدی']);
   });
 
   test('a member who joined later misses the foods shared before, unless they have one like it', () => {
@@ -49,5 +53,34 @@ suite('food match', () => {
     ];
     eq(missingFor({ id: 'dad', joined: '2026-11-07T00:00:00Z' }, all).map(x => x.name), ['گلابی']);
     eq(missingFor({ id: 'mom', joined: '2026-10-01T00:00:00Z' }, all), []);
+    eq(missingFor({ id: 'dad', joined: '2026-11-07T00:00:00Z', skip: ['گلابی'] }, all), []);
+  });
+
+  test('a food every other member already has is nothing to send', () => {
+    const all = [
+      { ...f('دوغ عالیس'), id: '1', user_id: 'me' }, { ...f('دوغ عالیس'), id: '2', user_id: 'mom' },
+      { ...f('دوغ عالیس'), id: '3', user_id: 'dad' }, { ...f('نان جو'), id: '4', user_id: 'me' },
+      { ...f('نان جو'), id: '5', user_id: 'mom' },
+    ];
+    eq(everyoneHas(all[0], all, ['me', 'mom', 'dad']), true);
+    eq(everyoneHas(all[3], all, ['me', 'mom', 'dad']), false);
+  });
+
+  test('the same food added by several members shows once, under the first one added', () => {
+    const list = [
+      { ...f('نان جو'), id: 'mom', created_at: '2026-11-03' },
+      { ...f('گلابی'), id: 'pear', created_at: '2026-11-02' },
+      { ...f('نان  جو'), id: 'me', created_at: '2026-11-01' },
+    ];
+    eq(groupSimilar(list.map((x, i) => ({ ...x, user_id: ['mom', 'me', 'me'][i] }))).map(g => [g.food.id, g.also.map(x => x.id)]),
+      [['me', ['mom']], ['pear', []]]);
+  });
+
+  test('two similar foods in one bank stay two', () => {
+    const list = [
+      { ...f('مربای آلبالو ( مجید )'), id: 'b', user_id: 'me', created_at: '2026-11-02' },
+      { ...f('مربا آلبالو'), id: 'a', user_id: 'me', created_at: '2026-11-01' },
+    ];
+    eq(groupSimilar(list).map(g => g.food.id), ['b', 'a']);
   });
 });
