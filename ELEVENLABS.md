@@ -38,7 +38,6 @@ review-1.mp3 | [proud] مرور هفته ثبت شد! نگاه کردن به ع�
 review-2.mp3 | [warm] آفرین! یه دانشمند خوب همیشه یادداشت برمی‌داره.
 goal-1.mp3 | [playful] هدف این هفته ثبت شد. بزن بریم!
 goal-2.mp3 | [warm] هدف تازه! من کنارتم.
-family-1.mp3 | [excited] خانواده به هدف مشترک تحرک این هفته رسید! کار تیمی، نتیجه‌ی تیمی!
 
 ### B. Days in a row (very excited; energy rises as the number grows)
 streak-3.mp3 | [excited] سه روز پشت‌سرهم! این دیگه یه عادت واقعیه!
@@ -61,7 +60,6 @@ care-activity-1.mp3 | [warm] چه خوب که کمی حرکت کردی.
 care-activity-2.mp3 | [gentle] حرکت آروم هم حال آدم رو خوب می‌کنه.
 care-review-1.mp3 | [gentle] ممنون که به هفته‌ات نگاه کردی.
 care-goal-1.mp3 | [gentle] هدف تازه ثبت شد. آروم و با مهربونی پیش برو.
-care-family-1.mp3 | [warm] خانواده با هم به هدف تحرک این هفته رسید. چه خوب که کنار همید.
 
 ### D. Greetings at the top of the home screen (friendly; the night ones sleepy and quiet)
 greet-morning-1.mp3 | [cheerful] صبح بخیر! آزمایشگاه امروز آماده‌ست.

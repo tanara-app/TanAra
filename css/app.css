@@ -924,13 +924,7 @@ body.kb .toast, body.chat-mode .toast { bottom: calc(var(--nav-h) + var(--safe-b
 }
 .fam-card > h2 { margin-bottom: 10px; }
 .fam-card summary h2 { margin: 0; }
-.fam-team { margin-bottom: 14px; }
-.fam-team-top { display: flex; justify-content: space-between; align-items: baseline; font-size: .85rem; color: var(--muted); }
-.fam-team-top b { color: var(--text, inherit); font-size: 1.05rem; }
-.fam-team-top small { color: var(--muted); font-weight: 500; }
-.fam-team.done .fam-team-top b { color: var(--accent); }
-.fam-team .bar { height: 10px; }
-.fam-team .bar i, .fam-row .bar i { background: var(--accent); }
+.fam-row .bar i { background: var(--accent); }
 .fam-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
 .fam-row { display: grid; grid-template-columns: 24px 64px 1fr 44px; align-items: center; gap: 10px; }
 .fam-row .bar { margin: 0; }

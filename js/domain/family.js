@@ -9,8 +9,7 @@
           eating-disorder history: no counting of how they eat)
 
   The score is the average of the parts that apply, as a percentage, each part capped at 100.
-  Only these numbers leave the device (table family_week); the team goal adds up everyone's
-  minutes against everyone's goals.
+  Only these numbers leave the device (table family_week).
 */
 import { addDays } from '../lib/dates.js';
 import { daysLoggedInWeek, activityWeek, ACTIVITY_GOAL } from './stats.js';
@@ -53,13 +52,6 @@ export function parts(r) {
 export function score(r) {
   const v = Object.values(parts(r)).filter(x => x !== null);
   return v.length ? Math.round((v.reduce((s, x) => s + x, 0) / v.length) * 100) : 0;
-}
-
-// The family's minutes together against the sum of everyone's own goals.
-export function teamGoal(rows) {
-  const min = rows.reduce((s, r) => s + (r.move_min || 0), 0);
-  const goal = rows.reduce((s, r) => s + (r.move_goal || 0), 0);
-  return { min, goal, done: goal > 0 && min >= goal, pct: goal > 0 ? Math.min(1, min / goal) : 0 };
 }
 
 // Rows of one week, best score first (ties: more minutes, then name).

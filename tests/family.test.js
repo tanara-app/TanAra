@@ -1,5 +1,5 @@
 import { suite, test, eq } from './harness.js';
-import { weekRow, score, parts, teamGoal, board, LOG_GOAL } from '../js/domain/family.js';
+import { weekRow, score, parts, board, LOG_GOAL } from '../js/domain/family.js';
 
 const ws = '2026-11-07'; // a Saturday
 const e = days => days.map(day => ({ day, meal: 'lunch', kcal: 300 }));
@@ -40,12 +40,6 @@ suite('family', () => {
   test('no plan part with a possible eating-disorder history, or without a plan', () => {
     eq(weekRow({ profile: { mode: 'plan', edHistory: 'yes' } }, ws).plan_of, 0);
     eq(weekRow({ profile: { mode: 'count' } }, ws).plan_of, 0);
-  });
-
-  test('the team goal adds up minutes and goals', () => {
-    const t = teamGoal([{ move_min: 100, move_goal: 150 }, { move_min: 300, move_goal: 250 }]);
-    eq(t.min, 400); eq(t.goal, 400); eq(t.done, true); eq(t.pct, 1);
-    eq(teamGoal([]).done, false);
   });
 
   test('the board is one week, best score first', () => {

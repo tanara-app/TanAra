@@ -71,9 +71,6 @@ const LINES = {
     'هدف این هفته ثبت شد. بزن بریم!',
     'هدف تازه! من کنارتم.',
   ] },
-  family: { mood: 'excited', lines: [
-    'خانواده به هدف مشترک تحرک این هفته رسید! کار تیمی، نتیجه‌ی تیمی!',
-  ] },
 };
 // With edCare: eating is looking after yourself, nothing more.
 const CARE = {
@@ -82,10 +79,9 @@ const CARE = {
   activity: { mood: 'happy', lines: ['چه خوب که کمی حرکت کردی.', 'حرکت آروم هم حال آدم رو خوب می‌کنه.'] },
   review: { mood: 'caring', lines: ['ممنون که به هفته‌ات نگاه کردی.'] },
   goal: { mood: 'caring', lines: ['هدف تازه ثبت شد. آروم و با مهربونی پیش برو.'] },
-  family: { mood: 'happy', lines: ['خانواده با هم به هدف تحرک این هفته رسید. چه خوب که کنار همید.'] },
 };
 // The moments that may come right after another line.
-const BIG = new Set(['first', 'meals', 'streak', 'review', 'goal', 'family']);
+const BIG = new Set(['first', 'meals', 'streak', 'review', 'goal']);
 // Each run of days has its own recording, so each has one fixed line (VOICE.md).
 const STREAK_LINE = { 3: 0, 7: 1, 14: 2, 21: 0, 30: 1, 60: 2, 100: 0, 200: 1, 365: 3 };
 const STREAKS = Object.keys(STREAK_LINE).map(Number);
@@ -210,7 +206,7 @@ function say(kind, n) {
   if (!BIG.has(kind) && Date.now() - log.last < 90000) return false;
   const mood = Array.isArray(set.mood) ? pick(set.mood) : set.mood;
   const i = kind === 'streak' ? STREAK_LINE[n] : Math.floor(Math.random() * set.lines.length);
-  const sfx = care ? 'sfx-chime' : kind === 'goal' ? 'sfx-gadget' : ['meals', 'streak', 'review', 'family'].includes(kind) ? 'sfx-cheer' : 'sfx-pop';
+  const sfx = care ? 'sfx-chime' : kind === 'goal' ? 'sfx-gadget' : ['meals', 'streak', 'review'].includes(kind) ? 'sfx-cheer' : 'sfx-pop';
   const file = kind === 'streak' ? `streak-${n}` : `${care ? 'care-' : ''}${kind}-${i + 1}`;
   show(mood, set.lines[i].replace('{n}', fa(n)), { sfx, voice: file });
   log.n++;

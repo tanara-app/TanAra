@@ -39,6 +39,10 @@ one needs to know goes in this file or in the project docs, not only in your own
   folder's server); then use `tanara-5180` (`http://127.0.0.1:5180`).
 - Tests: `node tests/run.js` (or open `tests/index.html` in the browser).
 - The user speaks Persian; answer in Persian.
+- ElevenLabs (the mascot's voice): always the newest model, and ask the user before generating anything
+  (voice, model, which lines). The voice is the user's own «Heimerdinger»; never pick an older model on your own.
+- Build only what the user agreed to. When a reply could mean more than one of the options you offered,
+  ask which ones before building (on 2026-11-08 a shared «team goal» was built that the user hadn't asked for).
 
 ## Where things are
 

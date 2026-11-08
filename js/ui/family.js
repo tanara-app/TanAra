@@ -1,19 +1,18 @@
 /*
-  «خانواده» on «پیشرفت» (the «من | خانواده» switch at the top): this week's shared activity goal
-  and each member's habit score against their own goals (js/domain/family.js), last week folded.
-  Nothing is added to «امروز»: when there is news (the shared goal reached, last week's result
-  in) a small dot shows on the «پیشرفت» tab, and the mascot says one line when the goal is reached.
+  «خانواده» on «پیشرفت» (the «من | خانواده» switch at the top): each member's habit score
+  against their own goals (js/domain/family.js), this week and last week folded.
+  Nothing is added to «امروز»: when last week's result is in, a small dot shows on the
+  «پیشرفت» tab until «خانواده» is opened.
 
   This device sends its own rows (this week and last, which late logging can still change) a
   few seconds after anything changes, and only when they changed. «من را در خانواده نشان نده»
   takes them back from the server and stops sending.
 */
 import * as store from '../data/store.js';
-import { weekRow, teamGoal, board, LOG_GOAL } from '../domain/family.js';
+import { weekRow, board, LOG_GOAL } from '../domain/family.js';
 import { fa, esc } from '../lib/fa.js';
 import { today, addDays, weekStart } from '../lib/dates.js';
 import { toast, sheet, icon } from './dom.js';
-import { cheer } from './mascot.js';
 
 let rows = null;       // everyone's rows from last week on, or null until read
 let failed = false;    // the last read didn't work (offline, or the server can't answer)
@@ -82,22 +81,16 @@ export function startFamily() {
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') read(); });
 }
 
-/* ---------------- the dot on «پیشرفت» and the mascot's line ---------------- */
+/* ---------------- the dot on «پیشرفت» ---------------- */
 
 function news() {
   if (!rows || hidden()) return [];
-  const { ws, prev } = weeks();
-  const out = [];
-  const now = board(rows, ws);
-  if (now.length > 1 && teamGoal(now).done) out.push(`goal:${ws}`);
-  if (board(rows, prev).length > 1) out.push(`week:${prev}`);
-  return out.filter(k => !mem.get(`seen:${k}`));
+  const { prev } = weeks();
+  return board(rows, prev).length > 1 && !mem.get(`seen:week:${prev}`) ? [`week:${prev}`] : [];
 }
 function markNews() {
   const n = news();
   document.querySelector('#nav a[data-route="progress"]')?.classList.toggle('news', n.length > 0);
-  const { ws } = weeks();
-  if (n.includes(`goal:${ws}`) && !mem.get(`cheered:${ws}`)) { mem.set(`cheered:${ws}`, '1'); cheer('family'); }
 }
 function seeNews() {
   news().forEach(k => mem.set(`seen:${k}`, '1'));
@@ -115,14 +108,6 @@ const memberRow = (r, rank) => `<li class="fam-row${r.me ? ' me' : ''}">
     <b class="fam-score">${fa(r.score)}٪</b>
   </li>`;
 
-const teamLine = list => {
-  const g = teamGoal(list);
-  return `<div class="fam-team${g.done ? ' done' : ''}">
-    <div class="fam-team-top"><span>هدف مشترک تحرک</span><b>${fa(g.min)} <small>/ ${fa(g.goal)} دقیقه</small>${g.done ? ' ✓' : ''}</b></div>
-    <div class="bar"><i style="width:${Math.round(g.pct * 100)}%"></i></div>
-  </div>`;
-};
-
 export function familyView() {
   const { ws, prev } = weeks();
   const local = !store.canPush();
@@ -138,12 +123,12 @@ export function familyView() {
     ${hidden() ? '<div class="note soft"><p>تو در جدول نیستی.</p><button class="btn sm" data-fam-join>من را هم نشان بده</button></div>' : ''}
     <section class="card fam-card">
       <h2>این هفته</h2>
-      ${now.length ? `${teamLine(now)}<ol class="fam-list">${now.map((r, i) => memberRow(r, i + 1)).join('')}</ol>`
+      ${now.length ? `<ol class="fam-list">${now.map((r, i) => memberRow(r, i + 1)).join('')}</ol>`
         : '<p class="muted small">هنوز کسی چیزی ثبت نکرده.</p>'}
     </section>
     ${before.length ? `<details class="card fold fam-card">
       <summary><span><h2>هفته‌ی گذشته</h2></span></summary>
-      ${teamLine(before)}<ol class="fam-list">${before.map((r, i) => memberRow(r, i + 1)).join('')}</ol>
+      <ol class="fam-list">${before.map((r, i) => memberRow(r, i + 1)).join('')}</ol>
     </details>` : ''}
     <button class="link small fam-how-link" data-fam-how>امتیاز چطور حساب می‌شود؟</button>`;
 }
