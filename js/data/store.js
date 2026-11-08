@@ -613,3 +613,18 @@ export async function familyBoard(since) {
     return res && !res.error ? res.data : null;
   } catch { return null; }
 }
+// The family land: everyone's plot ({ user_id, name, me, plot }) or null; and choosing this member's.
+export async function familyPlots() {
+  if (!remote) return null;
+  try {
+    const res = await remote.familyPlots();
+    return res && !res.error ? res.data : null;
+  } catch { return null; }
+}
+export async function familyChoose(plot) {
+  if (!remote) return { error: { message: 'local' } };
+  try {
+    const res = await remote.familyChoose(plot);
+    return res.error ? { error: res.error } : { ok: true };
+  } catch (e) { return { error: { message: String(e) } }; }
+}

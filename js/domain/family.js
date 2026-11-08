@@ -59,3 +59,25 @@ export function board(rows, week) {
   return rows.filter(r => r.week === week)
     .sort((a, b) => b.score - a.score || b.move_min - a.move_min || String(a.name).localeCompare(String(b.name), 'fa'));
 }
+
+/*
+  The family land: each member grows their own plot. Every PIECE_POINTS of score added up over
+  all weeks opens the next piece of their plot, up to PIECES. A plot never shrinks: a weak week
+  only means fewer new pieces, never losing any.
+*/
+export const PIECE_POINTS = 60;
+export const PIECES = 20;
+export const PLOTS = ['garden', 'farm', 'forest', 'lake'];
+
+// Everyone's score added up over all weeks: { user_id: total }.
+export function totals(rows) {
+  const out = {};
+  for (const r of rows) out[r.user_id] = (out[r.user_id] || 0) + (r.score || 0);
+  return out;
+}
+
+// Pieces open for a total, and the points still needed for the next one (0 when the plot is full).
+export function pieces(total) {
+  const open = Math.min(PIECES, Math.floor((total || 0) / PIECE_POINTS));
+  return { open, next: open >= PIECES ? 0 : PIECE_POINTS - ((total || 0) % PIECE_POINTS) };
+}

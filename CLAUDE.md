@@ -41,6 +41,8 @@ one needs to know goes in this file or in the project docs, not only in your own
 - The user speaks Persian; answer in Persian.
 - ElevenLabs (the mascot's voice): always the newest model, and ask the user before generating anything
   (voice, model, which lines). The voice is the user's own «Heimerdinger»; never pick an older model on your own.
+- No emoji anywhere in the app's UI (no 🏆, ✓ as emoji, etc.): draw icons as inline SVG like the existing ones
+  in `js/ui/dom.js`. The mascot appears only where it already is; don't add him to new screens unasked.
 - Build only what the user agreed to. When a reply could mean more than one of the options you offered,
   ask which ones before building (on 2026-11-08 a shared «team goal» was built that the user hadn't asked for).
 

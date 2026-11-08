@@ -168,6 +168,13 @@ export function createSupabaseRemote(sb) {
     familyBoard(since) {
       return sb.rpc('family_board', { since });
     },
+    // the family land (20261108_family_plot.sql): everyone's plot, and choosing this member's
+    familyPlots() {
+      return sb.rpc('family_plots');
+    },
+    familyChoose(plot) {
+      return sb.from('family_plot').insert({ plot });
+    },
     // The shared weekly magazine (20261108_magazine_shared.sql): the finished articles, newest first.
     magazine() {
       return sb.from('magazine').select('week,data').eq('status', 'ready').order('week', { ascending: false }).limit(60);

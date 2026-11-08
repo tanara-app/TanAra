@@ -1,5 +1,5 @@
 import { suite, test, eq } from './harness.js';
-import { weekRow, score, parts, board, LOG_GOAL } from '../js/domain/family.js';
+import { weekRow, score, parts, board, LOG_GOAL, totals, pieces, PIECE_POINTS, PIECES } from '../js/domain/family.js';
 
 const ws = '2026-11-07'; // a Saturday
 const e = days => days.map(day => ({ day, meal: 'lunch', kcal: 300 }));
@@ -50,5 +50,19 @@ suite('family', () => {
       { name: 'ت', week: ws, score: 60, move_min: 40 },
     ];
     eq(board(rows, ws).map(r => r.name), ['الف', 'ت', 'ب']);
+  });
+
+  test('scores add up over all weeks per member', () => {
+    const t = totals([{ user_id: 'a', score: 50 }, { user_id: 'b', score: 10 }, { user_id: 'a', score: 30 }]);
+    eq(t.a, 80); eq(t.b, 10);
+  });
+
+  test('every 60 points opens a piece, up to 20, and says what the next one needs', () => {
+    eq(pieces(0), { open: 0, next: PIECE_POINTS });
+    eq(pieces(59), { open: 0, next: 1 });
+    eq(pieces(60), { open: 1, next: PIECE_POINTS });
+    eq(pieces(185), { open: 3, next: 55 });
+    eq(pieces(PIECE_POINTS * PIECES + 500), { open: PIECES, next: 0 });
+    eq(pieces(undefined).open, 0);
   });
 });

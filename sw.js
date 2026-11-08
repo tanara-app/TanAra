@@ -5,7 +5,7 @@
    Supabase API calls are never touched. Bump CACHE when the shell list changes.
    Every other cache is cleared on activate (including «tanara-vault», from the removed vault).
    Also shows the push reminders sent by the `remind` Edge Function (see ui/reminders.js). */
-const CACHE = 'tanara-shell-v50';
+const CACHE = 'tanara-shell-v51';
 const SHELL = [
   './', './index.html', './manifest.json', './css/app.css',
   './js/app.js', './js/config.js',
@@ -16,7 +16,7 @@ const SHELL = [
   './js/ui/dom.js', './js/ui/onboarding.js', './js/ui/today.js', './js/ui/logFood.js', './js/ui/foodBank.js',
   './js/ui/progress.js', './js/ui/review.js', './js/ui/profile.js', './js/ui/login.js', './js/ui/chart.js', './js/ui/notices.js', './js/ui/motivation.js',
   './js/ai/hooshvareh.js', './js/ai/foodTags.js', './js/ui/chat.js', './js/ui/aiCards.js', './js/ui/units.js', './js/ui/plan.js', './js/ui/magazine.js',
-  './js/ui/phase.js', './js/ui/reminders.js', './js/ui/usage.js', './js/ui/photo.js', './js/ui/recipes.js', './js/ui/measure.js', './js/ui/shopping.js', './js/ui/barcode.js', './js/ui/theme.js', './js/ui/activity.js', './js/ui/checkin.js', './js/ui/mascot.js', './js/ui/celebrate.js', './js/ui/feedback.js', './js/ui/foodShare.js', './js/domain/foodMatch.js', './js/ui/family.js', './js/domain/family.js',
+  './js/ui/phase.js', './js/ui/reminders.js', './js/ui/usage.js', './js/ui/photo.js', './js/ui/recipes.js', './js/ui/measure.js', './js/ui/shopping.js', './js/ui/barcode.js', './js/ui/theme.js', './js/ui/activity.js', './js/ui/checkin.js', './js/ui/mascot.js', './js/ui/celebrate.js', './js/ui/feedback.js', './js/ui/foodShare.js', './js/domain/foodMatch.js', './js/ui/family.js', './js/domain/family.js', './js/ui/landArt.js', './img/land/base-land.webp',
   './favicon-32-v2.png', './icon-192-v2.png', './icon-512-v2.png', './icon-maskable-192-v2.png', './icon-maskable-512-v2.png', './apple-touch-icon-v2.png', './badge-96.png',
   './img/mascot/happy.webp', './img/mascot/surprised.webp', './img/mascot/proud.webp', './img/mascot/wink.webp', './img/mascot/calm.webp', './img/mascot/thinking.webp',
   './img/mascot/caring.webp', './img/mascot/excited.webp', './img/mascot/wave.webp', './img/mascot/hello.webp', './img/mascot/sleepy.webp', './img/mascot/face.webp', './img/mascot/face-thinking.webp',
