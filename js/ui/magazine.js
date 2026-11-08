@@ -12,7 +12,7 @@
 import * as store from '../data/store.js';
 import { aiAvailable, aiOnline, authToken, md, sparkle, focusArticle } from '../ai/hooshvareh.js';
 import { SUPABASE_URL, SUPABASE_KEY } from '../config.js';
-import { today, relLabel, weekStart, addDays, faFull } from '../lib/dates.js';
+import { today, relLabel, weekStart } from '../lib/dates.js';
 import { fa, esc } from '../lib/fa.js';
 import { toast, sheet, icon } from './dom.js';
 import { startChat } from './chat.js';
@@ -37,7 +37,6 @@ const dayOf = n => n.key.slice(4, 14);
 const sharedKey = week => `mag:${week}:all`;
 const weekArticle = () => articles().find(n => dayOf(n) >= weekStart(today()));
 const sharedThisWeek = () => !!store.note(sharedKey(weekStart(today())));
-const nextWeek = () => faFull(addDays(weekStart(today()), 7));
 
 // Copies the shared articles this app doesn't have yet into ai_notes, unread. After the first
 // pull, so another device's copy (and its read mark) isn't overwritten.
@@ -166,7 +165,6 @@ function bindSwipeAway(el, onGone) {
 
 const waiting = topic => `<section class="card ai-card">
   <p class="muted small ai-wait"><span class="typing"><i></i><i></i><i></i></span> ${topic ? `دارم درباره‌ی «${esc(topic)}» در منابع معتبر می‌گردم…` : 'دارم برای مقاله‌ی این هفته در منابع معتبر می‌گردم…'}</p>
-  <p class="muted small">جست‌وجو و نوشتن حدود یک دقیقه طول می‌کشد. بعد برای همه‌ی اعضا فرستاده می‌شود.</p>
 </section>`;
 
 function row(n, lead) {
@@ -186,21 +184,18 @@ export function renderMagazine(root) {
   root.innerHTML = `
     <header class="page-head mag-head">
       <h1>مجله</h1>
-      <p class="muted small">هر هفته یک مقاله که هوشواره از منابع معتبر علمی جمع می‌کند و برای همه‌ی اعضای تن‌آرا می‌فرستد.</p>
+      <p class="muted small">هر شنبه یک مقاله‌ی تازه برای همه.</p>
     </header>
 
     ${!ok ? '<div class="note soft"><p>مجله فقط وقتی وارد حساب شده‌ای می‌رسد.</p></div>' : ''}
     ${writing !== null ? waiting(writing) : ''}
     ${early ? `<section class="card">
-      <p class="muted small">${failure ? esc(failure) : 'مقاله‌ی این هفته هنوز نوشته نشده؛ شنبه صبح خودکار نوشته می‌شود. می‌توانی همین حالا بنویسی‌اش، یا موضوعش را خودت بگویی. هر دو برای همه‌ی اعضا فرستاده می‌شود.'}</p>
+      ${failure ? `<p class="muted small">${esc(failure)}</p>` : ''}
       <button class="btn block" data-now>مقاله‌ی این هفته را همین حالا بنویس</button>
-      <button class="btn block ai-btn mag-ask" data-topic>${sparkle(18)} مقاله‌ی این هفته درباره‌ی موضوع دلخواه</button>
+      <button class="btn block ai-btn mag-ask" data-topic>${sparkle(18)} با موضوع دلخواه</button>
     </section>` : ''}
-    ${ok && !early && writing === null && !weekArticle() ? `<p class="muted small">مقاله‌ی این هفته هنوز نرسیده؛ هوشواره هر شنبه صبح یکی برای همه می‌نویسد.</p>` : ''}
 
-    ${list.map((n, i) => row(n, i === 0)).join('') || (writing !== null || !ok ? '' : '<div class="empty">هنوز مقاله‌ای نیست.</div>')}
-
-    ${ok && writing === null && weekArticle() ? `<p class="muted small mag-next">هر هفته یک مقاله برای همه؛ مقاله‌ی بعدی از ${nextWeek()}.</p>` : ''}`;
+    ${list.map((n, i) => row(n, i === 0)).join('') || (writing !== null || !ok ? '' : '<div class="empty">هنوز مقاله‌ای نیست.</div>')}`;
 
   const refresh = () => { if (root.isConnected && location.hash === '#/mag') renderMagazine(root); };
   root.querySelectorAll('[data-open]').forEach(b => b.onclick = () => openArticle(b.dataset.open));
@@ -217,7 +212,7 @@ function askTopic(refresh) {
       <div class="sheet-head"><h2>موضوع دلخواه</h2><button class="icon-btn" data-close aria-label="بستن">${icon.close}</button></div>
       <form class="stack" novalidate>
         <label class="field"><span>درباره‌ی چه چیزی بخوانی؟</span><textarea name="topic" rows="3" maxlength="300" placeholder="مثلاً: روزه‌داری متناوب واقعاً بهتر از رژیم معمولی است؟"></textarea></label>
-        <p class="muted small">هوشواره فقط در منابع معتبر (سازمان جهانی بهداشت، NIH، کاکرین، مجله‌های پزشکی و…) می‌گردد و لینک منبع‌ها را زیر مقاله می‌گذارد. مقاله برای همه‌ی اعضا فرستاده می‌شود، پس چیزی شخصی ننویس.</p>
+        <p class="muted small">برای همه فرستاده می‌شود؛ چیزی شخصی ننویس.</p>
         <button class="btn primary block">بنویس</button>
       </form>`;
     body.querySelector('[data-close]').onclick = () => sheet.close();
