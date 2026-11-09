@@ -37,6 +37,9 @@ one needs to know goes in this file or in the project docs, not only in your own
   comes up, the server is probably already running under the other account; just navigate to
   `127.0.0.1:5173`. On 2026-11-08 `127.0.0.1:5173` itself answered 404 for every page (another
   folder's server); then use `tanara-5180` (`http://127.0.0.1:5180`).
+- Edge Functions deploy from this folder with the Supabase CLI (logged in on `m.b.a` on 2026-11-09):
+  `npx supabase functions deploy <name> --project-ref whmzjvmeyxdoqjtkukix --yes` (ask the user first;
+  `hooshvareh` is too big to send through the Supabase MCP tool).
 - Tests: `node tests/run.js` (or open `tests/index.html` in the browser).
 - The user speaks Persian; answer in Persian.
 - ElevenLabs (the mascot's voice): always the newest model, and ask the user before generating anything
@@ -45,11 +48,6 @@ one needs to know goes in this file or in the project docs, not only in your own
   in `js/ui/dom.js`. The mascot appears only where it already is; don't add him to new screens unasked.
 - Build only what the user agreed to. When a reply could mean more than one of the options you offered,
   ask which ones before building (on 2026-11-08 a shared «team goal» was built that the user hadn't asked for).
-
-## Waiting to deploy
-
-- `supabase/functions/hooshvareh/index.ts`: since 2026-11-09 git has one line the live function doesn't (reminders are now in
-  «نمایه» ← «تنظیمات» ← «یادآورها»). The user chose to deploy it with the next hooshvareh change; deploy it then and remove this note.
 
 ## Where things are
 
