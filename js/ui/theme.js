@@ -17,11 +17,15 @@ export const THEMES = [
   { value: 'dark', label: 'تیره' },
 ];
 
+// sw: swatch colours for the picker [background, accent, second colour], same as css/app.css
 export const PALETTES = [
-  { value: 'nana', label: 'نعنا', hint: 'سبز نعنایی' },
-  { value: 'anar', label: 'انار', hint: 'زرشکی کلاسیک با طلایی و سرمه‌ای' },
-  { value: 'kashi', label: 'کاشی', hint: 'لاجوردی با طلایی و فیروزه‌ای' },
+  { value: 'nana', label: 'نعنا', hint: 'سبز نعنایی', sw: { light: ['#f3f5f6', '#0c8460', '#a86b12'], dark: ['#0f1315', '#5fd3a8', '#e9b872'] } },
+  { value: 'anar', label: 'انار', hint: 'زرشکی کلاسیک با طلایی و سرمه‌ای', sw: { light: ['#f7f1ec', '#841728', '#a8741a'], dark: ['#160d0f', '#bd2139', '#e6b25c'] } },
+  { value: 'kashi', label: 'کاشی', hint: 'لاجوردی با طلایی و فیروزه‌ای', sw: { light: ['#eef2f8', '#1f3f8f', '#a8741a'], dark: ['#0d1424', '#e6b85c', '#7fd0e6'] } },
 ];
+
+// light or dark right now (auto resolved)
+export const shownMode = () => (getTheme() === 'auto' ? (mq.matches ? 'light' : 'dark') : getTheme());
 
 function read(k) { try { return localStorage.getItem(k); } catch { return null; } }
 function write(k, v) { try { v ? localStorage.setItem(k, v) : localStorage.removeItem(k); } catch { /* private mode */ } }
@@ -37,8 +41,7 @@ export function getPalette() {
 }
 
 export function applyTheme() {
-  const t = getTheme(), p = getPalette();
-  const on = t === 'auto' ? (mq.matches ? 'light' : 'dark') : t;
+  const p = getPalette(), on = shownMode();
   const html = document.documentElement;
   html.dataset.theme = on;
   if (p === 'nana') delete html.dataset.palette; else html.dataset.palette = p;

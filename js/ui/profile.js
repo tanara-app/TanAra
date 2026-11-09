@@ -1,5 +1,6 @@
-// Profile & settings: the targets (folded to one line) and the phase up front; everything else is rows
-// that open sheets, in small titled groups so the eye finds the group first and then the row.
+// Profile: the targets (folded to one line) and the phase up front, then rows about the person and
+// their tools, in small titled groups. App settings (reminders, appearance, the mascot, support,
+// data, account) live apart in «تنظیمات», a tall sheet opened by the gear in the header.
 import * as store from '../data/store.js';
 import { effectiveTargets, clampKcal, floorFor, hasMedicalFlag, ACTIVITY, CONDITIONS, correcting, rampKcal } from '../domain/targets.js';
 import { sortedWeights } from '../domain/stats.js';
@@ -16,7 +17,7 @@ import { openUsage } from './usage.js';
 import { shareAdmin, shareLine, checkShare, openFoodShare } from './foodShare.js';
 import { openShopping, shoppingLine } from './shopping.js';
 import { aiAvailable } from '../ai/hooshvareh.js';
-import { THEMES, PALETTES, getTheme, setTheme, getPalette, setPalette } from './theme.js';
+import { THEMES, PALETTES, getTheme, setTheme, getPalette, setPalette, shownMode } from './theme.js';
 import { MODES, buddyMode, setBuddyMode } from './mascot.js';
 import { openFeedback, feedbackLine } from './feedback.js';
 
@@ -51,11 +52,12 @@ const ICON = {
   usage: svg('<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>'),
   bell: svg('<path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M10 21h4"/>'),
   palette: svg('<path d="M12 3.5a8.5 8.5 0 0 0 0 17c1.3 0 1.8-.9 1.4-1.9-.5-1.2.3-2.3 1.6-2.3h1.8a3.7 3.7 0 0 0 3.7-3.7c0-5-3.8-9.1-8.5-9.1z"/><circle cx="8" cy="11" r="1.1" fill="currentColor"/><circle cx="11" cy="7.5" r="1.1" fill="currentColor"/><circle cx="15.5" cy="8.5" r="1.1" fill="currentColor"/>'),
-  theme: svg('<circle cx="12" cy="12" r="8.5"/><path d="M12 3.5v17a8.5 8.5 0 0 0 0-17z" fill="currentColor"/>'),
   data: svg('<ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/>'),
   report: svg('<path d="M5 21V4"/><path d="M5 4h12l-2.5 4.5L17 13H5"/>'),
   account: svg('<circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M17 6l3 3M15 8l2 2"/>'),
 };
+const COG = '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>';
+const appearanceLine = () => `${PALETTES.find(t => t.value === getPalette()).label} · ${THEMES.find(t => t.value === getTheme()).label}`;
 const row = (attr, ic, title, sub) => `<button class="set-row" ${attr}><i class="set-ic">${ICON[ic]}</i><span class="grow"><b>${title}</b>${sub ? `<small class="muted">${sub}</small>` : ''}</span>${icon.chevL}</button>`;
 const group = (title, rows) => `<h2 class="set-h">${title}</h2><section class="card set-list">${rows}</section>`;
 let targetsOpen = false;
@@ -67,7 +69,7 @@ export function renderProfile(root) {
   const st = store.syncStatus;
 
   root.innerHTML = `
-    <header class="page-head"><h1>نمایه</h1></header>
+    <header class="page-head head-row"><h1>نمایه</h1><button class="icon-btn" data-settings aria-label="تنظیمات">${COG}</button></header>
 
     <details class="card fold targets-fold"${targetsOpen ? ' open' : ''}>
       <summary><span><h2>هدف‌های روزانه</h2><small>${kcal50(eff.kcal)} کالری · ${fa(eff.protein)} گرم پروتئین</small></span></summary>
@@ -90,20 +92,7 @@ export function renderProfile(root) {
     ${group('ابزارها', `
       ${row('data-bank', 'bank', 'بانک غذا', `${fa(s.foods.length)} غذا`)}
       ${shareAdmin() ? row('data-share', 'share', 'غذاهای تازه‌ی خانواده', shareLine()) : ''}
-      ${row('data-shopping', 'cart', 'لیست خرید', shoppingLine())}`)}
-    ${group('هوشواره', `
-      ${row('data-mascot', 'voice', 'جمله‌ها و صدای هوشواره', MODES.find(m => m.value === buddyMode()).label)}
-      ${aiAvailable() ? row('data-usage', 'usage', 'مصرف هوشواره', 'هزینه‌ی ۳۰ روز اخیر') : ''}`)}
-    ${group('تنظیمات', `
-      ${row('data-reminders', 'bell', 'یادآورها', remindersLine())}
-      ${row('data-palette', 'palette', 'تم رنگی', PALETTES.find(t => t.value === getPalette()).label)}
-      ${row('data-theme', 'theme', 'روشن یا تیره', THEMES.find(t => t.value === getTheme()).label)}`)}
-    ${group('پشتیبانی', `
-      ${row('data-feedback', 'report', 'گزارش خرابی و انتقاد', feedbackLine())}`)}
-    ${group('حساب و داده‌ها', `
-      ${row('data-data', 'data', 'داده‌ها و پشتیبان', 'خروجی و برگرداندن')}
-      ${row('data-account', 'account', 'حساب', session.local ? 'حالت آزمایشی محلی' : `${esc(session.email || '')}${st.pending ? ` · ${fa(st.pending)} تغییر در صف` : ''}`)}`)}
-    <p class="muted small center">تن‌آرا · نسخه‌ی ۱</p>`;
+      ${row('data-shopping', 'cart', 'لیست خرید', shoppingLine())}`)}`;
 
   root.querySelector('.targets-fold').ontoggle = e => { targetsOpen = e.currentTarget.open; };
   root.querySelector('[data-recalc]').onclick = async () => {
@@ -115,29 +104,83 @@ export function renderProfile(root) {
   root.querySelector('[data-edit]').onclick = () => openEdit(p);
   root.querySelector('[data-mots]').onclick = () => openMotivationList();
   bindPhase(root);
-  bindReminders(root);
-  root.querySelector('[data-usage]')?.addEventListener('click', openUsage);
   root.querySelector('[data-bank]').onclick = () => openFoodBank();
   // the owner only: is it them, and how many members' foods wait (asked once, then on each close)
   const again = () => { if (root.isConnected) renderProfile(root); };
   checkShare(again);
   root.querySelector('[data-share]')?.addEventListener('click', () => openFoodShare(() => checkShare(again, true)));
   root.querySelector('[data-shopping]').onclick = () => openShopping();
-  root.querySelector('[data-theme]').onclick = async () => {
-    const t = await choose('روشن یا تیره', THEMES, getTheme());
-    if (t) { setTheme(t); renderProfile(root); }
-  };
-  root.querySelector('[data-palette]').onclick = async () => {
-    const t = await choose('تم رنگی', PALETTES.map(x => ({ value: x.value, label: `${x.label} · ${x.hint}` })), getPalette());
-    if (t) { setPalette(t); renderProfile(root); }
-  };
-  root.querySelector('[data-mascot]').onclick = async () => {
-    const v = await choose('جمله‌ها و صدای هوشواره', MODES, buddyMode());
-    if (v) { setBuddyMode(v); renderProfile(root); }
-  };
-  root.querySelector('[data-feedback]').onclick = openFeedback;
-  root.querySelector('[data-data]').onclick = openData;
-  root.querySelector('[data-account]').onclick = openAccount;
+  root.querySelector('[data-settings]').onclick = openSettings;
+}
+
+// «تنظیمات»: everything about the app rather than the person. Redrawn whenever a sheet opened
+// from it closes, so a row's second line (reminders, appearance…) is never stale.
+function openSettings() {
+  sheet.open(body => {
+    const draw = () => {
+      const st = store.syncStatus;
+      body.innerHTML = `
+        <div class="sheet-head"><h2>تنظیمات</h2><button class="icon-btn" data-close aria-label="بستن">${icon.close}</button></div>
+        ${group('عمومی', `
+          ${row('data-reminders', 'bell', 'یادآورها', remindersLine())}
+          ${row('data-look', 'palette', 'ظاهر', appearanceLine())}`)}
+        ${group('هوشواره', `
+          ${row('data-mascot', 'voice', 'جمله‌ها و صدای هوشواره', MODES.find(m => m.value === buddyMode()).label)}
+          ${aiAvailable() ? row('data-usage', 'usage', 'مصرف هوشواره', 'هزینه‌ی ۳۰ روز اخیر') : ''}`)}
+        ${group('پشتیبانی', `
+          ${row('data-feedback', 'report', 'گزارش خرابی و انتقاد', feedbackLine())}`)}
+        ${group('حساب و داده‌ها', `
+          ${row('data-data', 'data', 'داده‌ها و پشتیبان', 'خروجی و برگرداندن')}
+          ${row('data-account', 'account', 'حساب', session.local ? 'حالت آزمایشی محلی' : `${esc(session.email || '')}${st.pending ? ` · ${fa(st.pending)} تغییر در صف` : ''}`)}`)}
+        <p class="muted small center">تن‌آرا · نسخه‌ی ۱</p>`;
+      body.querySelector('[data-close]').onclick = () => sheet.close();
+      bindReminders(body);
+      body.querySelector('[data-look]').onclick = openAppearance;
+      body.querySelector('[data-mascot]').onclick = async () => {
+        const v = await choose('جمله‌ها و صدای هوشواره', MODES, buddyMode());
+        if (v) setBuddyMode(v);
+      };
+      body.querySelector('[data-usage]')?.addEventListener('click', openUsage);
+      body.querySelector('[data-feedback]').onclick = openFeedback;
+      body.querySelector('[data-data]').onclick = openData;
+      body.querySelector('[data-account]').onclick = openAccount;
+    };
+    draw();
+    // a sheet opened from here has closed: redraw the lines under the rows
+    const watch = new MutationObserver(muts => {
+      if (!body.isConnected) return watch.disconnect();
+      if (muts.some(m => [...m.removedNodes].some(n => n.classList?.contains('sheet-wrap')))) draw();
+    });
+    watch.observe(document.body, { childList: true });
+  }, { tall: true });
+}
+
+// «ظاهر»: the colour theme as swatches (drawn in the mode on screen) and light/dark as one switch.
+function openAppearance() {
+  sheet.open(body => {
+    const draw = () => {
+      const pal = getPalette(), mode = getTheme(), on = shownMode();
+      body.innerHTML = `
+        <div class="sheet-head"><h2>ظاهر</h2><button class="icon-btn" data-close aria-label="بستن">${icon.close}</button></div>
+        <div class="stack">
+          <div class="look-list" role="radiogroup" aria-label="تم رنگی">${PALETTES.map(x => {
+            const [bg, a, b] = x.sw[on];
+            return `<button type="button" class="look${x.value === pal ? ' on' : ''}" role="radio" aria-checked="${x.value === pal}" data-pal="${x.value}">
+              <span class="look-sw" style="background:${bg}"><i style="background:${a}"></i><i style="background:${b}"></i></span>
+              <span class="grow"><b>${x.label}</b><small class="muted">${x.hint}</small></span>
+              ${x.value === pal ? icon.check : ''}
+            </button>`;
+          }).join('')}</div>
+          <div class="field"><span class="muted small">روشن یا تیره</span>
+            <div class="seg" data-mode>${THEMES.map(t => `<button type="button" data-v="${t.value}" class="${t.value === mode ? 'on' : ''}">${t.value === 'auto' ? 'خودکار' : t.label}</button>`).join('')}</div>
+          </div>
+        </div>`;
+      body.querySelector('[data-close]').onclick = () => sheet.close();
+      body.querySelectorAll('[data-pal]').forEach(b => b.onclick = () => { setPalette(b.dataset.pal); draw(); });
+      body.querySelectorAll('[data-mode] button').forEach(b => b.onclick = () => { setTheme(b.dataset.v); draw(); });
+    };
+    draw();
+  });
 }
 
 function openData() {
@@ -175,7 +218,7 @@ function openAccount() {
     body.querySelector('[data-close]').onclick = () => sheet.close();
     body.querySelector('[data-signout]')?.addEventListener('click', async () => {
       if (store.syncStatus.pending && !(await confirmBox('هنوز چند تغییر به سرور نرسیده و با خروج از دست می‌رود. خارج می‌شوید؟', 'خروج'))) return;
-      sheet.close();
+      sheet.closeAll();
       session.signOut?.();
     });
   });

@@ -49,7 +49,7 @@ async function generate({ days = PLAN_DAYS, include = [] } = {}) {
     const t = effectiveTargets(store.profile());
     const s = store.get();
     // a plan is built only from the bank; with a handful of foods every occasion comes out empty
-    if (s.foods.length < 10) throw new Error('بانک غذایت تقریباً خالی است؛ از «نمایه» دکمه‌ی «بازگرداندن غذاهای پیش‌فرض» را بزن و دوباره امتحان کن.');
+    if (s.foods.length < 10) throw new Error('بانک غذایت تقریباً خالی است؛ از «نمایه» ← «تنظیمات» ← «داده‌ها و پشتیبان» دکمه‌ی «بازگرداندن غذاهای پیش‌فرض» را بزن و دوباره امتحان کن.');
     const pattern = eatingPattern(s.entries, s.ai_notes, today());
     // Ramadan within the period: the model shapes the options so they also work on fasting days
     const ramadan = Array.from({ length: days }, (_, n) => addDays(today(), n)).some(isRamadan);

@@ -16,7 +16,7 @@ So at the start of every session:
 2. Run `git status`. Uncommitted or untracked files may be the other Claude's unfinished work.
    Don't edit, commit or delete them unless the user says so; ask first.
 3. Read `HOOSHVAREH.md` for the current feature list before adding or changing anything.
-4. Check for new user reports (bugs, complaints, ideas sent from «نمایه» ← «گزارش خرابی و انتقاد») and show
+4. Check for new user reports (bugs, complaints, ideas sent from «نمایه» ← «تنظیمات» ← «گزارش خرابی و انتقاد») and show
    them to the user before anything else, as `FEEDBACK.md` says. Mark the ones you showed as `seen`.
 5. Commit only the files you changed, never `git add -A`. Before pushing, fetch again and merge or rebase
    if `origin/main` moved.

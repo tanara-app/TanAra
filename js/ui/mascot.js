@@ -100,7 +100,7 @@ export function setSound(on) {
   try { on ? localStorage.setItem(SOUND, 'on') : localStorage.removeItem(SOUND); } catch { /* private mode */ }
   if (on) speak('greet-back-1'); // a sample, right on the tap that turned it on
 }
-// The one setting in «نمایه»: 'off', 'text' or 'voice'.
+// The one setting in «نمایه» ← «تنظیمات»: 'off', 'text' or 'voice'.
 export const MODES = [
   { value: 'off', label: 'خاموش' },
   { value: 'text', label: 'فقط نوشته' },

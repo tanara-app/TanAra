@@ -6,7 +6,7 @@
                            migration); whoever is due gets a notification
     POST + user JWT        { test: true } sends a test notification to that person's devices
 
-  What is due comes from the profile (profile.data.reminders, set in «نمایه» ← «یادآورها»):
+  What is due comes from the profile (profile.data.reminders, set in «نمایه» ← «تنظیمات» ← «یادآورها»):
     log    at a chosen evening time, if fewer than two meals were logged that day — but not
            in maintenance with light logging on while the weight is in its band (the same
            rule as js/domain/phase.js → lightOn)

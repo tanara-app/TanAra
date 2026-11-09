@@ -186,6 +186,8 @@ p { margin: .3rem 0; }
 }
 .card-h { margin-bottom: 10px; }
 .page-head { padding: 4px 0 14px; }
+.page-head.head-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.page-head.head-row .icon-btn { margin-inline-end: -8px; color: var(--muted); }
 
 /* buttons */
 .btn {
@@ -857,6 +859,22 @@ body.kb .toast, body.chat-mode .toast { bottom: calc(var(--nav-h) + var(--safe-b
 .set-row .set-ic svg { color: var(--accent); }
 .set-row[data-mascot] .set-ic, .set-row[data-usage] .set-ic { background: var(--ai-soft); }
 .set-row[data-mascot] .set-ic svg, .set-row[data-usage] .set-ic svg { color: var(--ai); }
+.sheet .set-list { background: var(--surface-2); }
+.look-list { display: flex; flex-direction: column; gap: 8px; }
+.look {
+  display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px 14px; text-align: start;
+  border: 2px solid transparent; border-radius: 14px; background: var(--surface-2); cursor: pointer;
+}
+.look.on { border-color: var(--accent); }
+.look b { display: block; font-weight: 700; }
+.look small { display: block; font-size: .8rem; }
+.look > svg { color: var(--accent); flex: none; }
+.look-sw {
+  flex: none; width: 46px; height: 46px; border-radius: 50%; display: flex; align-items: center; justify-content: center; gap: 3px;
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.look-sw i { display: block; width: 14px; height: 14px; border-radius: 50%; }
+.look-sw i:first-child { width: 20px; height: 20px; }
 .set-h { margin: 18px 6px 6px; color: var(--muted); font-size: .82rem; font-weight: 600; }
 .targets-fold[open] > summary { margin-bottom: 12px; }
 .targets-fold > .targets { margin-bottom: 10px; }
