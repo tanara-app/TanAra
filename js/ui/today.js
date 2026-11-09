@@ -22,6 +22,8 @@ import { measureNote, bindMeasureNote } from './measure.js';
 import { checkinCard, bindCheckin } from './checkin.js';
 import { weekCard, bindWeekCard } from './review.js';
 import { greetCard, bindGreet } from './mascot.js';
+import { mealBudget, mealSharesFrom } from '../domain/portion.js';
+import { eatingPattern } from '../domain/pattern.js';
 
 let day = today();
 export const setDay = d => { day = d; };
@@ -57,6 +59,9 @@ export function renderToday(root) {
   const isToday = day === today();
   const remaining = round50(t.kcal) - round50(tot.kcal);
   const logged = daysLoggedInWeek(s.entries, weekStart(today()));
+  // «سهم وعده»: a beta for the accounts whose profile has it in `beta` (set from the database)
+  const beta = (p.beta || []).includes('portion');
+  const portionMode = beta && p.mode === 'portion';
   const planMode = p.mode === 'plan';
   // '' when no plan covers this day: the ordinary meal list is shown instead
   const plan = planMode ? planHtml(day) : '';
@@ -93,7 +98,8 @@ export function renderToday(root) {
     </header>
 
     <div class="seg mode-seg" data-mode role="tablist" aria-label="حالت">
-      <button type="button" role="tab" data-v="count" aria-selected="${!planMode}" class="${planMode ? '' : 'on'}">شمارش کالری</button>
+      <button type="button" role="tab" data-v="count" aria-selected="${!planMode && !portionMode}" class="${planMode || portionMode ? '' : 'on'}">شمارش کالری</button>
+      ${beta ? `<button type="button" role="tab" data-v="portion" aria-selected="${portionMode}" class="${portionMode ? 'on' : ''}">سهم وعده <small>آزمایشی</small></button>` : ''}
       <button type="button" role="tab" data-v="plan" aria-selected="${planMode}" class="${planMode ? 'on' : ''}">رژیم</button>
     </div>
 
@@ -158,12 +164,21 @@ export function renderToday(root) {
   root.querySelector('[data-prev]').onclick = () => { day = addDays(day, -1); renderToday(root); };
   root.querySelector('[data-next]').onclick = () => { if (!isToday) { day = addDays(day, 1); renderToday(root); } };
   root.querySelector('[data-today]')?.addEventListener('click', () => { day = today(); renderToday(root); });
-  root.querySelector('[data-log]')?.addEventListener('click', () => openLogSheet({ day }));
-  root.querySelectorAll('[data-add]').forEach(b => b.onclick = () => openLogSheet({ day, meal: b.dataset.add }));
+  // «سهم وعده»: the meal's calories for today, from what is left of the day
+  const room = portionMode ? {
+    smart: true,
+    budgetFor: m => {
+      const st = store.get();
+      const pat = eatingPattern(st.entries, st.ai_notes, day);
+      return { kcal: mealBudget(st.entries, day, m, t.kcal, mealSharesFrom(pat.ready ? pat.shares : null)), label: MEALS[m] };
+    },
+  } : null;
+  root.querySelector('[data-log]')?.addEventListener('click', () => openLogSheet({ day, room }));
+  root.querySelectorAll('[data-add]').forEach(b => b.onclick = () => openLogSheet({ day, meal: b.dataset.add, room }));
   root.querySelectorAll('[data-entry]').forEach(b => b.onclick = () => openEntrySheet(s.entries.find(e => e.id === b.dataset.entry)));
   root.querySelector('[data-mode]').onclick = e => {
     const v = e.target.closest('button[data-v]')?.dataset.v;
-    if (v && v !== (planMode ? 'plan' : 'count')) store.saveProfile({ ...p, mode: v });
+    if (v && v !== (planMode ? 'plan' : portionMode ? 'portion' : 'count')) store.saveProfile({ ...p, mode: v });
   };
   const redraw = () => { if (root.querySelector('[data-mode]')) renderToday(root); };
   if (planMode) bindPlan(root, day, redraw);

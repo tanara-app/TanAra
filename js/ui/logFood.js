@@ -15,6 +15,7 @@ import { photoItems } from '../domain/photo.js';
 import { pickPhoto, foodPhoto, cameraIcon } from './photo.js';
 import { scanBarcode, barcodeBox, fillFromBarcode, barcodeIcon } from './barcode.js';
 import { portionsFor } from '../domain/plan.js';
+import { fitMeal, usualCombos } from '../domain/portion.js';
 
 export const mealSeg = meal => `<div class="seg meal-seg" data-meal>
   ${Object.entries(MEALS).map(([k, l]) => `<button type="button" data-v="${k}" class="${k === meal ? 'on' : ''}">${l}</button>`).join('')}
@@ -38,6 +39,8 @@ const foodRow = (f, extra = '') => `
 const aiEstBtn = () => (aiAvailable() ? `<button type="button" class="btn ai-btn" data-ai-est>${sparkle()} تخمین کالری با هوشواره</button><p class="muted small ai-est-note" hidden></p>` : '');
 
 // `onSaved` is called with every entry the sheet logs (the diet plan notes which occasion it was for).
+// `room.smart` («سهم وعده», beta): any meal, its calories from `room.budgetFor(meal)`; the chosen
+// foods get amounts by their role on the plate (fitMeal), which + / − can change.
 // `room` ({ kcal, label }): from the diet plan's «+» — the meal is fixed, and the foods chosen
 // (from the bank or typed in) are given the amounts that fit what is left of the occasion
 // together (drawPortions) instead of an amount to pick.
@@ -45,13 +48,20 @@ export function openLogSheet({ day = today(), meal = null, onSaved = null, room 
   let curMeal = meal || (day === today() ? mealForNow() : 'lunch');
   let query = '';
   const save = e => { const row = store.saveEntry(e); onSaved?.(row); cheer('entry'); return row; };
-  const seg = () => (room ? `<p class="muted small portion">ثبت در ${room.label}</p>` : mealSeg(curMeal));
-  const onMeal = (root, set) => { if (!room) bindMeal(root, set); };
+  const smart = !!room?.smart;
+  if (smart) room = { ...room, ...room.budgetFor(curMeal) };
+  const seg = () => (room && !smart ? `<p class="muted small portion">ثبت در ${room.label}</p>` : mealSeg(curMeal));
+  const onMeal = (root, set) => {
+    if (room && !smart) return;
+    bindMeal(root, v => { if (smart) room = { ...room, ...room.budgetFor(v) }; set(v); });
+  };
+  const locks = new Map(); // «سهم وعده»: amounts set with + / −, by chosen food
   let chosen = []; // with `room`: the foods to be eaten together (a typed-in one may have no id)
   // in the list, next to each food: how much of it fits, beside what is already chosen
   const fits = f => {
     if (!room) return '';
     if (chosen.some(c => c.id === f.id)) return ' · <b>انتخاب شد</b>';
+    if (smart) return '';
     const p = portionsFor([...chosen, f], room.kcal).at(-1);
     return p ? ` · <b>تا ${amountLabel(p.qty, f.unit)}</b>` : ' · جا نمی‌شود';
   };
@@ -92,9 +102,12 @@ export function openLogSheet({ day = today(), meal = null, onSaved = null, room 
         }
         // frequents are per meal, so breakfast regulars don't crowd dinner
         const freq = frequentFoods(s.entries, foods, day, curMeal);
+        const combos = smart ? usualCombos(s.entries, foods, day, curMeal) : [];
         const groups = {};
         foods.forEach(f => (groups[f.category] ||= []).push(f));
         list.innerHTML = `
+          ${combos.length ? `<h3 class="list-h">ترکیب‌های همیشگی من</h3><div class="combos">${combos.map((c, n) => `<button class="combo" data-combo="${n}">
+            <span>${c.names.map(esc).join(' + ')}</span><small class="muted">${fa(c.n)} بار${c.meal !== curMeal ? ` · در ${MEALS[c.meal]}` : ''}</small></button>`).join('')}</div>` : ''}
           ${freq.length ? `<h3 class="list-h">پرتکرارهای من در ${MEALS[curMeal]}</h3>${freq.map(x => foodRow(x.food, room ? fits(x.food) : ` · معمولاً ${amountLabel(x.last.qty, x.last.grams ? GRAM : x.food.unit)}`)).join('')}` : ''}
           ${Object.keys(CATEGORIES).filter(c => groups[c]).map(c => `
             <h3 class="list-h">${CATEGORIES[c]}</h3>
@@ -108,6 +121,14 @@ export function openLogSheet({ day = today(), meal = null, onSaved = null, room 
       body.querySelector('[data-close]').onclick = () => sheet.close();
       body.querySelector('[data-bank]').onclick = () => openFoodBank(() => drawResults());
       list.addEventListener('click', e => {
+        const cb = e.target.closest('[data-combo]');
+        if (cb) {
+          const c = usualCombos(store.get().entries, store.get().foods, day, curMeal)[Number(cb.dataset.combo)];
+          const byId = new Map(store.get().foods.map(x => [x.id, x]));
+          chosen = c.ids.map(id => byId.get(id)).filter(Boolean);
+          locks.clear();
+          return drawPortions();
+        }
         const f = e.target.closest('[data-food]');
         if (f) return drawQty(store.get().foods.find(x => x.id === f.dataset.food));
         if (e.target.closest('[data-custom]')) drawCustom();
@@ -311,6 +332,7 @@ export function openLogSheet({ day = today(), meal = null, onSaved = null, room 
       // a bank food corrected meanwhile comes back with its new values
       chosen = chosen.map(c => (c.id && store.get().foods.find(f => f.id === c.id)) || c);
       if (!chosen.length) return drawList();
+      if (smart) return drawSmart();
       const left = Math.max(0, Math.round(room.kcal));
       const ps = portionsFor(chosen, left);
       const amt = (f, p) => p && { unit: f.unit, qty: p.qty, kcal: f.kcal * p.qty, protein: f.protein * p.qty };
@@ -351,6 +373,66 @@ export function openLogSheet({ day = today(), meal = null, onSaved = null, room 
         chosen.forEach((f, i) => all[i] && save({ day, meal: curMeal, food_id: f.id || null, name: f.name, ...all[i], is_veg: !!f.is_veg }));
         sheet.close();
         toast(on.length > 1 ? `${fa(on.length)} مورد ثبت شد` : `${chosen.find((_, i) => all[i]).name} ثبت شد`);
+      };
+    }
+
+    /*
+      «سهم وعده»: how much of each chosen food, by its role on the plate (fitMeal). + / − sets a
+      food's amount by hand and the others share what is left around it.
+    */
+    function drawSmart() {
+      for (const k of [...locks.keys()]) if (!chosen.includes(k)) locks.delete(k);
+      const left = Math.max(0, Math.round(room.kcal));
+      const lockIdx = Object.fromEntries(chosen.map((f, i) => [i, locks.get(f)]).filter(([, q]) => q != null));
+      const r = fitMeal(chosen, left, lockIdx);
+      const many = chosen.length > 1;
+      body.innerHTML = `
+        <div class="sheet-head">
+          <button class="icon-btn" data-back aria-label="برگشت">${icon.chevR}</button>
+          <h2>چقدر بخورم؟</h2><span></span>
+        </div>
+        ${mealSeg(curMeal)}
+        <p class="muted small portion">${left ? `سهم ${room.label} امروز: <b>${fa(left)}</b> کالری${many ? '. با هم این‌قدر:' : ''}` : `از کالری امروز چیزی برای ${room.label} نمانده.`}</p>
+        <div class="qty-box portions">${chosen.map((f, i) => {
+          const it = r.items[i];
+          const g = f.unit !== GRAM && Number(f.grams) > 0 ? ` (حدود ${fa(Math.round(it.qty * f.grams))} گرم)` : '';
+          return `<div class="portion-row smart">
+            <span class="grow"><b>${esc(f.name)}</b>
+              <small class="muted">${it.free ? 'کالری ندارد' : `${fa(Math.round(it.kcal))} کالری`}${g}${it.locked ? ' · دستی' : ''}</small></span>
+            <span class="pstep">
+              <button class="icon-btn sm" data-dec="${i}" aria-label="کمتر" ${it.qty - it.step < it.step - 1e-9 ? 'disabled' : ''}>${icon.minus}</button>
+              <b>${amountLabel(it.qty, f.unit)}</b>
+              <button class="icon-btn sm" data-inc="${i}" aria-label="بیشتر">${icon.plus}</button>
+            </span>
+            <button class="icon-btn sm" data-drop="${i}" aria-label="برداشتن ${esc(f.name)}">${icon.close}</button>
+          </div>`;
+        }).join('')}
+          <div class="preview"><b>${fa(Math.round(r.total))}</b> کالری · <b>${fa(Math.round(r.protein))}</b> گرم پروتئین</div>
+          ${r.over ? `<p class="small warn-text">${fa(r.over)} کالری بیشتر از سهم ${room.label}${r.drop != null ? `؛ بدون «${esc(chosen[r.drop].name)}» جا می‌شود` : ''}. می‌توانی همین را بخوری؛ از وعده‌های بعد کم می‌شود.</p>` : ''}
+          ${r.spare > 50 ? `<p class="small muted">همه به اندازه‌ی یک وعده رسیدند و ${fa(r.spare)} کالری از سهم ماند.</p>` : ''}
+          ${locks.size ? '<button class="link small" data-reset>برگشت به پیشنهاد اپ</button>' : ''}
+        </div>
+        <button class="btn block" data-beside>${icon.plus} یک خوراکی دیگر هم کنارش می‌خورم</button>
+        <button class="btn primary block big" data-save>${many ? `ثبت ${fa(chosen.length)} مورد` : 'ثبت'}</button>`;
+      bindMeal(body, v => { curMeal = v; room = { ...room, ...room.budgetFor(v) }; drawSmart(); });
+      body.querySelector('[data-back]').onclick = drawList;
+      body.querySelector('[data-beside]').onclick = () => { query = ''; drawList(); };
+      body.querySelector('[data-reset]')?.addEventListener('click', () => { locks.clear(); drawSmart(); });
+      const nudge = (i, dir) => {
+        const it = r.items[i];
+        locks.set(chosen[i], Math.max(it.step, Math.round((it.qty + dir * it.step) * 100) / 100));
+        drawSmart();
+      };
+      body.querySelectorAll('[data-dec]').forEach(b => b.onclick = () => nudge(Number(b.dataset.dec), -1));
+      body.querySelectorAll('[data-inc]').forEach(b => b.onclick = () => nudge(Number(b.dataset.inc), 1));
+      body.querySelectorAll('[data-drop]').forEach(b => b.onclick = () => { chosen.splice(Number(b.dataset.drop), 1); drawPortions(); });
+      body.querySelector('[data-save]').onclick = () => {
+        chosen.forEach((f, i) => {
+          const it = r.items[i];
+          save({ day, meal: curMeal, food_id: f.id || null, name: f.name, unit: f.unit, qty: it.qty, kcal: it.kcal, protein: it.protein, is_veg: !!f.is_veg });
+        });
+        sheet.close();
+        toast(many ? `${fa(chosen.length)} مورد ثبت شد` : `${chosen[0].name} ثبت شد`);
       };
     }
 

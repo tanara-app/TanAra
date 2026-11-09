@@ -16,6 +16,7 @@ import './drift.test.js';
 import './health.test.js';
 import './foodMatch.test.js';
 import './family.test.js';
+import './portion.test.js';
 
 const results = await run();
 const failed = results.filter(r => !r.ok);
