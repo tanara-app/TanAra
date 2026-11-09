@@ -15,6 +15,7 @@ import { iso, faDMY } from '../lib/dates.js';
 import { sheet, toast, icon } from './dom.js';
 import { foodMeta } from './units.js';
 import { foodKey, similar, similarIn, missingFor, everyoneHas, groupSimilar } from '../domain/foodMatch.js';
+import { skipFoods } from './plan.js';
 
 const SEED = new Set(SEED_FOODS.map(f => foodKey(f.name)));
 const WAIT = '<p class="muted small ai-wait"><span class="typing"><i></i><i></i><i></i></span> در حال خواندن…</p>';
@@ -320,6 +321,8 @@ function openSend(food, all, onSent) {
         btn.disabled = false; label();
         return fail(/already/.test(r.error.message || '') ? 'این غذا قبلاً تأیید شده.' : navigator.onLine ? 'فرستاده نشد؛ دوباره امتحان کن.' : 'اینترنت وصل نیست.');
       }
+      // one of the owner's own foods: already in their bank, so not «تازه» for their diet plan
+      if (store.get().foods.some(f => f.id === food.id)) skipFoods([food.id]);
       sheet.close();
       onSent(r.made);
     };

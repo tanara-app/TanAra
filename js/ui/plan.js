@@ -7,7 +7,7 @@ import * as store from '../data/store.js';
 import { effectiveTargets, hasMedicalFlag, CONDITIONS } from '../domain/targets.js';
 import {
   SLOTS, PLAN_DAYS, budgets, buildPlan, fitOption, optionBudget, planOn, planEnd, planDayNo, planOver,
-  picksOn, dayAdherence, newFoods, goneFoods, optionText,
+  picksOn, dayAdherence, newFoods, goneFoods, optionText, withSeen,
   swapItem, restoreItem, sameItems, swapSuggestions, swapsOn, dayPlan, offOn, slotExtras, dayRooms, roomPlan, carriesOver, CARRY_MAX,
   extraOption, rescalePlan, fastPlan, fastOn, slotLabel, needOf, OVER_SLACK, swapAllowed,
 } from '../domain/plan.js';
@@ -32,6 +32,14 @@ const shown = new Set();     // «day|slot»: slots showing the options that fol
 let refresh = () => {};
 
 const notes = () => store.get().ai_notes;
+
+// Keep these bank foods out of the «غذای تازه در بانک غذا» card of a plan (today's by default).
+export function skipFoods(ids, key = planOn(notes(), today())?.key) {
+  const cur = key && notes().find(n => n.key === key);
+  if (!cur) return;
+  const data = withSeen(cur.data, ids);
+  if (data !== cur.data) store.saveNote({ key: cur.key, kind: 'plan', text: cur.text, data });
+}
 const pickWord = n => (n === 2 ? 'دو تا را انتخاب کن' : 'یکی را انتخاب کن');
 const head = (title, extra = '') => `<div class="ai-card-h"><span class="ai-mark">${sparkle(16)}</span><b>${title}</b>${extra}</div>`;
 
@@ -684,10 +692,7 @@ export function bindPlan(root, day, redraw) {
   const gone = goneFoods(plan, s.foods);
   // a refresh keeps the period's end; it's made from the bank as it is now, so deleted foods drop out
   const refreshPlan = () => generate({ days: Math.max(1, diffDays(planEnd(plan), today()) + 1), include: fresh });
-  const markSeen = list => {
-    const cur = notes().find(n => n.key === plan.key);
-    if (cur) store.saveNote({ key: cur.key, kind: 'plan', text: cur.text, data: { ...cur.data, seenFoods: [...(cur.data.seenFoods || []), ...list.map(f => f.id)] } });
-  };
+  const markSeen = list => skipFoods(list.map(f => f.id), plan.key);
   root.querySelector('[data-plan-fresh]')?.addEventListener('click', refreshPlan);
   root.querySelector('[data-plan-gone]')?.addEventListener('click', refreshPlan);
   root.querySelector('[data-plan-skip]')?.addEventListener('click', () => markSeen(fresh));

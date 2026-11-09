@@ -1,5 +1,5 @@
 import { suite, test, eq, ok, near } from './harness.js';
-import { budgets, fitOption, buildPlan, optionBudget, planOn, previousPlan, planEnd, planDayNo, planOver, picksOn, dayAdherence, adherence, newFoods, goneFoods, optionText, swapItem, restoreItem, sameItems, swapSuggestions, swapsOn, dayPlan, offOn, slotExtras, slotRoom, dayRooms, shrinkOption, roomPlan, portionFor, portionsFor, SLOTS, maxKcal, maxQty, isFree, carriesOver, CARRY_MAX, optionAllowed, extraOption, rescalePlan, fastPlan, fastShape, fastOn, lowsFor, swapAllowed } from '../js/domain/plan.js';
+import { budgets, fitOption, buildPlan, optionBudget, planOn, previousPlan, planEnd, planDayNo, planOver, picksOn, dayAdherence, adherence, newFoods, goneFoods, optionText, swapItem, restoreItem, sameItems, swapSuggestions, swapsOn, dayPlan, offOn, slotExtras, slotRoom, dayRooms, shrinkOption, roomPlan, portionFor, portionsFor, SLOTS, maxKcal, maxQty, isFree, carriesOver, CARRY_MAX, optionAllowed, extraOption, rescalePlan, fastPlan, fastShape, fastOn, lowsFor, swapAllowed, withSeen } from '../js/domain/plan.js';
 
 const food = (id, unit, kcal, protein = 0, extra = {}) => ({ id, name: id, unit, kcal, protein, grams: 100, is_veg: false, created_at: '2026-01-01T00:00:00Z', ...extra });
 const FOODS = [
@@ -107,6 +107,10 @@ suite('plan', () => {
     const used = food('rice', 'کفگیر', 100, 2, { created_at: '2999-01-01T00:00:00Z' });
     eq(newFoods(plan, [...FOODS, fresh, used]).map(f => f.id), ['kiwi']);
     eq(newFoods({ ...plan, seenFoods: ['kiwi'] }, [...FOODS, fresh]), []);
+    eq(newFoods(withSeen(plan, ['kiwi']), [...FOODS, fresh]), []);
+    eq(withSeen({ seenFoods: ['a'] }, ['a', 'b', 'b']).seenFoods, ['a', 'b']);
+    const same = { seenFoods: ['a'] };
+    eq(withSeen(same, ['a']) === same, true);
   });
 
   test('foods deleted from the bank are noticed once', () => {

@@ -548,6 +548,15 @@ export function newFoods(plan, foods) {
   return foods.filter(f => f.created_at > plan.made && !used.has(f.id) && !seen.has(f.id));
 }
 
+// The plan note's data with these food ids added to seenFoods (once each), so newFoods() no
+// longer offers them: a «نه» on the card, or the owner sending one of their own bank foods to
+// everyone's bank (it was theirs already, so it is nothing new for their plan).
+export function withSeen(data, ids) {
+  const seen = new Set(data.seenFoods || []);
+  const add = [...new Set(ids)].filter(id => id && !seen.has(id));
+  return add.length ? { ...data, seenFoods: [...seen, ...add] } : data;
+}
+
 // Foods the plan uses that have since been deleted from the bank, once each: [{ id, name }].
 export function goneFoods(plan, foods) {
   const have = new Set(foods.map(f => f.id));
