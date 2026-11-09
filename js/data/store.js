@@ -513,7 +513,11 @@ export function importData(obj) {
 // rows are written by the Edge Function and only read here when the person asks.
 export const canPush = () => !!remote;
 export const sendFeedback = (report, blobs) => (remote ? remote.sendFeedback(report, blobs) : Promise.resolve({ error: { message: 'local' } }));
-export const myFeedback = () => (remote ? remote.myFeedback() : Promise.resolve({ data: [] }));
+// a Supabase query is awaitable but not a real Promise (no .catch), so it is awaited here
+export async function myFeedback() {
+  if (!remote) return { data: [] };
+  try { return await remote.myFeedback(); } catch (error) { return { error }; }
+}
 export const savePush = sub => (remote ? remote.savePush(sub) : Promise.resolve({ error: { message: 'local' } }));
 export const removePush = endpoint => (remote ? remote.removePush(endpoint) : Promise.resolve({}));
 // Rows of ai_usage since an ISO time, or null when they can't be read.
