@@ -2,7 +2,7 @@
 // fills user_id from the JWT, so the client never sends it.
 
 const CONFLICT = { profile: 'user_id', reviews: 'user_id,week_start', weights: 'user_id,day', waists: 'user_id,day', activity: 'user_id,day', foods: 'id', entries: 'id', motivations: 'id', chat: 'id', ai_notes: 'user_id,key' };
-const DELETE_KEY = { profile: 'user_id', foods: 'id', entries: 'id', weights: 'day', waists: 'day', activity: 'day', reviews: 'week_start', motivations: 'id', chat: 'id', ai_notes: 'key' };
+const DELETE_KEY = { family_shop: 'id', profile: 'user_id', foods: 'id', entries: 'id', weights: 'day', waists: 'day', activity: 'day', reviews: 'week_start', motivations: 'id', chat: 'id', ai_notes: 'key' };
 const BUCKET = 'motivation'; // private; files live under <user id>/
 const strip = rows => rows.map(({ user_id, ...r }) => r);
 
@@ -47,6 +47,13 @@ export function createSupabaseRemote(sb) {
 
     upsert(table, row) {
       return sb.from(table).upsert(row, { onConflict: CONFLICT[table] });
+    },
+
+    insert(table, row) {
+      return sb.from(table).insert(row);
+    },
+    update(table, key, patch) {
+      return sb.from(table).update(patch).eq(DELETE_KEY[table], key);
     },
 
     async remove(table, key) {
@@ -174,6 +181,10 @@ export function createSupabaseRemote(sb) {
     },
     familyChoose(plot) {
       return sb.from('family_plot').insert({ plot });
+    },
+    // «لیست خرید» of the whole family (20261109_family_shop.sql), with who wants each item
+    familyShop() {
+      return sb.rpc('family_shop_list');
     },
     // The shared weekly magazine (20261108_magazine_shared.sql): the finished articles, newest first.
     magazine() {

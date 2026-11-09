@@ -18,7 +18,8 @@ import { upcoming } from '../domain/occasions.js';
 import { today, parse, addDays, diffDays } from '../lib/dates.js';
 import { perUnit } from '../domain/recipe.js';
 import { tagsOf, TAGS_KEY } from '../domain/health.js';
-import { shopList, toBuy } from '../domain/shopping.js';
+import { toBuy } from '../domain/shopping.js';
+import * as shop from '../data/shop.js';
 
 const URL_ = `${SUPABASE_URL}/functions/v1/hooshvareh`;
 const SEED_NAMES = new Set(SEED_FOODS.map(f => f.name));
@@ -159,8 +160,8 @@ function context() {
     focus: focusKey,
     // their own recipes, as one unit of the finished dish and what goes in it
     recipes: s.ai_notes.filter(n => n.kind === 'recipe' && n.data?.items?.length).map(({ data: r }) => ({ name: r.name, ...perUnit(r), in_bank: s.foods.some(f => f.id === r.food_id), items: r.items.map(i => `${i.name} ${Math.round(i.grams)} g`) })),
-    // «لیست خرید»: what is still waiting to be bought
-    shopping: toBuy(shopList(s.ai_notes)).map(({ name, amount }) => ({ name, amount })),
+    // «لیست خرید» of the whole family: what is still waiting to be bought, and for whom
+    shopping: toBuy(shop.list()).map(({ name, amount, who, me }) => ({ name, amount, for: me ? 'them' : who })),
     // «برگشت به مسیر»: what they said when the diet slipped, what was planned, how it went
     checkins: s.ai_notes.filter(n => n.kind === 'checkin' && n.data).sort((a, b) => (a.key < b.key ? -1 : 1)).slice(-5)
       .map(({ key, data: d }) => ({ day: key.slice(8), signs: d.signs, mood: d.mood, causes: d.causes, said: d.said, cause: d.cause, steps: d.steps, goal: d.goal, outcome: d.outcome || null })),

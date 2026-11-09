@@ -98,6 +98,8 @@ export async function flush() {
       try {
         if (op.op === 'upsert') res = await remote.upsert(op.table, op.row);
         else if (op.op === 'delete') res = await remote.remove(op.table, op.key);
+        else if (op.op === 'insert') res = await remote.insert(op.table, op.row);
+        else if (op.op === 'update') res = await remote.update(op.table, op.key, op.patch);
         else if (op.op === 'clear') res = await remote.clear(op.table);
         else if (op.op === 'deleteWhere') res = await remote.removeWhere(op.table, op.col, op.val);
         else if (op.op === 'replaceAll') res = await remote.replaceAll(op.data);
@@ -512,6 +514,17 @@ export function importData(obj) {
 // Neither is part of the synced state: a subscription belongs to one browser, and the usage
 // rows are written by the Edge Function and only read here when the person asks.
 export const canPush = () => !!remote;
+// Writes to tables shared by the family (not part of this member's own state), through the same
+// offline queue: { op: 'insert' | 'update' | 'delete', table, row | key, patch }.
+export const queueShared = op => enqueue(op);
+export const pendingFor = table => queue.some(op => op.table === table);
+export async function familyShop() {
+  if (!remote) return null;
+  try {
+    const res = await remote.familyShop();
+    return res && !res.error ? res.data : null;
+  } catch { return null; }
+}
 export const sendFeedback = (report, blobs) => (remote ? remote.sendFeedback(report, blobs) : Promise.resolve({ error: { message: 'local' } }));
 // a Supabase query is awaitable but not a real Promise (no .catch), so it is awaited here
 export async function myFeedback() {

@@ -902,6 +902,8 @@ body.kb .toast, body.chat-mode .toast { bottom: calc(var(--nav-h) + var(--safe-b
 .shop-main { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; min-height: 54px; padding: 8px 2px; border: 0; background: none; text-align: start; cursor: pointer; }
 .shop-name { display: grid; min-width: 0; font-weight: 600; overflow-wrap: anywhere; }
 .shop-name small { color: var(--muted); font-size: .8rem; font-weight: 400; }
+.shop-name .shop-who { color: var(--accent); }
+.shop-row.done .shop-who { color: var(--muted); }
 .shop-row .tick { margin: 0; }
 .shop-row.done .tick { background: var(--accent); border-color: var(--accent); }
 .shop-row.done .shop-name { color: var(--muted); font-weight: 400; text-decoration: line-through; }

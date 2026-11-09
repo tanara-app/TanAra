@@ -16,6 +16,7 @@ import { disable as disableReminders } from './ui/reminders.js';
 import { applyTheme } from './ui/theme.js';
 import { maybeCelebrate } from './ui/celebrate.js';
 import { startFamily } from './ui/family.js';
+import * as shop from './data/shop.js';
 
 applyTheme();
 
@@ -128,6 +129,7 @@ view.addEventListener('focusout', e => {
 function show() { sheet.closeAll({ history: false }); resetProgress(); render(); window.scrollTo(0, 0); }
 window.addEventListener('hashchange', () => { going = null; if (route() !== shown) show(); });
 store.subscribe(requestRender);
+shop.onChange(requestRender);
 
 async function start(ns, remote) {
   store.init(ns, remote);
@@ -141,8 +143,9 @@ async function start(ns, remote) {
   if (remote) {
     store.pull();
     startFamily();
-    window.addEventListener('online', () => store.pull());
-    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') store.pull(); });
+    shop.refresh();
+    window.addEventListener('online', () => { store.pull(); shop.refresh(); });
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { store.pull(); shop.refresh(); } });
   }
 }
 

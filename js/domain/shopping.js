@@ -1,10 +1,11 @@
 /*
   «لیست خرید»: foods to buy. Pure functions — no DOM, no storage.
 
-  An item is an ai_note with key `shop:<id>` (kind 'shop'):
-  { id, name, amount, food_id, done, at }. `amount` is free text as it would be said in a
+  One list for the whole family (js/data/shop.js, table family_shop). An item:
+  { id, name, amount, food_id, done, at, who, me } — `who` is the member it is for. `amount` is free text as it would be said in a
   shop («۲ بسته», «نیم کیلو»). `food_id` links it to the bank food of the same name, so the
   diet plan can show which of its foods are waiting to be bought. `at` orders the list.
+  shopList() reads the old per-member lists (ai_notes with key `shop:<id>`), kept for the tests.
 */
 import { norm } from '../lib/fa.js';
 

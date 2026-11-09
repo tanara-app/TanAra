@@ -22,8 +22,8 @@ import { amountLabel } from './units.js';
 import { icon, sheet, toast, confirmBox } from './dom.js';
 import { cheer } from './mascot.js';
 import { openLogSheet, openEntrySheet } from './logFood.js';
-import { shopList, neededFoods } from '../domain/shopping.js';
-import { addToShopping } from './shopping.js';
+import { neededFoods } from '../domain/shopping.js';
+import { addToShopping, shopping } from './shopping.js';
 
 let busy = false;        // a plan is being made
 const busySlots = new Set(); // slots waiting for one more option
@@ -353,7 +353,7 @@ function openSwap(day, key, optId, index) {
         <div class="sheet-head"><h2>به‌جای «${esc(old.name)}»</h2>${close}</div>
         <p class="muted small">${rest.length ? `${rest.map(esc).join('، ')} سر جایش می‌ماند. ` : ''}مقدار جایگزین را خود اپ هم‌کالری با ${amount(base)} ${esc(base.name)} حساب می‌کند.</p>
         ${old.was ? `<button class="btn block" data-back>برگرداندن به «${esc(old.was)}»</button>` : ''}
-        ${neededFoods(shopList(notes())).has(old.food_id)
+        ${neededFoods(shopping()).has(old.food_id)
           ? `<p class="small shop-note">${icon.cart} «${esc(old.name)}» در لیست خریدت هست.</p>`
           : `<button class="btn block" data-shop-add>${icon.cart} «${esc(old.name)}» را به لیست خرید اضافه کن</button>`}
         <div class="search">${icon.search}<input type="search" placeholder="جست‌وجو در بانک غذا" value="${esc(query)}" autocomplete="off"></div>
@@ -614,7 +614,7 @@ export function planHtml(day) {
   const gone = isToday && !over ? goneFoods(plan, s.foods) : [];
   const dayNo = planDayNo(plan, day);
   const keys = Object.keys(SLOTS).filter(k => plan.slots[k].pick > 0); // a fasting day has three
-  const need = neededFoods(shopList(s.ai_notes)); // foods of the plan waiting on the shopping list
+  const need = neededFoods(shopping()); // foods of the plan waiting on the shopping list
   const card = k => slotCard(plan, k, day, picks, extras[k], rooms[k], showKcal, onlyWord(day), need);
 
   return `

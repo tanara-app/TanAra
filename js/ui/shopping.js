@@ -1,39 +1,42 @@
 /*
-  «لیست خرید»: what has to be bought. Opened from «نمایه»; items
-  also arrive from a recipe's ingredients, from a plan food they don't have (the swap sheet)
-  and from the chat (propose_shopping).
-
-  Hooshvareh's part (mode `shop`): a week's groceries worked out from the diet plan, or from
-  what they have been eating when there is no plan. Nothing is added until it is ticked here.
-
-  Items are ai_notes with key `shop:<id>` (see js/domain/shopping.js).
+  «لیست خرید»: what the family has to buy. One list for everyone (js/data/shop.js): each item
+  says who wants it (whoever added it), anyone can tick what they bought, and only the one who
+  added a waiting item can take it off. Opened from «نمایه»; items also arrive from a recipe's
+  ingredients, from a plan food they don't have (the swap sheet) and from the chat
+  (propose_shopping).
 */
 import * as store from '../data/store.js';
-import { shopList, toBuy, bought, shopAdd, shopMatch, shopText } from '../domain/shopping.js';
-import { planOn } from '../domain/plan.js';
+import * as shop from '../data/shop.js';
+import { toBuy, bought, shopAdd, shopMatch, shopText } from '../domain/shopping.js';
 import { fa, esc, norm } from '../lib/fa.js';
-import { today } from '../lib/dates.js';
 import { sheet, toast, icon } from './dom.js';
-import { ask, aiAvailable, sparkle } from '../ai/hooshvareh.js';
+import { sparkle } from '../ai/hooshvareh.js';
 
-const newId = () => (crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random()));
-export const shopping = () => shopList(store.get().ai_notes);
-const save = i => {
-  const id = i.id || newId();
-  store.saveNote({ key: `shop:${id}`, kind: 'shop', text: i.name, data: { ...i, id } });
-};
+export const shopping = () => shop.list();
 
-// Adds [{ name, amount, food_id }]; what is already waiting is skipped. Returns how many changed.
+// Adds [{ name, amount, food_id }] for this member; what is already waiting is skipped.
+// Returns how many changed.
 export function addToShopping(incoming) {
-  const rows = shopAdd(shopping(), incoming, store.get().foods);
-  rows.forEach(save);
+  const all = shopping();
+  // someone else's waiting item keeps its amount: only the one who added it changes it
+  const rows = shopAdd(all, incoming, store.get().foods).filter(r => {
+    const old = r.id && all.find(i => i.id === r.id);
+    return !old || old.done || old.me;
+  });
+  for (const r of rows) {
+    const old = r.id && all.find(i => i.id === r.id);
+    if (!old) shop.add(r);
+    else if (!old.done) shop.change(old.id, { amount: r.amount });
+    else if (old.me) shop.change(old.id, { amount: r.amount, done: false, at: r.at });
+    else { shop.remove(old.id); shop.add({ ...r, food_id: null }); } // bought earlier for someone else: now it's for this member
+  }
   return rows.length;
 }
 
 // Ticks the waiting items these names point at. Returns how many.
 export function markBought(names) {
   const hit = shopMatch(shopping(), names);
-  hit.forEach(i => save({ ...i, done: true }));
+  hit.forEach(i => shop.change(i.id, { done: true }));
   return hit.length;
 }
 
@@ -69,19 +72,17 @@ export function openShopping() {
       <div class="shop-row${i.done ? ' done' : ''}" data-id="${esc(i.id)}">
         <button class="shop-main" data-tick aria-pressed="${!!i.done}">
           <span class="tick">${i.done ? icon.check : ''}</span>
-          <span class="shop-name">${esc(i.name)}${i.amount ? `<small>${esc(i.amount)}</small>` : ''}</span>
+          <span class="shop-name">${esc(i.name)}<small>${i.amount ? `${esc(i.amount)} · ` : ''}<span class="shop-who">برای ${esc(i.who || 'من')}</span></small></span>
         </button>
-        <button class="icon-btn sm" data-rm aria-label="حذف ${esc(i.name)} از لیست">${icon.close}</button>
+        ${i.me || i.done ? `<button class="icon-btn sm" data-rm aria-label="حذف ${esc(i.name)} از لیست">${icon.close}</button>` : ''}
       </div>`;
 
     const paint = () => {
       const all = shopping(), need = toBuy(all), got = bought(all);
       list.innerHTML = `
-        ${need.map(row).join('') || `<div class="empty">${got.length ? 'همه را خریده‌ای.' : 'هر چیزی را که تمام شده یا برای رژیمت کم داری این‌جا بنویس تا موقع خرید جلوی چشمت باشد.'}</div>`}
+        ${need.map(row).join('') || `<div class="empty">${got.length ? 'همه خریده شده.' : 'این لیست مال همه‌ی خانواده است: هر چیزی را که می‌خواهی یا تمام شده این‌جا بنویس تا هر کس خرید می‌رود ببیند و بداند برای کیست.'}</div>`}
         ${got.length ? `<div class="shop-got-h"><h3 class="list-h">خریده‌شده</h3><button class="link small" data-clear>پاک کردن خریده‌ها</button></div>${got.map(row).join('')}` : ''}`;
-      acts.innerHTML = `
-        ${aiAvailable() ? `<button class="btn block ai-btn" data-ai>${sparkle()} هوشواره خرید این هفته را پیشنهاد بدهد</button>` : ''}
-        ${need.length ? '<button class="btn block" data-share>فرستادن لیست</button>' : ''}`;
+      acts.innerHTML = need.length ? '<button class="btn block" data-share>فرستادن لیست</button>' : '';
     };
 
     // while typing: bank foods with that name, one tap to add
@@ -111,17 +112,16 @@ export function openShopping() {
     };
     list.onclick = e => {
       if (e.target.closest('[data-clear]')) {
-        bought(shopping()).forEach(i => store.deleteNote(`shop:${i.id}`));
+        bought(shopping()).forEach(i => shop.remove(i.id));
         return paint();
       }
       const i = shopping().find(x => x.id === e.target.closest('[data-id]')?.dataset.id);
       if (!i) return;
-      if (e.target.closest('[data-rm]')) store.deleteNote(`shop:${i.id}`);
-      else if (e.target.closest('[data-tick]')) save({ ...i, done: !i.done });
+      if (e.target.closest('[data-rm]')) shop.remove(i.id);
+      else if (e.target.closest('[data-tick]')) shop.change(i.id, { done: !i.done });
       paint();
     };
     acts.onclick = async e => {
-      if (e.target.closest('[data-ai]')) return openSuggest(paint);
       if (!e.target.closest('[data-share]')) return;
       const text = `لیست خرید\n${shopText(shopping())}`;
       try {
@@ -130,6 +130,9 @@ export function openShopping() {
       } catch { /* the share sheet was dismissed */ }
     };
     paint();
+    // what the others added or bought since this device last looked
+    const off = shop.onChange(() => { if (body.isConnected) paint(); else off(); });
+    shop.refresh();
   }, { tall: true });
 }
 
@@ -162,42 +165,4 @@ export function pickForShopping(title, items, { note = '', hint = '', checked = 
       onDone?.();
     };
   }, { tall: true });
-}
-
-/* ---------------- Hooshvareh: this week's groceries ---------------- */
-
-function openSuggest(onDone) {
-  const plan = !!planOn(store.get().ai_notes, today());
-  sheet.open(body => {
-    const draw = (text = '') => {
-      body.innerHTML = `
-        <div class="sheet-head"><h2>خرید این هفته</h2>${close}</div>
-        <form class="stack" novalidate>
-          <p class="muted small">هوشواره ${plan ? 'از روی رژیمت' : 'از روی چیزهایی که این روزها می‌خوری'} حساب می‌کند برای یک هفته چه چیزهایی لازم داری. هر کدام را که خواستی به لیست اضافه می‌کنی.</p>
-          <label class="field"><span>چه چیزهایی در خانه داری یا تمام شده؟ <em>اختیاری</em></span><textarea name="have" rows="3" placeholder="مثلاً برنج و مرغ دارم؛ ماست و میوه تمام شده">${esc(text)}</textarea></label>
-          <button class="btn primary block big">${sparkle()} پیشنهاد بده</button>
-        </form>`;
-      body.querySelector('[data-close]').onclick = () => sheet.close();
-      body.querySelector('form').onsubmit = async e => {
-        e.preventDefault();
-        const have = e.target.elements.have.value.trim();
-        body.innerHTML = `
-          <div class="sheet-head"><h2>خرید این هفته</h2>${close}</div>
-          <p class="muted small ai-wait"><span class="typing"><i></i><i></i><i></i></span> هوشواره دارد لیست خرید هفته‌ات را می‌نویسد…</p>`;
-        body.querySelector('[data-close]').onclick = () => sheet.close();
-        try {
-          const r = await ask('shop', { have });
-          if (!body.isConnected) return;
-          const items = (r.items || []).map(i => ({ name: i.name, amount: i.amount, food_id: i.food_id || null, why: i.why }));
-          if (!items.length) { toast(r.note || 'پیشنهادی درنیامد.'); return draw(have); }
-          sheet.close();
-          pickForShopping('خرید این هفته', items, { note: r.note, onDone });
-        } catch (x) {
-          toast(x.message);
-          if (body.isConnected) draw(have);
-        }
-      };
-    };
-    draw();
-  });
 }

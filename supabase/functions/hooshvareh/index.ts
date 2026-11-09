@@ -14,7 +14,6 @@
     recipe    a home recipe as ingredients by weight (the app adds it up): theirs written
               down from text or a photo, a lighter version of one, or a new and simple
               dish to try that fits what is left of the day
-    shop      a week's groceries for the shopping list, from the diet plan or recent eating
     title     a short name for a chat conversation
     plan      a two-week diet plan: options with amounts for each meal, from the food bank
     plan_option  one more option for one meal of the current plan
@@ -105,7 +104,7 @@ Changing their data (chat only)
 - What you still cannot change: the profile, the targets, the phase and goal weight, the reminders, the text of their weekly reviews, saved motivations, and the plan beyond a single swap. Say where in the app they can do it.
 - When a message comes with a photo of food (or several: they can be different foods, or the same plate from other angles — count a food seen in two photos once, unless they say they had it twice), work out what is on the plate and how much (household units, or grams when a bank food is weighed), and call propose_log_food once per food, for the meal that fits the time unless they say otherwise. Say in one line what you assumed (portion size, oil); a photo hides oil, sugar and depth, so call it an estimate. If the photo is not food, say so and propose nothing. «[عکس غذا]» at the start of an earlier message of theirs means it came with a photo that you can no longer see.
 - «رسپی‌ها» (a tab inside «بانک غذا») holds their own home dishes as ingredients by weight; the app adds the pot up, so the calories of one کفگیر are those of their pot, and a saved recipe can also be a food in the bank. When you give them a recipe in the chat, or they tell you how they cook something and its numbers matter, call propose_recipe so they can keep it: every ingredient that carries calories (oil included) in grams for the whole pot. The app does the arithmetic and shows the result on the card, so in your text call per-serving numbers approximate («حدود»). In that tab they can also have you write a recipe down from text or a photo, make one lighter, or — the main use — get a new, simple dish to try («غذای تازه») sized to what is left of their day. When they ask you for a recipe in the chat, keep to the same spirit unless they ask otherwise: few ingredients, few steps, ordinary supermarket items.
-- «لیست خرید» (opened from «نمایه») is their shopping list: foods they have run out of or need for the plan. What is still to buy is in the data. When they say they are out of something, need to buy something, or have bought something on it, call propose_shopping; name things the way they are bought in a shop, with an amount only if they gave one or it is obvious. When they ask what to eat and something they would need is still on the list, they do not have it yet: suggest something else, or say it needs a trip to the shop. In the list itself they can also have you work out a week's groceries from their plan.
+- «لیست خرید» (opened from «نمایه») is one shopping list shared by the whole family: everyone adds what they want or what has run out, each item shows who it is for (whoever added it), and whoever goes shopping ticks what they bought. What is still to buy is in the data, with who each item is for. When they say they are out of something, need to buy something, or have bought something on it, call propose_shopping; name things the way they are bought in a shop, with an amount only if they gave one or it is obvious. When they ask what to eat and something they would need is still on the list, they do not have it yet: suggest something else, or say it needs a trip to the shop.
 - Use get_entries when you need individual foods from days older than the detailed window, and get_article for the full text of a magazine article before discussing its content, unless that text is already in the data.
 
 Where they are on the road
@@ -152,7 +151,7 @@ type Ctx = {
   energy?: any;
   measure?: { weigh: boolean; waist: boolean } | null;
   mode?: string; plan?: any; magazine?: any[]; focus?: string; recipes?: any[];
-  shopping?: { name: string; amount?: string }[];
+  shopping?: { name: string; amount?: string; for?: string }[];
   checkins?: any[];
 };
 
@@ -314,7 +313,7 @@ function sections(c: Ctx) {
       return a ? `# The magazine article they are asking about (full text)\n${articleText(a)}` : "";
     },
     recipes: () => (c.recipes || []).length ? `# Their own recipes, in «بانک غذا» ← «رسپی‌ها» (name | one unit, grams | kcal | protein g | what goes into the whole pot)\n${c.recipes!.map(r => `${r.name} | ${r.unit}${r.grams ? `, ${Math.round(r.grams)} g` : ""} | ${Math.round(r.kcal)} | ${r1(r.protein)}${r.in_bank ? " | in the bank" : ""} | ${(r.items || []).join("، ")}`).join("\n")}` : "",
-    shopping: () => `# Their shopping list («لیست خرید»): still to buy\n${(c.shopping || []).slice(0, 60).map(i => `${String(i.name).slice(0, 80)}${i.amount ? ` (${String(i.amount).slice(0, 40)})` : ""}`).join("، ") || "nothing on it"}`,
+    shopping: () => `# The family shopping list («لیست خرید»): still to buy, and who wants each (them = this user)\n${(c.shopping || []).slice(0, 60).map(i => `${String(i.name).slice(0, 80)}${i.amount ? ` (${String(i.amount).slice(0, 40)})` : ""}${i.for ? ` [for ${String(i.for).slice(0, 30)}]` : ""}`).join("، ") || "nothing on it"}`,
     foods: () => `# Their food bank (food_id | name | unit | grams in one unit | kcal per unit | protein g per unit | veg | second unit, grams in one | own = they added it themselves | health tags, see "Medical conditions")\n${foods.map(f => `${f.alias} | ${f.name} | ${f.unit} | ${f.grams ? r1(f.grams) : "?"} | ${r1(f.kcal)} | ${r1(f.protein)}${f.is_veg ? " | veg" : ""}${f.unit2 && f.grams2 ? ` | also by ${f.unit2}, ${r1(f.grams2)} g` : ""}${f.own ? " | own" : ""}${Array.isArray(f.tags) && f.tags.length ? ` | tags: ${f.tags.join(", ")}` : ""}`).join("\n")}`,
   };
 }
@@ -1032,37 +1031,6 @@ Write it down exactly as they make it: keep every amount they gave and do not ma
 
 ${RECIPE_RULES}`;
     },
-  },
-  shop: {
-    effort: "low",
-    data: (S) => [S.now(), S.profile(), S.mode(), S.plan(), S.recipes(), S.recent(), S.shopping()],
-    schema: {
-      type: "object",
-      properties: {
-        items: {
-          type: "array",
-          items: {
-            type: "object",
-            properties: {
-              name: str("Persian name of the thing as it is bought in a shop"),
-              amount: str("how much to buy for the week, short, the way it is sold («۲ بسته», «نیم کیلو», «۶ عدد»)"),
-              why: str("2–5 Persian words: what it is for («صبحانه‌های رژیم», «سالاد ناهار و شام»)"),
-            },
-            required: ["name", "amount", "why"], additionalProperties: false,
-          },
-        },
-        note: str("one short Persian sentence to them: what the list is built on, or why it is empty"),
-      },
-      required: ["items", "note"], additionalProperties: false,
-    },
-    prompt: (i) => `Write their grocery list for the next 7 days, for the shopping list («لیست خرید») inside the app. If the data has a diet plan, the list must let them eat by it for a week: cover the options they are most likely to pick (the ones they have been ticking or logging, otherwise a sensible spread), not every option of every meal. Without a plan, base it on what they have actually been eating over the last two weeks, and on their recipes where they cook them.${String(i.have || "").trim() ? `\nThey wrote about what is at home or has run out: «${String(i.have).slice(0, 600)}» — leave out what they have, make sure what has run out is on the list.` : ""}
-
-- Things as they are bought in an ordinary Iranian shop, not dishes: for a cooked dish list what it is made from (for قورمه‌سبزی: گوشت خورشتی، سبزی قورمه، لوبیا قرمز), merged across dishes into one line per thing.
-- Mostly what runs out within a week: dairy, eggs, bread, fruit, vegetables and salad, meat, chicken and fish, plus anything the plan leans on. Leave out pantry staples that a kitchen normally has (oil, salt, spices, tea, sugar, rice, tomato paste) unless they wrote that they are out of them.
-- Amounts for ONE person for one week, rounded to how the thing is sold (a pack, a bottle, half a kilo, a count), on the modest side: food that spoils is waste.
-- Nothing that is already on their shopping list (in the data). Nothing against profile.planPrefs (dislikes, allergies) or the medical conditions in the profile. No supplements, no diet products.
-- At most 18 lines, ordered the way one walks a shop: fruit and vegetables, then dairy and eggs, then meat, chicken and fish, then bread and grains, then the rest.
-If there is neither a plan nor anything logged, return an empty list and say in the note that it needs a plan or a few logged days first.`,
   },
   title: {
     effort: "low",
