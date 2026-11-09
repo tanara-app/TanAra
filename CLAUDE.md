@@ -46,6 +46,11 @@ one needs to know goes in this file or in the project docs, not only in your own
 - Build only what the user agreed to. When a reply could mean more than one of the options you offered,
   ask which ones before building (on 2026-11-08 a shared «team goal» was built that the user hadn't asked for).
 
+## Waiting to deploy
+
+- `supabase/functions/hooshvareh/index.ts`: since 2026-11-09 git has one line the live function doesn't (reminders are now in
+  «نمایه» ← «تنظیمات» ← «یادآورها»). The user chose to deploy it with the next hooshvareh change; deploy it then and remove this note.
+
 ## Where things are
 
 - Plain-JS PWA with no build step: `index.html`, `js/app.js`, `js/ui/` (screens), `js/domain/` (pure logic,
