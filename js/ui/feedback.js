@@ -6,7 +6,7 @@ import { fa, esc } from '../lib/fa.js';
 import { today, iso, faDMY } from '../lib/dates.js';
 import { sheet, toast, icon } from './dom.js';
 import { shrink } from './motivation.js';
-import { getTheme } from './theme.js';
+import { getTheme, getPalette } from './theme.js';
 
 const MAX = 4;
 const KINDS = {
@@ -122,6 +122,7 @@ function context() {
     screen: `${innerWidth}x${innerHeight}`,
     standalone: matchMedia('(display-mode: standalone)').matches || navigator.standalone === true,
     theme: getTheme(),
+    palette: getPalette(),
     phase: p.phase || null,
     online: navigator.onLine,
   };

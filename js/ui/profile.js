@@ -16,7 +16,7 @@ import { openUsage } from './usage.js';
 import { shareAdmin, shareLine, checkShare, openFoodShare } from './foodShare.js';
 import { openShopping, shoppingLine } from './shopping.js';
 import { aiAvailable } from '../ai/hooshvareh.js';
-import { THEMES, getTheme, setTheme } from './theme.js';
+import { THEMES, PALETTES, getTheme, setTheme, getPalette, setPalette } from './theme.js';
 import { MODES, buddyMode, setBuddyMode } from './mascot.js';
 import { openFeedback, feedbackLine } from './feedback.js';
 
@@ -50,6 +50,7 @@ const ICON = {
   voice: svg('<path d="M4 5h16v11H9l-5 4z"/><path d="M9 10.5h6"/>'),
   usage: svg('<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>'),
   bell: svg('<path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M10 21h4"/>'),
+  palette: svg('<path d="M12 3.5a8.5 8.5 0 0 0 0 17c1.3 0 1.8-.9 1.4-1.9-.5-1.2.3-2.3 1.6-2.3h1.8a3.7 3.7 0 0 0 3.7-3.7c0-5-3.8-9.1-8.5-9.1z"/><circle cx="8" cy="11" r="1.1" fill="currentColor"/><circle cx="11" cy="7.5" r="1.1" fill="currentColor"/><circle cx="15.5" cy="8.5" r="1.1" fill="currentColor"/>'),
   theme: svg('<circle cx="12" cy="12" r="8.5"/><path d="M12 3.5v17a8.5 8.5 0 0 0 0-17z" fill="currentColor"/>'),
   data: svg('<ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/>'),
   report: svg('<path d="M5 21V4"/><path d="M5 4h12l-2.5 4.5L17 13H5"/>'),
@@ -95,7 +96,8 @@ export function renderProfile(root) {
       ${aiAvailable() ? row('data-usage', 'usage', 'مصرف هوشواره', 'هزینه‌ی ۳۰ روز اخیر') : ''}`)}
     ${group('تنظیمات', `
       ${row('data-reminders', 'bell', 'یادآورها', remindersLine())}
-      ${row('data-theme', 'theme', 'ظاهر', THEMES.find(t => t.value === getTheme()).label)}`)}
+      ${row('data-palette', 'palette', 'تم رنگی', PALETTES.find(t => t.value === getPalette()).label)}
+      ${row('data-theme', 'theme', 'روشن یا تیره', THEMES.find(t => t.value === getTheme()).label)}`)}
     ${group('پشتیبانی', `
       ${row('data-feedback', 'report', 'گزارش خرابی و انتقاد', feedbackLine())}`)}
     ${group('حساب و داده‌ها', `
@@ -122,8 +124,12 @@ export function renderProfile(root) {
   root.querySelector('[data-share]')?.addEventListener('click', () => openFoodShare(() => checkShare(again, true)));
   root.querySelector('[data-shopping]').onclick = () => openShopping();
   root.querySelector('[data-theme]').onclick = async () => {
-    const t = await choose('ظاهر', THEMES, getTheme());
+    const t = await choose('روشن یا تیره', THEMES, getTheme());
     if (t) { setTheme(t); renderProfile(root); }
+  };
+  root.querySelector('[data-palette]').onclick = async () => {
+    const t = await choose('تم رنگی', PALETTES.map(x => ({ value: x.value, label: `${x.label} · ${x.hint}` })), getPalette());
+    if (t) { setPalette(t); renderProfile(root); }
   };
   root.querySelector('[data-mascot]').onclick = async () => {
     const v = await choose('جمله‌ها و صدای هوشواره', MODES, buddyMode());

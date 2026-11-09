@@ -46,8 +46,33 @@
   color-scheme: light;
 }
 
-/* «زرشکی»: classic barberry red on warm ivory, with gold and navy as its complements (light). */
-:root[data-theme="crimson"] {
+/* Named colour themes, each with a dark and a light version (js/ui/theme.js sets data-palette; no attribute = «نعنا», above).
+   Any new colour in this file must be one of these variables so it works in every theme. */
+/* «انار»: classic barberry red, with gold and navy as complements. */
+:root[data-palette="anar"] {
+  --bg: #160d0f;
+  --surface: #211417;
+  --surface-2: #2b1b1f;
+  --line: #3a2529;
+  --text: #f3e9ea;
+  --muted: #b09a9c;
+  --accent: #e0566b;
+  --accent-ink: #2a0a10;
+  --accent-soft: rgba(224, 86, 107, .15);
+  --protein: #e6b25c;
+  --doctor: #8fb0e8;
+  --doctor-soft: rgba(143, 176, 232, .12);
+  --ai: #d0a8f0;
+  --ai-soft: rgba(208, 168, 240, .12);
+  --ai-ink: #1f1028;
+  --nav-bg: rgba(22, 13, 15, .94);
+  --shadow: rgba(0, 0, 0, .5);
+  --mot-event: #3a1c22;
+  --mot-quote: #2d2a1e;
+  --mot-quote-2: #3a3420;
+  color-scheme: dark;
+}
+:root[data-palette="anar"][data-theme="light"] {
   --bg: #f7f1ec;
   --surface: #fffdfb;
   --surface-2: #f1e7e0;
@@ -70,8 +95,8 @@
   --mot-quote-2: #efe0bf;
   color-scheme: light;
 }
-/* «لاجوردی»: deep lapis blue with gold, like tilework; coral and turquoise as accents (dark). */
-:root[data-theme="lapis"] {
+/* «کاشی»: lapis blue and gold like Persian tilework, with coral and turquoise. */
+:root[data-palette="kashi"] {
   --bg: #0d1424;
   --surface: #141d31;
   --surface-2: #1c2740;
@@ -93,6 +118,29 @@
   --mot-quote: #2d2a1e;
   --mot-quote-2: #3a3420;
   color-scheme: dark;
+}
+:root[data-palette="kashi"][data-theme="light"] {
+  --bg: #eef2f8;
+  --surface: #ffffff;
+  --surface-2: #e3e9f3;
+  --line: #d3dcea;
+  --text: #121a2e;
+  --muted: #586480;
+  --accent: #1f3f8f;
+  --accent-ink: #ffffff;
+  --accent-soft: rgba(31, 63, 143, .09);
+  --protein: #a8741a;
+  --doctor: #0f7c8f;
+  --doctor-soft: rgba(15, 124, 143, .08);
+  --ai: #6a4fd6;
+  --ai-soft: rgba(106, 79, 214, .09);
+  --ai-ink: #ffffff;
+  --nav-bg: rgba(255, 255, 255, .94);
+  --shadow: rgba(18, 26, 46, .16);
+  --mot-event: #dbe6f6;
+  --mot-quote: #f3ecd4;
+  --mot-quote-2: #efe5c4;
+  color-scheme: light;
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
