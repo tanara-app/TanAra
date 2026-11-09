@@ -11,6 +11,7 @@ import { renderProfile, setSession } from './ui/profile.js';
 import { renderLogin } from './ui/login.js';
 import { renderChat } from './ui/chat.js';
 import { renderMagazine } from './ui/magazine.js';
+import { renderTools } from './ui/tools.js';
 import { configureAI, sparkle } from './ai/hooshvareh.js';
 import { disable as disableReminders } from './ui/reminders.js';
 import { applyTheme } from './ui/theme.js';
@@ -27,11 +28,13 @@ const ROUTES = {
   today: { label: 'امروز', icon: icon.today, render: renderToday },
   progress: { label: 'پیشرفت', icon: icon.chart, render: renderProgress },
   ai: { label: 'هوشواره', icon: sparkle(24), render: renderChat },
-  mag: { label: 'مجله', icon: icon.book, render: renderMagazine },
+  tools: { label: 'ابزارها', icon: icon.tools, render: renderTools },
   profile: { label: 'نمایه', icon: icon.user, render: renderProfile },
+  // not in the bottom bar: opened from «ابزارها» (and the magazine card on «امروز»)
+  mag: { label: 'مجله', render: renderMagazine, under: 'tools' },
 };
 
-nav.innerHTML = Object.entries(ROUTES).map(([k, r]) => `<a href="#/${k}" data-route="${k}" aria-label="${r.label}">${r.icon}<span>${r.label}</span></a>`).join('');
+nav.innerHTML = Object.entries(ROUTES).filter(([, r]) => !r.under).map(([k, r]) => `<a href="#/${k}" data-route="${k}" aria-label="${r.label}">${r.icon}<span>${r.label}</span></a>`).join('');
 
 // «مرور هفته» used to be a tab; old links land on «پیشرفت», where the past weeks open from.
 if (location.hash === '#/review') history.replaceState(history.state, '', '#/progress');
@@ -106,7 +109,7 @@ function render() {
   const r = route();
   document.body.classList.toggle('chat-mode', r === 'ai');
   view.classList.toggle('chat-view', r === 'ai');
-  nav.querySelectorAll('a').forEach(a => a.classList.toggle('on', a.dataset.route === r));
+  nav.querySelectorAll('a').forEach(a => a.classList.toggle('on', a.dataset.route === (ROUTES[r].under || r)));
   shown = r;
   ROUTES[r].render(view);
   maybeCelebrate();

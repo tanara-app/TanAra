@@ -9,9 +9,9 @@ import { aiAvailable, sparkle } from '../ai/hooshvareh.js';
 import { recipesPanel, recipes } from './recipes.js';
 import { scanBarcode, barcodeBox, fillFromBarcode, barcodeIcon } from './barcode.js';
 
-export function openFoodBank(onChange) {
+export function openFoodBank(onChange, first = 'foods') {
   let query = '';
-  let tab = 'foods';
+  let tab = first;
   sheet.open(body => {
     function draw() {
       body.innerHTML = `

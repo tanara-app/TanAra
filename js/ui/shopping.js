@@ -41,11 +41,6 @@ export function markBought(names) {
 }
 
 const close = `<button class="icon-btn" data-close aria-label="بستن">${icon.close}</button>`;
-const countText = n => (n ? `${fa(n)} قلم مانده` : 'چیزی برای خرید نمانده');
-
-/* ---------------- on «نمایه» ---------------- */
-
-export const shoppingLine = () => countText(toBuy(shopping()).length);
 
 /* ---------------- the list ---------------- */
 

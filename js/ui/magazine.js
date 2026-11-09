@@ -183,6 +183,7 @@ export function renderMagazine(root) {
 
   root.innerHTML = `
     <header class="page-head mag-head">
+      <button class="link small mag-back" data-back>${icon.chevR} ابزارها</button>
       <h1>مجله</h1>
       <p class="muted small">هر شنبه یک مقاله‌ی تازه برای همه.</p>
     </header>
@@ -199,6 +200,7 @@ export function renderMagazine(root) {
 
   const refresh = () => { if (root.isConnected && location.hash === '#/mag') renderMagazine(root); };
   root.querySelectorAll('[data-open]').forEach(b => b.onclick = () => openArticle(b.dataset.open));
+  root.querySelector('[data-back]').onclick = () => location.replace('#/tools');
   root.querySelector('[data-now]')?.addEventListener('click', () => writeNow('', refresh));
   root.querySelector('[data-topic]')?.addEventListener('click', () => askTopic(refresh));
   pullShared(refresh);

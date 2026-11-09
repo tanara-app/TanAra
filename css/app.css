@@ -1077,3 +1077,22 @@ body.kb .toast, body.chat-mode .toast { bottom: calc(var(--nav-h) + var(--safe-b
 .plot-info .num { font-variant-numeric: tabular-nums; }
 .land-next { text-align: center; font-size: .78rem; color: var(--muted); margin: 0 0 4px; }
 
+
+/* «ابزارها»: tiles like the icons on a phone's home screen (js/ui/tools.js) */
+.tool-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px 10px; padding: 6px 0 4px; }
+.tool { display: flex; flex-direction: column; align-items: center; gap: 7px; min-width: 0; padding: 0; border: 0; background: none; color: var(--text); cursor: pointer;
+  -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; touch-action: manipulation; transition: transform .18s ease; }
+.tool-ic { position: relative; display: grid; place-items: center; width: 100%; max-width: 68px; aspect-ratio: 1; border-radius: 22%;
+  background: var(--surface-2); box-shadow: 0 4px 12px var(--shadow); }
+.tool-ic img { width: 100%; height: 100%; border-radius: inherit; object-fit: cover; pointer-events: none; }
+.tool-name { max-width: 100%; font-size: .78rem; line-height: 1.35; text-align: center; overflow-wrap: anywhere; }
+.tool-badge { position: absolute; top: -6px; inset-inline-end: -6px; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 11px;
+  display: grid; place-items: center; background: #e5484d; color: #fff; font-size: .75rem; font-weight: 700; box-shadow: 0 0 0 2px var(--bg); }
+.tool-grid.arranging { touch-action: none; }
+.tool-grid.arranging .tool:not(.lifted) .tool-ic { animation: tool-wiggle .32s ease-in-out infinite alternate; }
+.tool-grid.arranging .tool:nth-child(2n) .tool-ic { animation-delay: -.16s; }
+.tool.lifted { position: relative; z-index: 5; transition: none; opacity: .92; }
+@keyframes tool-wiggle { from { transform: rotate(-2.5deg); } to { transform: rotate(2.5deg); } }
+@media (prefers-reduced-motion: reduce) { .tool-grid.arranging .tool .tool-ic { animation: none; outline: 2px dashed var(--accent); outline-offset: 3px; } }
+.mag-back { display: inline-flex; align-items: center; gap: 2px; margin-bottom: 6px; padding: 0; }
+.mag-back svg { width: 18px; height: 18px; }
