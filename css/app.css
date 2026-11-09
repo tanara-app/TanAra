@@ -46,6 +46,55 @@
   color-scheme: light;
 }
 
+/* «زرشکی»: classic barberry red on warm ivory, with gold and navy as its complements (light). */
+:root[data-theme="crimson"] {
+  --bg: #f7f1ec;
+  --surface: #fffdfb;
+  --surface-2: #f1e7e0;
+  --line: #e7d9d0;
+  --text: #2a1216;
+  --muted: #7a5e60;
+  --accent: #8e1b2c;
+  --accent-ink: #ffffff;
+  --accent-soft: rgba(142, 27, 44, .09);
+  --protein: #a8741a;
+  --doctor: #2c5487;
+  --doctor-soft: rgba(44, 84, 135, .08);
+  --ai: #7a3f8f;
+  --ai-soft: rgba(122, 63, 143, .09);
+  --ai-ink: #ffffff;
+  --nav-bg: rgba(255, 253, 251, .94);
+  --shadow: rgba(60, 20, 26, .16);
+  --mot-event: #f4e0e1;
+  --mot-quote: #f5ead3;
+  --mot-quote-2: #efe0bf;
+  color-scheme: light;
+}
+/* «لاجوردی»: deep lapis blue with gold, like tilework; coral and turquoise as accents (dark). */
+:root[data-theme="lapis"] {
+  --bg: #0d1424;
+  --surface: #141d31;
+  --surface-2: #1c2740;
+  --line: #273352;
+  --text: #eaeef7;
+  --muted: #9aa6c0;
+  --accent: #e6b85c;
+  --accent-ink: #241a05;
+  --accent-soft: rgba(230, 184, 92, .14);
+  --protein: #f2937e;
+  --doctor: #7fd0e6;
+  --doctor-soft: rgba(127, 208, 230, .12);
+  --ai: #c3a8ff;
+  --ai-soft: rgba(195, 168, 255, .12);
+  --ai-ink: #1a1430;
+  --nav-bg: rgba(13, 20, 36, .94);
+  --shadow: rgba(0, 0, 0, .5);
+  --mot-event: #1c2f45;
+  --mot-quote: #2d2a1e;
+  --mot-quote-2: #3a3420;
+  color-scheme: dark;
+}
+
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 [hidden] { display: none !important; }
 html { -webkit-text-size-adjust: 100%; }
