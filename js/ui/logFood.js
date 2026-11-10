@@ -404,7 +404,7 @@ export function openLogSheet({ day = today(), meal = null, onSaved = null, room 
           <h2>چقدر بخورم؟</h2><span></span>
         </div>
         ${mealSeg(curMeal)}
-        <p class="muted small portion">${left ? `سهم ${room.label} امروز: <b>${fa(left)}</b> کالری${many ? '. با هم این‌قدر:' : ''}` : `از کالری امروز چیزی برای ${room.label} نمانده.`}</p>
+        ${left ? '' : `<p class="muted small portion">از کالری امروز چیزی برای ${room.label} نمانده.</p>`}
         <div class="qty-box portions">${chosen.map((f, i) => {
           const it = r.items[i];
           const v = views[i];
@@ -424,10 +424,10 @@ export function openLogSheet({ day = today(), meal = null, onSaved = null, room 
             <button class="icon-btn sm" data-drop="${i}" aria-label="برداشتن ${esc(f.name)}">${icon.close}</button>
           </div>`;
         }).join('')}
-          <div class="preview"><b>${fa(Math.round(r.total))}</b> کالری · <b>${fa(Math.round(r.protein))}</b> گرم پروتئین</div>
+          <div class="preview ptotal"><span><b>${fa(Math.round(r.total))}</b>${left ? ` از ${fa(left)}` : ''} کالری · <b>${fa(Math.round(r.protein))}</b> گرم پروتئین</span>
+            ${locks.size ? `<button type="button" class="icon-btn sm" data-reset aria-label="برگشت به پیشنهاد اپ">${icon.undo}</button>` : ''}</div>
           ${r.over ? `<p class="small warn-text">${fa(r.over)} کالری بیشتر از سهم ${room.label}${r.drop != null ? `؛ بدون «${esc(chosen[r.drop].name)}» جا می‌شود` : ''}. می‌توانی همین را بخوری؛ از وعده‌های بعد کم می‌شود.</p>` : ''}
           ${r.spare > 50 ? `<p class="small muted">همه به اندازه‌ی یک وعده رسیدند و ${fa(r.spare)} کالری از سهم ماند.</p>` : ''}
-          ${locks.size ? '<button class="link small" data-reset>برگشت به پیشنهاد اپ</button>' : ''}
         </div>
         <button class="btn block" data-beside>${icon.plus} یک خوراکی دیگر هم کنارش می‌خورم</button>
         <button class="btn primary block big" data-save>${many ? `ثبت ${fa(chosen.length)} مورد` : 'ثبت'}</button>`;

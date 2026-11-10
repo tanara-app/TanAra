@@ -48,6 +48,10 @@ one needs to know goes in this file or in the project docs, not only in your own
   in `js/ui/dom.js`. The mascot appears only where it already is; don't add him to new screens unasked.
 - Keep text in the app to a minimum: no hint lines or explanations under things unless the user asks
   (on 2026-11-09 they were annoyed by a «نگه دار و بکش» hint under the tools grid).
+  On 2026-11-10 they said again that we keep adding too much text and that it distracts: a number goes
+  where the user already looks (e.g. «۶۱۲ از ۶۳۲ کالری» in the total, not a separate «سهم شام امروز…» line),
+  and an action that can be an icon is an icon (undo instead of «برگشت به پیشنهاد اپ»). Before adding any
+  sentence, label or link to the UI, ask whether the screen works without it.
 - Build only what the user agreed to. When a reply could mean more than one of the options you offered,
   ask which ones before building (on 2026-11-08 a shared «team goal» was built that the user hadn't asked for).
 
