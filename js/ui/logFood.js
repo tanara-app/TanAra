@@ -15,7 +15,8 @@ import { photoItems } from '../domain/photo.js';
 import { pickPhoto, foodPhoto, cameraIcon } from './photo.js';
 import { scanBarcode, barcodeBox, fillFromBarcode, barcodeIcon } from './barcode.js';
 import { portionsFor } from '../domain/plan.js';
-import { fitMeal, usualCombos } from '../domain/portion.js';
+import { fitMeal } from '../domain/portion.js';
+import { packs, savePack, askPackName } from './packs.js';
 
 export const mealSeg = meal => `<div class="seg meal-seg" data-meal>
   ${Object.entries(MEALS).map(([k, l]) => `<button type="button" data-v="${k}" class="${k === meal ? 'on' : ''}">${l}</button>`).join('')}
@@ -44,7 +45,8 @@ const aiEstBtn = () => (aiAvailable() ? `<button type="button" class="btn ai-btn
 // `room` ({ kcal, label }): from the diet plan's «+» — the meal is fixed, and the foods chosen
 // (from the bank or typed in) are given the amounts that fit what is left of the occasion
 // together (drawPortions) instead of an amount to pick.
-export function openLogSheet({ day = today(), meal = null, onSaved = null, room = null } = {}) {
+// `start` (with room.smart): foods to begin with, from a pack (`pack`: its id) on the today screen.
+export function openLogSheet({ day = today(), meal = null, onSaved = null, room = null, start = null, pack = null } = {}) {
   let curMeal = meal || (day === today() ? mealForNow() : 'lunch');
   let query = '';
   const save = e => { const row = store.saveEntry(e); onSaved?.(row); cheer('entry'); return row; };
@@ -57,7 +59,8 @@ export function openLogSheet({ day = today(), meal = null, onSaved = null, room 
   };
   const locks = new Map(); // «سهم وعده»: amounts set with + / −, by chosen food
   const shown = new Map(); // «سهم وعده»: the unit each chosen food's amount is shown in: 'u', 'u2' or 'g'
-  let chosen = []; // with `room`: the foods to be eaten together (a typed-in one may have no id)
+  let chosen = start && room?.smart ? [...start] : []; // with `room`: the foods to be eaten together (a typed-in one may have no id)
+  let packId = pack; // «بسته‌ها»: the pack these foods came from, which the bookmark updates
   // in the list, next to each food: how much of it fits, beside what is already chosen
   const fits = f => {
     if (!room) return '';
@@ -103,12 +106,9 @@ export function openLogSheet({ day = today(), meal = null, onSaved = null, room 
         }
         // frequents are per meal, so breakfast regulars don't crowd dinner
         const freq = frequentFoods(s.entries, foods, day, curMeal);
-        const combos = smart ? usualCombos(s.entries, foods, day, curMeal) : [];
         const groups = {};
         foods.forEach(f => (groups[f.category] ||= []).push(f));
         list.innerHTML = `
-          ${combos.length ? `<h3 class="list-h">ترکیب‌های همیشگی من</h3><div class="combos">${combos.map((c, n) => `<button class="combo" data-combo="${n}">
-            <span>${c.names.map(esc).join(' + ')}</span><small class="muted">${fa(c.n)} بار${c.meal !== curMeal ? ` · در ${MEALS[c.meal]}` : ''}</small></button>`).join('')}</div>` : ''}
           ${freq.length ? `<h3 class="list-h">پرتکرارهای من در ${MEALS[curMeal]}</h3>${freq.map(x => foodRow(x.food, room ? fits(x.food) : ` · معمولاً ${amountLabel(x.last.qty, x.last.grams ? GRAM : x.food.unit)}`)).join('')}` : ''}
           ${Object.keys(CATEGORIES).filter(c => groups[c]).map(c => `
             <h3 class="list-h">${CATEGORIES[c]}</h3>
@@ -122,14 +122,6 @@ export function openLogSheet({ day = today(), meal = null, onSaved = null, room 
       body.querySelector('[data-close]').onclick = () => sheet.close();
       body.querySelector('[data-bank]').onclick = () => openFoodBank(() => drawResults());
       list.addEventListener('click', e => {
-        const cb = e.target.closest('[data-combo]');
-        if (cb) {
-          const c = usualCombos(store.get().entries, store.get().foods, day, curMeal)[Number(cb.dataset.combo)];
-          const byId = new Map(store.get().foods.map(x => [x.id, x]));
-          chosen = c.ids.map(id => byId.get(id)).filter(Boolean);
-          locks.clear();
-          return drawPortions();
-        }
         const f = e.target.closest('[data-food]');
         if (f) return drawQty(store.get().foods.find(x => x.id === f.dataset.food));
         if (e.target.closest('[data-custom]')) drawCustom();
@@ -381,6 +373,8 @@ export function openLogSheet({ day = today(), meal = null, onSaved = null, room 
       «سهم وعده»: how much of each chosen food, by its role on the plate (fitMeal). + / − sets a
       food's amount by hand and the others share what is left around it.
     */
+    // a pack keeps bank foods only (a typed-in food has no id)
+    const packIds = () => [...new Set(chosen.map(f => f.id).filter(Boolean))];
     function drawSmart() {
       for (const k of [...locks.keys()]) if (!chosen.includes(k)) locks.delete(k);
       const left = Math.max(0, Math.round(room.kcal));
@@ -401,7 +395,7 @@ export function openLogSheet({ day = today(), meal = null, onSaved = null, room 
       body.innerHTML = `
         <div class="sheet-head">
           <button class="icon-btn" data-back aria-label="برگشت">${icon.chevR}</button>
-          <h2>چقدر بخورم؟</h2><span></span>
+          <h2>چقدر بخورم؟</h2>${packIds().length >= 2 ? `<button class="icon-btn" data-pack-save aria-label="${packId ? 'به‌روز کردن بسته' : 'ذخیره به‌عنوان بسته'}">${packId ? icon.bookmarkOn : icon.bookmark}</button>` : '<span></span>'}
         </div>
         ${mealSeg(curMeal)}
         ${left ? '' : `<p class="muted small portion">از کالری امروز چیزی برای ${room.label} نمانده.</p>`}
@@ -435,6 +429,15 @@ export function openLogSheet({ day = today(), meal = null, onSaved = null, room 
       body.querySelector('[data-back]').onclick = drawList;
       body.querySelector('[data-beside]').onclick = () => { query = ''; drawList(); };
       body.querySelector('[data-reset]')?.addEventListener('click', () => { locks.clear(); drawSmart(); });
+      body.querySelector('[data-pack-save]')?.addEventListener('click', async () => {
+        const old = packId && packs().find(p => p.id === packId);
+        if (old) { savePack({ ...old, ids: packIds() }); return toast('بسته به‌روز شد'); }
+        const name = await askPackName();
+        if (!name) return;
+        packId = savePack({ name, meal: curMeal, ids: packIds() }).id;
+        toast('بسته ذخیره شد');
+        drawSmart();
+      });
       const nudge = (i, dir) => {
         const it = r.items[i];
         const v = views[i];
@@ -466,7 +469,7 @@ export function openLogSheet({ day = today(), meal = null, onSaved = null, room 
       };
     }
 
-    drawList();
+    if (chosen.length) drawPortions(); else drawList();
   }, { tall: true });
 }
 

@@ -23,6 +23,7 @@ import { checkinCard, bindCheckin } from './checkin.js';
 import { weekCard, bindWeekCard } from './review.js';
 import { greetCard, bindGreet } from './mascot.js';
 import { mealBudget, mealSharesFrom } from '../domain/portion.js';
+import { packRow, bindPacks } from './packs.js';
 import { eatingPattern } from '../domain/pattern.js';
 
 let day = today();
@@ -87,6 +88,12 @@ export function renderToday(root) {
     }
   }
 
+  // «سهم وعده»: the meal's calories for today, from what is left of the day
+  const budgetFor = m => {
+    const st = store.get();
+    const pat = eatingPattern(st.entries, st.ai_notes, day);
+    return { kcal: mealBudget(st.entries, day, m, t.kcal, mealSharesFrom(pat.ready ? pat.shares : null)), label: MEALS[m] };
+  };
   root.innerHTML = `
     <header class="day-nav">
       <button class="icon-btn" data-prev aria-label="روز قبل">${icon.chevR}</button>
@@ -145,6 +152,7 @@ export function renderToday(root) {
             <span class="muted">${items.length ? `${fa(Math.round(mt.kcal))} کالری` : ''}</span>
             <button class="icon-btn sm" data-add="${k}" aria-label="افزودن به ${label}">${icon.plus}</button>
           </div>
+          ${portionMode ? packRow(day, k, budgetFor) : ''}
           ${items.map(e => `
             <button class="entry" data-entry="${e.id}">
               <span class="ename">${esc(e.name)}${e.is_veg ? ` <i class="veg">${icon.leaf}</i>` : ''}</span>
@@ -164,17 +172,10 @@ export function renderToday(root) {
   root.querySelector('[data-prev]').onclick = () => { day = addDays(day, -1); renderToday(root); };
   root.querySelector('[data-next]').onclick = () => { if (!isToday) { day = addDays(day, 1); renderToday(root); } };
   root.querySelector('[data-today]')?.addEventListener('click', () => { day = today(); renderToday(root); });
-  // «سهم وعده»: the meal's calories for today, from what is left of the day
-  const room = portionMode ? {
-    smart: true,
-    budgetFor: m => {
-      const st = store.get();
-      const pat = eatingPattern(st.entries, st.ai_notes, day);
-      return { kcal: mealBudget(st.entries, day, m, t.kcal, mealSharesFrom(pat.ready ? pat.shares : null)), label: MEALS[m] };
-    },
-  } : null;
+  const room = portionMode ? { smart: true, budgetFor } : null;
   root.querySelector('[data-log]')?.addEventListener('click', () => openLogSheet({ day, room }));
   root.querySelectorAll('[data-add]').forEach(b => b.onclick = () => openLogSheet({ day, meal: b.dataset.add, room }));
+  if (portionMode) bindPacks(root, { day, budgetFor, redraw: () => renderToday(root), edit: (meal, start, pack) => openLogSheet({ day, meal, room, start, pack }) });
   root.querySelectorAll('[data-entry]').forEach(b => b.onclick = () => openEntrySheet(s.entries.find(e => e.id === b.dataset.entry)));
   root.querySelector('[data-mode]').onclick = e => {
     const v = e.target.closest('button[data-v]')?.dataset.v;

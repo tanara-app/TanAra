@@ -1,5 +1,5 @@
 import { suite, test, eq, ok } from './harness.js';
-import { roleOf, fitMeal, mealBudget, usualCombos, MEAL_SHARES } from '../js/domain/portion.js';
+import { roleOf, fitMeal, mealBudget, usualCombos, mealPacks, packKey, MEAL_SHARES } from '../js/domain/portion.js';
 import { SEED_FOODS } from '../js/data/seedFoods.js';
 
 const seed = name => {
@@ -103,5 +103,15 @@ suite('portion', () => {
     const c = usualCombos(entries, foods, '2026-11-09', 'breakfast');
     eq(c.length, 1);
     eq([c[0].n, c[0].last, c[0].meal, [...c[0].names].sort()], [2, '2026-11-03', 'breakfast', [BREAD.name, CHEESE.name].sort()]);
+  });
+
+  test('packs: the meal\'s own, then combos that are not a pack or turned down', () => {
+    const combo = (ids, meals) => ({ ids, meals, names: ids });
+    const combos = [combo(['a', 'b'], { breakfast: 3 }), combo(['c', 'd'], { breakfast: 2 }), combo(['e', 'f'], { breakfast: 2 }), combo(['g', 'h'], { breakfast: 1, lunch: 2 })];
+    const packs = [{ id: 'p1', name: 'صبحانه', meal: 'breakfast', ids: ['b', 'a'] }, { id: 'p2', name: 'ناهار', meal: 'lunch', ids: ['x', 'y'] }];
+    const r = mealPacks(packs, combos, ['c,d'], 'breakfast');
+    eq(r.own.map(p => p.id), ['p1']);
+    eq(r.sug.map(c => packKey(c.ids)), ['e,f']);
+    eq(mealPacks([], combos, [], 'breakfast', 2).sug.length, 2);
   });
 });

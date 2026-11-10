@@ -196,3 +196,16 @@ export function usualCombos(entries, foods, day, meal, { days = 60, limit = 6 } 
     .sort((a, b) => (b.meals[meal] ? 1 : 0) - (a.meals[meal] ? 1 : 0) || b.n - a.n || (a.last < b.last ? 1 : -1))
     .slice(0, limit);
 }
+
+/*
+  «بسته‌ها»: the meal's own packs (saved by the user: { id, name, meal, ids }), then up to `max`
+  suggestions: combos eaten in this meal on two days or more that are neither a pack already
+  (in any meal) nor turned down («پیشنهاد نکن»; `hidden` holds their sorted ids joined by ',').
+*/
+export const packKey = ids => [...ids].sort().join(',');
+export function mealPacks(packs, combos, hidden, meal, max = 2) {
+  const own = packs.filter(p => p.meal === meal);
+  const taken = new Set([...packs.map(p => packKey(p.ids)), ...hidden]);
+  const sug = combos.filter(c => (c.meals[meal] || 0) >= 2 && !taken.has(packKey(c.ids))).slice(0, max);
+  return { own, sug };
+}
