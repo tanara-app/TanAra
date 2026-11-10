@@ -8,7 +8,7 @@ import { norm, esc, fa, qtyLabel } from '../lib/fa.js';
 import { mealForNow, today } from '../lib/dates.js';
 import { sheet, toast, confirmBox, icon } from './dom.js';
 import { openFoodBank, openFoodForm } from './foodBank.js';
-import { foodMeta, amountLabel, unitFields, bindUnitFields, mountAmount } from './units.js';
+import { foodMeta, amountLabel, unitFields, bindUnitFields, mountAmount, hasGrams, hasUnit2 } from './units.js';
 import { ask, aiAvailable, sparkle } from '../ai/hooshvareh.js';
 import { cheer } from './mascot.js';
 import { photoItems } from '../domain/photo.js';
@@ -56,6 +56,7 @@ export function openLogSheet({ day = today(), meal = null, onSaved = null, room 
     bindMeal(root, v => { if (smart) room = { ...room, ...room.budgetFor(v) }; set(v); });
   };
   const locks = new Map(); // «سهم وعده»: amounts set with + / −, by chosen food
+  const shown = new Map(); // «سهم وعده»: the unit each chosen food's amount is shown in: 'u', 'u2' or 'g'
   let chosen = []; // with `room`: the foods to be eaten together (a typed-in one may have no id)
   // in the list, next to each food: how much of it fits, beside what is already chosen
   const fits = f => {
@@ -386,6 +387,17 @@ export function openLogSheet({ day = today(), meal = null, onSaved = null, room 
       const lockIdx = Object.fromEntries(chosen.map((f, i) => [i, locks.get(f)]).filter(([, q]) => q != null));
       const r = fitMeal(chosen, left, lockIdx);
       const many = chosen.length > 1;
+      // the amount in the unit it is shown in (fitMeal works in the food's own unit)
+      const view = (f, it) => {
+        const ms = [f.unit !== GRAM && 'u', hasUnit2(f) && 'u2', f.unit !== GRAM && hasGrams(f) && 'g'].filter(Boolean);
+        const m = ms.includes(shown.get(f)) ? shown.get(f) : ms[0] || 'u';
+        const gIn = m === 'g' ? 1 : m === 'u2' ? Number(f.grams2) : 1; // grams in one shown unit ('u': in food units)
+        const per = m === 'u' ? 1 : Number(f.grams) / gIn;              // shown units in one food unit
+        const val = m === 'g' ? Math.round(it.qty * per) : Math.round(it.qty * per * 100) / 100;
+        const step = m === 'g' ? (val >= 100 ? 25 : 10) : m === 'u2' ? 0.5 : it.step;
+        return { ms, m, per, val, step, min: m === 'g' ? 5 : step, unit: m === 'g' ? GRAM : m === 'u2' ? f.unit2 : f.unit };
+      };
+      const views = chosen.map((f, i) => view(f, r.items[i]));
       body.innerHTML = `
         <div class="sheet-head">
           <button class="icon-btn" data-back aria-label="برگشت">${icon.chevR}</button>
@@ -395,13 +407,15 @@ export function openLogSheet({ day = today(), meal = null, onSaved = null, room 
         <p class="muted small portion">${left ? `سهم ${room.label} امروز: <b>${fa(left)}</b> کالری${many ? '. با هم این‌قدر:' : ''}` : `از کالری امروز چیزی برای ${room.label} نمانده.`}</p>
         <div class="qty-box portions">${chosen.map((f, i) => {
           const it = r.items[i];
-          const g = f.unit !== GRAM && Number(f.grams) > 0 ? ` (حدود ${fa(Math.round(it.qty * f.grams))} گرم)` : '';
+          const v = views[i];
+          const g = v.m !== 'g' && f.unit !== GRAM && Number(f.grams) > 0 ? ` (حدود ${fa(Math.round(it.qty * f.grams))} گرم)` : '';
           return `<div class="portion-row smart">
             <span class="grow"><b>${esc(f.name)}</b>
-              <small class="muted">${it.free ? 'کالری ندارد' : `${fa(Math.round(it.kcal))} کالری`}${g}${it.locked ? ' · دستی' : ''}</small></span>
+              <small class="muted">${it.free ? 'کالری ندارد' : `${fa(Math.round(it.kcal))} کالری`}${g}${it.locked ? ' · دستی' : ''}</small>
+              ${v.ms.length > 1 ? `<span class="seg small punit" data-unit="${i}">${v.ms.map(m => `<button type="button" data-v="${m}" class="${m === v.m ? 'on' : ''}">با ${esc(m === 'g' ? GRAM : m === 'u2' ? f.unit2 : f.unit)}</button>`).join('')}</span>` : ''}</span>
             <span class="pstep">
-              <button class="icon-btn sm" data-dec="${i}" aria-label="کمتر" ${it.qty - it.step < it.step - 1e-9 ? 'disabled' : ''}>${icon.minus}</button>
-              <b>${amountLabel(it.qty, f.unit)}</b>
+              <button class="icon-btn sm" data-dec="${i}" aria-label="کمتر" ${v.val - v.step < v.min - 1e-9 ? 'disabled' : ''}>${icon.minus}</button>
+              <b>${amountLabel(v.val, v.unit)}</b>
               <button class="icon-btn sm" data-inc="${i}" aria-label="بیشتر">${icon.plus}</button>
             </span>
             <button class="icon-btn sm" data-drop="${i}" aria-label="برداشتن ${esc(f.name)}">${icon.close}</button>
@@ -420,16 +434,29 @@ export function openLogSheet({ day = today(), meal = null, onSaved = null, room 
       body.querySelector('[data-reset]')?.addEventListener('click', () => { locks.clear(); drawSmart(); });
       const nudge = (i, dir) => {
         const it = r.items[i];
-        locks.set(chosen[i], Math.max(it.step, Math.round((it.qty + dir * it.step) * 100) / 100));
+        const v = views[i];
+        if (v.m === 'u') locks.set(chosen[i], Math.max(it.step, Math.round((it.qty + dir * it.step) * 100) / 100));
+        else {
+          // grams go to the next round 5 / 10 / 25; the amount is kept in the food's own unit
+          const to = Math.max(v.min, v.m === 'g' ? (dir > 0 ? Math.floor(v.val / v.step) + 1 : Math.ceil(v.val / v.step) - 1) * v.step : v.val + dir * v.step);
+          locks.set(chosen[i], to / v.per);
+        }
         drawSmart();
       };
+      body.querySelectorAll('[data-unit]').forEach(x => x.addEventListener('click', e => {
+        const b = e.target.closest('button[data-v]');
+        if (!b) return;
+        shown.set(chosen[Number(x.dataset.unit)], b.dataset.v);
+        drawSmart();
+      }));
       body.querySelectorAll('[data-dec]').forEach(b => b.onclick = () => nudge(Number(b.dataset.dec), -1));
       body.querySelectorAll('[data-inc]').forEach(b => b.onclick = () => nudge(Number(b.dataset.inc), 1));
       body.querySelectorAll('[data-drop]').forEach(b => b.onclick = () => { chosen.splice(Number(b.dataset.drop), 1); drawPortions(); });
       body.querySelector('[data-save]').onclick = () => {
         chosen.forEach((f, i) => {
           const it = r.items[i];
-          save({ day, meal: curMeal, food_id: f.id || null, name: f.name, unit: f.unit, qty: it.qty, kcal: it.kcal, protein: it.protein, is_veg: !!f.is_veg });
+          const v = views[i];
+          save({ day, meal: curMeal, food_id: f.id || null, name: f.name, unit: v.unit, qty: v.m === 'u' ? it.qty : v.val, kcal: it.kcal, protein: it.protein, is_veg: !!f.is_veg });
         });
         sheet.close();
         toast(many ? `${fa(chosen.length)} مورد ثبت شد` : `${chosen[0].name} ثبت شد`);
