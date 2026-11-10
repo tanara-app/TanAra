@@ -447,11 +447,18 @@ dl.calc dd { margin: 0; text-align: left; }
 .portion-row small b { color: var(--text); }
 .portion-row .icon-btn.sm { background: var(--surface); flex: none; }
 .portion-row .eaten-btn { align-self: flex-start; padding: 2px 0; }
-.portion-row.smart { flex-wrap: wrap; row-gap: 4px; }
-.portion-row.smart .grow { flex: 1 1 100%; }
-.portion-row.smart .pstep { margin-inline-start: auto; }
-.portion-row .punit { align-self: flex-start; padding: 3px; margin-top: 4px; }
-.portion-row .punit button { min-height: 30px; padding: 0 10px; white-space: nowrap; }
+.portion-row.smart { gap: 6px; }
+.portion-row.smart .grow { flex: 1 1 auto; }
+.portion-row.smart .grow > b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.portion-row.smart .icon-btn.sm { width: 32px; height: 32px; }
+.portion-row.smart .icon-btn.sm svg { width: 18px; height: 18px; }
+.qty-box.portions:has(.portion-row.smart) { gap: 0; padding-block: 6px; }
+.portion-row.smart + .portion-row.smart { border-top: 1px solid var(--line); }
+.portion-row.smart, .qty-box.portions:has(.portion-row.smart) > :not(.portion-row) { padding-block: 8px; }
+.portions .pstep { gap: 4px; }
+.portions .pstep > b, .pstep .punit { min-width: 70px; text-align: center; font-size: .88rem; }
+.pstep .punit { background: none; border: 0; font: inherit; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 3px; padding: 4px 2px; border-radius: 8px; font-weight: 700; font-size: .88rem; color: var(--text); text-decoration: underline dotted; text-underline-offset: 4px; }
+.pstep .punit svg { width: 13px; height: 13px; flex: none; opacity: .6; }
 .pstep { display: flex; align-items: center; gap: 6px; flex: none; }
 .pstep b { min-width: 74px; text-align: center; font-size: .92rem; }
 .pstep .icon-btn.sm:disabled { opacity: .35; }

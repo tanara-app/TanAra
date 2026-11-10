@@ -408,14 +408,16 @@ export function openLogSheet({ day = today(), meal = null, onSaved = null, room 
         <div class="qty-box portions">${chosen.map((f, i) => {
           const it = r.items[i];
           const v = views[i];
-          const g = v.m !== 'g' && f.unit !== GRAM && Number(f.grams) > 0 ? ` (حدود ${fa(Math.round(it.qty * f.grams))} گرم)` : '';
+          // a food whose unit has a weight: tapping its amount shows it in grams (and back)
+          const amt = v.ms.length > 1
+            ? `<button type="button" class="punit" data-unit="${i}" aria-label="واحد دیگر">${amountLabel(v.val, v.unit)}${icon.swap}</button>`
+            : `<b>${amountLabel(v.val, v.unit)}</b>`;
           return `<div class="portion-row smart">
             <span class="grow"><b>${esc(f.name)}</b>
-              <small class="muted">${it.free ? 'کالری ندارد' : `${fa(Math.round(it.kcal))} کالری`}${g}${it.locked ? ' · دستی' : ''}</small>
-              ${v.ms.length > 1 ? `<span class="seg small punit" data-unit="${i}">${v.ms.map(m => `<button type="button" data-v="${m}" class="${m === v.m ? 'on' : ''}">با ${esc(m === 'g' ? GRAM : m === 'u2' ? f.unit2 : f.unit)}</button>`).join('')}</span>` : ''}</span>
+              <small class="muted">${it.free ? 'کالری ندارد' : `${fa(Math.round(it.kcal))} کالری`}${it.locked ? ' · دستی' : ''}</small></span>
             <span class="pstep">
               <button class="icon-btn sm" data-dec="${i}" aria-label="کمتر" ${v.val - v.step < v.min - 1e-9 ? 'disabled' : ''}>${icon.minus}</button>
-              <b>${amountLabel(v.val, v.unit)}</b>
+              ${amt}
               <button class="icon-btn sm" data-inc="${i}" aria-label="بیشتر">${icon.plus}</button>
             </span>
             <button class="icon-btn sm" data-drop="${i}" aria-label="برداشتن ${esc(f.name)}">${icon.close}</button>
@@ -443,12 +445,12 @@ export function openLogSheet({ day = today(), meal = null, onSaved = null, room 
         }
         drawSmart();
       };
-      body.querySelectorAll('[data-unit]').forEach(x => x.addEventListener('click', e => {
-        const b = e.target.closest('button[data-v]');
-        if (!b) return;
-        shown.set(chosen[Number(x.dataset.unit)], b.dataset.v);
+      body.querySelectorAll('[data-unit]').forEach(x => x.onclick = () => {
+        const i = Number(x.dataset.unit);
+        const { ms, m } = views[i];
+        shown.set(chosen[i], ms[(ms.indexOf(m) + 1) % ms.length]);
         drawSmart();
-      }));
+      });
       body.querySelectorAll('[data-dec]').forEach(b => b.onclick = () => nudge(Number(b.dataset.dec), -1));
       body.querySelectorAll('[data-inc]').forEach(b => b.onclick = () => nudge(Number(b.dataset.inc), 1));
       body.querySelectorAll('[data-drop]').forEach(b => b.onclick = () => { chosen.splice(Number(b.dataset.drop), 1); drawPortions(); });
