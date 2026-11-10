@@ -26,7 +26,9 @@ let counts = null; // { foods, members } waiting, once read
 let asking = false;
 let people = []; // every account: { id, name, joined, skip }
 
-export const shareAdmin = () => admin === true;
+// the owner's tile shows at once from what the server said last time, before it answers again
+const remembered = () => { try { return localStorage.getItem(store.localKey('share-admin')) === '1'; } catch { return false; } };
+export const shareAdmin = () => admin === true || (admin == null && remembered());
 export function shareLine() {
   if (!counts) return 'غذاهای اعضا، برای بانک همه';
   const parts = [];
@@ -46,15 +48,18 @@ export function checkShare(onChange, again = false) {
   asking = true;
   lastAsk = Date.now();
   (async () => {
-    const was = [admin, shareLine()];
-    if (admin == null) admin = await store.isUsageAdmin();
+    const was = [shareAdmin(), shareLine()];
+    if (admin == null) {
+      admin = await store.isUsageAdmin();
+      if (admin != null) try { localStorage.setItem(store.localKey('share-admin'), admin ? '1' : '0'); } catch { /* private mode */ }
+    }
     if (admin) {
       const [all, ms] = await Promise.all([store.shareFoods(), store.shareMembers()]);
       if (ms) people = ms.map(toPerson);
       counts = all && ms ? { foods: pending(all).length, members: newcomers(all).length } : null;
     }
     asking = false;
-    if (was[0] !== admin || was[1] !== shareLine()) onChange?.();
+    if (was[0] !== shareAdmin() || was[1] !== shareLine()) onChange?.();
   })();
 }
 
