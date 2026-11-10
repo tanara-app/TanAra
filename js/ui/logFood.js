@@ -409,9 +409,10 @@ export function openLogSheet({ day = today(), meal = null, onSaved = null, room 
           const it = r.items[i];
           const v = views[i];
           // a food whose unit has a weight: tapping its amount shows it in grams (and back)
+          const val = `<b>${v.unit === GRAM ? fa(Math.round(v.val)) : qtyLabel(v.val)}</b><small><span>${esc(v.unit)}</span>${v.ms.length > 1 ? icon.swap : ''}</small>`;
           const amt = v.ms.length > 1
-            ? `<button type="button" class="punit" data-unit="${i}" aria-label="واحد دیگر">${amountLabel(v.val, v.unit)}${icon.swap}</button>`
-            : `<b>${amountLabel(v.val, v.unit)}</b>`;
+            ? `<button type="button" class="pval punit" data-unit="${i}" aria-label="${esc(amountLabel(v.val, v.unit))}، واحد دیگر">${val}</button>`
+            : `<span class="pval">${val}</span>`;
           return `<div class="portion-row smart">
             <span class="grow"><b>${esc(f.name)}</b>
               <small class="muted">${it.free ? 'کالری ندارد' : `${fa(Math.round(it.kcal))} کالری`}${it.locked ? ' · دستی' : ''}</small></span>

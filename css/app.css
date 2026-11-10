@@ -456,9 +456,13 @@ dl.calc dd { margin: 0; text-align: left; }
 .portion-row.smart + .portion-row.smart { border-top: 1px solid var(--line); }
 .portion-row.smart, .qty-box.portions:has(.portion-row.smart) > :not(.portion-row) { padding-block: 8px; }
 .portions .pstep { gap: 4px; }
-.portions .pstep > b, .pstep .punit { min-width: 70px; text-align: center; font-size: .88rem; }
-.pstep .punit { background: none; border: 0; font: inherit; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 3px; padding: 4px 2px; border-radius: 8px; font-weight: 700; font-size: .88rem; color: var(--text); text-decoration: underline dotted; text-underline-offset: 4px; }
-.pstep .punit svg { width: 13px; height: 13px; flex: none; opacity: .6; }
+.pval { width: 86px; min-height: 44px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; padding: 3px 4px; border-radius: 12px; background: var(--surface); border: 1px solid transparent; font: inherit; color: var(--text); line-height: 1.2; }
+.pval b { font-size: 1rem; }
+.pval small { display: inline-flex; align-items: center; gap: 3px; font-size: .72rem; color: var(--muted); white-space: nowrap; max-width: 100%; }
+.pval small span { overflow: hidden; text-overflow: ellipsis; }
+.pval small svg { width: 11px; height: 11px; flex: none; }
+button.pval { cursor: pointer; border-color: var(--line); }
+button.pval:active { background: var(--surface-2); }
 .pstep { display: flex; align-items: center; gap: 6px; flex: none; }
 .pstep b { min-width: 74px; text-align: center; font-size: .92rem; }
 .pstep .icon-btn.sm:disabled { opacity: .35; }
