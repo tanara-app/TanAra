@@ -11,7 +11,7 @@
 */
 import * as store from '../data/store.js';
 import { CATEGORIES, UNITS, GRAM } from '../data/seedFoods.js';
-import { recipeFrom, recipeItems, recipeTotals, itemTotals, perUnit, recipeFood } from '../domain/recipe.js';
+import { recipeFrom, recipeItems, recipeTotals, perUnit, recipeFood } from '../domain/recipe.js';
 import { MEALS, entriesOn, totals } from '../domain/stats.js';
 import { effectiveTargets } from '../domain/targets.js';
 import { SLOTS } from '../domain/plan.js';
@@ -82,12 +82,12 @@ export function recipesPanel(box, onChange) {
 
 /* ---------------- one recipe ---------------- */
 
+// one serving's numbers; the pot's totals are left to «ویرایش»
 const numbers = r => {
-  const u = perUnit(r), t = recipeTotals(r);
+  const u = perUnit(r);
   return `
     <div class="preview recipe-num"><b>${fa(u.kcal)}</b> کالری · <b>${fa(u.protein, 1)}</b> گرم پروتئین
-      <small>در هر ${esc(r.unit)}${u.grams ? ` (حدود ${fa(Math.round(u.grams))} گرم)` : ''}</small></div>
-    <p class="muted small center">کل قابلمه: ${fa(t.kcal)} کالری · ${fa(r.servings, 1)} ${esc(r.unit)}${r.cookedGrams ? ` · ${fa(r.cookedGrams)} گرم پخته` : ''}${r.minutes ? ` · ${fa(r.minutes)} دقیقه` : ''}</p>`;
+      <small>هر ${esc(r.unit)}${u.grams ? ` · ${fa(Math.round(u.grams))} گرم` : ''}${r.minutes ? ` · ${fa(r.minutes)} دقیقه` : ''}</small></div>`;
 };
 
 /*
@@ -105,10 +105,9 @@ export function openRecipe(recipe, { draft = false, another = null, base = null,
         ${numbers(r)}
         ${base ? `<div class="ai-act"><p>قبل: هر ${esc(base.unit)} <b>${fa(was.kcal)}</b> کالری و ${fa(was.protein, 1)} گرم پروتئین ← حالا <b>${fa(now.kcal)}</b> کالری و ${fa(now.protein, 1)} گرم</p>
           ${changes.length ? `<ul class="recipe-changes">${changes.map(c => `<li>${esc(c)}</li>`).join('')}</ul>` : ''}</div>` : ''}
-        ${r.note ? `<p class="small ai-est-note">${sparkle(14)} ${esc(r.note)}</p>` : ''}
-        <h3 class="list-h">مواد (برای کل قابلمه)</h3>
-        <ul class="recipe-items">${r.items.map(i => `<li><span>${esc(i.name)}</span><small class="muted">${fa(Math.round(i.grams))} گرم · ${fa(itemTotals(i).kcal)} کالری${i.food_id ? '' : ' · تخمینی'}</small></li>`).join('')}</ul>
-        <button class="link small shop-link" data-shop-items>${icon.cart} چیزی را نداری؟ به لیست خرید اضافه کن</button>
+        ${draft && r.note ? `<p class="small ai-est-note">${sparkle(14)} ${esc(r.note)}</p>` : ''}
+        <div class="list-h recipe-h"><span>مواد</span><button type="button" class="icon-btn sm" data-shop-items aria-label="به لیست خرید">${icon.cart}</button></div>
+        <ul class="recipe-items">${r.items.map(i => `<li><span>${esc(i.name)}</span><small class="muted">${fa(Math.round(i.grams))} گرم</small></li>`).join('')}</ul>
         ${r.steps?.length ? `<h3 class="list-h">روش پخت</h3><ol class="recipe-steps">${r.steps.map(s => `<li>${esc(s)}</li>`).join('')}</ol>` : ''}
         <div class="stack recipe-acts">${draft ? `
           <label class="check"><input type="checkbox" data-bank checked><span>در بانک غذا هم باشد<small class="muted">تا در ثبت غذا و رژیم بیاید</small></span></label>
@@ -116,13 +115,14 @@ export function openRecipe(recipe, { draft = false, another = null, base = null,
           ${base ? '<button class="btn block" data-keep-new>جدا ذخیره کن</button>' : ''}
           ${another ? `<button class="btn block ai-btn" data-another>${sparkle()} یک پیشنهاد دیگر</button>` : ''}
           <button class="btn block" data-edit>${icon.edit} اول ویرایشش کنم</button>` : `
-          <button class="btn primary block big" data-cooked>پختم؛ یک سهم ثبت کن</button>
-          ${aiAvailable() ? `<button class="btn block ai-btn" data-light>${sparkle()} سبک‌ترش کن</button>` : ''}
-          ${bankFood(r) ? '' : '<button class="btn block" data-to-bank>به بانک غذا اضافه کن</button>'}
-          <button class="btn block" data-edit>${icon.edit} ویرایش</button>
-          <button class="btn danger-ghost block" data-del>حذف رسپی</button>`}
-        </div>
-        <p class="muted small">عدد موادی که «تخمینی» دارند از بانک غذا نیامده؛ جمع و تقسیم را خود اپ حساب می‌کند. در «ویرایش» می‌توانی هر عدد را درست کنی.</p>`;
+          <button class="btn primary block big" data-cooked>پختم</button>
+          <div class="recipe-tools">
+            ${aiAvailable() ? `<button type="button" class="ai-btn" data-light>${sparkle()}<span>سبک‌تر</span></button>` : ''}
+            ${bankFood(r) ? '' : `<button type="button" data-to-bank>${icon.plus}<span>بانک غذا</span></button>`}
+            <button type="button" data-edit>${icon.edit}<span>ویرایش</span></button>
+            <button type="button" class="danger" data-del>${icon.trash}<span>حذف</span></button>
+          </div>`}
+        </div>`;
       body.querySelector('[data-close]').onclick = () => sheet.close();
       const on = (sel, fn) => body.querySelector(sel)?.addEventListener('click', fn);
       const keep = id => {

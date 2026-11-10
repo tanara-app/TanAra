@@ -850,6 +850,14 @@ body.kb .toast, body.chat-mode .toast { bottom: calc(var(--nav-h) + var(--safe-b
 .recipe-changes { display: grid; gap: 4px; font-size: .9rem; }
 .recipe-changes li::before { content: '· '; color: var(--ai); }
 .recipe-acts { margin-top: 16px; gap: 8px; }
+.recipe-h { display: flex; align-items: center; justify-content: space-between; }
+.recipe-h .icon-btn.sm { width: 32px; height: 32px; color: var(--text); }
+.recipe-h .icon-btn.sm svg { width: 16px; height: 16px; }
+.recipe-tools { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 8px; }
+.recipe-tools button { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 4px; border: 0; border-radius: 14px; background: var(--surface-2); color: var(--text); font: inherit; font-size: .8rem; cursor: pointer; }
+.recipe-tools button svg { width: 20px; height: 20px; }
+.recipe-tools button.danger { color: var(--muted); }
+.recipe-tools button.ai-btn { color: var(--ai); background: var(--ai-soft); }
 .ritem { padding: 10px; border-radius: 14px; background: var(--surface-2); display: grid; gap: 8px; }
 .ritem .field input { background: var(--surface) !important; }
 .ritem .field > span { font-size: .78rem; white-space: nowrap; }
