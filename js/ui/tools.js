@@ -12,14 +12,14 @@ import { fa } from '../lib/fa.js';
 import { icon } from './dom.js';
 import { openShopping, shopping } from './shopping.js';
 import { toBuy } from '../domain/shopping.js';
-import { openFoodBank } from './foodBank.js';
+import { openFoodBank, openRecipes } from './foodBank.js';
 import { shareAdmin, checkShare, openFoodShare } from './foodShare.js';
 
 const again = () => { const v = document.querySelector('#view .tools'); if (v) renderTools(v.parentElement); };
 const TOOLS = {
   shop: { label: 'لیست خرید', badge: () => toBuy(shopping()).length, open: () => openShopping() },
   bank: { label: 'بانک غذا', open: () => openFoodBank() },
-  recipes: { label: 'رسپی‌ها', open: () => openFoodBank(null, 'recipes') },
+  recipes: { label: 'رسپی‌ها', open: () => openRecipes() },
   mag: { label: 'مجله', open: () => { location.hash = '#/mag'; } },
   share: { label: 'غذاهای تازه‌ی خانواده', only: shareAdmin, open: () => openFoodShare(() => checkShare(again, true)) },
 };

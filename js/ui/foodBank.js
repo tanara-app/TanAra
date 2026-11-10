@@ -1,4 +1,4 @@
-// Food bank management: search, add, edit, delete. Its second tab, «رسپی‌ها», is in recipes.js.
+// Food bank management: search, add, edit, delete. «رسپی‌ها» is a page of its own (openRecipes; recipes.js).
 import * as store from '../data/store.js';
 import { CATEGORIES } from '../data/seedFoods.js';
 import { norm, esc, faDigits } from '../lib/fa.js';
@@ -9,25 +9,26 @@ import { aiAvailable, sparkle } from '../ai/hooshvareh.js';
 import { recipesPanel, recipes } from './recipes.js';
 import { scanBarcode, barcodeBox, fillFromBarcode, barcodeIcon } from './barcode.js';
 
-export function openFoodBank(onChange, first = 'foods') {
+// «رسپی‌ها»: its own page, from its own tile in «ابزارها».
+export function openRecipes(onChange) {
+  sheet.open(body => {
+    body.innerHTML = `
+      <div class="sheet-head"><h2>رسپی‌ها</h2><button class="icon-btn" data-close aria-label="بستن">${icon.close}</button></div>
+      <div class="stack" data-pane></div>`;
+    body.querySelector('[data-close]').onclick = () => { sheet.close(); onChange?.(); };
+    recipesPanel(body.querySelector('[data-pane]'), onChange);
+  }, { tall: true });
+}
+
+export function openFoodBank(onChange) {
   let query = '';
-  let tab = first;
   sheet.open(body => {
     function draw() {
       body.innerHTML = `
         <div class="sheet-head"><h2>بانک غذا</h2><button class="icon-btn" data-close aria-label="بستن">${icon.close}</button></div>
-        <div class="seg" data-tab>
-          <button type="button" data-v="foods" class="${tab === 'foods' ? 'on' : ''}">غذاها</button>
-          <button type="button" data-v="recipes" class="${tab === 'recipes' ? 'on' : ''}">رسپی‌ها</button>
-        </div>
         <div class="stack" data-pane></div>`;
       body.querySelector('[data-close]').onclick = () => { sheet.close(); onChange?.(); };
-      body.querySelector('[data-tab]').onclick = e => {
-        const b = e.target.closest('button[data-v]');
-        if (b && b.dataset.v !== tab) { tab = b.dataset.v; draw(); }
-      };
       const pane = body.querySelector('[data-pane]');
-      if (tab === 'recipes') return recipesPanel(pane, onChange);
       pane.innerHTML = `
         <div class="search">${icon.search}<input type="search" placeholder="جست‌وجو" value="${esc(query)}"></div>
         <button class="btn block" data-new>${icon.plus} غذای جدید</button>

@@ -56,7 +56,7 @@ const brief = r => ({
   items: r.items.map(({ name, grams, kcal100, protein100 }) => ({ name, grams, kcal100, protein100 })), steps: r.steps,
 });
 
-/* ---------------- the list, a tab of the food bank ---------------- */
+/* ---------------- the list, the «رسپی‌ها» page (openRecipes in foodBank.js) ---------------- */
 
 export function recipesPanel(box, onChange) {
   const draw = () => {
