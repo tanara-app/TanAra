@@ -470,6 +470,9 @@ button.pval:active { background: var(--surface-2); }
 .warn-text { color: var(--protein); margin: 0; }
 .packs { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding: 2px 0 6px; -webkit-touch-callout: none; user-select: none; }
 .packs::-webkit-scrollbar { display: none; }
+.packs.more-end { -webkit-mask-image: linear-gradient(to left, #000 calc(100% - 36px), transparent); mask-image: linear-gradient(to left, #000 calc(100% - 36px), transparent); }
+.packs.more-start { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 36px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 36px), transparent); }
+.packs.more-start.more-end { -webkit-mask-image: linear-gradient(to left, transparent, #000 36px, #000 calc(100% - 36px), transparent); mask-image: linear-gradient(to left, transparent, #000 36px, #000 calc(100% - 36px), transparent); }
 .pack-chip { flex: none; max-width: 210px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 6px 12px; border-radius: 999px; border: 1px solid transparent; background: var(--surface-2); color: var(--text); font: inherit; font-size: .82rem; cursor: pointer; touch-action: pan-x; }
 .pack-chip.sug { background: transparent; border: 1px dashed var(--line); color: var(--muted); }
 .pack-chip.on { border-color: var(--accent); border-style: solid; color: var(--text); }

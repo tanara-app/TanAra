@@ -126,7 +126,14 @@ export function bindPacks(root, { day, budgetFor, redraw, edit }) {
     row.addEventListener('pointerup', stop);
     row.addEventListener('pointercancel', stop);
     row.addEventListener('pointerleave', stop);
-    row.addEventListener('scroll', stop, { passive: true });
+    // a faded edge where more chips are hidden (RTL: scrollLeft goes from 0 to negative)
+    const edges = () => {
+      const max = row.scrollWidth - row.clientWidth, pos = Math.abs(row.scrollLeft);
+      row.classList.toggle('more-end', max > 2 && pos < max - 2);
+      row.classList.toggle('more-start', pos > 2);
+    };
+    edges();
+    row.addEventListener('scroll', () => { stop(); edges(); }, { passive: true });
     row.addEventListener('contextmenu', e => e.preventDefault());
     row.addEventListener('click', e => {
       const b = e.target.closest('[data-pack]');
