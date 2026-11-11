@@ -38,8 +38,17 @@ Sizes (a footprint is N×N tiles; one tile is about the size of a small hut)
 - palace 3×3, caravanserai 2×2, garden 2×2, windcatcher 1×1. Keep the same scale between buildings.
 
 Style
-- (to be filled in after the style test)
+- Soft realistic 3D render, like a detailed handcrafted stone and clay diorama model: natural materials (carved
+  sandstone, sun-dried adobe, terracotta brick, cedar wood, turquoise glazed tile, real gold), fine surface texture,
+  warm late-afternoon light, subtle ambient occlusion, a gentle miniature-model feel.
+- Rich but natural colours. Not cartoonish, not glossy plastic, not painterly.
+- Strictly a corner view: one corner of the footprint points straight down at the viewer and both sides of the
+  building are seen equally (not a front view, not turned only a little).
+- Nothing outside the footprint: no shadow, haze or vignette on the transparent background.
 ```
+
+سبک انتخاب‌شده (۲۰۲۶-۱۱-۱۱): **ماکت (C)**. تصویر کاخ همین سبک باید به فایل‌های پروژه اضافه شود تا مرجع بقیه باشد.
+دو خط آخر Style برای ایرادهای کاخ آزمایشی است (کمی از روبه‌رو بود و سایه‌ی کم‌رنگی بیرون از زمینش داشت).
 
 ## آزمایش سبک
 

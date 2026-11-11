@@ -20,15 +20,9 @@ const ZMIN = 0.55, ZMAX = 2.2;
 
 const coinSvg = (s = 20) => `<img src="img/game/test/coin.webp" width="${s}" height="${s}" alt="" draggable="false">`;
 
-// Style test (2026-11-11): tapping the palace switches between the drawn shape and the images
-// made in two styles. Remembered on this device. Goes away once a style is chosen.
-const ART = [
-  { name: 'شکل ساده' },
-  { name: 'مینیاتور', key: 'palace-b', file: 'img/game/test/palace-b.webp' },
-  { name: 'ماکت', key: 'palace-c', file: 'img/game/test/palace-c.webp' },
-];
-let artPick = 0;
-try { artPick = Number(localStorage.getItem('tanara:gameArt')) % ART.length || 0; } catch { /* storage blocked */ }
+// Buildings that already have an image (style «ماکت», art/STYLE.md); the rest are still drawn.
+// For now the palace is the ChatGPT style-test image, until its Meshy + Blender render.
+const ART = { palace: 'img/game/test/palace-c.webp' };
 const hammerSvg = '<svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4l6 6-3 3-6-6z"/><path d="M11 7L4 14l3 3 7-7"/><path d="M5.5 15.5L3 20l4.5-2.5"/></svg>';
 const clockSvg = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>';
 
@@ -107,7 +101,7 @@ function start(el, L) {
 
   class Land extends Phaser.Scene {
     preload() {
-      for (const a of ART) if (a.key) this.load.image(a.key, a.file);
+      for (const [kind, file] of Object.entries(ART)) this.load.image(`art-${kind}`, file);
       this.load.image('coinImg', 'img/game/test/coin.webp');
     }
 
@@ -183,7 +177,7 @@ function start(el, L) {
       const k = KINDS[it.kind];
       g.clear();
       s.img?.destroy(); s.img = null;
-      const art = it.kind === 'palace' && !it.done && ART[artPick].key;
+      const art = ART[it.kind] && !it.done && `art-${it.kind}`;
       if (art) {
         // the image's bottom edge on the footprint's front corner, as wide as the footprint
         s.img = this.add.image(0, k.size * TH / 2, art).setOrigin(0.5, 1);
@@ -314,12 +308,6 @@ function start(el, L) {
         s.it = state.items.find(i => i.id === it.id);
         this.status(s, now); this.bounce(s.c);
         flyCoins(c.gained, s.c);
-        return;
-      }
-      if (it.kind === 'palace') { // style test: the next look
-        artPick = (artPick + 1) % ART.length;
-        try { localStorage.setItem('tanara:gameArt', String(artPick)); } catch { /* storage blocked */ }
-        this.paint(s); this.bounce(s.c); this.label(s, ART[artPick].name);
         return;
       }
       this.bounce(s.c);
