@@ -18,6 +18,7 @@ import './foodMatch.test.js';
 import './family.test.js';
 import './portion.test.js';
 import './chatText.test.js';
+import './game.test.js';
 
 const results = await run();
 const failed = results.filter(r => !r.ok);

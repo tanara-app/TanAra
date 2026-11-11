@@ -12,6 +12,7 @@ import { renderLogin } from './ui/login.js';
 import { renderChat } from './ui/chat.js';
 import { renderMagazine } from './ui/magazine.js';
 import { renderTools } from './ui/tools.js';
+import { renderGame } from './ui/game.js';
 import { configureAI, sparkle } from './ai/hooshvareh.js';
 import { disable as disableReminders } from './ui/reminders.js';
 import { applyTheme } from './ui/theme.js';
@@ -32,6 +33,8 @@ const ROUTES = {
   profile: { label: 'نمایه', icon: icon.user, render: renderProfile },
   // not in the bottom bar: opened from «ابزارها» (and the magazine card on «امروز»)
   mag: { label: 'مجله', render: renderMagazine, under: 'tools' },
+  game: { label: 'سرزمین', render: renderGame, under: 'tools' }, // beta: the city-builder
+
 };
 
 nav.innerHTML = Object.entries(ROUTES).filter(([, r]) => !r.under).map(([k, r]) => `<a href="#/${k}" data-route="${k}" aria-label="${r.label}">${r.icon}<span>${r.label}</span></a>`).join('');
