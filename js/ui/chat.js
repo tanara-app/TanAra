@@ -3,6 +3,7 @@
 // written until the card is confirmed.
 import * as store from '../data/store.js';
 import { isTeen } from '../domain/targets.js';
+import { hideCalls } from '../domain/chatText.js';
 import { chat, ask, aiAvailable, md, focusArticle } from '../ai/hooshvareh.js';
 import { MEALS } from '../domain/stats.js';
 import { CATEGORIES } from '../data/seedFoods.js';
@@ -321,12 +322,13 @@ function bubble(m) {
     const photo = m.content.startsWith(PHOTO_MARK);
     return `<div class="msg me">${photo ? `<span class="shot-tag">${cameraIcon} عکس غذا</span>` : ''}<p>${esc(photo ? m.content.slice(PHOTO_MARK.length).trim() : m.content).replace(/\n/g, '<br>')}</p></div>`;
   }
-  return `<div class="msg ai">${md(m.content)}${actionsHtml(m.id, m.actions || [])}</div>`;
+  return `<div class="msg ai">${md(hideCalls(m.content))}${actionsHtml(m.id, m.actions || [])}</div>`;
 }
 
 function liveHtml() {
   if (!live || !sameThread(live, current)) return '';
-  const body = live.text ? md(live.text) : `<p class="typing"><img class="ai-face" src="img/mascot/face-thinking.webp" alt="" width="34" height="34"><i></i><i></i><i></i></p>`;
+  const shown = hideCalls(live.text);
+  const body = shown ? md(shown) : `<p class="typing"><img class="ai-face" src="img/mascot/face-thinking.webp" alt="" width="34" height="34"><i></i><i></i><i></i></p>`;
   return `<div class="msg ai" data-live>${body}${actionsHtml(null, live.actions)}${live.error ? `<p class="err">${esc(live.error)}</p>` : ''}</div>`;
 }
 
@@ -550,7 +552,7 @@ async function send() {
   // History for the model: this conversation, plus what became of each proposal.
   const history = sorted().filter(m => sameThread(m, thread)).map(m => ({
     role: m.role,
-    content: m.role === 'assistant' && m.actions?.length ? `${m.content}\n\n${m.actions.map(historyLine).join('\n')}` : m.content,
+    content: m.role !== 'assistant' ? m.content : m.actions?.length ? `${hideCalls(m.content)}\n\n${m.actions.map(historyLine).join('\n')}` : hideCalls(m.content),
   }));
   history.push({ role: 'user', content: text });
   live = { text: '', actions: [], error: null, thread };
@@ -571,8 +573,8 @@ async function send() {
   cancelAnimationFrame(raf);
   const done = live;
   live = null;
-  if (done.text.trim() || done.actions.length) {
-    store.saveChat({ role: 'assistant', content: done.text.trim() + (done.error ? `\n\n(${done.error})` : ''), actions: done.actions, thread });
+  if (hideCalls(done.text) || done.actions.length) {
+    store.saveChat({ role: 'assistant', content: hideCalls(done.text) +(done.error ? `\n\n(${done.error})` : ''), actions: done.actions, thread });
     nameThread(thread);
   } else {
     toast(done.error || 'هوشواره جوابی نداد.');

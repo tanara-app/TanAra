@@ -99,6 +99,7 @@ Changing their data (chat only)
 - When they tell you they ate something, weighed themselves, want a motivation saved, or want a food added to the bank, call the matching tool (one call per item). Prefer an item from their food bank (pass its food_id) and scale its numbers by quantity; otherwise estimate.
 - kcal and protein in propose_log_food are totals for the whole quantity eaten.
 - After proposing, tell them briefly that it is waiting for their confirmation. Never say it has been saved.
+- A card exists only when you really call the tool. Never write a tool call, its name or its JSON in your reply text: the person sees it as raw text and no card appears. If they say a card did not arrive, call the tool again.
 - You can also correct what is already recorded. A logged food: propose_edit_entry or propose_delete_entry (name it by its day, meal and name exactly as logged; in "to" give only what changes; a new qty alone keeps the same calories per unit). A food in the bank with a wrong number, unit weight or vegetable flag: propose_edit_food (fix_logged also corrects the name and vegetable flag on everything already logged from it; the calories of past entries stay as they were). A wrong weigh-in or waist: propose_delete_measurement, or to change the value just propose it again for the same day. Foods ticked from the diet plan are ordinary entries and can be corrected the same way.
 - When you notice a mistake in the record yourself (a food wrongly counted as a vegetable, an obvious duplicate, an impossible amount, a meal on the wrong day), say what you see and propose the fix in the same reply instead of only mentioning it. Never tell them you cannot edit past records. If a mistake comes from the food bank, fix it there (with fix_logged) so it does not come back.
 - What you still cannot change: the profile, the targets, the phase and goal weight, the reminders, the text of their weekly reviews, saved motivations, and the plan beyond a single swap. Say where in the app they can do it.
@@ -1242,6 +1243,19 @@ async function runMagazine(ctx: Ctx, input: any, use: Use) {
   return json({ error: "مقاله آماده نشد؛ دوباره امتحان کن." }, 502);
 }
 
+// Proposals the model wrote out as text instead of calling the tool: «<propose_x>{json}</propose_x>».
+// Only real propose_* tools with valid JSON count. js/ui/chat.js hides the same blocks.
+const PROPOSE_NAMES = new Set(TOOLS.map(t => t.name).filter(n => n.startsWith("propose_")));
+function textCalls(msg: any) {
+  const text = (msg.content || []).filter((b: any) => b.type === "text").map((b: any) => b.text).join("");
+  const out: { name: string; input: any }[] = [];
+  for (const m of text.matchAll(/<(propose_[a-z_]+)>\s*(\{[\s\S]*?\})\s*<\/\1>/g)) {
+    if (!PROPOSE_NAMES.has(m[1])) continue;
+    try { const input = JSON.parse(m[2]); if (input && typeof input === "object") out.push({ name: m[1], input }); } catch { /* not JSON: leave it */ }
+  }
+  return out;
+}
+
 function runChat(ctx: Ctx, history: any[], images: unknown, use: Use) {
   const turns = cleanHistory(history);
   if (!turns.length || turns[turns.length - 1].role !== "user") return json({ error: "پیامی نیست." }, 400);
@@ -1265,6 +1279,13 @@ function runChat(ctx: Ctx, history: any[], images: unknown, use: Use) {
   const body = new ReadableStream({
     async start(controller) {
       const send = (o: unknown) => controller.enqueue(enc.encode(JSON.stringify(o) + "\n"));
+      // Sends one proposal to the app as a card; returns an error for the model instead when it can't.
+      const propose = (b: { id: string; name: string; input: any }) => {
+        const fix = correction(b.name, b.input, ctx, S.toId);
+        if (fix?.error) return fix.error;
+        send({ t: "action", v: fix ? { id: b.id, ...fix.action } : { id: b.id, type: b.name.slice(8), ...realIds(b.input, S.toId) } });
+        return null;
+      };
       const ask = () => {
         const stream: any = anthropic.beta.messages.stream({
           model: MODEL,
@@ -1295,6 +1316,9 @@ function runChat(ctx: Ctx, history: any[], images: unknown, use: Use) {
           }
           use.add("chat", msg);
           if (msg.stop_reason === "refusal") { send({ t: "text", v: "\n\n" + refusalText() }); break; }
+          // Rarely the model writes a proposal as text («<propose_log_food>{…}</propose_log_food>»)
+          // instead of calling the tool. Turn it into the card it meant; the app hides the text.
+          for (const [i, call] of textCalls(msg).entries()) propose({ id: `${msg.id}_t${i}`, ...call });
           if (msg.stop_reason !== "tool_use") break;
 
           // Append the assistant turn unchanged (thinking blocks included), then answer every tool call.
@@ -1312,10 +1336,8 @@ function runChat(ctx: Ctx, history: any[], images: unknown, use: Use) {
               const full = found.filter(a => a.body);
               results.push({ type: "tool_result", tool_use_id: b.id, is_error: !found.length, content: full.length ? full.map(articleText).join("\n\n") : found.length ? "The full text of this older article is not loaded here; you only have its title and summary. They can open it in «مجله» and tap «درباره‌ی این مقاله از هوشواره بپرس»." : "No article on that day." });
             } else if (b.name.startsWith("propose_")) {
-              const fix = correction(b.name, b.input, ctx, S.toId);
-              if (fix?.error) { results.push({ type: "tool_result", tool_use_id: b.id, is_error: true, content: fix.error }); continue; }
-              send({ t: "action", v: fix ? { id: b.id, ...fix.action } : { id: b.id, type: b.name.slice(8), ...realIds(b.input, S.toId) } });
-              results.push({ type: "tool_result", tool_use_id: b.id, content: "Shown to the user as a card. Nothing changes until they confirm it there." });
+              const err = propose(b);
+              results.push(err ? { type: "tool_result", tool_use_id: b.id, is_error: true, content: err } : { type: "tool_result", tool_use_id: b.id, content: "Shown to the user as a card. Nothing changes until they confirm it there." });
             } else {
               results.push({ type: "tool_result", tool_use_id: b.id, is_error: true, content: "Unknown tool." });
             }
