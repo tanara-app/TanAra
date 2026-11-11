@@ -18,7 +18,17 @@ import { TW, TH, iso, polys, drawPreview } from './gameArt.js';
 const PHASER = 'https://cdn.jsdelivr.net/npm/phaser@4.2.1/dist/phaser.min.js';
 const ZMIN = 0.55, ZMAX = 2.2;
 
-const coinSvg = (s = 20) => `<svg viewBox="0 0 24 24" width="${s}" height="${s}"><circle cx="12" cy="12" r="10" fill="#f2c14e"/><circle cx="12" cy="12" r="7" fill="none" stroke="#c98f1c" stroke-width="2"/><path d="M12 8.5l2.2 3.5L12 15.5 9.8 12z" fill="#c98f1c"/></svg>`;
+const coinSvg = (s = 20) => `<img src="img/game/test/coin.webp" width="${s}" height="${s}" alt="" draggable="false">`;
+
+// Style test (2026-11-11): tapping the palace switches between the drawn shape and the images
+// made in two styles. Remembered on this device. Goes away once a style is chosen.
+const ART = [
+  { name: 'شکل ساده' },
+  { name: 'مینیاتور', key: 'palace-b', file: 'img/game/test/palace-b.webp' },
+  { name: 'ماکت', key: 'palace-c', file: 'img/game/test/palace-c.webp' },
+];
+let artPick = 0;
+try { artPick = Number(localStorage.getItem('tanara:gameArt')) % ART.length || 0; } catch { /* storage blocked */ }
 const hammerSvg = '<svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4l6 6-3 3-6-6z"/><path d="M11 7L4 14l3 3 7-7"/><path d="M5.5 15.5L3 20l4.5-2.5"/></svg>';
 const clockSvg = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>';
 
@@ -96,6 +106,11 @@ function start(el, L) {
   showCoins();
 
   class Land extends Phaser.Scene {
+    preload() {
+      for (const a of ART) if (a.key) this.load.image(a.key, a.file);
+      this.load.image('coinImg', 'img/game/test/coin.webp');
+    }
+
     create() {
       scene = this;
       const cam = this.cameras.main;
@@ -167,7 +182,15 @@ function start(el, L) {
       const { it, g } = s;
       const k = KINDS[it.kind];
       g.clear();
-      for (const q of polys(it.kind, k.size, { building: !!it.done })) {
+      s.img?.destroy(); s.img = null;
+      const art = it.kind === 'palace' && !it.done && ART[artPick].key;
+      if (art) {
+        // the image's bottom edge on the footprint's front corner, as wide as the footprint
+        s.img = this.add.image(0, k.size * TH / 2, art).setOrigin(0.5, 1);
+        s.img.setScale(k.size * TW * 1.04 / s.img.width);
+        s.c.addAt(s.img, 0);
+      }
+      if (!art) for (const q of polys(it.kind, k.size, { building: !!it.done })) {
         g.fillStyle(parseInt(q.fill.slice(1), 16), it.done ? 0.8 : 1);
         const pts = []; for (let i = 0; i < q.pts.length; i += 2) pts.push({ x: q.pts[i], y: q.pts[i + 1] });
         g.fillPoints(pts, true);
@@ -196,7 +219,7 @@ function start(el, L) {
       }
       const n = stored(it, now);
       if (n >= 3 && !s.bubble) {
-        s.bubble = this.add.image(0, -k.size * 22 - 34, 'coin').setScale(1.3);
+        s.bubble = this.add.image(0, -k.size * 22 - 34, 'coinImg').setScale(28 / 128);
         s.c.add(s.bubble);
         this.tweens.add({ targets: s.bubble, y: s.bubble.y - 6, duration: 600, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
       } else if (n < 3 && s.bubble) { s.bubble.destroy(); s.bubble = null; }
@@ -291,6 +314,12 @@ function start(el, L) {
         s.it = state.items.find(i => i.id === it.id);
         this.status(s, now); this.bounce(s.c);
         flyCoins(c.gained, s.c);
+        return;
+      }
+      if (it.kind === 'palace') { // style test: the next look
+        artPick = (artPick + 1) % ART.length;
+        try { localStorage.setItem('tanara:gameArt', String(artPick)); } catch { /* storage blocked */ }
+        this.paint(s); this.bounce(s.c); this.label(s, ART[artPick].name);
         return;
       }
       this.bounce(s.c);
