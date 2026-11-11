@@ -39,7 +39,10 @@ one needs to know goes in this file or in the project docs, not only in your own
   folder's server); then use `tanara-5180` (`http://127.0.0.1:5180`).
 - Edge Functions deploy from this folder with the Supabase CLI (logged in on `m.b.a` on 2026-11-09):
   `npx supabase functions deploy <name> --project-ref whmzjvmeyxdoqjtkukix --yes` (ask the user first;
-  `hooshvareh` is too big to send through the Supabase MCP tool).
+  `hooshvareh` is too big to send through the Supabase MCP tool). `ClaudeAccount` has no CLI login: after
+  pushing, it deploys with the MCP tool a one-line `index.ts` that imports
+  `https://raw.githubusercontent.com/tanara-app/TanAra/<full commit hash>/supabase/functions/<name>/index.ts`
+  (verify_jwt true for `hooshvareh`), as on 2026-11-11 (version 45).
 - Tests: `node tests/run.js` (or open `tests/index.html` in the browser).
 - The user speaks Persian; answer in Persian.
 - ElevenLabs (the mascot's voice): always the newest model, and ask the user before generating anything
