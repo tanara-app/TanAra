@@ -36,7 +36,8 @@ one needs to know goes in this file or in the project docs, not only in your own
   `m.b.a`, from another folder) answered `localhost` with 404 for every page. If "Port in use"
   comes up, the server is probably already running under the other account; just navigate to
   `127.0.0.1:5173`. On 2026-11-08 `127.0.0.1:5173` itself answered 404 for every page (another
-  folder's server); then use `tanara-5180` (`http://127.0.0.1:5180`).
+  folder's server); then use `tanara-5180` (`http://127.0.0.1:5180`). On 2026-11-12 `127.0.0.1:5180` served an
+  old copy of the app (another server); then use `tanara-5190`. Check with a fetch that the page has your change.
 - Edge Functions deploy from this folder with the Supabase CLI (logged in on `m.b.a` on 2026-11-09):
   `npx supabase functions deploy <name> --project-ref whmzjvmeyxdoqjtkukix --yes` (ask the user first;
   `hooshvareh` is too big to send through the Supabase MCP tool). `ClaudeAccount` has no CLI login: after
@@ -55,6 +56,9 @@ one needs to know goes in this file or in the project docs, not only in your own
   where the user already looks (e.g. «۶۱۲ از ۶۳۲ کالری» in the total, not a separate «سهم شام امروز…» line),
   and an action that can be an icon is an icon (undo instead of «برگشت به پیشنهاد اپ»). Before adding any
   sentence, label or link to the UI, ask whether the screen works without it.
+- Anything that only some members have (a beta in `profile.beta`, not yet released to everyone) carries the word
+  «آزمایشی» next to its name where it is opened (e.g. «سهم وعده آزمایشی» in its tab, «سرزمین» with «آزمایشی» under
+  its tile in «ابزارها»). The user asked for this on 2026-11-12. Remove the word when it is released to all.
 - Build only what the user agreed to. When a reply could mean more than one of the options you offered,
   ask which ones before building (on 2026-11-08 a shared «team goal» was built that the user hadn't asked for).
 

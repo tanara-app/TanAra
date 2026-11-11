@@ -25,7 +25,7 @@ const TOOLS = {
   mag: { label: 'مجله', open: () => { location.hash = '#/mag'; } },
   share: { label: 'غذاهای تازه‌ی خانواده', only: shareAdmin, open: () => openFoodShare(() => checkShare(again, true)) },
   // beta, only for accounts with `game` in profile.beta (set from the database)
-  game: { label: 'سرزمین', art: 'palace', only: () => (store.profile()?.beta || []).includes('game'), open: () => { location.hash = '#/game'; } },
+  game: { label: 'سرزمین', beta: true, art: 'palace', only: () => (store.profile()?.beta || []).includes('game'), open: () => { location.hash = '#/game'; } },
 };
 
 // The member's order: what they arranged, then any tool added since, in its usual place.
@@ -50,7 +50,7 @@ export function renderTools(root) {
           const t = TOOLS[k], n = t.badge?.() || 0;
           return `<button class="tool" data-tool="${k}" aria-label="${t.label}${n ? `، ${fa(n)} مورد` : ''}">
             <span class="tool-ic">${t.art ? `<canvas data-art="${t.art}"></canvas>` : `<img src="img/tools/${k}.webp" alt="" draggable="false">`}${n ? `<b class="tool-badge">${fa(n)}</b>` : ''}</span>
-            <span class="tool-name">${t.label}</span>
+            <span class="tool-name">${t.label}${t.beta ? '<small>آزمایشی</small>' : ''}</span>
           </button>`;
         }).join('')}
       </div>
