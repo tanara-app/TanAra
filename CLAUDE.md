@@ -73,6 +73,8 @@ one needs to know goes in this file or in the project docs, not only in your own
 - `FEEDBACK.md`: how to read users' reports (table `feedback`, photos via `tools/feedback-photos.mjs`).
 - `HOOSHVAREH.md`: everything the AI assistant and the app do. Keep it up to date with every new feature.
 - `art/STYLE.md`: the art style guide and ChatGPT prompts for the «سرزمین» game images.
+- `REDESIGN.md`: the rebuild of «امروز» and «رژیم» into one part, step by step: what the user decided so far. Read it before
+  touching the today screen, «سهم وعده» or «رژیم».
 - `IDEAS.md`: ideas for daily "hooks" that bring members back, with the ones the user picked. When one gets built,
   mark it there.
 - `VOICE.md` / `ELEVENLABS.md`: the mascot Heimerdinger's lines and the brief for recording them
