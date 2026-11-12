@@ -380,6 +380,14 @@ dl.calc dd { margin: 0; text-align: left; }
 .eat-pack.sug { background: none; border: 1px dashed var(--line); }
 .eat-pack.new { background: none; border: 1px dashed var(--line); color: var(--muted); flex-direction: row; align-items: center; justify-content: center; gap: 4px; font-weight: 700; }
 .eat-pack.new svg { width: 18px; height: 18px; }
+.eat-lh { display: flex; align-items: center; gap: 6px; margin: 14px 0 8px; font-size: .8rem; font-weight: 700; color: var(--muted); }
+.eat-lh svg { color: var(--accent); width: 14px; height: 14px; }
+.eat-free, .meal-free { display: flex; flex-wrap: wrap; gap: 8px; }
+.eat-chip { display: inline-flex; align-items: center; gap: 6px; min-height: 38px; padding: 0 12px; border-radius: 999px; border: 1px solid transparent; background: var(--accent-soft); color: var(--text); font: inherit; font-size: .85rem; font-weight: 600; cursor: pointer; }
+.eat-chip svg { width: 14px; height: 14px; color: var(--accent); }
+.eat-chip.on { border-color: var(--accent); color: var(--accent); }
+.meal-free { align-items: center; margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--line); }
+.meal-free > svg { color: var(--accent); flex: none; }
 .eat-results { display: flex; flex-direction: column; }
 .eat-hit { display: flex; flex-wrap: wrap; align-items: center; border-bottom: 1px solid var(--line); }
 .eat-row { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 6px 0; border: 0; background: none; color: var(--text); font: inherit; text-align: right; cursor: pointer; }

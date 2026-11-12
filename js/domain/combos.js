@@ -13,6 +13,8 @@
 */
 import { norm } from '../lib/fa.js';
 import { packKey, roleOf } from './portion.js';
+import { isFree } from './plan.js';
+import { frequentFoods } from './stats.js';
 
 export const libKey = id => `lib:${id}`;
 
@@ -90,6 +92,19 @@ export function mealCombos({ meal, foods, packs = [], usual = [], starters = [],
     add({ key: `s:${c.id}`, name: c.name, foods: list, ids: list.map(f => f.id), kind: 'starter', lib: c });
   }
   return out;
+}
+
+/*
+  «هر وقت گرسنه شدی»: foods free to eat whenever (isFree: a vegetable with at most 50 kcal a unit, or
+  next to nothing like unsweetened tea), from their own bank, without one their illness keeps out
+  (`avoid`). The ones they eat most in this meal first, then the ones they eat at all, then by name.
+*/
+export function freeFoods(foods, entries, day, meal, { avoid = null, limit = 6 } = {}) {
+  const inMeal = new Map(frequentFoods(entries, foods, day, meal, 60).map((x, n) => [x.food.id, n]));
+  const used = new Set(entries.map(e => e.food_id).filter(Boolean));
+  return foods.filter(f => isFree(f) && !(avoid && avoid(f.id)))
+    .sort((a, b) => (inMeal.get(a.id) ?? 99) - (inMeal.get(b.id) ?? 99) || (used.has(b.id) ? 1 : 0) - (used.has(a.id) ? 1 : 0) || a.name.localeCompare(b.name, 'fa'))
+    .slice(0, limit);
 }
 
 // Combos whose name or a food's name has `q` in it.

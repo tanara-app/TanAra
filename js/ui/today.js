@@ -28,6 +28,7 @@ import { TAG_SAYS } from '../domain/health.js';
 import { packRow, bindPacks } from './packs.js';
 import { mealRowsHtml, bindMealRows, openMeal } from './meal.js';
 import { openEat } from './eat.js';
+import { freeFoods, shortName } from '../domain/combos.js';
 import { eatingPattern } from '../domain/pattern.js';
 
 let day = today();
@@ -120,6 +121,11 @@ export function renderToday(root) {
   const standing = m => mealStanding(asShown(store.get().entries), day, m, t.kcal, sharesNow());
   const shownList = asShown(list);
   const avoid = eat ? planAvoid() : null;
+  // a meal whose share is used up: three foods free to eat anyway (a tap opens their amounts)
+  const freeRow = m => {
+    const free = freeFoods(s.foods, s.entries, day, m, { avoid, limit: 3 });
+    return free.length ? `<div class="meal-free">${icon.leaf}${free.map(f => `<button type="button" class="eat-chip" data-free="${f.id}" data-free-meal="${m}">${esc(shortName(f.name))}</button>`).join('')}</div>` : '';
+  };
   root.innerHTML = `
     <header class="day-nav">
       <button class="icon-btn" data-prev aria-label="روز قبل">${icon.chevR}</button>
@@ -194,6 +200,7 @@ export function renderToday(root) {
               <span class="ekcal">${fa(Math.round(e.kcal))}</span>
             </button>`;
           }).join('')}
+          ${st && isToday && (st.share <= 0 || st.eaten >= st.share) ? freeRow(k) : ''}
         </div>`;
       }).join('')}
     </section>` : ''}
@@ -210,6 +217,10 @@ export function renderToday(root) {
   const room = portionMode ? { smart: true, budgetFor } : null;
   root.querySelector('[data-log]')?.addEventListener('click', () => (one ? openMeal({ day, budgetFor }) : eat ? openEat({ day, budgetFor }) : openLogSheet({ day, room })));
   if (one) bindMealRows(root, day, budgetFor);
+  root.querySelectorAll('[data-free]').forEach(b => b.onclick = () => {
+    const f = store.get().foods.find(x => x.id === b.dataset.free);
+    if (f) openEat({ day, meal: b.dataset.freeMeal, budgetFor, start: [f] });
+  });
   root.querySelectorAll('[data-add]').forEach(b => b.onclick = () => (eat ? openEat({ day, meal: b.dataset.add, budgetFor }) : openLogSheet({ day, meal: b.dataset.add, room })));
   if (portionMode) bindPacks(root, { day, budgetFor, redraw: () => renderToday(root), edit: (meal, start, pack) => openLogSheet({ day, meal, room, start, pack }) });
   root.querySelectorAll('[data-entry]').forEach(b => b.onclick = () => openEntrySheet(s.entries.find(e => e.id === b.dataset.entry)));

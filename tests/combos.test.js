@@ -1,5 +1,5 @@
 import { suite, test, eq, ok } from './harness.js';
-import { comboFoods, dislikeTest, mealCombos, searchCombos, shortName, mealRows, libKey } from '../js/domain/combos.js';
+import { comboFoods, dislikeTest, mealCombos, searchCombos, shortName, mealRows, libKey, freeFoods } from '../js/domain/combos.js';
 import { fitMeal, packKey } from '../js/domain/portion.js';
 import { COMBOS } from '../js/data/combos.js';
 import { SEED_FOODS } from '../js/data/seedFoods.js';
@@ -97,6 +97,17 @@ suite('combos', () => {
     ok(searchCombos(list, 'قیمه').some(c => c.name === 'چلو قیمه'));
     ok(searchCombos(list, 'ماست').length >= 3);
     eq(searchCombos(list, '').length, list.length);
+  });
+
+  test('free foods: low-calorie vegetables and near-nothing drinks, the usual ones first, none their illness keeps out', () => {
+    const list = freeFoods(BANK, [], '2026-11-14', 'dinner', { limit: 50 }).map(f => f.name);
+    ok(list.includes('خیار') && list.includes('چای بدون قند'));
+    ok(!list.includes('سالاد فصل با سس مایونز'), 'a salad with mayonnaise is not free');
+    ok(!list.includes('خرما') && !list.includes('گردو (مغز کامل)'), 'small but not free');
+    const es = [{ day: '2026-11-13', meal: 'dinner', food_id: id('سبزی خوردن'), created_at: '1' }, { day: '2026-11-12', meal: 'dinner', food_id: id('سبزی خوردن'), created_at: '2' }];
+    eq(freeFoods(BANK, es, '2026-11-14', 'dinner')[0].name, 'سبزی خوردن');
+    const avoid = fid => (fid === id('خیار') ? 'salty' : null);
+    ok(!freeFoods(BANK, [], '2026-11-14', 'dinner', { avoid, limit: 50 }).some(f => f.name === 'خیار'));
   });
 
   test('short names drop the bracketed note', () => {

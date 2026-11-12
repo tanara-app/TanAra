@@ -22,7 +22,7 @@ import { mealForNow, today } from '../lib/dates.js';
 import { sheet, toast, confirmBox, choose, icon } from './dom.js';
 import { amountLabel, hasGrams, hasUnit2 } from './units.js';
 import { fitMeal, usualCombos, roleOf, packKey } from '../domain/portion.js';
-import { mealCombos, shortName, libKey } from '../domain/combos.js';
+import { mealCombos, shortName, libKey, freeFoods } from '../domain/combos.js';
 import { COMBOS } from '../data/combos.js';
 import { packs, savePack, askPackName, deletePack, hideKey, hidden } from './packs.js';
 import { planAvoid } from '../ai/foodTags.js';
@@ -60,7 +60,8 @@ function packsFor(day, meal) {
   return [...own, ...sug];
 }
 
-export function openEat({ day = today(), meal = null, budgetFor }) {
+// `start`: foods to begin with (a free food tapped on a meal card); the sheet opens on their amounts
+export function openEat({ day = today(), meal = null, budgetFor, start = null }) {
   let cur = meal || (day === today() ? meal5ForNow(mealForNow()) : 'lunch');
   let view_ = 'home';
   let query = '';
@@ -132,6 +133,8 @@ export function openEat({ day = today(), meal = null, budgetFor }) {
       if (query) return drawResults(main);
       const list = packsFor(day, cur);
       const avoid = avoidOf();
+      // «هر وقت گرسنه شدی»: free to eat, whatever is left of the meal
+      const free = freeFoods(store.get().foods, store.get().entries, day, cur, { avoid: planAvoid() });
       main.innerHTML = `
         <div class="eat-packs">
           ${list.map(c => `
@@ -140,7 +143,9 @@ export function openEat({ day = today(), meal = null, budgetFor }) {
               <small>${c.foods.map(f => esc(shortName(f.name))).join('، ')}</small>
             </button>`).join('')}
           <button type="button" class="eat-pack new" data-new-pack>${icon.plus}<span>بسته</span></button>
-        </div>`;
+        </div>
+        ${free.length ? `<p class="eat-lh">${icon.leaf}<span>آزاد</span></p>
+        <div class="eat-free">${free.map(f => `<button type="button" class="eat-chip${isPicked(f) ? ' on' : ''}" data-food="${f.id}" aria-pressed="${isPicked(f)}">${isPicked(f) ? icon.check : icon.leaf}<span>${esc(shortName(f.name))}</span></button>`).join('')}</div>` : ''}`;
     }
 
     function drawResults(main) {
@@ -384,6 +389,6 @@ export function openEat({ day = today(), meal = null, budgetFor }) {
       drawPlate();
     }
 
-    drawHome();
+    if (start?.length) { picked = [...start]; drawPlate(); } else drawHome();
   }, { tall: true, onClose: () => unsub?.() });
 }
