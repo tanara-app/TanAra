@@ -924,8 +924,12 @@ body.kb .toast, body.chat-mode .toast { bottom: calc(var(--nav-h) + var(--safe-b
 .look-sw i { display: block; width: 14px; height: 14px; border-radius: 50%; }
 .look-sw i:first-child { width: 20px; height: 20px; }
 .set-h { margin: 18px 6px 6px; color: var(--muted); font-size: .82rem; font-weight: 600; }
-.targets-fold[open] > summary { margin-bottom: 12px; }
-.targets-fold > .targets { margin-bottom: 10px; }
+.targets-card, .me-tile { display: block; width: 100%; border: 0; color: inherit; font: inherit; text-align: start; cursor: pointer; }
+.me-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.me-tile { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 18px 16px; }
+.me-tile .set-ic { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 13px; background: var(--accent-soft); color: var(--accent); margin-bottom: 10px; }
+.me-tile b { font-weight: 600; }
+.me-tile small { font-size: .8rem; }
 
 /* shopping list */
 .pill-btn { border: 0; cursor: pointer; font-family: inherit; }

@@ -1,5 +1,5 @@
-// Profile: the targets (folded to one line) and the phase up front, then rows about the person and
-// their tools, in small titled groups. App settings (reminders, appearance, the mascot, support,
+// Profile, as tiles: the two daily targets (a tap opens recalculating and setting them by hand), the
+// phase, then two square tiles for the person's own details and their motivations. App settings (reminders, appearance, the mascot, support,
 // data, account) live apart in «تنظیمات», a tall sheet opened by the gear in the header.
 import * as store from '../data/store.js';
 import { effectiveTargets, clampKcal, floorFor, hasMedicalFlag, ACTIVITY, CONDITIONS, correcting, rampKcal } from '../domain/targets.js';
@@ -54,7 +54,6 @@ const COG = '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke=
 const appearanceLine = () => `${PALETTES.find(t => t.value === getPalette()).label} · ${THEMES.find(t => t.value === getTheme()).label}`;
 const row = (attr, ic, title, sub) => `<button class="set-row" ${attr}><i class="set-ic">${ICON[ic]}</i><span class="grow"><b>${title}</b>${sub ? `<small class="muted">${sub}</small>` : ''}</span>${icon.chevL}</button>`;
 const group = (title, rows) => `<h2 class="set-h">${title}</h2><section class="card set-list">${rows}</section>`;
-let targetsOpen = false;
 
 export function renderProfile(root) {
   const s = store.get();
@@ -65,32 +64,22 @@ export function renderProfile(root) {
   root.innerHTML = `
     <header class="page-head head-row"><h1>نمایه</h1><button class="icon-btn" data-settings aria-label="تنظیمات">${COG}</button></header>
 
-    <details class="card fold targets-fold"${targetsOpen ? ' open' : ''}>
-      <summary><span><h2>هدف‌های روزانه</h2><small>${kcal50(eff.kcal)} کالری · ${fa(eff.protein)} گرم پروتئین</small></span></summary>
+    <button class="card targets-card" data-targets aria-label="هدف‌های روزانه">
+      <h2 class="card-h">هدف‌های روزانه</h2>
       <div class="targets">
         <div class="tile big"><span>کالری</span><b>${kcal50(eff.kcal)}</b><small>${correcting(p) ? 'اصلاح کوتاه' : rampKcal(p) ? 'رو به نگهداری' : eff.phase !== 'loss' ? 'سطح نگهداری' : p.targets?.manualKcal ? 'دستی' : p.targets?.source === 'measured' ? 'از مصرف واقعی بدنت' : 'محاسبه‌شده'}</small></div>
         <div class="tile big"><span>${eff.proteinMax ? 'پروتئین (حداکثر، برای کلیه)' : 'پروتئین'}</span><b>${fa(eff.protein)}</b><small>گرم${p.targets?.manualProtein ? ' · دستی' : ''}</small></div>
       </div>
-      <p class="muted small">آخرین محاسبه با وزن ${fa(p.targets?.baseWeight, 1)} کیلو${p.targets?.computedAt ? `، ${faDMY(p.targets.computedAt)}` : ''}.</p>
-      <div class="row gap">
-        <button class="btn grow" data-recalc>محاسبه‌ی دوباره</button>
-        <button class="btn grow" data-manual>تنظیم دستی</button>
-      </div>
-    </details>
+    </button>
 
     ${phaseCard()}
 
-    ${group('من و برنامه‌ام', `
-      ${row('data-edit', 'me', 'اطلاعات من', `${fa(p.age)} ساله · قد ${fa(p.heightCm, 1)}`)}
-      ${row('data-mots', 'mots', 'انگیزه‌ها', s.motivations.length ? `${fa(s.motivations.length)} مورد` : 'هنوز خالی')}`)}`;
+    <div class="me-grid">
+      <button class="card me-tile" data-edit><i class="set-ic">${ICON.me}</i><b>اطلاعات من</b><small class="muted">${fa(p.age)} ساله · قد ${fa(p.heightCm, 1)}</small></button>
+      <button class="card me-tile" data-mots><i class="set-ic">${ICON.mots}</i><b>انگیزه‌ها</b><small class="muted">${s.motivations.length ? `${fa(s.motivations.length)} مورد` : 'هنوز خالی'}</small></button>
+    </div>`;
 
-  root.querySelector('.targets-fold').ontoggle = e => { targetsOpen = e.currentTarget.open; };
-  root.querySelector('[data-recalc]').onclick = async () => {
-    const msg = p.targets?.manualKcal || p.targets?.manualProtein
-      ? 'هدف‌ها با آخرین وزن دوباره حساب شوند؟ تنظیم دستی پاک می‌شود.' : 'هدف‌ها با آخرین وزن دوباره حساب شوند؟';
-    if (await confirmBox(msg, 'حساب کن')) { recalcTargets(); toast('هدف‌ها به‌روز شد'); }
-  };
-  root.querySelector('[data-manual]').onclick = () => openManual(p);
+  root.querySelector('[data-targets]').onclick = () => openTargets(p);
   root.querySelector('[data-edit]').onclick = () => openEdit(p);
   root.querySelector('[data-mots]').onclick = () => openMotivationList();
   bindPhase(root);
@@ -205,6 +194,26 @@ function openAccount() {
       sheet.closeAll();
       session.signOut?.();
     });
+  });
+}
+
+// «هدف‌های روزانه»: when they were last worked out, and the two ways to change them.
+function openTargets(p) {
+  sheet.open(body => {
+    body.innerHTML = `
+      <div class="sheet-head"><h2>هدف‌های روزانه</h2><button class="icon-btn" data-close aria-label="بستن">${icon.close}</button></div>
+      <p class="muted small">آخرین محاسبه با وزن ${fa(p.targets?.baseWeight, 1)} کیلو${p.targets?.computedAt ? `، ${faDMY(p.targets.computedAt)}` : ''}.</p>
+      <div class="row gap mt">
+        <button class="btn grow" data-recalc>محاسبه‌ی دوباره</button>
+        <button class="btn grow" data-manual>تنظیم دستی</button>
+      </div>`;
+    body.querySelector('[data-close]').onclick = () => sheet.close();
+    body.querySelector('[data-recalc]').onclick = async () => {
+      const msg = p.targets?.manualKcal || p.targets?.manualProtein
+        ? 'هدف‌ها با آخرین وزن دوباره حساب شوند؟ تنظیم دستی پاک می‌شود.' : 'هدف‌ها با آخرین وزن دوباره حساب شوند؟';
+      if (await confirmBox(msg, 'حساب کن')) { recalcTargets(); sheet.close(); toast('هدف‌ها به‌روز شد'); }
+    };
+    body.querySelector('[data-manual]').onclick = () => { sheet.close(); openManual(p); };
   });
 }
 
