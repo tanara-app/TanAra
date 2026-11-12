@@ -46,9 +46,12 @@ const aiEstBtn = () => (aiAvailable() ? `<button type="button" class="btn ai-btn
 // (from the bank or typed in) are given the amounts that fit what is left of the occasion
 // together (drawPortions) instead of an amount to pick.
 // `start` (with room.smart): foods to begin with, from a pack (`pack`: its id) on the today screen.
-export function openLogSheet({ day = today(), meal = null, onSaved = null, room = null, start = null, pack = null } = {}) {
+// `onPick(food)` (the single meal screen): a food chosen here (from the list, a barcode or typed in)
+// is handed back instead of asking an amount, and the sheet closes. `via`: 'photo', 'scan' or
+// 'custom' starts there; a photo or scan given up closes the sheet.
+export function openLogSheet({ day = today(), meal = null, onSaved = null, room = null, start = null, pack = null, onPick = null, via = null, query: q0 = '' } = {}) {
   let curMeal = meal || (day === today() ? mealForNow() : 'lunch');
-  let query = '';
+  let query = q0; // a name typed in the meal screen's search, for «غذای دلخواه»
   const save = e => { const row = store.saveEntry(e); onSaved?.(row); cheer('entry'); return row; };
   const smart = !!room?.smart;
   if (smart) room = { ...room, ...room.budgetFor(curMeal) };
@@ -127,14 +130,15 @@ export function openLogSheet({ day = today(), meal = null, onSaved = null, room 
         if (e.target.closest('[data-custom]')) drawCustom();
       });
       body.querySelector('.sheet-foot [data-custom]').onclick = () => drawCustom();
-      body.querySelector('[data-scan]').onclick = scan;
+      body.querySelector('[data-scan]').onclick = () => scan();
       body.querySelector('[data-portions]')?.addEventListener('click', drawPortions);
-      body.querySelector('[data-photo]')?.addEventListener('click', takePhoto);
+      body.querySelector('[data-photo]')?.addEventListener('click', () => takePhoto());
     }
 
     // A barcode seen before opens its bank food; a new one opens «غذای دلخواه», filled in.
-    async function scan() {
+    async function scan(closeIfNone = false) {
       const code = await scanBarcode();
+      if (!code && closeIfNone && body.isConnected) return sheet.close();
       if (!code || !body.isConnected) return;
       const food = store.get().foods.find(f => f.barcode === code);
       if (food) return drawQty(food);
@@ -145,8 +149,9 @@ export function openLogSheet({ day = today(), meal = null, onSaved = null, room 
       Photo → list of foods → log. The amounts come from Hooshvareh's look at the plate;
       calories of bank foods come from the bank (photoItems). Nothing is saved before «ثبت».
     */
-    async function takePhoto() {
+    async function takePhoto(closeIfNone = false) {
       const file = await pickPhoto();
+      if (!file && closeIfNone && body.isConnected) return sheet.close();
       if (!file || !body.isConnected) return;
       let shot;
       try { shot = await foodPhoto(file); } catch { return toast('عکس خوانده نشد'); }
@@ -219,6 +224,7 @@ export function openLogSheet({ day = today(), meal = null, onSaved = null, room 
       amount picker, whatever is left of the occasion. Back goes to the portions.
     */
     function drawQty(food, eaten = false) {
+      if (onPick && !eaten) { sheet.close(); onPick(food); return; }
       if (room && !eaten) {
         if (!chosen.some(c => c.id === food.id)) chosen.push(food);
         return drawPortions();
@@ -273,11 +279,11 @@ export function openLogSheet({ day = today(), meal = null, onSaved = null, room 
           ${code ? barcodeBox(code) : ''}
           ${aiEstBtn()}
           ${unitFields({ unit: 'پرس', grams: 300, kcal: '', protein: '' })}
-          ${room ? '' : '<div class="qty-box"><div class="stack" data-amount></div></div>'}
+          ${room || onPick ? '' : '<div class="qty-box"><div class="stack" data-amount></div></div>'}
           <label class="check"><input type="checkbox" name="veg"><span>جزو وعده‌ی سبزی حساب شود</span></label>
           <label class="check"><input type="checkbox" name="save" ${code ? 'checked' : ''}><span>به بانک غذا هم اضافه شود${code ? ' (دفعه‌ی بعد با همین بارکد مستقیم می‌آید)' : ''}</span></label>
           <p class="err" hidden></p>
-          <button class="btn primary block big">${room ? 'بگو چقدر بخورم' : 'ثبت'}</button>
+          <button class="btn primary block big">${room || onPick ? 'بگو چقدر بخورم' : 'ثبت'}</button>
         </form>`;
       onMeal(body, v => { curMeal = v; });
       const form = body.querySelector('form');
@@ -288,7 +294,7 @@ export function openLogSheet({ day = today(), meal = null, onSaved = null, room 
         const r = units.read();
         return r.error ? { unit: F.unit.value === GRAM ? GRAM : 'پرس', grams: null, kcal: 0, protein: 0 } : r;
       };
-      if (!room) amount = mountAmount(body.querySelector('[data-amount]'), base, { qty: 1, grams: false });
+      if (!room && !onPick) amount = mountAmount(body.querySelector('[data-amount]'), base, { qty: 1, grams: false });
       bindEstimate(body, F, units);
       // the form has no category field; a product's category still reaches the bank
       let category = null;
@@ -304,6 +310,11 @@ export function openLogSheet({ day = today(), meal = null, onSaved = null, room 
         let food_id = null;
         if (F.save.checked) {
           food_id = store.upsertFood({ name, ...r, is_veg: F.veg.checked, category: category || (F.veg.checked ? 'veg' : 'other'), barcode: code }).id;
+        }
+        if (onPick) {
+          sheet.close();
+          onPick({ id: food_id, name, ...r, is_veg: F.veg.checked });
+          return;
         }
         if (room) {
           chosen.push({ id: food_id, name, ...r, is_veg: F.veg.checked });
@@ -469,7 +480,13 @@ export function openLogSheet({ day = today(), meal = null, onSaved = null, room 
       };
     }
 
-    if (chosen.length) drawPortions(); else drawList();
+    if (chosen.length) drawPortions();
+    else if (via === 'custom') drawCustom();
+    else {
+      drawList();
+      if (via === 'photo') takePhoto(true);
+      if (via === 'scan') scan(true);
+    }
   }, { tall: true });
 }
 

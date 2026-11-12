@@ -17,6 +17,7 @@ import './health.test.js';
 import './foodMatch.test.js';
 import './family.test.js';
 import './portion.test.js';
+import './combos.test.js';
 import './chatText.test.js';
 import './game.test.js';
 

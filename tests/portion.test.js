@@ -64,9 +64,11 @@ suite('portion', () => {
 
   test('a meal that does not fit even at the least: says by how much and what to drop', () => {
     const foods = [seed('قیمه (بدون روغن رو)'), seed('شیرینی تر (خامه‌ای)')];
-    const r = fitMeal(foods, 100);
+    const r = fitMeal(foods, 200);
     ok(r.over > 0);
     eq(r.drop, 1);
+    // nothing to suggest when going without any one of them still does not fit
+    eq(fitMeal(foods, 0).drop, null);
   });
 
   test('a food with no calories and a drink are not shared out', () => {

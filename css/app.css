@@ -468,6 +468,66 @@ button.pval:active { background: var(--surface-2); }
 .pstep b { min-width: 74px; text-align: center; font-size: .92rem; }
 .pstep .icon-btn.sm:disabled { opacity: .35; }
 .warn-text { color: var(--protein); margin: 0; }
+
+/* «یکی» (beta): the «وعده‌ها» page with the meals as rows, and the meal sheet (ui/meal.js) */
+.meals-page .mag-back { margin-bottom: 4px; }
+.day-left { display: flex; align-items: center; gap: 16px; padding: 14px 16px; margin-bottom: 12px; }
+.day-left > div:first-child { display: flex; flex-direction: column; align-items: center; min-width: 92px; }
+.day-left > div:first-child b { font-size: 1.6rem; line-height: 1.2; }
+.day-left > div:first-child span { color: var(--muted); font-size: .78rem; }
+.dl-protein { flex: 1; display: flex; flex-direction: column; gap: 6px; font-size: .85rem; color: var(--muted); }
+.dl-protein b { color: var(--text); }
+.meal-rows { padding: 4px 14px; }
+.mrow {
+  width: 100%; display: flex; align-items: center; gap: 10px; min-height: 60px; padding: 10px 0;
+  border: 0; background: none; color: var(--text); font: inherit; text-align: right; cursor: pointer;
+}
+.mrow + .mrow { border-top: 1px solid var(--line); }
+.mrow:active { opacity: .7; }
+.mr-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.mr-text b { font-size: 1.02rem; }
+.mr-text small { color: var(--muted); font-size: .8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mr-kcal { flex: none; font-weight: 800; min-width: 44px; text-align: center; }
+.mr-kcal.open { font-weight: 600; font-size: .85rem; color: var(--muted); padding: 3px 10px; border: 1px dashed var(--line); border-radius: 999px; min-width: 0; }
+.mr-go { flex: none; display: flex; color: var(--muted); }
+.mr-go svg { width: 18px; height: 18px; }
+
+.meal-title { grid-column: 2; display: flex; flex-direction: column; align-items: center; gap: 0; border: 0; background: none; color: var(--text); font: inherit; cursor: pointer; padding: 2px 0; min-width: 0; }
+.meal-title h2 { display: inline-flex; align-items: center; gap: 4px; font-size: 1.1rem; }
+.meal-title h2 .chev-d { width: 16px; height: 16px; color: var(--muted); }
+.meal-title small { color: var(--muted); font-size: .78rem; }
+.logged { background: var(--surface-2); border-radius: 14px; padding: 0 12px; }
+.logged .entry:first-of-type { margin-top: 0; border-top: 0; }
+.meal-list { display: flex; flex-direction: column; }
+.combos { display: flex; flex-direction: column; gap: 4px; }
+.combo {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%; text-align: right;
+  padding: 8px 12px; min-height: 44px; justify-content: center; border: 1px solid var(--line); border-radius: 12px; background: none; color: var(--text); font: inherit; cursor: pointer;
+  -webkit-touch-callout: none; user-select: none;
+}
+.combo:active { background: var(--surface-2); }
+.cname { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; }
+.cname .ck { display: inline-flex; color: var(--accent); }
+.cname .ck svg { width: 15px; height: 15px; }
+.cfoods { font-size: .78rem; color: var(--muted); }
+.more-combos { align-self: center; padding: 6px 12px; }
+.food-row { position: relative; }
+.food-row.on .fname { color: var(--accent); }
+.fcheck { position: absolute; left: 6px; top: 50%; transform: translateY(-50%); color: var(--accent); display: flex; }
+.meal-foot { display: flex; flex-direction: column; gap: 8px; }
+.meal-foot .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.plate-bar {
+  display: flex; align-items: center; gap: 10px; width: 100%; min-height: 50px; padding: 0 16px; border: 0; border-radius: 14px;
+  background: var(--accent); color: var(--accent-ink); font: inherit; font-weight: 700; cursor: pointer; text-align: right;
+}
+.pb-names { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pb-go { flex: none; display: inline-flex; align-items: center; gap: 2px; }
+.pb-go svg { width: 18px; height: 18px; }
+.plate-name { margin: -4px 0 0; text-align: center; font-weight: 700; color: var(--muted); font-size: .9rem; }
+.pname { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-width: 0; border: 0; background: none; color: var(--text); font: inherit; text-align: right; cursor: pointer; padding: 0; }
+.pname b { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pname b { text-decoration: underline dotted var(--muted); text-underline-offset: 4px; }
+.plate-actions .btn:not(.grow) { width: 56px; min-height: 56px; flex: none; display: grid; place-items: center; }
 .packs { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding: 2px 0 6px; -webkit-touch-callout: none; user-select: none; }
 .packs::-webkit-scrollbar { display: none; }
 .packs.more-end { -webkit-mask-image: linear-gradient(to left, #000 calc(100% - 36px), transparent); mask-image: linear-gradient(to left, #000 calc(100% - 36px), transparent); }

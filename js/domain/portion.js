@@ -20,7 +20,7 @@ export const ROLES = {
   starch: { label: 'نان و برنج', w: 3, g: [30, 300], units: [0.5, 3] },
   dairy: { label: 'شیر و ماست', w: 2, g: [100, 300], units: [0.5, 2] },
   rich: { label: 'پرکالری', w: 1.2, g: [15, 60], units: [0.5, 1.5] },
-  fruit: { label: 'میوه', w: 1.5, g: [80, 450], units: [0.5, 3] },
+  fruit: { label: 'میوه', w: 1.5, g: [80, 300], units: [0.5, 2] }, // at most two pieces: the diet plan's cap too (maxQty)
   veg: { label: 'سبزی', w: 1, g: [50, 400], units: [0.5, 3] },
   fat: { label: 'چربی و شیرینی کم', w: 0.6, g: [5, 30], units: [0.5, 1.5] },
   treat: { label: 'تنقلات', w: 0.6, g: [10, 120], units: [0.5, 1.5] },
@@ -64,7 +64,7 @@ function limits(f, role) {
   const g = gramsOf(f);
   if (f.unit === GRAM) return { min: R.g[0], max: R.g[1], step: 5 };
   if (!g) return { min: R.units[0], max: R.units[1], step: 0.5 };
-  const step = g <= 15 ? 1 : 0.5; // a walnut, a date, a spoon: whole ones
+  const step = g <= 15 && f.unit === 'عدد' ? 1 : 0.5; // a walnut or a date: whole ones; half a spoon is fine
   const min = Math.max(step, Math.round(R.g[0] / g / step) * step);
   const max = Math.max(min, Math.floor(R.g[1] / g / step) * step);
   return { min, max, step };
@@ -72,6 +72,7 @@ function limits(f, role) {
 
 const roundTo = (x, step) => Math.round(x / step) * step;
 const TOL = 15; // calories
+const VEG_G = 100; // a usual helping of a vegetable beside a meal: a tomato, a cucumber, half a bowl of salad
 
 /*
   How much of each food to eat, together, in `kcal` calories.
@@ -92,6 +93,20 @@ export function fitMeal(foods, kcal, locked = {}) {
     const qty = isLocked ? Number(locked[i]) : free ? (f.unit === GRAM ? 100 : 1) : role === 'drink' ? (f.unit === GRAM ? 200 : 1) : 0;
     return { f, role, per, ...lim, fixed, free, isLocked, qty };
   });
+  /*
+    Beside a food that carries the meal, a vegetable gets a usual helping (VEG_G) and the
+    calories go to the rest: shared by calories, a salad or herbs took what the stew left and
+    grew to four tomatoes or nine handfuls of herbs. A meal of vegetables only still fills up.
+  */
+  if (info.some(x => !x.fixed && x.role !== 'veg')) {
+    for (const x of info) {
+      if (x.fixed || x.role !== 'veg') continue;
+      const g = gramsOf(x.f);
+      const want = g ? VEG_G / g : 1;
+      x.qty = Math.min(x.max, Math.max(x.min, roundTo(want, x.step)));
+      x.fixed = true;
+    }
+  }
   const flex = info.filter(x => !x.fixed);
   let room = budget - info.filter(x => x.fixed).reduce((t, x) => t + x.qty * x.per, 0);
 
@@ -142,7 +157,8 @@ export function fitMeal(foods, kcal, locked = {}) {
       atMax: !x.fixed && x.qty >= x.max - 1e-9, atMin: !x.fixed && x.qty <= x.min + 1e-9,
     })),
     total, protein: info.reduce((t, x) => t + x.qty * (Number(x.f.protein) || 0), 0),
-    over, spare, drop: over > 0 && foods.length > 1 && cand.length ? cand[0].i : null,
+    // only a food whose going makes the meal fit: «بدون نان جا می‌شود» must be true
+    over, spare, drop: over > 0 && foods.length > 1 ? cand.find(({ x }) => x.qty * x.per >= over - TOL)?.i ?? null : null,
   };
 }
 

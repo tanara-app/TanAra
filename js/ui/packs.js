@@ -15,15 +15,18 @@ import { cheer } from './mascot.js';
 const newId = () => (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()));
 
 export const packs = () => store.get().ai_notes.filter(n => n.kind === 'pack' && n.data?.ids?.length).map(n => n.data);
-const hidden = () => store.note('pack_hide')?.data?.keys || [];
+export const hidden = () => store.note('pack_hide')?.data?.keys || [];
 
+// `from`: the starter combo (data/combos.js) this one was made from, which it then replaces
 export function savePack(p) {
-  const data = { id: p.id || newId(), name: p.name, meal: p.meal, ids: [...p.ids] };
+  const data = { id: p.id || newId(), name: p.name, meal: p.meal, ids: [...p.ids], ...(p.from ? { from: p.from } : {}) };
   store.saveNote({ key: `pack:${data.id}`, kind: 'pack', text: data.name, data });
   return data;
 }
-const deletePack = id => store.deleteNote(`pack:${id}`);
-const hide = ids => store.saveNote({ key: 'pack_hide', kind: 'pack_hide', data: { keys: [...new Set([...hidden(), packKey(ids)])] } });
+export const deletePack = id => store.deleteNote(`pack:${id}`);
+// a turned-down combo: its foods' key, or `lib:<id>` for a starter one
+export const hideKey = key => store.saveNote({ key: 'pack_hide', kind: 'pack_hide', data: { keys: [...new Set([...hidden(), key])] } });
+const hide = ids => hideKey(packKey(ids));
 
 // the pack's foods that are still in the bank
 const foodsOf = ids => {
