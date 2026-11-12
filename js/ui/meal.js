@@ -47,7 +47,7 @@ const combosFor = (day, meal) => {
 export function mealRowsHtml(day, budgetFor) {
   const rows = mealRows(store.get().entries, day, MEALS, m => budgetFor(m).kcal);
   return `<section class="card meal-rows">${rows.map(r => `
-    <button type="button" class="mrow" data-open-meal="${r.meal}">
+    <button type="button" class="meal-row" data-open-meal="${r.meal}">
       <span class="mr-text"><b>${r.label}</b>${r.names.length ? `<small>${r.names.map(esc).join('، ')}</small>` : ''}</span>
       ${r.items.length ? `<span class="mr-kcal">${fa(Math.round(r.kcal))}</span>` : r.budget > 0 ? `<span class="mr-kcal open" aria-label="${fa(r.budget)} کالری جا دارد">${fa(r.budget)}</span>` : ''}
     </button>`).join('')}
