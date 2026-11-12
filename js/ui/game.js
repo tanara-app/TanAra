@@ -1,5 +1,5 @@
 /*
-  «سرزمین» (beta): the city-builder, opened from «ابزارها» (#/game). Full screen, portrait.
+  «سرزمین» (beta): the city-builder, opened from «بیشتر» (#/game). Full screen, portrait.
   Drawn with Phaser 4 (loaded from the CDN only when this page opens); the buttons and the coin
   count are plain HTML over it. Logic is in js/domain/game.js, the placeholder art in gameArt.js.
 

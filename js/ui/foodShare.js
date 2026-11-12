@@ -1,5 +1,5 @@
 /*
-  «غذاهای تازه‌ی خانواده» (نمایه ← ابزارها), for the app's owner only: the foods members added to
+  «غذاهای تازه‌ی خانواده» (بیشتر), for the app's owner only: the foods members added to
   their own bank themselves (not the starting bank), newest first. For each one the owner can fix
   the name, category or numbers and send it to the members they pick, or keep it out («نه»).
   Members who already have a similar food (foodMatch.js) are shown it and are not ticked; a food

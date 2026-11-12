@@ -58,7 +58,7 @@ one needs to know goes in this file or in the project docs, not only in your own
   sentence, label or link to the UI, ask whether the screen works without it.
 - Anything that only some members have (a beta in `profile.beta`, not yet released to everyone) carries the word
   «آزمایشی» next to its name where it is opened (e.g. «سهم وعده آزمایشی» in its tab, «سرزمین» with «آزمایشی» under
-  its tile in «ابزارها»). The user asked for this on 2026-11-12. Remove the word when it is released to all.
+  its tile in «بیشتر»). The user asked for this on 2026-11-12. Remove the word when it is released to all.
 - Build only what the user agreed to. When a reply could mean more than one of the options you offered,
   ask which ones before building (on 2026-11-08 a shared «team goal» was built that the user hadn't asked for).
 

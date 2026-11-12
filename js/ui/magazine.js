@@ -183,7 +183,7 @@ export function renderMagazine(root) {
 
   root.innerHTML = `
     <header class="page-head mag-head">
-      <button class="link small mag-back" data-back>${icon.chevR} ابزارها</button>
+      <button class="link small mag-back" data-back>${icon.chevR} بیشتر</button>
       <h1>مجله</h1>
       <p class="muted small">هر شنبه یک مقاله‌ی تازه برای همه.</p>
     </header>

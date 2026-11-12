@@ -9,7 +9,7 @@ import { aiAvailable, sparkle } from '../ai/hooshvareh.js';
 import { recipesPanel, recipes } from './recipes.js';
 import { scanBarcode, barcodeBox, fillFromBarcode, barcodeIcon } from './barcode.js';
 
-// «رسپی‌ها»: its own page, from its own tile in «ابزارها».
+// «رسپی‌ها»: its own page, from its own tile in «بیشتر».
 export function openRecipes(onChange) {
   sheet.open(body => {
     body.innerHTML = `

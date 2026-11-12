@@ -29,9 +29,9 @@ const ROUTES = {
   today: { label: 'امروز', icon: icon.today, render: renderToday },
   progress: { label: 'پیشرفت', icon: icon.chart, render: renderProgress },
   ai: { label: 'هوشواره', icon: sparkle(24), render: renderChat },
-  tools: { label: 'ابزارها', icon: icon.tools, render: renderTools },
+  tools: { label: 'بیشتر', icon: icon.tools, render: renderTools },
   profile: { label: 'نمایه', icon: icon.user, render: renderProfile },
-  // not in the bottom bar: opened from «ابزارها» (and the magazine card on «امروز»)
+  // not in the bottom bar: opened from «بیشتر» (and the magazine card on «امروز»)
   mag: { label: 'مجله', render: renderMagazine, under: 'tools' },
   game: { label: 'سرزمین', render: renderGame, under: 'tools' }, // beta: the city-builder
 

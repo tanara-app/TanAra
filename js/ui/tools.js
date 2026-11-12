@@ -1,5 +1,5 @@
 /*
-  «ابزارها» (a tab of the bottom bar, where «مجله» used to be): the app's tools as square tiles,
+  «بیشتر» (a tab of the bottom bar, where «مجله» used to be): the app's tools as square tiles,
   like the icons on a phone's home screen. Holding a tile for a moment picks it up; dragging it
   puts it somewhere else, and that order is kept in the profile (profile.toolsOrder), so it is
   the same on every device of that member. «تمام» (or a tap outside the tiles) ends arranging.
@@ -42,7 +42,7 @@ export function renderTools(root) {
   root.innerHTML = `
     <section class="tools">
       <header class="page-head head-row">
-        <h1>ابزارها</h1>
+        <h1>بیشتر</h1>
         ${arranging ? '<button class="btn sm" data-done>تمام</button>' : ''}
       </header>
       <div class="tool-grid${arranging ? ' arranging' : ''}">
