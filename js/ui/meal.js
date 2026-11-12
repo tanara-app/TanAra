@@ -1,8 +1,8 @@
 /*
   The single meal screen (beta «یکی»): one place instead of «شمارش کالری»، «سهم وعده» and «رژیم».
 
-  For now it is its own page, «وعده‌ها» in «بیشتر» (#/meals), only for accounts with `one` in
-  profile.beta; the today screen is unchanged. On that page every meal is one row: its name, the foods eaten, and the calories eaten —
+  Only for accounts with `one` in profile.beta: then the today screen has no mode tabs, and every
+  meal there is one row: its name, the foods eaten, and the calories eaten —
   or, for a meal with nothing yet, the calories it has. A tap opens the meal:
   - what was already logged in it (a tap edits);
   - combos (domain/combos.js): their own, the ones they keep eating, the app's starters;
@@ -17,11 +17,7 @@ import * as store from '../data/store.js';
 import { MEALS, frequentFoods, lastAmountFor } from '../domain/stats.js';
 import { CATEGORIES, GRAM } from '../data/seedFoods.js';
 import { norm, esc, fa, qtyLabel } from '../lib/fa.js';
-import { mealForNow, today, addDays, relLabel, faDM } from '../lib/dates.js';
-import { effectiveTargets } from '../domain/targets.js';
-import { totals, entriesOn } from '../domain/stats.js';
-import { mealBudget, mealSharesFrom } from '../domain/portion.js';
-import { eatingPattern } from '../domain/pattern.js';
+import { mealForNow, today } from '../lib/dates.js';
 import { sheet, toast, confirmBox, choose, icon } from './dom.js';
 import { amountLabel, foodMeta, hasGrams, hasUnit2 } from './units.js';
 import { fitMeal, usualCombos, roleOf, packKey } from '../domain/portion.js';
@@ -45,53 +41,6 @@ const combosFor = (day, meal) => {
     avoid: planAvoid(), dislikes: store.profile()?.planPrefs?.dislikes || '',
   });
 };
-
-/* ---------------- the page: «وعده‌ها» ---------------- */
-
-export const oneOn = () => (store.profile()?.beta || []).includes('one');
-let pageDay = today();
-
-export function renderMeals(root) {
-  if (!oneOn()) { location.replace('#/tools'); return; }
-  const day = pageDay;
-  const isToday = day === today();
-  const s = store.get();
-  const t = effectiveTargets(store.profile(), day);
-  const tot = totals(entriesOn(s.entries, day));
-  const rest = Math.round(t.kcal - tot.kcal);
-  // the calories a meal has: what is left of the day, shared by the meals not eaten yet
-  const budgetFor = m => {
-    const st = store.get();
-    const pat = eatingPattern(st.entries, st.ai_notes, day);
-    return { kcal: mealBudget(st.entries, day, m, t.kcal, mealSharesFrom(pat.ready ? pat.shares : null)), label: MEALS[m] };
-  };
-  root.innerHTML = `
-    <section class="meals-page">
-      <button class="link small mag-back" data-back>${icon.chevR} بیشتر</button>
-      <header class="day-nav">
-        <button class="icon-btn" data-prev aria-label="روز قبل">${icon.chevR}</button>
-        <div class="day-title">
-          <h1>${relLabel(day)}</h1>
-          ${isToday ? `<small>${faDM(day)}</small>` : '<button class="link small" data-today>برگشت به امروز</button>'}
-        </div>
-        <button class="icon-btn" data-next aria-label="روز بعد" ${isToday ? 'disabled' : ''}>${icon.chevL}</button>
-      </header>
-      <section class="card day-left">
-        <div><b>${fa(Math.abs(rest))}</b><span>${rest >= 0 ? 'کالری مانده' : 'کالری بیشتر از هدف'}</span></div>
-        <div class="dl-protein"><span>پروتئین <b>${fa(Math.round(tot.protein))}</b> از ${fa(t.protein)}</span>
-          <div class="bar"><i style="width:${t.protein ? Math.min(100, tot.protein / t.protein * 100) : 0}%"></i></div></div>
-      </section>
-      ${mealRowsHtml(day, budgetFor)}
-      <div class="fab-space"></div>
-      <button class="fab" data-log>${icon.plus}<span>ثبت غذا</span></button>
-    </section>`;
-  root.querySelector('[data-back]').onclick = () => location.replace('#/tools');
-  root.querySelector('[data-prev]').onclick = () => { pageDay = addDays(day, -1); renderMeals(root); };
-  root.querySelector('[data-next]').onclick = () => { if (!isToday) { pageDay = addDays(day, 1); renderMeals(root); } };
-  root.querySelector('[data-today]')?.addEventListener('click', () => { pageDay = today(); renderMeals(root); });
-  root.querySelector('[data-log]').onclick = () => openMeal({ day, budgetFor });
-  bindMealRows(root, day, budgetFor);
-}
 
 /* ---------------- the meal rows ---------------- */
 

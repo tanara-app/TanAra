@@ -16,12 +16,7 @@ import { openFoodBank, openRecipes } from './foodBank.js';
 import { shareAdmin, checkShare, openFoodShare } from './foodShare.js';
 import { drawPreview } from './gameArt.js';
 import { KINDS } from '../domain/game.js';
-import { oneOn } from './meal.js';
 
-// a tile drawn here rather than an image: a plate with a fork and a spoon
-const PLATE = `<svg viewBox="0 0 48 48" width="62%" height="62%" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-  <circle cx="24" cy="24" r="12.5"/><circle cx="24" cy="24" r="7.5" stroke-opacity=".55"/>
-  <path d="M6 9v9a3 3 0 0 0 3 3v18M9 9v7M12 9v9a3 3 0 0 1-3 3"/><path d="M41 39V22c-3 0-4-4-4-7s1.5-6 4-6v30"/></svg>`;
 
 const again = () => { const v = document.querySelector('#view .tools'); if (v) renderTools(v.parentElement); };
 const TOOLS = {
@@ -31,8 +26,6 @@ const TOOLS = {
   mag: { label: 'مجله', open: () => { location.hash = '#/mag'; } },
   share: { label: 'غذاهای تازه‌ی خانواده', only: shareAdmin, open: () => openFoodShare(() => checkShare(again, true)) },
   // beta, only for accounts with `game` in profile.beta (set from the database)
-  // beta, only for accounts with `one`: the single meal screen (meal.js), on its own page for now
-  meals: { label: 'وعده‌ها', beta: true, svg: PLATE, only: oneOn, open: () => { location.hash = '#/meals'; } },
   game: { label: 'سرزمین', beta: true, art: 'palace', only: () => (store.profile()?.beta || []).includes('game'), open: () => { location.hash = '#/game'; } },
 };
 
@@ -57,7 +50,7 @@ export function renderTools(root) {
         ${keys.map(k => {
           const t = TOOLS[k], n = t.badge?.() || 0;
           return `<button class="tool" data-tool="${k}" aria-label="${t.label}${n ? `، ${fa(n)} مورد` : ''}">
-            <span class="tool-ic">${t.svg ? t.svg : t.art ? `<canvas data-art="${t.art}"></canvas>` : `<img src="img/tools/${k}.webp" alt="" draggable="false">`}${n ? `<b class="tool-badge">${fa(n)}</b>` : ''}</span>
+            <span class="tool-ic">${t.art ? `<canvas data-art="${t.art}"></canvas>` : `<img src="img/tools/${k}.webp" alt="" draggable="false">`}${n ? `<b class="tool-badge">${fa(n)}</b>` : ''}</span>
             <span class="tool-name">${t.label}${t.beta ? '<small>آزمایشی</small>' : ''}</span>
           </button>`;
         }).join('')}

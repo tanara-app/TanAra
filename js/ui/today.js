@@ -24,6 +24,7 @@ import { weekCard, bindWeekCard } from './review.js';
 import { greetCard, bindGreet } from './mascot.js';
 import { mealBudget, mealSharesFrom } from '../domain/portion.js';
 import { packRow, bindPacks } from './packs.js';
+import { mealRowsHtml, bindMealRows, openMeal } from './meal.js';
 import { eatingPattern } from '../domain/pattern.js';
 
 let day = today();
@@ -62,8 +63,10 @@ export function renderToday(root) {
   const logged = daysLoggedInWeek(s.entries, weekStart(today()));
   // «سهم وعده»: a beta for the accounts whose profile has it in `beta` (set from the database)
   const beta = (p.beta || []).includes('portion');
-  const portionMode = beta && p.mode === 'portion';
-  const planMode = p.mode === 'plan';
+  // «یکی» (beta, accounts with `one`): one meal screen in place of the three modes (meal.js)
+  const one = (p.beta || []).includes('one');
+  const portionMode = !one && beta && p.mode === 'portion';
+  const planMode = !one && p.mode === 'plan';
   // '' when no plan covers this day: the ordinary meal list is shown instead
   const plan = planMode ? planHtml(day) : '';
   const counting = !planMode || !!p.planKcal;
@@ -104,11 +107,11 @@ export function renderToday(root) {
       <button class="icon-btn" data-next aria-label="روز بعد" ${isToday ? 'disabled' : ''}>${icon.chevL}</button>
     </header>
 
-    <div class="seg mode-seg" data-mode role="tablist" aria-label="حالت">
+    ${one ? '' : `<div class="seg mode-seg" data-mode role="tablist" aria-label="حالت">
       <button type="button" role="tab" data-v="count" aria-selected="${!planMode && !portionMode}" class="${planMode || portionMode ? '' : 'on'}">شمارش کالری</button>
       ${beta ? `<button type="button" role="tab" data-v="portion" aria-selected="${portionMode}" class="${portionMode ? 'on' : ''}">سهم وعده <small>آزمایشی</small></button>` : ''}
       <button type="button" role="tab" data-v="plan" aria-selected="${planMode}" class="${planMode ? 'on' : ''}">رژیم</button>
-    </div>
+    </div>`}
 
     ${counting ? `<section class="card summary">
       <div class="ring-wrap">
@@ -142,7 +145,8 @@ export function renderToday(root) {
 
     ${plan}
 
-    ${mealList ? `<section class="meals">
+    ${one ? mealRowsHtml(day, budgetFor) : ''}
+    ${mealList && !one ? `<section class="meals">
       ${Object.entries(MEALS).map(([k, label]) => {
         const items = list.filter(e => e.meal === k).sort((a, b) => (a.created_at < b.created_at ? -1 : 1));
         const mt = totals(items);
@@ -173,15 +177,18 @@ export function renderToday(root) {
   root.querySelector('[data-next]').onclick = () => { if (!isToday) { day = addDays(day, 1); renderToday(root); } };
   root.querySelector('[data-today]')?.addEventListener('click', () => { day = today(); renderToday(root); });
   const room = portionMode ? { smart: true, budgetFor } : null;
-  root.querySelector('[data-log]')?.addEventListener('click', () => openLogSheet({ day, room }));
+  root.querySelector('[data-log]')?.addEventListener('click', () => (one ? openMeal({ day, budgetFor }) : openLogSheet({ day, room })));
+  if (one) bindMealRows(root, day, budgetFor);
   root.querySelectorAll('[data-add]').forEach(b => b.onclick = () => openLogSheet({ day, meal: b.dataset.add, room }));
   if (portionMode) bindPacks(root, { day, budgetFor, redraw: () => renderToday(root), edit: (meal, start, pack) => openLogSheet({ day, meal, room, start, pack }) });
   root.querySelectorAll('[data-entry]').forEach(b => b.onclick = () => openEntrySheet(s.entries.find(e => e.id === b.dataset.entry)));
-  root.querySelector('[data-mode]').onclick = e => {
+  const modeSeg = root.querySelector('[data-mode]');
+  if (modeSeg) modeSeg.onclick = e => {
     const v = e.target.closest('button[data-v]')?.dataset.v;
     if (v && v !== (planMode ? 'plan' : portionMode ? 'portion' : 'count')) store.saveProfile({ ...p, mode: v });
   };
-  const redraw = () => { if (root.querySelector('[data-mode]')) renderToday(root); };
+  const onToday = () => !!root.querySelector('[data-mode], .meal-rows');
+  const redraw = () => { if (onToday()) renderToday(root); };
   if (planMode) bindPlan(root, day, redraw);
   bindMotivation(root);
   bindGreet(root);
@@ -213,6 +220,6 @@ export function renderToday(root) {
     n.remove();
   });
   // last: generating the tip or today's magazine article redraws this screen
-  const redrawAi = () => { if (root.querySelector('[data-mode]') && day === today()) renderToday(root); };
+  const redrawAi = () => { if (onToday() && day === today()) renderToday(root); };
   if (isToday) { bindTip(redrawAi, root); bindMag(root, redrawAi); bindOccasion(root, redrawAi); bindWeekCard(root, redrawAi); }
 }
