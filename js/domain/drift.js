@@ -12,6 +12,7 @@
   - plan: in the diet plan, under half the occasions eaten as planned, after keeping to it.
 */
 import { addDays, diffDays } from '../lib/dates.js';
+import { baseMeal } from './meals.js';
 
 export const WEIGHT_KG = 0.7;
 export const WAIST_CM = 1.5;
@@ -55,7 +56,7 @@ export function overSign(entries, day, kcalOn) {
   const by = new Map();
   for (const e of entries) if (e.day >= addDays(day, -7) && e.day <= addDays(day, -1)) {
     const d = by.get(e.day) || { kcal: 0, meals: new Set() };
-    d.kcal += Number(e.kcal) || 0; d.meals.add(e.meal);
+    d.kcal += Number(e.kcal) || 0; d.meals.add(baseMeal(e.meal));
     by.set(e.day, d);
   }
   const over = [...by].filter(([d, x]) => x.meals.size >= 2 && kcalOn(d) && x.kcal > kcalOn(d) + OVER_KCAL)

@@ -13,7 +13,7 @@
   also speaks (his voice is recorded with ElevenLabs, see VOICE.md); it starts on «فقط نوشته».
 */
 import * as store from '../data/store.js';
-import { entriesOn, streak } from '../domain/stats.js';
+import { entriesOn, streak, baseMeal } from '../domain/stats.js';
 import { today, diffDays } from '../lib/dates.js';
 import { esc, fa } from '../lib/fa.js';
 
@@ -239,7 +239,7 @@ function onEntry() {
   const said = readLog().said;
   if (!said.includes('first')) { say('first'); return; }
   if (!edCare()) {
-    const meals = new Set(todays.map(e => e.meal));
+    const meals = new Set(todays.map(e => baseMeal(e.meal)));
     if (!said.includes('meals') && ['breakfast', 'lunch', 'dinner'].every(m => meals.has(m))) { say('meals'); return; }
     const n = streak(entries, t);
     if (STREAKS.includes(n) && !said.includes(`streak${n}`)) { say('streak', n); return; }

@@ -16,6 +16,7 @@
   the target stays right in the person's own way of logging.
 */
 import { addDays, diffDays } from '../lib/dates.js';
+import { baseMeal } from './meals.js';
 import { sortedWeights } from './stats.js';
 import { computeTargets } from './targets.js';
 
@@ -62,7 +63,7 @@ export function measuredTdee(entries, weights, { day, startDate, formula } = {})
     if (e.day < from || e.day > to) continue;
     const d = byDay.get(e.day) || { kcal: 0, meals: new Set() };
     d.kcal += Number(e.kcal) || 0;
-    d.meals.add(e.meal);
+    d.meals.add(baseMeal(e.meal));
     byDay.set(e.day, d);
   }
   const full = [...byDay.values()].filter(d => d.meals.size >= 2);

@@ -6,7 +6,7 @@ import * as store from '../data/store.js';
 import { effectiveTargets, isTeen, proteinFor } from '../domain/targets.js';
 import { phaseNotes, bindPhase, phaseLabel } from './phase.js';
 import { lightOn } from '../domain/phase.js';
-import { MEALS, entriesOn, totals, daysLoggedInWeek, sortedWeights } from '../domain/stats.js';
+import { MEALS, MEALS5, mealLabel, baseMeal, meal5, entriesOn, totals, daysLoggedInWeek, sortedWeights } from '../domain/stats.js';
 import { underEating, rapidLoss, rapidLimit } from '../domain/safety.js';
 import { fa, kcal50, round50, esc, qtyLabel } from '../lib/fa.js';
 import { amountLabel } from './units.js';
@@ -22,7 +22,7 @@ import { measureNote, bindMeasureNote } from './measure.js';
 import { checkinCard, bindCheckin } from './checkin.js';
 import { weekCard, bindWeekCard } from './review.js';
 import { greetCard, bindGreet } from './mascot.js';
-import { mealBudget, mealSharesFrom, mealStanding } from '../domain/portion.js';
+import { mealBudget, mealSharesFrom, mealShares5From, mealStanding } from '../domain/portion.js';
 import { planAvoid } from '../ai/foodTags.js';
 import { TAG_SAYS } from '../domain/health.js';
 import { packRow, bindPacks } from './packs.js';
@@ -97,16 +97,23 @@ export function renderToday(root) {
   }
 
   // «سهم وعده»: the meal's calories for today, from what is left of the day
+  // the meals shown: five with `eat` (an old snack placed by the hour it was logged), else four
+  // (an afternoon snack counted as the snack); the entries get the meal they are shown in
+  const meals = eat ? MEALS5 : MEALS;
+  // the first day they see five meals is kept: snacks before it were all 'snack' (meals.js)
+  if (eat && !p.fiveFrom) { store.saveProfile({ ...p, fiveFrom: today() }); return; }
+  const asShown = es => es.map(e => (eat ? { ...e, meal: meal5(e, p.fiveFrom) } : e.meal === 'snack2' ? { ...e, meal: baseMeal(e.meal) } : e));
+  const sharesNow = () => {
+    const st = store.get();
+    const pat = eatingPattern(st.entries, st.ai_notes, day);
+    return (eat ? mealShares5From : mealSharesFrom)(pat.ready ? pat.shares : null);
+  };
   const budgetFor = m => {
     const st = store.get();
-    const pat = eatingPattern(st.entries, st.ai_notes, day);
-    return { kcal: mealBudget(st.entries, day, m, t.kcal, mealSharesFrom(pat.ready ? pat.shares : null)), label: MEALS[m] };
+    return { kcal: mealBudget(asShown(st.entries), day, m, t.kcal, sharesNow()), label: mealLabel(m) };
   };
-  const standing = m => {
-    const st = store.get();
-    const pat = eatingPattern(st.entries, st.ai_notes, day);
-    return mealStanding(st.entries, day, m, t.kcal, mealSharesFrom(pat.ready ? pat.shares : null));
-  };
+  const standing = m => mealStanding(asShown(store.get().entries), day, m, t.kcal, sharesNow());
+  const shownList = asShown(list);
   const avoid = eat ? planAvoid() : null;
   root.innerHTML = `
     <header class="day-nav">
@@ -158,8 +165,8 @@ export function renderToday(root) {
 
     ${one ? mealRowsHtml(day, budgetFor) : ''}
     ${mealList && !one ? `<section class="meals">
-      ${Object.entries(MEALS).map(([k, label]) => {
-        const items = list.filter(e => e.meal === k).sort((a, b) => (a.created_at < b.created_at ? -1 : 1));
+      ${Object.entries(meals).map(([k, label]) => {
+        const items = shownList.filter(e => e.meal === k).sort((a, b) => (a.created_at < b.created_at ? -1 : 1));
         const mt = totals(items);
         const st = eat ? standing(k) : null;
         return `<div class="meal card">

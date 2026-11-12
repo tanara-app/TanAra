@@ -1,5 +1,6 @@
 // Fixed safety rules. Pure functions; the UI decides where to show them.
 import { addDays, weekStart } from '../lib/dates.js';
+import { baseMeal } from './meals.js';
 import { sortedWeights, weekAvg, totals } from './stats.js';
 
 /*
@@ -51,7 +52,7 @@ export function underEating(entries, floor, day) {
   const days = [1, 2, 3].map(n => addDays(day, -n));
   for (const d of days) {
     const list = entries.filter(e => e.day === d);
-    const meals = new Set(list.map(e => e.meal));
+    const meals = new Set(list.map(e => baseMeal(e.meal)));
     if (meals.size < 2) return null;
     if (totals(list).kcal >= floor) return null;
   }

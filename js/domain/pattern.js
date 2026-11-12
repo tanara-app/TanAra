@@ -10,6 +10,7 @@
   The total stays the target, whatever the habit: this moves calories between meals, nothing else.
 */
 import { addDays } from '../lib/dates.js';
+import { baseMeal } from './meals.js';
 import { SLOTS, planOn, picksOn, planEnd, fastOn } from './plan.js';
 
 export const PATTERN = {
@@ -60,19 +61,19 @@ export function eatingPattern(entries, notes, day) {
   const byMeal = {};
   let days = 0;
   for (const [d, es] of byDay) {
-    if (new Set(es.map(e => e.meal)).size < 2) continue;
+    if (new Set(es.map(e => baseMeal(e.meal))).size < 2) continue;
     if (Object.keys(picksOn(notes, es, d)).length) continue;
     if (fastOn(notes, d)) continue; // a fasting day says nothing about their usual meals
     days++;
-    for (const e of es) byMeal[e.meal] = (byMeal[e.meal] || 0) + (Number(e.kcal) || 0);
+    for (const e of es) byMeal[baseMeal(e.meal)] = (byMeal[baseMeal(e.meal)] || 0) + (Number(e.kcal) || 0);
   }
   const total = Object.values(byMeal).reduce((a, b) => a + b, 0);
   if (days < PATTERN.MIN_DAYS || !(total > 0)) return { ready: false, days, need: Math.max(1, PATTERN.MIN_DAYS - days) };
 
   const count = new Map();
   for (const e of list) {
-    const key = `${e.meal}|${e.food_id || e.name}`;
-    const c = count.get(key) || { meal: e.meal, name: e.name, unit: e.unit, qtys: [] };
+    const key = `${baseMeal(e.meal)}|${e.food_id || e.name}`;
+    const c = count.get(key) || { meal: baseMeal(e.meal), name: e.name, unit: e.unit, qtys: [] };
     if (c.unit === e.unit) c.qtys.push(Number(e.qty) || 0);
     count.set(key, c);
   }

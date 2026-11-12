@@ -264,6 +264,8 @@ textarea { resize: vertical; }
 }
 .seg button.on { background: var(--accent); color: var(--accent-ink); }
 .seg.small button { min-height: 34px; font-size: .85rem; }
+/* five meals (the rebuilt «امروز»): the two snacks' longer names wrap onto two lines */
+.seg.five button { font-size: .78rem; line-height: 1.25; padding-inline: 2px; white-space: normal; }
 
 .choices { display: flex; flex-direction: column; gap: 10px; }
 .choice {

@@ -2,7 +2,8 @@
 // Or one photo: Hooshvareh lists what is on the plate and it is logged after a look.
 // Or a packaged food's barcode: from the bank if scanned before, else looked up (barcode.js).
 import * as store from '../data/store.js';
-import { MEALS, frequentFoods, lastAmountFor } from '../domain/stats.js';
+import { MEALS, MEALS5, mealLabel, frequentFoods, lastAmountFor } from '../domain/stats.js';
+import { meal5ForNow } from '../domain/meals.js';
 import { CATEGORIES, GRAM } from '../data/seedFoods.js';
 import { norm, esc, fa, qtyLabel } from '../lib/fa.js';
 import { mealForNow, today } from '../lib/dates.js';
@@ -18,8 +19,10 @@ import { portionsFor } from '../domain/plan.js';
 import { fitMeal } from '../domain/portion.js';
 import { packs, savePack, askPackName } from './packs.js';
 
-export const mealSeg = meal => `<div class="seg meal-seg" data-meal>
-  ${Object.entries(MEALS).map(([k, l]) => `<button type="button" data-v="${k}" class="${k === meal ? 'on' : ''}">${l}</button>`).join('')}
+// the rebuilt «امروز» (beta `eat`, REDESIGN.md) has five meals: two snacks
+const fiveOn = () => (store.profile()?.beta || []).includes('eat');
+export const mealSeg = meal => `<div class="seg meal-seg${fiveOn() || meal === 'snack2' ? ' five' : ''}" data-meal>
+  ${Object.entries(fiveOn() || meal === 'snack2' ? MEALS5 : MEALS).map(([k, l]) => `<button type="button" data-v="${k}" class="${k === meal ? 'on' : ''}">${l}</button>`).join('')}
 </div>`;
 
 export function bindMeal(root, set) {
@@ -50,7 +53,7 @@ const aiEstBtn = () => (aiAvailable() ? `<button type="button" class="btn ai-btn
 // is handed back instead of asking an amount, and the sheet closes. `via`: 'photo', 'scan' or
 // 'custom' starts there; a photo or scan given up closes the sheet.
 export function openLogSheet({ day = today(), meal = null, onSaved = null, room = null, start = null, pack = null, onPick = null, via = null, query: q0 = '' } = {}) {
-  let curMeal = meal || (day === today() ? mealForNow() : 'lunch');
+  let curMeal = meal || (day === today() ? (fiveOn() ? meal5ForNow(mealForNow()) : mealForNow()) : 'lunch');
   let query = q0; // a name typed in the meal screen's search, for «غذای دلخواه»
   const save = e => { const row = store.saveEntry(e); onSaved?.(row); cheer('entry'); return row; };
   const smart = !!room?.smart;
@@ -112,7 +115,7 @@ export function openLogSheet({ day = today(), meal = null, onSaved = null, room 
         const groups = {};
         foods.forEach(f => (groups[f.category] ||= []).push(f));
         list.innerHTML = `
-          ${freq.length ? `<h3 class="list-h">پرتکرارهای من در ${MEALS[curMeal]}</h3>${freq.map(x => foodRow(x.food, room ? fits(x.food) : ` · معمولاً ${amountLabel(x.last.qty, x.last.grams ? GRAM : x.food.unit)}`)).join('')}` : ''}
+          ${freq.length ? `<h3 class="list-h">پرتکرارهای من در ${mealLabel(curMeal)}</h3>${freq.map(x => foodRow(x.food, room ? fits(x.food) : ` · معمولاً ${amountLabel(x.last.qty, x.last.grams ? GRAM : x.food.unit)}`)).join('')}` : ''}
           ${Object.keys(CATEGORIES).filter(c => groups[c]).map(c => `
             <h3 class="list-h">${CATEGORIES[c]}</h3>
             ${groups[c].sort((a, b) => a.name.localeCompare(b.name, 'fa')).map(f => foodRow(f, fits(f))).join('')}`).join('')}

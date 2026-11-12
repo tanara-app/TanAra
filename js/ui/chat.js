@@ -5,7 +5,7 @@ import * as store from '../data/store.js';
 import { isTeen } from '../domain/targets.js';
 import { hideCalls } from '../domain/chatText.js';
 import { chat, ask, aiAvailable, md, focusArticle } from '../ai/hooshvareh.js';
-import { MEALS } from '../domain/stats.js';
+import { MEALS, mealLabel } from '../domain/stats.js';
 import { CATEGORIES } from '../data/seedFoods.js';
 import { SLOTS, planOn, swapsOn, swapItem, swapAllowed } from '../domain/plan.js';
 import { fa, esc, qtyLabel, norm } from '../lib/fa.js';
@@ -134,7 +134,7 @@ function changesText(was = {}, set = {}, { food = false } = {}) {
   const out = [];
   if ('name' in set) out.push(`نام: ${esc(set.name)}`);
   if ('day' in set && isISO(set.day)) out.push(`روز: ${relLabel(set.day)}`);
-  if ('meal' in set) out.push(`وعده: ${MEALS[set.meal] || ''}`);
+  if ('meal' in set) out.push(`وعده: ${mealLabel(set.meal) || ''}`);
   if (food) {
     if ('unit' in set) out.push(`واحد: ${esc(was.unit || '')} ← ${esc(set.unit)}`);
     if ('grams' in set) out.push(`وزن هر ${esc(next.unit || 'واحد')}: ${was.grams ? `${fa(Math.round(was.grams))} ← ` : ''}${fa(Math.round(set.grams))} گرم`);
@@ -146,7 +146,7 @@ function changesText(was = {}, set = {}, { food = false } = {}) {
   return out.join(' · ');
 }
 // «ناهارِ دیروز: برنج»
-const entryLabel = e => `${MEALS[e?.meal] || 'وعده'}ِ ${isISO(e?.day) ? relLabel(e.day) : ''}: <b>${esc(e?.name || '')}</b>`;
+const entryLabel = e => `${mealLabel(e?.meal) || 'وعده'}ِ ${isISO(e?.day) ? relLabel(e.day) : ''}: <b>${esc(e?.name || '')}</b>`;
 // entries logged from a bank food that a changed name / veg flag would also correct
 const loggedFrom = a => store.get().entries.filter(e => e.food_id === a.food_id && (('is_veg' in a.set && !!e.is_veg !== !!a.set.is_veg) || ('name' in a.set && e.name !== a.set.name)));
 
@@ -167,7 +167,7 @@ function describe(a) {
     case 'delete_waist':
       return `حذف دور کمر <b>${fa(a.cm, 1)}</b> سانتی‌متر از ${isISO(a.day) ? relLabel(a.day) : ''}`;
     case 'log_food':
-      return `ثبت در ${MEALS[a.meal] || 'وعده'}ِ ${isISO(a.day) ? relLabel(a.day) : ''}: <b>${esc(a.name)}</b><br><small>${qtyLabel(Number(a.qty) || 1)} ${esc(a.unit || '')} · ${fa(Math.round(a.kcal))} کالری · ${fa(Math.round(a.protein * 10) / 10, 1)} گرم پروتئین</small>`;
+      return `ثبت در ${mealLabel(a.meal) || 'وعده'}ِ ${isISO(a.day) ? relLabel(a.day) : ''}: <b>${esc(a.name)}</b><br><small>${qtyLabel(Number(a.qty) || 1)} ${esc(a.unit || '')} · ${fa(Math.round(a.kcal))} کالری · ${fa(Math.round(a.protein * 10) / 10, 1)} گرم پروتئین</small>`;
     case 'weight':
       return `ثبت وزن <b>${fa(a.kg, 1)}</b> کیلو برای ${isISO(a.day) ? relLabel(a.day) : ''}`;
     case 'waist':

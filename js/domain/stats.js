@@ -1,12 +1,8 @@
 // Aggregations over entries and weights. Pure functions.
 import { addDays, weekStart, diffDays, range, parse } from '../lib/dates.js';
 
-export const MEALS = {
-  breakfast: 'صبحانه',
-  lunch: 'ناهار',
-  dinner: 'شام',
-  snack: 'میان‌وعده',
-};
+import { baseMeal } from './meals.js';
+export { MEALS, MEALS5, mealLabel, baseMeal, meal5 } from './meals.js';
 
 export function entriesOn(entries, day) {
   return entries.filter(e => e.day === day);
@@ -147,7 +143,7 @@ export function frequentFoods(entries, foods, day, meal, limit = 6) {
   const byId = new Map(foods.map(f => [f.id, f]));
   const stats = new Map();
   for (const e of entries) {
-    if (!e.food_id || e.meal !== meal || e.day < from || !byId.has(e.food_id)) continue;
+    if (!e.food_id || baseMeal(e.meal) !== baseMeal(meal) || e.day < from || !byId.has(e.food_id)) continue;
     const s = stats.get(e.food_id) || { n: 0, last: null };
     s.n++;
     if (!s.last || e.created_at >= s.last.created_at) s.last = e;
@@ -175,7 +171,7 @@ export function lastAmountFor(entries, food, meal) {
   for (const e of entries) {
     if (e.food_id !== food.id) continue;
     if (!best || e.created_at > best.created_at) best = e;
-    if (e.meal === meal && (!bestMeal || e.created_at > bestMeal.created_at)) bestMeal = e;
+    if (baseMeal(e.meal) === baseMeal(meal) && (!bestMeal || e.created_at > bestMeal.created_at)) bestMeal = e;
   }
   return amountOf(bestMeal || best, food);
 }

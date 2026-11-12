@@ -156,7 +156,8 @@ type Ctx = {
   checkins?: any[];
 };
 
-const MEALS: Record<string, string> = { breakfast: "صبحانه", lunch: "ناهار", dinner: "شام", snack: "میان‌وعده" };
+// snack2: the afternoon snack of the rebuilt «امروز» (js/domain/meals.js); older snacks are all «snack»
+const MEALS: Record<string, string> = { breakfast: "صبحانه", lunch: "ناهار", dinner: "شام", snack: "میان‌وعده", snack2: "میان‌وعده‌ی عصر" };
 const r1 = (n: unknown) => Math.round(Number(n) * 10) / 10;
 const addDays = (day: string, n: number) => {
   const d = new Date(day + "T12:00:00Z");
