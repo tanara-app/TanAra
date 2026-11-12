@@ -6,7 +6,7 @@
    Supabase API calls are never touched. Bump CACHE when the shell list changes.
    Every other cache is cleared on activate (including «tanara-vault», from the removed vault).
    Also shows the push reminders sent by the `remind` Edge Function (see ui/reminders.js). */
-const CACHE = 'tanara-shell-v74';
+const CACHE = 'tanara-shell-v75';
 const SHELL = [
   './', './index.html', './manifest.json', './css/app.css',
   './js/app.js', './js/config.js',
@@ -14,7 +14,7 @@ const SHELL = [
   './js/domain/targets.js', './js/domain/stats.js', './js/domain/safety.js', './js/domain/plan.js', './js/domain/health.js',
   './js/domain/energy.js', './js/domain/phase.js', './js/domain/photo.js', './js/domain/recipe.js', './js/domain/shopping.js', './js/data/shop.js', './js/domain/barcode.js', './js/domain/occasions.js', './js/domain/drift.js', './js/domain/pattern.js', './js/domain/portion.js', './js/domain/meals.js', './js/domain/combos.js', './js/data/combos.js', './js/domain/chatText.js',
   './js/data/store.js', './js/data/supabaseRemote.js', './js/data/seedFoods.js',
-  './js/ui/dom.js', './js/ui/onboarding.js', './js/ui/today.js', './js/ui/meal.js', './js/ui/packs.js', './js/ui/logFood.js', './js/ui/foodBank.js',
+  './js/ui/dom.js', './js/ui/onboarding.js', './js/ui/today.js', './js/ui/eat.js', './js/ui/meal.js', './js/ui/packs.js', './js/ui/logFood.js', './js/ui/foodBank.js',
   './js/ui/progress.js', './js/ui/review.js', './js/ui/profile.js', './js/ui/login.js', './js/ui/chart.js', './js/ui/notices.js', './js/ui/motivation.js',
   './js/ai/hooshvareh.js', './js/ai/foodTags.js', './js/ui/chat.js', './js/ui/aiCards.js', './js/ui/units.js', './js/ui/plan.js', './js/ui/magazine.js',
   './js/ui/phase.js', './js/ui/reminders.js', './js/ui/usage.js', './js/ui/photo.js', './js/ui/recipes.js', './js/ui/measure.js', './js/ui/shopping.js', './js/ui/tools.js', './js/ui/game.js', './js/ui/gameArt.js', './js/domain/game.js', './js/ui/barcode.js', './js/ui/theme.js', './js/ui/activity.js', './js/ui/checkin.js', './js/ui/mascot.js', './js/ui/celebrate.js', './js/ui/feedback.js', './js/ui/foodShare.js', './js/domain/foodMatch.js', './js/ui/family.js', './js/domain/family.js', './js/ui/landArt.js', './img/land/base-land.webp', './img/tools/shop.webp', './img/tools/bank.webp', './img/tools/recipes.webp', './img/tools/mag.webp', './img/tools/share.webp',

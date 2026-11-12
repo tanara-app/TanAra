@@ -148,7 +148,8 @@ export function fitMeal(foods, kcal, locked = {}) {
   // within TOL of the budget is on it: half-unit steps can't land closer
   const over = total - budget > TOL ? Math.round(total - budget) : 0;
   const spare = flex.length && flex.every(x => x.qty >= x.max - 1e-9) ? Math.max(0, Math.round(budget - total)) : 0;
-  const cand = info.map((x, i) => ({ x, i })).filter(({ x }) => !x.free && x.per > 0)
+  // never a food whose amount they set themselves
+  const cand = info.map((x, i) => ({ x, i })).filter(({ x }) => !x.free && x.per > 0 && !x.isLocked)
     .sort((a, b) => rank(a.x) - rank(b.x) || b.x.qty * b.x.per - a.x.qty * a.x.per);
   return {
     items: info.map(x => ({

@@ -69,6 +69,8 @@ suite('portion', () => {
     eq(r.drop, 1);
     // nothing to suggest when going without any one of them still does not fit
     eq(fitMeal(foods, 0).drop, null);
+    // and never the one they set by hand
+    eq(fitMeal(foods, 200, { 1: 1 }).drop === 1, false);
   });
 
   test('a food with no calories and a drink are not shared out', () => {
