@@ -107,9 +107,15 @@ export function renderToday(root) {
     const pat = eatingPattern(st.entries, st.ai_notes, day);
     return (eat ? mealShares5From : mealSharesFrom)(pat.ready ? pat.shares : null);
   };
+  // with reduced kidney function protein is a limit: each meal gets its part of it (fitMeal)
   const budgetFor = m => {
     const st = store.get();
-    return { kcal: mealBudget(asShown(st.entries), day, m, t.kcal, sharesNow()), label: mealLabel(m) };
+    const sh = sharesNow();
+    const all = Object.values(sh).reduce((a, b) => a + b, 0);
+    return {
+      kcal: mealBudget(asShown(st.entries), day, m, t.kcal, sh), label: mealLabel(m),
+      proteinMax: t.proteinMax && all ? Math.round(t.protein * (sh[m] || 0) / all) : null,
+    };
   };
   const standing = m => mealStanding(asShown(store.get().entries), day, m, t.kcal, sharesNow());
   const shownList = asShown(list);

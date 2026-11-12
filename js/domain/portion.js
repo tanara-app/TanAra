@@ -81,7 +81,7 @@ const VEG_G = 100; // a usual helping of a vegetable beside a meal: a tomato, a 
   over (calories past the budget even at the least of each), spare (calories left because every
   food reached its most), drop (index of the food to suggest taking off when over, or null) }.
 */
-export function fitMeal(foods, kcal, locked = {}) {
+export function fitMeal(foods, kcal, locked = {}, { proteinMax = null } = {}) {
   const budget = Math.max(0, Number(kcal) || 0);
   const info = foods.map((f, i) => {
     const role = roleOf(f);
@@ -135,10 +135,28 @@ export function fitMeal(foods, kcal, locked = {}) {
     if (!x) break;
     x.qty = Math.round((x.qty - x.step) * 100) / 100;
   }
+  /*
+    `proteinMax` (reduced kidney function: protein is a limit, targets.js): the meal's part of it.
+    Steps of protein-rich foods come off first while it is past the limit (down to their least
+    helping), and the calories freed go to the other foods below; a protein-rich food is not given
+    a step that takes it past the limit again.
+  */
+  const prot = () => info.reduce((t, x) => t + x.qty * (Number(x.f.protein) || 0), 0);
+  const pOf = y => (Number(y.f.protein) || 0) * y.step;
+  // a food where protein is a good part of the calories (meat, egg, yoghurt): rice or bread only add a little
+  const dense = y => y.per > 0 && (Number(y.f.protein) || 0) * 4 / y.per >= 0.15;
+  if (proteinMax != null) {
+    for (let n = 0; n < 50 && prot() > proteinMax + 0.5; n++) {
+      const x = flex.filter(y => dense(y) && y.qty - y.step >= y.min - 1e-9).sort((a, b) => pOf(b) - pOf(a))[0];
+      if (!x) break;
+      x.qty = Math.round((x.qty - x.step) * 100) / 100;
+    }
+  }
   // and rounding down may have left a step that fits: give it to the food furthest below its part
   for (let n = 0; n < 50; n++) {
     const gap = budget - sum();
-    const x = flex.filter(y => y.qty + y.step <= y.max + 1e-9 && y.step * y.per <= gap + TOL)
+    const x = flex.filter(y => y.qty + y.step <= y.max + 1e-9 && y.step * y.per <= gap + TOL
+      && (proteinMax == null || !dense(y) || prot() + pOf(y) <= proteinMax + 0.5))
       .sort((a, b) => (b.want - b.qty * b.per) - (a.want - a.qty * a.per))[0];
     if (!x) break;
     x.qty = Math.round((x.qty + x.step) * 100) / 100;

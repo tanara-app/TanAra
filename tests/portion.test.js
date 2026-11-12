@@ -95,6 +95,17 @@ suite('portion', () => {
     eq(mealBudget([{ day, meal: 'lunch', kcal: 2500 }], day, 'dinner', 2000), 0);
   });
 
+  test('a protein limit (reduced kidney function) takes protein steps off and gives the calories to the rest', () => {
+    const foods = [seed('برنج سفید (کته یا چلو)'), seed('جوجه‌کباب'), seed('سالاد شیرازی (بدون روغن)')];
+    const free = fitMeal(foods, 600);
+    const r = fitMeal(foods, 600, {}, { proteinMax: 30 });
+    ok(free.protein > 30, `without the limit ${free.protein}`);
+    ok(r.protein <= 30.5, `protein ${r.protein}`);
+    ok(r.items[0].qty > free.items[0].qty, 'more rice instead');
+    // never below the least helping of the protein food, even when that is past the limit
+    eq(fitMeal(foods, 600, {}, { proteinMax: 5 }).items[1].qty, 0.5);
+  });
+
   test('meal standing: an eaten meal keeps its part of the day, an open one gets what is left', () => {
     const day = '2026-11-12';
     const entries = [{ day, meal: 'breakfast', kcal: 370 }, { day, meal: 'lunch', kcal: 900 }];

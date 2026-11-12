@@ -14,13 +14,13 @@
   again around it. The bookmark keeps the foods as a pack (or updates the pack they came from).
 */
 import * as store from '../data/store.js';
-import { MEALS5, mealLabel, baseMeal, frequentFoods } from '../domain/stats.js';
+import { MEALS5, mealLabel, baseMeal, frequentFoods, lastAmountFor } from '../domain/stats.js';
 import { meal5ForNow } from '../domain/meals.js';
 import { GRAM } from '../data/seedFoods.js';
 import { norm, esc, fa, qtyLabel } from '../lib/fa.js';
 import { mealForNow, today } from '../lib/dates.js';
 import { sheet, toast, confirmBox, choose, icon } from './dom.js';
-import { amountLabel, hasGrams } from './units.js';
+import { amountLabel, hasGrams, hasUnit2 } from './units.js';
 import { fitMeal, usualCombos, roleOf, packKey } from '../domain/portion.js';
 import { mealCombos, shortName, libKey } from '../domain/combos.js';
 import { COMBOS } from '../data/combos.js';
@@ -38,6 +38,9 @@ const RESULTS = 40;       // search results shown
 const NUMS = [0.5, 1, 1.5, 2, 3];
 const COUNTS = [1, 2, 3, 4, 5];   // a food counted whole (a walnut, a date)
 const GRAMS = [50, 100, 150, 200, 300];
+// the unit each food was last shown in (a tap on the unit), so it comes back that way: { food id: 'u' | 'u2' | 'g' }
+const UNIT_KEY = 'unit_pref';
+const unitPrefs = () => store.note(UNIT_KEY)?.data || {};
 
 // the packs of a meal: their own (a snack's packs serve both snacks), then suggestions
 function packsFor(day, meal) {
@@ -59,15 +62,16 @@ function packsFor(day, meal) {
 
 export function openEat({ day = today(), meal = null, budgetFor }) {
   let cur = meal || (day === today() ? meal5ForNow(mealForNow()) : 'lunch');
-  let view = 'home';
+  let view_ = 'home';
   let query = '';
   let picked = [];          // the foods ticked (a typed-in one may have no id)
   let from = null;          // the pack the foods came from
   let edited = false;       // its foods changed since
   let why = null;           // the food whose «why» line is open
   let openRow = null;       // the food whose ready numbers are open
+  let editing = false;      // the pencil: amounts can be changed and foods taken off
   const locks = new Map();  // food → amount set by a tap, in its own unit
-  const grams = new Set();  // foods shown in grams
+  const shown = new Map();  // food → the unit it is shown in now: 'u', 'u2' or 'g'
   let unsub = null;
 
   const left = () => Math.max(0, Math.round(budgetFor(cur).kcal));
@@ -75,18 +79,18 @@ export function openEat({ day = today(), meal = null, budgetFor }) {
   const isPicked = f => picked.some(p => p === f || (p.id && p.id === f.id));
 
   sheet.open(body => {
-    unsub = store.subscribe(() => { if (body.isConnected && view === 'plate') drawPlate(); });
+    unsub = store.subscribe(() => { if (body.isConnected && view_ === 'plate') drawPlate(); });
 
     const pickMeal = async () => {
       const v = await choose('وعده', Object.entries(MEALS5).map(([value, label]) => ({ value, label })), cur);
       if (!v || v === cur) return;
       cur = v;
-      view === 'plate' ? drawPlate() : drawHome();
+      view_ === 'plate' ? drawPlate() : drawHome();
     };
 
     /* ----- home: search and packs ----- */
     function drawHome() {
-      view = 'home';
+      view_ = 'home';
       body.innerHTML = `
         <div class="sheet-head">
           <button class="icon-btn" data-close aria-label="بستن">${icon.close}</button>
@@ -206,7 +210,7 @@ export function openEat({ day = today(), meal = null, budgetFor }) {
         const c = packsFor(day, cur).find(x => x.key === p.dataset.pack);
         if (!c) return;
         picked = [...c.foods]; from = c; edited = false;
-        locks.clear(); grams.clear(); openRow = null;
+        locks.clear(); shown.clear(); openRow = null; editing = false;
         return drawPlate();
       }
       if (e.target.closest('[data-new-pack]')) { from = null; const i = body.querySelector('input'); i.focus(); return; }
@@ -239,17 +243,54 @@ export function openEat({ day = today(), meal = null, budgetFor }) {
         const v = await choose(c.name, [{ value: 'hide', label: 'پیشنهاد نکن' }], null);
         if (v === 'hide') hideKey(c.kind === 'starter' ? libKey(c.lib.id) : packKey(c.ids));
       }
-      if (view === 'home') drawHome();
+      if (view_ === 'home') drawHome();
     }
 
-    /* ----- amounts ----- */
+    /* ----- amounts: the app's answer first; the pencil to change it ----- */
+    // the units a food can be shown in, in the order a tap goes through them: its own, grams, its second one
+    // («۱ کفگیر» → «۱۲۰ گرم» → …); the second unit only when half-steps of it can say the same amount
+    // closely (½ بشقاب for one کفگیر of rice would be a quarter more)
+    const u2Close = (f, qty) => {
+      if (!hasUnit2(f) || !(qty > 0)) return false;
+      const exact = qty * Number(f.grams) / Number(f.grams2);
+      const q = Math.max(0.5, Math.round(exact * 2) / 2);
+      return Math.abs(q - exact) / exact <= 0.1;
+    };
+    const modesOf = (f, qty = null) => ['u', f.unit !== GRAM && hasGrams(f) && 'g', (qty == null ? hasUnit2(f) : u2Close(f, qty)) && 'u2'].filter(Boolean);
+    const modeOf = (f, qty) => {
+      const ms = modesOf(f, qty);
+      if (shown.has(f) && ms.includes(shown.get(f))) return shown.get(f);
+      const pref = f.id && unitPrefs()[f.id];
+      if (pref && ms.includes(pref)) return pref;
+      // never chosen: the way they logged it last time
+      const last = f.id && store.get().entries.some(e => e.food_id === f.id) ? lastAmountFor(store.get().entries, f, cur) : null;
+      const m = last?.grams ? 'g' : last?.unit2 ? 'u2' : 'u';
+      return ms.includes(m) ? m : 'u';
+    };
+    // the amount as shown, rounded to what can be measured in that unit, and in the food's own units
+    const view = (f, it) => {
+      const m = modeOf(f, it.qty);
+      const g = Number(f.grams);
+      let q = it.qty, units = it.qty, unit = f.unit;
+      if (m === 'g') { q = Math.max(5, Math.round(it.qty * g / 5) * 5); units = q / g; unit = GRAM; }
+      if (m === 'u2') { q = Math.max(0.5, Math.round(it.qty * g / Number(f.grams2) * 2) / 2); units = q * Number(f.grams2) / g; unit = f.unit2; }
+      const nums = m === 'g' || f.unit === GRAM ? GRAMS : m === 'u' && it.step === 1 ? COUNTS : NUMS;
+      const toUnits = n => (m === 'g' ? n / g : m === 'u2' ? n * Number(f.grams2) / g : n);
+      return { m, q, unit, units, nums, toUnits, kcal: units * (Number(f.kcal) || 0), protein: units * (Number(f.protein) || 0) };
+    };
+    const amountText = (q, unit) => (unit === GRAM ? fa(q) : qtyLabel(q));
+
     function drawPlate() {
-      view = 'plate';
+      view_ = 'plate';
       picked = picked.map(c => (c.id && store.get().foods.find(f => f.id === c.id)) || c);
       for (const k of [...locks.keys()]) if (!picked.includes(k)) locks.delete(k);
-      if (!picked.length) { from = null; return drawHome(); }
-      const budget = left();
-      const r = fitMeal(picked, budget, Object.fromEntries(picked.map((f, i) => [i, locks.get(f)]).filter(([, q]) => q != null)));
+      if (!picked.length) { from = null; editing = false; return drawHome(); }
+      const b = budgetFor(cur);
+      const budget = Math.max(0, Math.round(b.kcal));
+      const r = fitMeal(picked, budget, Object.fromEntries(picked.map((f, i) => [i, locks.get(f)]).filter(([, q]) => q != null)), { proteinMax: b.proteinMax ?? null });
+      const views = picked.map((f, i) => view(f, r.items[i]));
+      const total = views.reduce((t, v) => t + v.kcal, 0);
+      const protein = views.reduce((t, v) => t + v.protein, 0);
       const avoid = avoidOf();
       const ids = [...new Set(picked.map(f => f.id).filter(Boolean))];
       const own = from?.own;
@@ -260,55 +301,61 @@ export function openEat({ day = today(), meal = null, budgetFor }) {
           <button type="button" class="eat-title" data-pick-meal aria-label="وعده‌ی دیگر"><h2>${mealLabel(cur)}</h2>${from ? `<small>${esc(from.name)}</small>` : ''}</button>
           ${ids.length >= 2 ? `<button class="icon-btn" data-keep ${canKeep ? '' : 'disabled'} aria-label="${own ? 'به‌روز کردن بسته' : 'ذخیره به‌عنوان بسته'}">${own ? icon.bookmarkOn : icon.bookmark}</button>` : '<span></span>'}
         </div>
-        <div class="eat-plate">${picked.map((f, i) => {
+        <div class="eat-answer${editing ? ' editing' : ''}">${picked.map((f, i) => {
           const it = r.items[i];
-          const g = grams.has(f) && f.unit !== GRAM && hasGrams(f);
-          const shownQty = g ? Math.round(it.qty * Number(f.grams)) : it.qty;
-          const unit = g ? GRAM : f.unit;
-          const isOpen = openRow === f;
-          const nums = g || f.unit === GRAM ? GRAMS : it.step === 1 ? COUNTS : NUMS;
+          const v = views[i];
           const bad = f.id && avoid(f.id);
-          return `<div class="eat-item${isOpen ? ' open' : ''}">
-            <div class="eat-itop">
-              <button type="button" class="eat-iname" data-row="${i}" aria-expanded="${isOpen}">
-                <b>${esc(shortName(f.name))}${bad ? '<i class="sick-dot"></i>' : ''}</b><small>${it.free ? 'کالری ندارد' : `${fa(Math.round(it.kcal))} کالری`}</small>
+          const more = modesOf(f, it.qty).length > 1;
+          const isOpen = editing && openRow === f;
+          return `<div class="eat-line${locks.has(f) ? ' hand' : ''}${isOpen ? ' open' : ''}">
+            <div class="eat-ltop">
+              ${editing ? `<button type="button" class="eat-x" data-drop="${i}" aria-label="برداشتن ${esc(f.name)}">${icon.close}</button>` : ''}
+              <div class="eat-lname"><b>${esc(shortName(f.name))}${bad ? '<i class="sick-dot"></i>' : ''}</b><small>${it.free ? 'کالری ندارد' : `${fa(Math.round(v.kcal))} کالری`}</small></div>
+              <button type="button" class="eat-q" ${editing ? `data-row="${i}" aria-expanded="${isOpen}"` : more ? `data-unit="${i}" aria-label="${esc(amountLabel(v.q, v.unit))}، واحد دیگر"` : 'disabled'}>
+                <b>${amountText(v.q, v.unit)}</b><small>${esc(v.unit)}${!editing && more ? icon.swap : ''}</small>
               </button>
-              <button type="button" class="eat-amt" data-row="${i}">${unit === GRAM ? fa(shownQty) : qtyLabel(shownQty)} <small>${esc(unit)}</small></button>
-              <button type="button" class="eat-x" data-drop="${i}" aria-label="برداشتن ${esc(f.name)}">${icon.close}</button>
             </div>
-            ${isOpen ? `<div class="eat-nums">${nums.map(n => `<button type="button" class="eat-n${Math.abs(n - shownQty) < 1e-6 ? ' on' : ''}" data-set="${i}" data-n="${n}">${unit === GRAM ? fa(n) : qtyLabel(n)}</button>`).join('')}
-              ${f.unit !== GRAM && hasGrams(f) ? `<button type="button" class="eat-n g${g ? ' on' : ''}" data-grams="${i}">${g ? esc(f.unit) : 'گرم'}</button>` : ''}</div>` : ''}
+            ${isOpen ? `<div class="eat-nums">${v.nums.map(n => `<button type="button" class="eat-n${Math.abs(n - v.q) < 1e-6 ? ' on' : ''}" data-set="${i}" data-n="${n}">${amountText(n, v.unit)}</button>`).join('')}
+              ${more ? `<button type="button" class="eat-n g" data-unit="${i}">${icon.swap}</button>` : ''}</div>` : ''}
           </div>`;
         }).join('')}</div>
-        <div class="eat-total"><span><b>${fa(Math.round(r.total))}</b>${budget ? ` از ${fa(budget)}` : ''} کالری · <b>${fa(Math.round(r.protein))}</b> گرم پروتئین</span>
-          ${locks.size ? `<button type="button" class="icon-btn sm" data-reset aria-label="مقدارهای پیشنهادی">${icon.undo}</button>` : ''}</div>
+        <div class="eat-total"><span><b>${fa(Math.round(total))}</b>${budget ? ` از ${fa(budget)}` : ''} کالری · <b>${fa(Math.round(protein))}</b> گرم پروتئین</span>
+          ${editing && locks.size ? `<button type="button" class="icon-btn sm" data-reset aria-label="مقدارهای اپ">${icon.undo}</button>` : ''}</div>
         ${r.over ? `<p class="small warn-text eat-over">${fa(r.over)} کالری بیشتر${r.drop != null && picked.length > 1 ? `؛ بدون «${esc(shortName(picked[r.drop].name))}» جا می‌شود` : ''}</p>` : ''}
-        <button type="button" class="eat-more" data-more>${icon.plus} خوراکی دیگر</button>
-        <div class="eat-savebar"><button class="btn primary block big" data-save>${picked.length > 1 ? `ثبت ${fa(picked.length)} مورد` : 'ثبت'}</button></div>`;
+        ${editing ? `<button type="button" class="eat-more" data-more>${icon.plus} خوراکی دیگر</button>` : ''}
+        <div class="eat-savebar">
+          <button class="btn primary big grow" data-save>${picked.length > 1 ? `ثبت ${fa(picked.length)} مورد` : 'ثبت'}</button>
+          <button type="button" class="eat-edit${editing ? ' on' : ''}" data-edit aria-label="${editing ? 'تمام' : 'تغییر مقدارها'}" aria-pressed="${editing}">${editing ? icon.check : icon.edit}</button>
+        </div>`;
 
-      body.querySelector('[data-back]').onclick = drawHome;
+      body.querySelector('[data-back]').onclick = () => { editing = false; drawHome(); };
       body.querySelector('[data-pick-meal]').onclick = pickMeal;
-      body.querySelector('[data-more]').onclick = () => { query = ''; drawHome(); body.querySelector('input').focus(); };
+      body.querySelector('[data-edit]').onclick = () => { editing = !editing; openRow = null; drawPlate(); };
+      body.querySelector('[data-more]')?.addEventListener('click', () => { query = ''; editing = false; drawHome(); body.querySelector('input').focus(); });
       body.querySelector('[data-reset]')?.addEventListener('click', () => { locks.clear(); drawPlate(); });
       body.querySelector('[data-keep]')?.addEventListener('click', keep);
-      body.querySelectorAll('[data-row]').forEach(b => b.onclick = () => { const f = picked[Number(b.dataset.row)]; openRow = openRow === f ? null : f; drawPlate(); });
-      body.querySelectorAll('[data-drop]').forEach(b => b.onclick = () => { picked.splice(Number(b.dataset.drop), 1); if (from) edited = true; drawPlate(); });
-      body.querySelectorAll('[data-set]').forEach(b => b.onclick = () => {
-        const f = picked[Number(b.dataset.set)];
-        const n = Number(b.dataset.n);
-        locks.set(f, grams.has(f) && f.unit !== GRAM ? n / Number(f.grams) : n);
+      body.querySelectorAll('[data-row]').forEach(x => x.onclick = () => { const f = picked[Number(x.dataset.row)]; openRow = openRow === f ? null : f; drawPlate(); });
+      // another unit: only how it is shown (and remembered for this food), never the amount
+      body.querySelectorAll('[data-unit]').forEach(x => x.onclick = () => {
+        const i = Number(x.dataset.unit);
+        const f = picked[i];
+        const qty = r.items[i].qty;
+        const ms = modesOf(f, qty);
+        const next = ms[(ms.indexOf(modeOf(f, qty)) + 1) % ms.length];
+        shown.set(f, next);
+        if (f.id) store.saveNote({ key: UNIT_KEY, kind: UNIT_KEY, data: { ...unitPrefs(), [f.id]: next } });
         drawPlate();
       });
-      body.querySelectorAll('[data-grams]').forEach(b => b.onclick = () => {
-        const f = picked[Number(b.dataset.grams)];
-        grams.has(f) ? grams.delete(f) : grams.add(f);
+      body.querySelectorAll('[data-drop]').forEach(x => x.onclick = () => { picked.splice(Number(x.dataset.drop), 1); if (from) edited = true; drawPlate(); });
+      body.querySelectorAll('[data-set]').forEach(x => x.onclick = () => {
+        const i = Number(x.dataset.set);
+        locks.set(picked[i], views[i].toUnits(Number(x.dataset.n)));
         drawPlate();
       });
       body.querySelector('[data-save]').onclick = () => {
         picked.forEach((f, i) => {
-          const it = r.items[i];
-          const g = grams.has(f) && f.unit !== GRAM && hasGrams(f);
-          store.saveEntry({ day, meal: cur, food_id: f.id || null, name: f.name, unit: g ? GRAM : f.unit, qty: g ? Math.round(it.qty * Number(f.grams)) : it.qty, kcal: it.kcal, protein: it.protein, is_veg: !!f.is_veg });
+          const v = views[i];
+          store.saveEntry({ day, meal: cur, food_id: f.id || null, name: f.name, unit: v.unit, qty: v.q, kcal: v.kcal, protein: v.protein, is_veg: !!f.is_veg });
         });
         cheer('entry');
         const n = picked.length;

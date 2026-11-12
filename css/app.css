@@ -398,15 +398,23 @@ dl.calc dd { margin: 0; text-align: left; }
 .eat-bar { position: sticky; bottom: calc(var(--safe-b) + 4px); display: flex; align-items: center; gap: 10px; width: 100%; min-height: 56px; margin-top: -8px; padding: 0 18px; border: 0; border-radius: 16px; background: var(--accent); color: var(--accent-ink); font: inherit; text-align: right; cursor: pointer; box-shadow: 0 8px 24px var(--shadow); }
 .eat-bar b { flex: none; font-weight: 800; }
 .eat-bar span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .85rem; text-align: left; }
-.eat-plate { background: var(--surface-2); border-radius: 18px; padding: 2px 14px; }
-.eat-item + .eat-item { border-top: 1px solid var(--line); }
-.eat-itop { display: flex; align-items: center; gap: 8px; min-height: 64px; }
-.eat-iname { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 1px; border: 0; background: none; color: var(--text); font: inherit; text-align: right; cursor: pointer; padding: 6px 0; }
-.eat-iname b { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
-.eat-iname small { font-size: .78rem; color: var(--muted); }
-.eat-amt { flex: none; min-width: 96px; height: 44px; padding: 0 10px; border-radius: 12px; border: 1.5px solid transparent; background: var(--surface); color: var(--text); font: inherit; font-weight: 800; font-size: 1rem; cursor: pointer; white-space: nowrap; }
-.eat-amt small { font-size: .74rem; color: var(--muted); font-weight: 500; }
-.eat-item.open .eat-amt { border-color: var(--accent); color: var(--accent); }
+.eat-answer { background: var(--surface-2); border-radius: 20px; padding: 2px 16px; }
+.eat-line + .eat-line { border-top: 1px solid var(--line); }
+.eat-ltop { display: flex; align-items: center; gap: 10px; min-height: 76px; }
+.eat-lname { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.eat-lname b { font-size: 1.02rem; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.eat-lname small { font-size: .78rem; color: var(--muted); }
+.eat-q { flex: none; min-width: 92px; display: flex; flex-direction: column; align-items: center; gap: 0; padding: 6px 8px; border: 1.5px solid transparent; border-radius: 14px; background: none; color: var(--accent); font: inherit; cursor: pointer; }
+.eat-q:disabled { cursor: default; opacity: 1; }
+.eat-q b { font-size: 1.85rem; font-weight: 800; line-height: 1.15; }
+.eat-q small { display: inline-flex; align-items: center; gap: 4px; font-size: .76rem; color: var(--muted); }
+.eat-q small svg { width: 12px; height: 12px; }
+.eat-answer.editing .eat-q { background: var(--surface); border-color: var(--line); }
+.eat-line.open .eat-q { border-color: var(--accent); }
+.eat-line.hand .eat-q { color: var(--text); }
+.eat-edit { flex: none; width: 56px; height: 56px; display: grid; place-items: center; border: 0; border-radius: 16px; background: var(--surface-2); color: var(--text); cursor: pointer; }
+.eat-edit.on { background: var(--accent-soft); color: var(--accent); }
+.eat-n.g svg { width: 16px; height: 16px; }
 .eat-x { flex: none; width: 32px; height: 32px; margin-inline-end: -6px; display: grid; place-items: center; border: 0; border-radius: 50%; background: none; color: var(--muted); cursor: pointer; padding: 0; }
 .eat-x svg { width: 18px; height: 18px; }
 .eat-nums { display: flex; gap: 6px; padding: 0 0 14px; }
@@ -419,7 +427,8 @@ dl.calc dd { margin: 0; text-align: left; }
 .eat-over { text-align: center; margin-top: -6px; }
 .eat-more { display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 48px; border-radius: 14px; border: 1px dashed var(--line); background: none; color: var(--muted); font: inherit; cursor: pointer; }
 .eat-more svg { width: 18px; height: 18px; }
-.eat-savebar { position: sticky; bottom: calc(-18px - var(--safe-b)); margin-top: auto; padding: 10px 0 4px; background: var(--surface); }
+.eat-savebar { position: sticky; bottom: calc(-18px - var(--safe-b)); margin-top: auto; padding: 10px 0 4px; background: var(--surface); display: flex; gap: 10px; }
+.eat-savebar .grow { flex: 1; }
 .entry {
   width: 100%; display: grid; grid-template-columns: 1fr auto auto; gap: 10px; align-items: center;
   padding: 10px 0; border: 0; border-top: 1px solid var(--line); background: none; text-align: right; cursor: pointer;
