@@ -192,8 +192,8 @@ export function mealStanding(entries, day, meal, target, shares = MEAL_SHARES) {
 }
 
 // The five meals of the rebuilt «امروز» (meals.js): each snack its own part.
-export const MEAL_SHARES5 = { breakfast: 0.25, snack: 0.1, lunch: 0.3, snack2: 0.1, dinner: 0.25 };
-export const mealShares5From = s => (s ? { breakfast: s.breakfast, snack: s.snack1 || 0, lunch: s.lunch, snack2: s.snack2 || 0, dinner: s.dinner } : MEAL_SHARES5);
+export const MEAL_SHARES5 = { breakfast: 0.25, snack1: 0.1, lunch: 0.3, snack2: 0.1, dinner: 0.25 };
+export const mealShares5From = s => (s ? { breakfast: s.breakfast, snack1: s.snack1 || 0, lunch: s.lunch, snack2: s.snack2 || 0, dinner: s.dinner } : MEAL_SHARES5);
 
 // Plan occasions' shares (pattern.js) per meal.
 export const mealSharesFrom = s => (s ? { breakfast: s.breakfast, lunch: s.lunch, dinner: s.dinner, snack: (s.snack1 || 0) + (s.snack2 || 0) } : MEAL_SHARES);

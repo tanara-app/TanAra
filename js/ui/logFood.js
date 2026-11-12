@@ -21,8 +21,9 @@ import { packs, savePack, askPackName } from './packs.js';
 
 // the rebuilt «امروز» (beta `eat`, REDESIGN.md) has five meals: two snacks
 const fiveOn = () => (store.profile()?.beta || []).includes('eat');
-export const mealSeg = meal => `<div class="seg meal-seg${fiveOn() || meal === 'snack2' ? ' five' : ''}" data-meal>
-  ${Object.entries(fiveOn() || meal === 'snack2' ? MEALS5 : MEALS).map(([k, l]) => `<button type="button" data-v="${k}" class="${k === meal ? 'on' : ''}">${l}</button>`).join('')}
+const five = meal => fiveOn() || meal === 'snack1' || meal === 'snack2';
+export const mealSeg = meal => `<div class="seg meal-seg${five(meal) ? ' five' : ''}" data-meal>
+  ${Object.entries(five(meal) ? MEALS5 : MEALS).map(([k, l]) => `<button type="button" data-v="${k}" class="${k === meal ? 'on' : ''}">${l}</button>`).join('')}
 </div>`;
 
 export function bindMeal(root, set) {

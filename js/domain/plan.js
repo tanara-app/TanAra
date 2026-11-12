@@ -391,12 +391,13 @@ export function slotExtras(entries, picks, off, day, { fast = false } = {}) {
   const lastOf = {};
   keys.forEach(k => { lastOf[SLOTS[k].meal] = k; });
   const out = Object.fromEntries(keys.map(k => [k, []]));
-  // an afternoon snack logged as such ('snack2', meals.js) goes to the afternoon one
+  // a snack logged as the morning or the afternoon one ('snack1' / 'snack2', meals.js) goes there
   entries.filter(e => e.day === day && !planned.has(e.id) && lastOf[baseMeal(e.meal)])
     .sort((x, y) => (x.created_at < y.created_at ? -1 : 1))
     .forEach(e => {
       const m = baseMeal(e.meal);
-      out[SLOTS[off[e.id]]?.meal === m ? off[e.id] : e.meal === 'snack2' && !fast ? 'snack2' : (m === 'snack' && snackSlot(e, fast)) || lastOf[m]].push(e);
+      const named = !fast && (e.meal === 'snack1' || e.meal === 'snack2') ? e.meal : null;
+      out[SLOTS[off[e.id]]?.meal === m ? off[e.id] : named || (m === 'snack' && snackSlot(e, fast)) || lastOf[m]].push(e);
     });
   return out;
 }

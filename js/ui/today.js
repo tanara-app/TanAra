@@ -97,12 +97,10 @@ export function renderToday(root) {
   }
 
   // «سهم وعده»: the meal's calories for today, from what is left of the day
-  // the meals shown: five with `eat` (an old snack placed by the hour it was logged), else four
-  // (an afternoon snack counted as the snack); the entries get the meal they are shown in
+  // the meals shown: five with `eat` (a plain snack placed by the hour it was logged), else four
+  // (either named snack counted as the snack); the entries get the meal they are shown in
   const meals = eat ? MEALS5 : MEALS;
-  // the first day they see five meals is kept: snacks before it were all 'snack' (meals.js)
-  if (eat && !p.fiveFrom) { store.saveProfile({ ...p, fiveFrom: today() }); return; }
-  const asShown = es => es.map(e => (eat ? { ...e, meal: meal5(e, p.fiveFrom) } : e.meal === 'snack2' ? { ...e, meal: baseMeal(e.meal) } : e));
+  const asShown = es => es.map(e => (eat ? { ...e, meal: meal5(e) } : e.meal !== baseMeal(e.meal) ? { ...e, meal: baseMeal(e.meal) } : e));
   const sharesNow = () => {
     const st = store.get();
     const pat = eatingPattern(st.entries, st.ai_notes, day);
