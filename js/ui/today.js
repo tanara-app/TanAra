@@ -22,7 +22,9 @@ import { measureNote, bindMeasureNote } from './measure.js';
 import { checkinCard, bindCheckin } from './checkin.js';
 import { weekCard, bindWeekCard } from './review.js';
 import { greetCard, bindGreet } from './mascot.js';
-import { mealBudget, mealSharesFrom } from '../domain/portion.js';
+import { mealBudget, mealSharesFrom, mealStanding } from '../domain/portion.js';
+import { planAvoid } from '../ai/foodTags.js';
+import { TAG_SAYS } from '../domain/health.js';
 import { packRow, bindPacks } from './packs.js';
 import { mealRowsHtml, bindMealRows, openMeal } from './meal.js';
 import { eatingPattern } from '../domain/pattern.js';
@@ -65,8 +67,11 @@ export function renderToday(root) {
   const beta = (p.beta || []).includes('portion');
   // «یکی» (beta, accounts with `one`): one meal screen in place of the three modes (meal.js)
   const one = (p.beta || []).includes('one');
-  const portionMode = !one && beta && p.mode === 'portion';
-  const planMode = !one && p.mode === 'plan';
+  // the rebuild of «امروز» (REDESIGN.md, beta `eat`, on for nobody yet): no mode tabs; each meal card
+  // shows its share of the day and a line for it, and a dot by a food their illness keeps out
+  const eat = !one && (p.beta || []).includes('eat');
+  const portionMode = !one && !eat && beta && p.mode === 'portion';
+  const planMode = !one && !eat && p.mode === 'plan';
   // '' when no plan covers this day: the ordinary meal list is shown instead
   const plan = planMode ? planHtml(day) : '';
   const counting = !planMode || !!p.planKcal;
@@ -97,6 +102,12 @@ export function renderToday(root) {
     const pat = eatingPattern(st.entries, st.ai_notes, day);
     return { kcal: mealBudget(st.entries, day, m, t.kcal, mealSharesFrom(pat.ready ? pat.shares : null)), label: MEALS[m] };
   };
+  const standing = m => {
+    const st = store.get();
+    const pat = eatingPattern(st.entries, st.ai_notes, day);
+    return mealStanding(st.entries, day, m, t.kcal, mealSharesFrom(pat.ready ? pat.shares : null));
+  };
+  const avoid = eat ? planAvoid() : null;
   root.innerHTML = `
     <header class="day-nav">
       <button class="icon-btn" data-prev aria-label="روز قبل">${icon.chevR}</button>
@@ -107,7 +118,7 @@ export function renderToday(root) {
       <button class="icon-btn" data-next aria-label="روز بعد" ${isToday ? 'disabled' : ''}>${icon.chevL}</button>
     </header>
 
-    ${one ? '' : `<div class="seg mode-seg" data-mode role="tablist" aria-label="حالت">
+    ${one || eat ? '' : `<div class="seg mode-seg" data-mode role="tablist" aria-label="حالت">
       <button type="button" role="tab" data-v="count" aria-selected="${!planMode && !portionMode}" class="${planMode || portionMode ? '' : 'on'}">شمارش کالری</button>
       ${beta ? `<button type="button" role="tab" data-v="portion" aria-selected="${portionMode}" class="${portionMode ? 'on' : ''}">سهم وعده <small>آزمایشی</small></button>` : ''}
       <button type="button" role="tab" data-v="plan" aria-selected="${planMode}" class="${planMode ? 'on' : ''}">رژیم</button>
@@ -150,19 +161,27 @@ export function renderToday(root) {
       ${Object.entries(MEALS).map(([k, label]) => {
         const items = list.filter(e => e.meal === k).sort((a, b) => (a.created_at < b.created_at ? -1 : 1));
         const mt = totals(items);
+        const st = eat ? standing(k) : null;
         return `<div class="meal card">
           <div class="meal-head">
             <h2>${label}</h2>
-            <span class="muted">${items.length ? `${fa(Math.round(mt.kcal))} کالری` : ''}</span>
+            ${st ? (items.length
+              ? `<span class="meal-share"><b class="${st.over ? 'over' : ''}">${fa(st.eaten)}</b> از ${fa(st.share)}</span>`
+              : `<span class="meal-share">${fa(st.share)}</span>`)
+            : `<span class="muted">${items.length ? `${fa(Math.round(mt.kcal))} کالری` : ''}</span>`}
             <button class="icon-btn sm" data-add="${k}" aria-label="افزودن به ${label}">${icon.plus}</button>
           </div>
+          ${st ? `<div class="meal-line" aria-hidden="true"><i class="${st.over ? 'over' : ''}" style="width:${st.share ? Math.min(100, st.eaten / st.share * 100) : st.eaten ? 100 : 0}%"></i></div>` : ''}
           ${portionMode ? packRow(day, k, budgetFor) : ''}
-          ${items.map(e => `
+          ${items.map(e => {
+            const bad = avoid && e.food_id ? avoid(e.food_id) : null;
+            return `
             <button class="entry" data-entry="${e.id}">
-              <span class="ename">${esc(e.name)}${e.is_veg ? ` <i class="veg">${icon.leaf}</i>` : ''}</span>
+              <span class="ename">${esc(e.name)}${e.is_veg ? ` <i class="veg">${icon.leaf}</i>` : ''}${bad ? `<i class="sick-dot" title="${TAG_SAYS[bad]}" aria-label="${TAG_SAYS[bad]}"></i>` : ''}</span>
               <span class="eqty">${amountLabel(Number(e.qty), e.unit)}</span>
               <span class="ekcal">${fa(Math.round(e.kcal))}</span>
-            </button>`).join('')}
+            </button>`;
+          }).join('')}
         </div>`;
       }).join('')}
     </section>` : ''}
@@ -176,7 +195,8 @@ export function renderToday(root) {
   root.querySelector('[data-prev]').onclick = () => { day = addDays(day, -1); renderToday(root); };
   root.querySelector('[data-next]').onclick = () => { if (!isToday) { day = addDays(day, 1); renderToday(root); } };
   root.querySelector('[data-today]')?.addEventListener('click', () => { day = today(); renderToday(root); });
-  const room = portionMode ? { smart: true, budgetFor } : null;
+  // `eat`: until the new meal sheet is built (REDESIGN.md, step 2), «+» opens «چقدر بخورم؟»
+  const room = portionMode || eat ? { smart: true, budgetFor } : null;
   root.querySelector('[data-log]')?.addEventListener('click', () => (one ? openMeal({ day, budgetFor }) : openLogSheet({ day, room })));
   if (one) bindMealRows(root, day, budgetFor);
   root.querySelectorAll('[data-add]').forEach(b => b.onclick = () => openLogSheet({ day, meal: b.dataset.add, room }));

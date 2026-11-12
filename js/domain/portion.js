@@ -179,6 +179,18 @@ export function mealBudget(entries, day, meal, target, shares = MEAL_SHARES) {
   return Math.max(0, Math.round((target - eaten) * (all ? shares[meal] / all : 1)));
 }
 
+/*
+  How a meal stands, for its card on the today screen (the rebuild in REDESIGN.md): what was eaten,
+  and its share of the day. A meal eaten from keeps its own part of the target; a meal not eaten
+  yet gets what is left of the day (mealBudget), so a big lunch shows a smaller dinner. `over`:
+  past the share by more than the rounding of half-unit steps.
+*/
+export function mealStanding(entries, day, meal, target, shares = MEAL_SHARES) {
+  const eaten = Math.round(entries.filter(e => e.day === day && e.meal === meal).reduce((t, e) => t + (Number(e.kcal) || 0), 0));
+  const share = eaten > 0 ? Math.round(target * (shares[meal] || 0)) : mealBudget(entries, day, meal, target, shares);
+  return { eaten, share, over: eaten > share + TOL };
+}
+
 // Plan occasions' shares (pattern.js) per meal.
 export const mealSharesFrom = s => (s ? { breakfast: s.breakfast, lunch: s.lunch, dinner: s.dinner, snack: (s.snack1 || 0) + (s.snack2 || 0) } : MEAL_SHARES);
 

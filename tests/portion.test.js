@@ -1,5 +1,5 @@
 import { suite, test, eq, ok } from './harness.js';
-import { roleOf, fitMeal, mealBudget, usualCombos, mealPacks, packKey, MEAL_SHARES } from '../js/domain/portion.js';
+import { roleOf, fitMeal, mealBudget, mealStanding, usualCombos, mealPacks, packKey, MEAL_SHARES } from '../js/domain/portion.js';
 import { SEED_FOODS } from '../js/data/seedFoods.js';
 
 const seed = name => {
@@ -91,6 +91,16 @@ suite('portion', () => {
     // 600 left for dinner and snack: dinner 0.25 / 0.45 of it
     eq(mealBudget(lunch, day, 'dinner', 2000), Math.round(600 * MEAL_SHARES.dinner / 0.45));
     eq(mealBudget([{ day, meal: 'lunch', kcal: 2500 }], day, 'dinner', 2000), 0);
+  });
+
+  test('meal standing: an eaten meal keeps its part of the day, an open one gets what is left', () => {
+    const day = '2026-11-12';
+    const entries = [{ day, meal: 'breakfast', kcal: 370 }, { day, meal: 'lunch', kcal: 900 }];
+    eq(mealStanding(entries, day, 'breakfast', 2000), { eaten: 370, share: 500, over: false });
+    eq(mealStanding(entries, day, 'lunch', 2000), { eaten: 900, share: 600, over: true });
+    // 730 left for dinner and snack: dinner 0.25 / 0.45 of it
+    eq(mealStanding(entries, day, 'dinner', 2000), { eaten: 0, share: Math.round(730 * 0.25 / 0.45), over: false });
+    eq(mealStanding([{ day, meal: 'breakfast', kcal: 510 }], day, 'breakfast', 2000).over, false, 'within the rounding');
   });
 
   test('usual combos: the same foods together on two days or more', () => {

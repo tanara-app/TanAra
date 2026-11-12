@@ -350,6 +350,14 @@ dl.calc dd { margin: 0; text-align: left; }
 .meal-head { display: flex; align-items: center; gap: 8px; }
 .meal-head h2 { flex: 1; }
 .meal-head .muted { font-size: .85rem; }
+/* the rebuild of «امروز» (REDESIGN.md, beta `eat`): a meal's share, its line, a dot for an illness */
+.meal-share { font-size: .85rem; color: var(--muted); }
+.meal-share b { color: var(--text); font-weight: 800; }
+.meal-share b.over, .meal-line i.over { color: var(--protein); }
+.meal-line { height: 4px; border-radius: 4px; background: var(--surface-2); margin-top: 10px; overflow: hidden; }
+.meal-line i { display: block; height: 100%; border-radius: 4px; background: var(--accent); }
+.meal-line i.over { background: var(--protein); }
+.sick-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--protein); margin-inline-start: 6px; vertical-align: middle; }
 .entry {
   width: 100%; display: grid; grid-template-columns: 1fr auto auto; gap: 10px; align-items: center;
   padding: 10px 0; border: 0; border-top: 1px solid var(--line); background: none; text-align: right; cursor: pointer;
