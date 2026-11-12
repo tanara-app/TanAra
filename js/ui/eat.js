@@ -63,6 +63,9 @@ function packsFor(day, meal) {
 // `start`: foods to begin with (a free food tapped on a meal card); the sheet opens on their amounts
 export function openEat({ day = today(), meal = null, budgetFor, start = null }) {
   let cur = meal || (day === today() ? meal5ForNow(mealForNow()) : 'lunch');
+  // a fasting day has only سحری, افطار and شام: the one for this hour
+  const dayMeals = budgetFor(cur).meals;
+  if (dayMeals && !dayMeals[cur]) { const h = new Date().getHours(); cur = h < 12 ? 'breakfast' : h < 20 ? 'snack2' : 'dinner'; }
   let view_ = 'home';
   let query = '';
   let picked = [];          // the foods ticked (a typed-in one may have no id)
@@ -76,6 +79,8 @@ export function openEat({ day = today(), meal = null, budgetFor, start = null })
   let unsub = null;
 
   const left = () => Math.max(0, Math.round(budgetFor(cur).kcal));
+  // the meal's name as the today screen calls it (سحری and افطار on a fasting day)
+  const labelOf = m => budgetFor(m).label || mealLabel(m);
   const avoidOf = () => planAvoid() || (() => null);
   const isPicked = f => picked.some(p => p === f || (p.id && p.id === f.id));
 
@@ -83,7 +88,7 @@ export function openEat({ day = today(), meal = null, budgetFor, start = null })
     unsub = store.subscribe(() => { if (body.isConnected && view_ === 'plate') drawPlate(); });
 
     const pickMeal = async () => {
-      const v = await choose('وعده', Object.entries(MEALS5).map(([value, label]) => ({ value, label })), cur);
+      const v = await choose('وعده', Object.entries(budgetFor(cur).meals || MEALS5).map(([value, label]) => ({ value, label })), cur);
       if (!v || v === cur) return;
       cur = v;
       view_ === 'plate' ? drawPlate() : drawHome();
@@ -95,7 +100,7 @@ export function openEat({ day = today(), meal = null, budgetFor, start = null })
       body.innerHTML = `
         <div class="sheet-head">
           <button class="icon-btn" data-close aria-label="بستن">${icon.close}</button>
-          <button type="button" class="eat-title" data-pick-meal aria-label="وعده‌ی دیگر"><h2>${mealLabel(cur)}</h2><small>${fa(left())} کالری</small></button>
+          <button type="button" class="eat-title" data-pick-meal aria-label="وعده‌ی دیگر"><h2>${labelOf(cur)}</h2><small>${fa(left())} کالری</small></button>
           <span></span>
         </div>
         <label class="eat-search${query ? ' on' : ''}">
@@ -303,7 +308,7 @@ export function openEat({ day = today(), meal = null, budgetFor, start = null })
       body.innerHTML = `
         <div class="sheet-head">
           <button class="icon-btn" data-back aria-label="برگشت">${icon.chevR}</button>
-          <button type="button" class="eat-title" data-pick-meal aria-label="وعده‌ی دیگر"><h2>${mealLabel(cur)}</h2>${from ? `<small>${esc(from.name)}</small>` : ''}</button>
+          <button type="button" class="eat-title" data-pick-meal aria-label="وعده‌ی دیگر"><h2>${labelOf(cur)}</h2>${from ? `<small>${esc(from.name)}</small>` : ''}</button>
           ${ids.length >= 2 ? `<button class="icon-btn" data-keep ${canKeep ? '' : 'disabled'} aria-label="${own ? 'به‌روز کردن بسته' : 'ذخیره به‌عنوان بسته'}">${own ? icon.bookmarkOn : icon.bookmark}</button>` : '<span></span>'}
         </div>
         <div class="eat-answer${editing ? ' editing' : ''}">${picked.map((f, i) => {

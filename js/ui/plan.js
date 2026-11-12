@@ -189,7 +189,7 @@ function savePicks(day, picks, swaps = swapsOn(notes(), day), off = offOn(notes(
 }
 
 // Fasting or not on a day of Ramadan. Ticks stay; ones made for the other shape show as from an earlier plan.
-function setFast(day, fast) {
+export function setFast(day, fast) {
   const s = store.get();
   savePicks(day, picksOn(s.ai_notes, s.entries, day), undefined, undefined, fast);
 }

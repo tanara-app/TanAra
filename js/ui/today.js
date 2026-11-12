@@ -17,7 +17,9 @@ import { dismissed, dismiss } from './notices.js';
 import { motivationCard, bindMotivation } from './motivation.js';
 import { tipCard, bindTip, occasionCard, bindOccasion } from './aiCards.js';
 import { magCard, bindMag } from './magazine.js';
-import { planHtml, bindPlan } from './plan.js';
+import { planHtml, bindPlan, setFast } from './plan.js';
+import { fastOn } from '../domain/plan.js';
+import { isRamadan } from '../domain/occasions.js';
 import { measureNote, bindMeasureNote } from './measure.js';
 import { checkinCard, bindCheckin } from './checkin.js';
 import { weekCard, bindWeekCard } from './review.js';
@@ -32,6 +34,20 @@ import { freeFoods, shortName } from '../domain/combos.js';
 import { eatingPattern } from '../domain/pattern.js';
 
 let day = today();
+
+// a fasting day of the rebuilt «امروز» (beta `eat`): its three meals and their part of the day
+const FAST_MEALS = { breakfast: 'سحری', snack2: 'افطار', dinner: 'شام' };
+const FAST_SHARES5 = { breakfast: 0.4, snack2: 0.3, dinner: 0.3 };
+const MOON = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg>';
+// what a fasting day asks of some illnesses (the same words as the diet's)
+function fastNotes(conditions) {
+  const has = c => conditions.includes(c);
+  const out = [];
+  if (has('diabetes')) out.push('با دیابت، روزه گرفتن و مقدار داروها را حتماً با پزشکت هماهنگ کن؛ اگر قندت افت کرد یا حالت بد شد روزه را بشکن.');
+  if (has('kidney')) out.push('با کم شدن کارکرد کلیه، روزه گرفتن (و کم‌آبی‌اش) را حتماً با پزشکت هماهنگ کن.');
+  if (has('stones') || has('gout')) out.push(`با ${has('gout') ? 'نقرس' : 'سنگ کلیه'}، کم‌آبیِ روزه خطر ${has('gout') ? 'حمله‌ی نقرس' : 'سنگ'} را بیشتر می‌کند: روزه گرفتن را با پزشکت هماهنگ کن و از افطار تا سحر آب زیاد بنوش.`);
+  return out.map(t => `<p class="note doctor small">${t}</p>`).join('');
+}
 export const setDay = d => { day = d; };
 let moreOpen = false;
 
@@ -101,9 +117,18 @@ export function renderToday(root) {
   // «سهم وعده»: the meal's calories for today, from what is left of the day
   // the meals shown: five with `eat` (a plain snack placed by the hour it was logged), else four
   // (either named snack counted as the snack); the entries get the meal they are shown in
-  const meals = eat ? MEALS5 : MEALS;
-  const asShown = es => es.map(e => (eat ? { ...e, meal: meal5(e) } : e.meal !== baseMeal(e.meal) ? { ...e, meal: baseMeal(e.meal) } : e));
+  /*
+    A fasting day in Ramadan (the moon in the pills row; remembered like the diet's «امروز روزه‌ام»,
+    for the days after too): three meals, سحری in breakfast, افطار in the afternoon snack and شام,
+    with 40 / 30 / 30 of the day. What was logged in another meal that day goes with the nearest one.
+  */
+  const ramadan = eat && isRamadan(day);
+  const fast = ramadan && fastOn(s.ai_notes, day);
+  const meals = fast ? FAST_MEALS : eat ? MEALS5 : MEALS;
+  const fastMeal = m => (m === 'snack1' ? 'breakfast' : m === 'lunch' || m === 'snack' ? 'snack2' : m);
+  const asShown = es => es.map(e => (eat ? { ...e, meal: fast && e.day === day ? fastMeal(meal5(e)) : meal5(e) } : e.meal !== baseMeal(e.meal) ? { ...e, meal: baseMeal(e.meal) } : e));
   const sharesNow = () => {
+    if (fast) return FAST_SHARES5;
     const st = store.get();
     const pat = eatingPattern(st.entries, st.ai_notes, day);
     return (eat ? mealShares5From : mealSharesFrom)(pat.ready ? pat.shares : null);
@@ -114,7 +139,7 @@ export function renderToday(root) {
     const sh = sharesNow();
     const all = Object.values(sh).reduce((a, b) => a + b, 0);
     return {
-      kcal: mealBudget(asShown(st.entries), day, m, t.kcal, sh), label: mealLabel(m),
+      kcal: mealBudget(asShown(st.entries), day, m, t.kcal, sh), label: meals[m] || mealLabel(m), meals,
       proteinMax: t.proteinMax && all ? Math.round(t.protein * (sh[m] || 0) / all) : null,
     };
   };
@@ -162,11 +187,13 @@ export function renderToday(root) {
     </section>` : ''}
 
     <div class="pills">
+      ${ramadan ? `<button type="button" class="pill fast-pill${fast ? ' on' : ''}" data-fast aria-pressed="${fast}" aria-label="${isToday ? 'امروز' : 'این روز'} روزه‌ام">${MOON}</button>` : ''}
       <div class="pill">${icon.leaf}<span>سبزی ${isToday ? 'امروز' : ''}: <b>${qtyLabel(Math.round(tot.veg * 2) / 2)}</b> وعده</span></div>
       <div class="pill"><span>این هفته <b>${fa(logged)}</b> روز ثبت کرده‌اید${lightOn(p, sortedWeights(s.weights), today()) ? ' · ثبت سبک' : ''}</span></div>
       ${t.phase !== 'loss' ? `<div class="pill"><span>مرحله: <b>${phaseLabel(p, day)}</b></span></div>` : ''}
     </div>
 
+    ${fast ? fastNotes(p.conditions || []) : ''}
     ${notices.map(n => `<div class="note ${n.cls || 'soft'}" data-notice="${n.key}" data-mark="${n.mark}">${n.html}${n.keep ? '' : '<button class="link small" data-dismiss>باشه</button>'}</div>`).join('')}
 
     ${isToday ? greetCard() : ''}
@@ -217,6 +244,7 @@ export function renderToday(root) {
   const room = portionMode ? { smart: true, budgetFor } : null;
   root.querySelector('[data-log]')?.addEventListener('click', () => (one ? openMeal({ day, budgetFor }) : eat ? openEat({ day, budgetFor }) : openLogSheet({ day, room })));
   if (one) bindMealRows(root, day, budgetFor);
+  root.querySelector('[data-fast]')?.addEventListener('click', () => setFast(day, !fast));
   root.querySelectorAll('[data-free]').forEach(b => b.onclick = () => {
     const f = store.get().foods.find(x => x.id === b.dataset.free);
     if (f) openEat({ day, meal: b.dataset.freeMeal, budgetFor, start: [f] });

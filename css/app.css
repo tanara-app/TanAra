@@ -359,6 +359,8 @@ dl.calc dd { margin: 0; text-align: left; }
 .meal-line { height: 4px; border-radius: 4px; background: var(--surface-2); margin-top: 10px; overflow: hidden; }
 .meal-line i { display: block; height: 100%; border-radius: 4px; background: var(--accent); }
 .meal-line i.over { background: var(--protein); }
+.fast-pill { width: 36px; padding: 0; justify-content: center; border: 1px dashed var(--line); background: none; color: var(--muted); cursor: pointer; }
+.fast-pill.on { border-color: transparent; background: var(--accent-soft); color: var(--accent); }
 .sick-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--protein); margin-inline-start: 6px; vertical-align: middle; }
 /* the meal sheet of the rebuilt «امروز» (ui/eat.js) */
 .eat-title { grid-column: 2; display: flex; flex-direction: column; align-items: center; min-width: 0; border: 0; background: none; color: var(--text); font: inherit; cursor: pointer; padding: 2px 0; }
