@@ -4,7 +4,7 @@
   puts it somewhere else, and that order is kept in the profile (profile.toolsOrder), so it is
   the same on every device of that member. «تمام» (or a tap outside the tiles) ends arranging.
 
-  Tiles: «تازه‌ها» (the app's changes, #/news), the family shopping list, the food bank, its recipes, the magazine (its own page,
+  Tiles: the family shopping list, the food bank, its recipes, the magazine (its own page,
   #/mag), and for the app owner «غذاهای تازه‌ی خانواده».
 */
 import * as store from '../data/store.js';
@@ -16,11 +16,9 @@ import { openFoodBank, openRecipes } from './foodBank.js';
 import { shareAdmin, checkShare, openFoodShare } from './foodShare.js';
 import { drawPreview } from './gameArt.js';
 import { KINDS } from '../domain/game.js';
-import { unread, NEWS_ICON, setToolOpener } from './news.js';
 
 const again = () => { const v = document.querySelector('#view .tools'); if (v) renderTools(v.parentElement); };
 const TOOLS = {
-  news: { label: 'تازه‌ها', svg: NEWS_ICON, badge: () => unread().length, open: () => { location.hash = '#/news'; } },
   shop: { label: 'لیست خرید', badge: () => toBuy(shopping()).length, open: () => openShopping() },
   bank: { label: 'بانک غذا', open: () => openFoodBank() },
   recipes: { label: 'رسپی‌ها', open: () => openRecipes() },
@@ -38,8 +36,6 @@ function order() {
 
 let arranging = false;
 
-setToolOpener(k => TOOLS[k]?.open());
-
 export function renderTools(root) {
   checkShare(again);
   const keys = order();
@@ -53,7 +49,7 @@ export function renderTools(root) {
         ${keys.map(k => {
           const t = TOOLS[k], n = t.badge?.() || 0;
           return `<button class="tool" data-tool="${k}" aria-label="${t.label}${n ? `، ${fa(n)} مورد` : ''}">
-            <span class="tool-ic">${t.art ? `<canvas data-art="${t.art}"></canvas>` : t.svg ? `<i class="tool-svg">${t.svg}</i>` : `<img src="img/tools/${k}.webp" alt="" draggable="false">`}${n ? `<b class="tool-badge">${fa(n)}</b>` : ''}</span>
+            <span class="tool-ic">${t.art ? `<canvas data-art="${t.art}"></canvas>` : `<img src="img/tools/${k}.webp" alt="" draggable="false">`}${n ? `<b class="tool-badge">${fa(n)}</b>` : ''}</span>
             <span class="tool-name">${t.label}${t.beta ? '<small>آزمایشی</small>' : ''}</span>
           </button>`;
         }).join('')}
