@@ -480,14 +480,11 @@ button.pval:active { background: var(--surface-2); }
 .mr-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .mr-text b { font-size: 1.02rem; }
 .mr-text small { color: var(--muted); font-size: .8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.mr-kcal { flex: none; font-weight: 800; min-width: 44px; text-align: center; }
-.mr-kcal.open { font-weight: 600; font-size: .85rem; color: var(--muted); padding: 3px 10px; border: 1px dashed var(--line); border-radius: 999px; min-width: 0; }
-.mr-go { flex: none; display: flex; color: var(--muted); }
-.mr-go svg { width: 18px; height: 18px; }
+.mr-kcal { flex: none; font-weight: 800; font-size: 1.02rem; text-align: left; }
+.mr-kcal.open { font-weight: 500; color: var(--muted); }
 
 .meal-title { grid-column: 2; display: flex; flex-direction: column; align-items: center; gap: 0; border: 0; background: none; color: var(--text); font: inherit; cursor: pointer; padding: 2px 0; min-width: 0; }
-.meal-title h2 { display: inline-flex; align-items: center; gap: 4px; font-size: 1.1rem; }
-.meal-title h2 .chev-d { width: 16px; height: 16px; color: var(--muted); }
+.meal-title h2 { font-size: 1.1rem; }
 .meal-title small { color: var(--muted); font-size: .78rem; }
 .logged { background: var(--surface-2); border-radius: 14px; padding: 0 12px; }
 .logged .entry:first-of-type { margin-top: 0; border-top: 0; }
@@ -508,14 +505,14 @@ button.pval:active { background: var(--surface-2); }
 .food-row.on .fname { color: var(--accent); }
 .fcheck { position: absolute; left: 6px; top: 50%; transform: translateY(-50%); color: var(--accent); display: flex; }
 .meal-foot { display: flex; flex-direction: column; gap: 8px; }
-.meal-foot .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.meal-foot .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; white-space: nowrap; }
+.meal-foot .custom-btn { flex: 2; }
 .plate-bar {
   display: flex; align-items: center; gap: 10px; width: 100%; min-height: 50px; padding: 0 16px; border: 0; border-radius: 14px;
   background: var(--accent); color: var(--accent-ink); font: inherit; font-weight: 700; cursor: pointer; text-align: right;
 }
 .pb-names { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.pb-go { flex: none; display: inline-flex; align-items: center; gap: 2px; }
-.pb-go svg { width: 18px; height: 18px; }
+.pb-go { flex: none; padding: 5px 12px; border-radius: 999px; background: rgba(255,255,255,.18); font-size: .88rem; }
 .plate-name { margin: -4px 0 0; text-align: center; font-weight: 700; color: var(--muted); font-size: .9rem; }
 .pname { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-width: 0; border: 0; background: none; color: var(--text); font: inherit; text-align: right; cursor: pointer; padding: 0; }
 .pname b { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

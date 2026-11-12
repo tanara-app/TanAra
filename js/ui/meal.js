@@ -50,7 +50,6 @@ export function mealRowsHtml(day, budgetFor) {
     <button type="button" class="mrow" data-open-meal="${r.meal}">
       <span class="mr-text"><b>${r.label}</b>${r.names.length ? `<small>${r.names.map(esc).join('، ')}</small>` : ''}</span>
       ${r.items.length ? `<span class="mr-kcal">${fa(Math.round(r.kcal))}</span>` : r.budget > 0 ? `<span class="mr-kcal open" aria-label="${fa(r.budget)} کالری جا دارد">${fa(r.budget)}</span>` : ''}
-      <span class="mr-go">${icon.chevL}</span>
     </button>`).join('')}
   </section>`;
 }
@@ -95,7 +94,7 @@ export function openMeal({ day = today(), meal = null, budgetFor }) {
       <div class="sheet-head">
         ${start}
         <button type="button" class="meal-title" data-pick-meal aria-label="وعده‌ی دیگر">
-          <h2>${MEALS[cur]}${icon.chevD}</h2>${kcal ? `<small>${fa(left())} کالری</small>` : ''}
+          <h2>${MEALS[cur]}</h2>${kcal ? `<small>${fa(left())} کالری</small>` : ''}
         </button>
         ${end}
       </div>`;
@@ -116,11 +115,11 @@ export function openMeal({ day = today(), meal = null, budgetFor }) {
         <div class="search">${icon.search}<input type="search" placeholder="جست‌وجو" value="${esc(query)}" autocomplete="off" aria-label="جست‌وجوی غذا یا ترکیب"></div>
         <div class="meal-list"></div>
         <div class="sheet-foot meal-foot">
-          ${chosen.length ? `<button class="plate-bar" data-plate><span class="pb-names">${chosen.map(c => esc(shortName(c.name))).join('، ')}</span><span class="pb-go">${fa(chosen.length)}${icon.chevL}</span></button>` : ''}
+          ${chosen.length ? `<button class="plate-bar" data-plate><span class="pb-names">${chosen.map(c => esc(shortName(c.name))).join('، ')}</span><span class="pb-go">مقدارها</span></button>` : ''}
           <div class="row gap">
             ${aiAvailable() ? `<button class="btn grow" data-via="photo" aria-label="عکس">${cameraIcon}</button>` : ''}
             <button class="btn grow" data-via="scan" aria-label="بارکد">${barcodeIcon}</button>
-            <button class="btn grow" data-via="custom">${icon.edit} غذای دلخواه</button>
+            <button class="btn grow custom-btn" data-via="custom">${icon.edit} غذای دلخواه</button>
           </div>
         </div>`;
       const list = body.querySelector('.meal-list');
