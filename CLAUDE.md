@@ -59,6 +59,11 @@ one needs to know goes in this file or in the project docs, not only in your own
 - Anything that only some members have (a beta in `profile.beta`, not yet released to everyone) carries the word
   «آزمایشی» next to its name where it is opened (e.g. «سهم وعده آزمایشی» in its tab, «سرزمین» with «آزمایشی» under
   its tile in «بیشتر»). The user asked for this on 2026-11-12. Remove the word when it is released to all.
+- «تازه‌ها» (`js/data/news.js`): every change members can see gets an entry there in the same commit, newest
+  first: a short title and at most one line, with `go` or `tool` so the card opens it. Show the user the exact
+  text before pushing; they approve every word. Nothing that is still «آزمایشی» (a beta) goes in; it gets its
+  entry when it opens to everyone. `big: true` (it also pops up once as a sheet) only when the user says so.
+  Fixes behind the scenes (tests, docs, server-only) don't get one. The user asked for this on 2026-11-12.
 - Build only what the user agreed to. When a reply could mean more than one of the options you offered,
   ask which ones before building (on 2026-11-08 a shared «team goal» was built that the user hadn't asked for).
 

@@ -19,6 +19,7 @@ import './family.test.js';
 import './portion.test.js';
 import './chatText.test.js';
 import './game.test.js';
+import './news.test.js';
 
 const results = await run();
 const failed = results.filter(r => !r.ok);
