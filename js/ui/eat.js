@@ -21,7 +21,7 @@ import { norm, esc, fa, qtyLabel, parseNum } from '../lib/fa.js';
 import { mealForNow, today } from '../lib/dates.js';
 import { sheet, toast, confirmBox, choose, icon } from './dom.js';
 import { amountLabel, hasGrams, hasUnit2 } from './units.js';
-import { fitMeal, usualCombos, roleOf, packKey } from '../domain/portion.js';
+import { fitMeal, usualCombos, roleOf, packKey, usualAmounts } from '../domain/portion.js';
 import { mealCombos, shortName, libKey, freeFoods } from '../domain/combos.js';
 import { COMBOS } from '../data/combos.js';
 import { packs, savePack, askPackName, deletePack, hideKey, hidden } from './packs.js';
@@ -303,7 +303,7 @@ export function openEat({ day = today(), meal = null, budgetFor, start = null })
       if (!picked.length) { from = null; editing = false; return drawHome(); }
       const b = budgetFor(cur);
       const budget = Math.max(0, Math.round(b.kcal));
-      const r = fitMeal(picked, budget, Object.fromEntries(picked.map((f, i) => [i, locks.get(f)]).filter(([, q]) => q != null)), { proteinMax: b.proteinMax ?? null });
+      const r = fitMeal(picked, budget, Object.fromEntries(picked.map((f, i) => [i, locks.get(f)]).filter(([, q]) => q != null)), { proteinMax: b.proteinMax ?? null, usual: usualAmounts(store.get().entries, store.get().foods, day) });
       const views = picked.map((f, i) => view(f, r.items[i]));
       const total = views.reduce((t, v) => t + v.kcal, 0);
       const protein = views.reduce((t, v) => t + v.protein, 0);

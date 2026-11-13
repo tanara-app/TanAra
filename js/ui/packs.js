@@ -6,7 +6,7 @@
   or turns down a suggestion. Stored in ai_notes: `pack:<id>` (kind 'pack') and `pack_hide`.
 */
 import * as store from '../data/store.js';
-import { fitMeal, usualCombos, mealPacks, packKey } from '../domain/portion.js';
+import { fitMeal, usualCombos, mealPacks, packKey, usualAmounts } from '../domain/portion.js';
 import { esc, fa } from '../lib/fa.js';
 import { sheet, toast, confirmBox, choose, icon } from './dom.js';
 import { amountLabel } from './units.js';
@@ -79,7 +79,7 @@ export function packRow(day, meal, budgetFor) {
   let quick = '';
   if (cur) {
     const foods = foodsOf(cur.ids);
-    const r = fitMeal(foods, budgetFor(meal).kcal);
+    const r = fitMeal(foods, budgetFor(meal).kcal, {}, { usual: usualAmounts(store.get().entries, store.get().foods, day) });
     quick = `<div class="pack-quick">
       <p>${foods.map((f, i) => `<b>${amountLabel(r.items[i].qty, f.unit)}</b> ${esc(f.name)}`).join(' · ')}</p>
       <div class="pq-row"><span class="muted small grow">${fa(Math.round(r.total))} کالری</span>
@@ -152,7 +152,7 @@ export function bindPacks(root, { day, budgetFor, redraw, edit }) {
     quick.querySelector('[data-pack-edit]').onclick = () => { open = null; edit(meal, foodsOf(c.ids), c.pack?.id || null); };
     quick.querySelector('[data-pack-log]').onclick = () => {
       const foods = foodsOf(c.ids);
-      const r = fitMeal(foods, budgetFor(meal).kcal);
+      const r = fitMeal(foods, budgetFor(meal).kcal, {}, { usual: usualAmounts(store.get().entries, store.get().foods, day) });
       foods.forEach((f, i) => {
         const it = r.items[i];
         store.saveEntry({ day, meal, food_id: f.id, name: f.name, unit: f.unit, qty: it.qty, kcal: it.kcal, protein: it.protein, is_veg: !!f.is_veg });

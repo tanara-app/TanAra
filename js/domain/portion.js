@@ -2,18 +2,19 @@
   «سهم وعده» (beta): they eat what they like; they pick the foods of a meal and the app says how
   much of each fits. Pure functions — no DOM, no storage, no AI, so it costs nothing.
 
-  Sharing the calories out equally (portionsFor in plan.js) gives as many calories of cheese as of
-  watermelon, so more cheese than a meal wants and a sliver of fruit. Here every food has a role on
-  the plate (roleOf), worked out from its category and its own numbers, so the user's own foods
-  get one too. A role has a weight (its part of the meal when present) and a sensible helping in
-  grams: vegetables and fruit may grow big (much food for few calories), protein keeps its part,
-  and spreads, nuts, sweets and rich foods like cheese stay small whatever is left.
+  Sharing the calories out by kind of food gave as many calories of ارده as of شیره خرما, so half as
+  many grams of the denser one. Here every food starts from a usual helping (theirs from their own
+  history, else the app's, data/usual.js) and the whole plate is scaled to the meal's calories, each
+  kind stretching as much as it does on a real plate (fitMeal). Every food also has a role on the
+  plate (roleOf), worked out from its category and its own numbers, so their own foods get one too:
+  it sets how far the food stretches and its absolute limits.
 */
 import { addDays } from '../lib/dates.js';
 import { GRAM } from '../data/seedFoods.js';
+import { USUAL } from '../data/usual.js';
 
-// w: part of the meal. g: [least, most] grams in one meal. units: the same when a unit's weight
-// is unknown. step: rounding, in units (a small one, like a walnut, is counted whole).
+// g: [least, most] grams in one meal, whatever the usual helping. units: the same when a unit's
+// weight is unknown. (w: the old share of the meal, no longer used by fitMeal.)
 export const ROLES = {
   main: { label: 'غذای اصلی', w: 4, g: [150, 450], units: [0.5, 3] },
   protein: { label: 'پروتئین', w: 3, g: [50, 250], units: [0.5, 3] },
@@ -46,7 +47,7 @@ export function roleOf(f) {
     case 'protein': return 'protein';
     case 'drink': return 'drink';
     case 'sweet': return 'treat';
-    case 'nuts': return 'fat';
+    case 'nuts': return d != null && d < 3.6 ? 'fruit' : 'fat'; // a date or a raisin is eaten like fruit; a walnut is not
   }
   // breakfast, dairy, other and the user's own foods: from the numbers
   if (kcal <= 0) return 'veg';
@@ -58,7 +59,7 @@ export function roleOf(f) {
   return 'main';
 }
 
-// One food's limits and step, in its own unit.
+// One food's least and most in a meal (absolute, whatever its usual helping) and its step, in its own unit.
 function limits(f, role) {
   const R = ROLES[role];
   const g = gramsOf(f);
@@ -72,16 +73,87 @@ function limits(f, role) {
 
 const roundTo = (x, step) => Math.round(x / step) * step;
 const TOL = 15; // calories
-const VEG_G = 100; // a usual helping of a vegetable beside a meal: a tomato, a cucumber, half a bowl of salad
+
+/*
+  How much a food stretches when the meal's calories are more or less than its usual plate
+  (the helping goes as s^e when the plate is scaled by s): the dish, rice and bread carry the meal,
+  protein and yoghurt follow a little less, fruit half as much, and a spread, nuts or a sweet only a
+  little: two spoons of ارده stay about two spoons in a big breakfast. Vegetables and drinks keep
+  their usual helping beside a meal (a meal of vegetables only still scales them).
+*/
+const STRETCH = { main: 1, starch: 1, protein: 0.8, dairy: 0.6, fruit: 0.5, rich: 0.45, fat: 0.35, treat: 0.35, veg: 0, drink: 0 };
+// …and when the meal is smaller than its usual plate, everything shrinks nearly together: less bread
+// is eaten with less ارده, so a spread does not stay put while the bread goes.
+const SHRINK = { main: 1, starch: 1, protein: 0.9, dairy: 0.9, fruit: 0.8, rich: 1, fat: 1, treat: 1, veg: 0, drink: 0 };
+// How far from its usual helping a food may go, as a part of it (inside the absolute limits too).
+const RANGE = { main: [0.34, 3], starch: [0.25, 3], protein: [0.4, 2.5], dairy: [0.4, 2], fruit: [0.5, 2], rich: [0.5, 2], fat: [0.5, 2], treat: [0.5, 2], veg: [0.5, 3], drink: [1, 1] };
+// A usual helping in grams for a food weighed in grams (no unit to go by).
+const USUAL_G = { main: 250, starch: 150, protein: 120, dairy: 200, rich: 30, fruit: 150, veg: 100, fat: 15, treat: 40, drink: 200 };
+
+/*
+  A food's usual helping in one meal, in its own unit: theirs when they have logged it at least twice
+  (`usual`: food id → amount, usualAmounts), else the app's for a starter food (data/usual.js), else
+  from its unit: one spoon, glass, bowl, slice or piece (three of something small like a date), a
+  کفگیر and a half of rice, two palms of bread.
+*/
+export function usualHelping(f, role, usual = null) {
+  const own = f.id && usual?.get?.(f.id);
+  if (own > 0) return own;
+  if (USUAL[f.name] > 0) return USUAL[f.name];
+  if (f.unit === GRAM) return USUAL_G[role] || 100;
+  const g = gramsOf(f);
+  if (f.unit === 'عدد' && g && g <= 15) return role === 'treat' ? 2 : 3;
+  if (f.unit === 'کفگیر') return role === 'main' || role === 'starch' ? 1.5 : 1;
+  if (f.unit === 'کف‌دست' && role === 'starch') return 2;
+  if (f.unit === 'قاشق چای‌خوری') return 2;
+  return 1;
+}
+
+/*
+  Their usual amount of each food they have logged at least twice in the last `days`: the middle one
+  of their amounts, in the food's own unit (an amount in grams or in its second unit is turned back).
+  food id → amount.
+*/
+export function usualAmounts(entries, foods, day, { days = 120 } = {}) {
+  const from = addDays(day, -days);
+  const byId = new Map(foods.map(f => [f.id, f]));
+  const seen = new Map();
+  for (const e of entries) {
+    const f = e.food_id && byId.get(e.food_id);
+    if (!f || e.day < from || e.day > day) continue;
+    const q = Number(e.qty) || 0;
+    const g = Number(f.grams);
+    let u = null;
+    if (e.unit === f.unit) u = q;
+    else if (e.unit === GRAM && g > 0) u = q / g;
+    else if (f.unit2 && e.unit === f.unit2 && g > 0) u = q * Number(f.grams2) / g;
+    if (u > 0) (seen.get(f.id) || seen.set(f.id, []).get(f.id)).push(u);
+  }
+  const out = new Map();
+  for (const [id, qs] of seen) {
+    if (qs.length < 2) continue;
+    qs.sort((a, b) => a - b);
+    out.set(id, qs[Math.floor((qs.length - 1) / 2)]);
+  }
+  return out;
+}
 
 /*
   How much of each food to eat, together, in `kcal` calories.
-  `locked` ({ index: qty }): amounts the user set with + / −; the rest is shared out around them.
-  Returns { items: [{ qty, kcal, protein, role, free, locked, atMax, atMin }], total, protein,
+
+  Every food starts from its usual helping (usualHelping) and the plate is scaled to the calories:
+  each by s^STRETCH[role], with s found by halving, so the foods keep natural proportions to each
+  other however big or small the meal is. Each stays inside RANGE of its usual helping and inside
+  its role's absolute limits. Then the amounts are rounded to measurable steps, and a step is taken
+  off or given where it moves a food least from where it would be.
+
+  `locked` ({ index: qty }): amounts set by hand; the rest is fitted around them.
+  `usual`: their own usual amounts (usualAmounts). `proteinMax`: a protein limit for the meal.
+  Returns { items: [{ qty, kcal, protein, role, free, locked, step, atMax, atMin }], total, protein,
   over (calories past the budget even at the least of each), spare (calories left because every
-  food reached its most), drop (index of the food to suggest taking off when over, or null) }.
+  food reached its most), drop (index of a food whose going makes the meal fit, or null) }.
 */
-export function fitMeal(foods, kcal, locked = {}, { proteinMax = null } = {}) {
+export function fitMeal(foods, kcal, locked = {}, { proteinMax = null, usual = null } = {}) {
   const budget = Math.max(0, Number(kcal) || 0);
   const info = foods.map((f, i) => {
     const role = roleOf(f);
@@ -89,49 +161,44 @@ export function fitMeal(foods, kcal, locked = {}, { proteinMax = null } = {}) {
     const lim = limits(f, role);
     const isLocked = locked[i] != null;
     const free = per <= 0;
+    const base = usualHelping(f, role, usual);
+    const [lo, hi] = RANGE[role];
+    // the food's own range, from its usual helping, inside the absolute limits
+    // the least is from its usual helping (8 dates are not «at least 80 grams of fruit»), never under a step
+    const min = Math.max(lim.step, Math.min(lim.max, roundTo(base * lo, lim.step) || lim.step));
+    const max = Math.max(min, Math.min(lim.max, Math.floor(base * hi / lim.step) * lim.step));
     const fixed = isLocked || free || role === 'drink';
-    const qty = isLocked ? Number(locked[i]) : free ? (f.unit === GRAM ? 100 : 1) : role === 'drink' ? (f.unit === GRAM ? 200 : 1) : 0;
-    return { f, role, per, ...lim, fixed, free, isLocked, qty };
+    const qty = isLocked ? Number(locked[i]) : free || role === 'drink' ? base : 0;
+    return { f, role, per, step: lim.step, min, max, base, e: STRETCH[role], eDown: SHRINK[role], fixed, free, isLocked, qty };
   });
-  /*
-    Beside a food that carries the meal, a vegetable gets a usual helping (VEG_G) and the
-    calories go to the rest: shared by calories, a salad or herbs took what the stew left and
-    grew to four tomatoes or nine handfuls of herbs. A meal of vegetables only still fills up.
-  */
-  if (info.some(x => !x.fixed && x.role !== 'veg')) {
-    for (const x of info) {
-      if (x.fixed || x.role !== 'veg') continue;
-      const g = gramsOf(x.f);
-      const want = g ? VEG_G / g : 1;
-      x.qty = Math.min(x.max, Math.max(x.min, roundTo(want, x.step)));
-      x.fixed = true;
-    }
+  // beside a food that carries the meal, a vegetable keeps its usual helping (it never fills the
+  // calories left: that gave two bowls of salad or three tomatoes); a meal of vegetables only scales them
+  const carried = info.some(x => !x.fixed && x.e > 0);
+  for (const x of info) {
+    if (x.fixed || x.e > 0) continue;
+    if (carried) { x.qty = Math.min(x.max, Math.max(x.min, roundTo(x.base, x.step))); x.fixed = true; } else { x.e = 1; x.eDown = 1; }
   }
+
   const flex = info.filter(x => !x.fixed);
-  let room = budget - info.filter(x => x.fixed).reduce((t, x) => t + x.qty * x.per, 0);
-
-  // shares by weight; a food that hits a limit keeps it and the rest is shared again
+  const room = budget - info.filter(x => x.fixed).reduce((t, x) => t + x.qty * x.per, 0);
   const clampQ = (x, q) => Math.min(x.max, Math.max(x.min, q));
-  let open = [...flex];
-  let left = room;
-  for (let n = 0; n < 12 && open.length; n++) {
-    const W = open.reduce((t, x) => t + ROLES[x.role].w, 0);
-    let moved = false;
-    for (const x of open) x.qty = (left * ROLES[x.role].w / W) / x.per;
-    const out = open.filter(x => x.qty < x.min || x.qty > x.max);
-    if (!out.length) break;
-    for (const x of out) { x.qty = clampQ(x, x.qty); moved = true; }
-    open = open.filter(x => !out.includes(x));
-    left = room - flex.filter(x => !open.includes(x)).reduce((t, x) => t + x.qty * x.per, 0);
-    if (!moved) break;
-  }
-  for (const x of flex) { x.want = x.qty * x.per; x.qty = clampQ(x, roundTo(x.qty, x.step)); }
+  const grow = (x, s) => x.base * s ** (s >= 1 ? x.e : x.eDown);
+  const at = s => flex.reduce((t, x) => t + clampQ(x, grow(x, s)) * x.per, 0);
+  // the scale that fills the room: more calories as it grows, so halving finds it
+  let lo = 0.02, hi = 50;
+  for (let n = 0; n < 60; n++) { const mid = Math.sqrt(lo * hi); if (at(mid) > room) hi = mid; else lo = mid; }
+  const s = Math.sqrt(lo * hi);
+  for (const x of flex) { x.target = clampQ(x, grow(x, s)); x.qty = clampQ(x, roundTo(x.target, x.step)); }
 
-  // rounding up may have gone past the budget: take a step off the least needed, while it can
   const sum = () => info.reduce((t, x) => t + x.qty * x.per, 0);
-  const rank = x => DROP_ORDER.indexOf(x.role);
+  // how far a food would be from where it should be after a step (relative, so a spoon and a bowl compare)
+  const off = (x, q) => Math.abs(q - x.target) / Math.max(x.target, x.step);
+  // on a tie, a step comes off the spread before the bread, and goes to the bread before the spread
+  const prefer = (a, b, dir) => (off(a, a.qty + dir * a.step) - off(a, a.qty)) - (off(b, b.qty + dir * b.step) - off(b, b.qty))
+    || (dir < 0 ? a.e - b.e : b.e - a.e);
+  // rounding up went past the budget: a step off where it moves a food least from its place
   for (let n = 0; n < 50 && sum() > budget + TOL; n++) {
-    const x = flex.filter(y => y.qty - y.step >= y.min - 1e-9).sort((a, b) => rank(a) - rank(b) || b.per - a.per)[0];
+    const x = flex.filter(y => y.qty - y.step >= y.min - 1e-9 && y.per > 0).sort((a, b) => prefer(a, b, -1))[0];
     if (!x) break;
     x.qty = Math.round((x.qty - x.step) * 100) / 100;
   }
@@ -150,22 +217,26 @@ export function fitMeal(foods, kcal, locked = {}, { proteinMax = null } = {}) {
       const x = flex.filter(y => dense(y) && y.qty - y.step >= y.min - 1e-9).sort((a, b) => pOf(b) - pOf(a))[0];
       if (!x) break;
       x.qty = Math.round((x.qty - x.step) * 100) / 100;
+      x.target = Math.min(x.target, x.qty);
     }
   }
-  // and rounding down may have left a step that fits: give it to the food furthest below its part
+  // rounding down left room: a step to the food it moves closest to its place
   for (let n = 0; n < 50; n++) {
     const gap = budget - sum();
-    const x = flex.filter(y => y.qty + y.step <= y.max + 1e-9 && y.step * y.per <= gap + TOL
+    // never a step that takes a food far past its place (a whole spoon of oil where half was its share)
+    const x = flex.filter(y => y.qty + y.step <= y.max + 1e-9 && y.per > 0 && y.step * y.per <= gap + TOL
+      && off(y, y.qty + y.step) <= (y.e >= 0.8 ? 0.6 : 0.35) // a spread or a sweet even less: it would pass the bread's partner
       && (proteinMax == null || !dense(y) || prot() + pOf(y) <= proteinMax + 0.5))
-      .sort((a, b) => (b.want - b.qty * b.per) - (a.want - a.qty * a.per))[0];
+      .sort((a, b) => prefer(a, b, 1))[0];
     if (!x) break;
     x.qty = Math.round((x.qty + x.step) * 100) / 100;
   }
 
   const total = sum();
-  // within TOL of the budget is on it: half-unit steps can't land closer
+  // within TOL of the budget is on it: measurable steps can't land closer
   const over = total - budget > TOL ? Math.round(total - budget) : 0;
   const spare = flex.length && flex.every(x => x.qty >= x.max - 1e-9) ? Math.max(0, Math.round(budget - total)) : 0;
+  const rank = x => DROP_ORDER.indexOf(x.role);
   // never a food whose amount they set themselves
   const cand = info.map((x, i) => ({ x, i })).filter(({ x }) => !x.free && x.per > 0 && !x.isLocked)
     .sort((a, b) => rank(a.x) - rank(b.x) || b.x.qty * b.x.per - a.x.qty * a.x.per);
@@ -175,7 +246,7 @@ export function fitMeal(foods, kcal, locked = {}, { proteinMax = null } = {}) {
       free: x.free, locked: x.isLocked, step: x.step,
       atMax: !x.fixed && x.qty >= x.max - 1e-9, atMin: !x.fixed && x.qty <= x.min + 1e-9,
     })),
-    total, protein: info.reduce((t, x) => t + x.qty * (Number(x.f.protein) || 0), 0),
+    total, protein: prot(),
     // only a food whose going makes the meal fit: «بدون نان جا می‌شود» must be true
     over, spare, drop: over > 0 && foods.length > 1 ? cand.find(({ x }) => x.qty * x.per >= over - TOL)?.i ?? null : null,
   };

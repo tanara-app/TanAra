@@ -1,5 +1,5 @@
 import { suite, test, eq, ok } from './harness.js';
-import { roleOf, fitMeal, mealBudget, mealStanding, usualCombos, mealPacks, packKey, MEAL_SHARES } from '../js/domain/portion.js';
+import { roleOf, fitMeal, mealBudget, mealStanding, usualCombos, mealPacks, packKey, MEAL_SHARES, usualAmounts, usualHelping } from '../js/domain/portion.js';
 import { SEED_FOODS } from '../js/data/seedFoods.js';
 
 const seed = name => {
@@ -64,13 +64,13 @@ suite('portion', () => {
 
   test('a meal that does not fit even at the least: says by how much and what to drop', () => {
     const foods = [seed('قیمه (بدون روغن رو)'), seed('شیرینی تر (خامه‌ای)')];
-    const r = fitMeal(foods, 200);
+    const r = fitMeal(foods, 100);
     ok(r.over > 0);
     eq(r.drop, 1);
     // nothing to suggest when going without any one of them still does not fit
     eq(fitMeal(foods, 0).drop, null);
     // and never the one they set by hand
-    eq(fitMeal(foods, 200, { 1: 1 }).drop === 1, false);
+    eq(fitMeal(foods, 100, { 1: 1 }).drop === 1, false);
   });
 
   test('a food with no calories and a drink are not shared out', () => {
@@ -104,6 +104,75 @@ suite('portion', () => {
     ok(r.items[0].qty > free.items[0].qty, 'more rice instead');
     // never below the least helping of the protein food, even when that is past the limit
     eq(fitMeal(foods, 600, {}, { proteinMax: 5 }).items[1].qty, 0.5);
+  });
+
+  // A user's own food, as it is in a real bank: date syrup by the spoon.
+  const SHIRE = { id: 'shire', name: 'شیره خرما', category: 'sweet', unit: 'قاشق غذاخوری', grams: 20, kcal: 58, protein: 0.2 };
+  const gramsOfItem = (f, it) => it.qty * Number(f.grams);
+
+  test('usual helpings: ارده stays more than شیره at every meal size, in spoons and in grams', () => {
+    const foods = [seed('نان سنگک'), seed('ارده'), SHIRE];
+    for (const k of [250, 300, 350, 400, 450, 550, 650]) {
+      const r = fitMeal(foods, k);
+      ok(r.items[1].qty >= r.items[2].qty, `${k}: spoons ${r.items[1].qty} vs ${r.items[2].qty}`);
+      ok(gramsOfItem(foods[1], r.items[1]) >= gramsOfItem(foods[2], r.items[2]), `${k}: grams`);
+      ok(Math.abs(r.total - k) <= 60, `${k}: total ${r.total}`);
+    }
+  });
+
+  test('a bigger meal grows the bread and the dish, not the spread', () => {
+    const foods = [seed('نان سنگک'), seed('کره'), seed('عسل')];
+    const usual = fitMeal(foods, 400), big = fitMeal(foods, 900);
+    ok(big.items[0].qty >= usual.items[0].qty * 2.5, `bread ${usual.items[0].qty} → ${big.items[0].qty}`);
+    ok(big.items[1].qty <= usual.items[1].qty * 1.5, `butter ${usual.items[1].qty} → ${big.items[1].qty}`);
+  });
+
+  test('a smaller meal shrinks the spread with the bread', () => {
+    const foods = [seed('نان سنگک'), seed('ارده'), SHIRE];
+    const r = fitMeal(foods, 300);
+    ok(r.items[1].qty <= 1.5, `ارده ${r.items[1].qty}`);
+    ok(r.items[0].qty >= 1.5, `bread ${r.items[0].qty}`);
+  });
+
+  test('rice and stew keep a natural ratio from a small lunch to a big one', () => {
+    const foods = [seed('برنج سفید (کته یا چلو)'), seed('قیمه (بدون روغن رو)'), seed('روغن خورش / غذا'), seed('سالاد شیرازی (بدون روغن)')];
+    for (const k of [450, 600, 750, 900]) {
+      const r = fitMeal(foods, k);
+      const ratio = r.items[0].qty / r.items[1].qty;
+      ok(ratio >= 0.5 && ratio <= 2, `${k}: rice ${r.items[0].qty} / stew ${r.items[1].qty}`);
+      eq(r.items[3].qty, 1, `${k}: the salad keeps its bowl`);
+      ok(r.items[2].qty <= 1, `${k}: oil ${r.items[2].qty}`);
+    }
+  });
+
+  test('a vegetable beside a meal keeps its usual helping and never fills the calories left', () => {
+    const foods = [seed('برنج سفید (کته یا چلو)'), seed('کباب کوبیده'), seed('گوجه‌فرنگی')];
+    for (const k of [500, 700, 900]) eq(fitMeal(foods, k).items[2].qty, 1, `${k}`);
+  });
+
+  test('dates are eaten like fruit: a snack of dates fills its calories', () => {
+    eq(roleOf(seed('خرما')), 'fruit');
+    eq(roleOf(seed('گردو (مغز کامل)')), 'fat');
+    const r = fitMeal([seed('خرما'), seed('چای بدون قند')], 150);
+    ok(Math.abs(r.total - 150) <= 20, `total ${r.total}`);
+  });
+
+  test('their own usual amount comes first', () => {
+    const dates = seed('خرما');
+    const day = '2026-11-13';
+    const es = [1, 2, 3].map(n => ({ day: `2026-11-0${n}`, food_id: dates.id, unit: 'عدد', qty: 5, created_at: String(n) }));
+    const usual = usualAmounts(es, [dates], day);
+    eq(usual.get(dates.id), 5);
+    eq(usualHelping(dates, 'fruit', usual), 5);
+    eq(usualHelping(dates, 'fruit'), 3, 'without history: the app\'s');
+    // one log is not a habit yet
+    eq(usualAmounts(es.slice(0, 1), [dates], day).size, 0);
+  });
+
+  test('usual amounts read grams and the second unit back into the food\'s own unit', () => {
+    const rice = seed('برنج سفید (کته یا چلو)'); // کفگیر 120 g, بشقاب 300 g
+    const es = [{ day: '2026-11-10', food_id: rice.id, unit: 'گرم', qty: 240 }, { day: '2026-11-11', food_id: rice.id, unit: 'بشقاب', qty: 1 }, { day: '2026-11-12', food_id: rice.id, unit: 'کفگیر', qty: 2 }];
+    eq(usualAmounts(es, [rice], '2026-11-13').get(rice.id), 2);
   });
 
   test('meal standing: an eaten meal keeps its part of the day, an open one gets what is left', () => {

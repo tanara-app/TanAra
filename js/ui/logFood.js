@@ -16,7 +16,7 @@ import { photoItems } from '../domain/photo.js';
 import { pickPhoto, foodPhoto, cameraIcon } from './photo.js';
 import { scanBarcode, barcodeBox, fillFromBarcode, barcodeIcon } from './barcode.js';
 import { portionsFor } from '../domain/plan.js';
-import { fitMeal } from '../domain/portion.js';
+import { fitMeal, usualAmounts } from '../domain/portion.js';
 import { packs, savePack, askPackName } from './packs.js';
 
 // the rebuilt «امروز» (beta `eat`, REDESIGN.md) has five meals: two snacks
@@ -394,7 +394,7 @@ export function openLogSheet({ day = today(), meal = null, onSaved = null, room 
       for (const k of [...locks.keys()]) if (!chosen.includes(k)) locks.delete(k);
       const left = Math.max(0, Math.round(room.kcal));
       const lockIdx = Object.fromEntries(chosen.map((f, i) => [i, locks.get(f)]).filter(([, q]) => q != null));
-      const r = fitMeal(chosen, left, lockIdx);
+      const r = fitMeal(chosen, left, lockIdx, { usual: usualAmounts(store.get().entries, store.get().foods, day) });
       const many = chosen.length > 1;
       // the amount in the unit it is shown in (fitMeal works in the food's own unit)
       const view = (f, it) => {
