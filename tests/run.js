@@ -22,6 +22,7 @@ import './meals.test.js';
 import './quality.test.js';
 import './chatText.test.js';
 import './game.test.js';
+import './battle.test.js';
 
 const results = await run();
 const failed = results.filter(r => !r.ok);

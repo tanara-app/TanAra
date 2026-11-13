@@ -12,6 +12,8 @@
   Logged meals give coins, active days water, full weeks gems (claimed when this page opens or the
   data changes); a day with breakfast, lunch and dinner logged puts a chest on the palace (tap it).
   The badge by the bar is the player's level (experience); the cup opens the achievements.
+  A barracks or camp sheet has a sword that opens training (GAME.md §7); the crossed swords at the
+  bottom open the road of div forts, and a fort opens the battle (js/ui/battle.js).
 */
 import * as store from '../data/store.js';
 import { today } from '../lib/dates.js';
@@ -20,9 +22,12 @@ import { icon } from './dom.js';
 import {
   KINDS, ROCKS, SHOP, GROUPS, SIZE, EDGE, load, claimAll, settle, fits, freeSpot, place, collect, stored, itemAt, rockAt, left,
   fmtLeft, cap, builders, busy, whyNot, priceOf, countOf, maxCount, maxLv, whyNotUp, upgrade, level, whyNotClear,
-  clearRock, speedCost, speedUp, chestReady, openChest, xpLevel, achievements, claimAch,
+  clearRock, speedCost, speedUp, chestReady, openChest, xpLevel, achievements, claimAch, give,
 } from '../domain/game.js';
 import { TW, TH, iso, polys, scaffoldPolys, drawPreview } from './gameArt.js';
+import { TROOPS, TROOP_ORDER, train, untrain, settleArmy, armyRoom, armyUsed, whyNotTrain, opensAt, armyCount } from '../domain/army.js';
+import { FORTS, fortLayout, fortOpen, endFort } from '../domain/battle.js';
+import { openBattle, troopSvg } from './battle.js';
 
 const PHASER = 'https://cdn.jsdelivr.net/npm/phaser@4.2.1/dist/phaser.min.js';
 const ZMIN = 0.2, ZMAX = 2.2;
@@ -46,6 +51,7 @@ const FIT = {};
 // The ground until its picture (§12): green grass, a lighter ring where troops are placed, and a dark
 // band of woods round it. OUT tiles of woods are visible past each side.
 const OUT = 8;
+const swordsSvg = '<svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4l10 10M4 4h4M4 4v4M20 4L10 14M20 4h-4M20 4v4"/><path d="M8 16l-3 3M16 16l3 3M11 13l-4 4M13 13l4 4"/></svg>';
 const trophySvg = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 4h8v5a4 4 0 0 1-8 0z"/><path d="M8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4M12 13v4M8 20h8M9 17h6"/></svg>';
 const chestSvg = '<svg viewBox="0 0 24 24" width="22" height="22"><rect x="3" y="9" width="18" height="11" rx="2" fill="#a0612b" stroke="#4a2c12" stroke-width="1.4"/><path d="M3 11a9 5 0 0 1 18 0" fill="#c47a35" stroke="#4a2c12" stroke-width="1.4"/><rect x="10.5" y="10" width="3" height="4" rx="1" fill="#f2c14e" stroke="#4a2c12" stroke-width="1"/></svg>';
 const hammerSvg = '<svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4l6 6-3 3-6-6z"/><path d="M11 7L4 14l3 3 7-7"/><path d="M5.5 15.5L3 20l4.5-2.5"/></svg>';
@@ -70,7 +76,8 @@ function current() {
   const d = store.get();
   const g0 = load(p.game, today());
   const { game: g1, gained } = claimAll(g0, { entries: d.entries, activity: d.activity }, today());
-  const { game } = settle(g1, Date.now());
+  const { game: g2 } = settle(g1, Date.now());
+  const { game } = settleArmy(g2, Date.now());
   if (game !== p.game) save(game);
   return { game, gained };
 }
@@ -100,10 +107,13 @@ export function renderGame(root) {
         <button class="game-ach" data-ach aria-label="دستاوردها">${trophySvg}<span class="game-dot" hidden></span></button>
       </div>
       <button class="game-build" data-shop aria-label="ساختن">${hammerSvg}</button>
+      <button class="game-attack" data-attack aria-label="حمله">${swordsSvg}</button>
       <div class="game-place" hidden><button data-ok aria-label="بگذار">${icon.check}</button><button data-no aria-label="نه">${icon.close}</button></div>
       <div class="game-shop" hidden><div class="game-sheet"><div class="game-tabs"></div><div class="game-cards"></div></div></div>
       <div class="game-info" hidden></div>
       <div class="game-shop game-achs" hidden><div class="game-list"></div></div>
+      <div class="game-shop game-train" hidden><div class="game-sheet"><div class="game-army"></div><div class="game-cards"></div></div></div>
+      <div class="game-shop game-map" hidden><div class="game-list"></div></div>
       <p class="game-wait">در حال بارگذاری…</p>
     </section>`;
   const el = root.querySelector('.game');
@@ -429,6 +439,8 @@ function start(el, L) {
       const now = Date.now();
       if (now - (this.last || 0) < 250) return;
       this.last = now;
+      const a = settleArmy(state, now);
+      if (a.ready) { commit(a.game); if (!trainEl.hidden) openTrain(); }
       const r = settle(state, now);
       if (r.grown.length) { commit(r.game); for (const o of r.grown) this.addThing(o); }
       if (r.done.length) {
@@ -445,6 +457,7 @@ function start(el, L) {
       }
       for (const s of this.sprites.values()) if (s.it.job || KINDS[s.it.kind]?.makes) this.status(s, now);
       if (selected && find(selected)?.job) refreshTimer();
+      if (!trainEl.hidden) refreshQueue(now);
     }
   }
 
@@ -500,7 +513,8 @@ function start(el, L) {
         const extra = why === 'palace' ? `<span class="game-lock">${lockSvg}کاخ سطح ${fa(K.maxLv.findIndex(m => m > o.lv) + 1)}</span>` : '';
         body = actionHtml('up', upSvg, costHtml(next.cost, state.res) + timeHtml(next.time), why, extra);
       }
-      infoEl.innerHTML = `<div class="game-info-head"><b>${K.name}</b>${lv}${statHtml(o)}</div>${body}`;
+      const army = (o.kind === 'barracks' || o.kind === 'camp') && o.lv > 0 ? `<button class="game-btn" data-act="train" aria-label="آموزش">${swordSvg.replace(/14/g, '20')}</button>` : '';
+      infoEl.innerHTML = `<div class="game-info-head"><b>${K.name}</b>${lv}${statHtml(o)}</div>${body}${army ? `<div class="game-act">${army}</div>` : ''}`;
     }
     infoEl.hidden = false;
   }
@@ -534,6 +548,7 @@ function start(el, L) {
     if (!b || !selected) return;
     const now = Date.now(), id = selected, act = b.dataset.act;
     let g = null;
+    if (act === 'train') { openTrain(); return; }
     if (act === 'up') g = upgrade(state, id, now);
     else if (act === 'clear') g = clearRock(state, id, now);
     else if (act === 'speed') g = speedUp(state, id, now);
@@ -554,7 +569,7 @@ function start(el, L) {
 
   let tab = 'res';
   function openShop() {
-    closeInfo(); achEl.hidden = true;
+    closeInfo(); hideSheets();
     const kinds = SHOP.filter(k => KINDS[k].group === tab);
     shopEl.querySelector('.game-tabs').innerHTML = Object.entries(GROUPS).map(([g, name]) => `<button class="game-tab${g === tab ? ' on' : ''}" data-tab="${g}">${name}</button>`).join('');
     const cards = shopEl.querySelector('.game-cards');
@@ -608,11 +623,77 @@ function start(el, L) {
     }
   };
 
+  /* ---- training (GAME.md §7) ---- */
+
+  const trainEl = el.querySelector('.game-train');
+  const hideSheets = () => { for (const x of [shopEl, achEl, trainEl, mapEl]) x.hidden = true; };
+  function openTrain() {
+    closeInfo(); hideSheets();
+    const q = state.queue || [];
+    const queued = {}; for (const x of q) queued[x.t] = (queued[x.t] || 0) + 1;
+    trainEl.querySelector('.game-army').innerHTML = `<span class="game-room">${builderSvg(16)}${fa(armyUsed(state))}/${fa(armyRoom(state))}</span>
+      <span class="game-have">${TROOP_ORDER.filter(t => state.army?.[t]).map(t => `<span>${troopSvg(t, 22)}${fa(state.army[t])}</span>`).join('')}</span>
+      <span class="game-time" data-q></span>`;
+    trainEl.querySelector('.game-cards').innerHTML = TROOP_ORDER.map(t => {
+      const T = TROOPS[t], why = whyNotTrain(state, t);
+      const lock = why === 'locked' ? `<span class="game-lock">${lockSvg}${fa(opensAt(t))}</span>` : '';
+      const n = queued[t] ? `<span class="game-q" data-un="${t}">${fa(queued[t])}<i>−</i></span>` : '';
+      return `<button class="game-card${why && why !== 'cost' ? ' off' : ''}" data-troop="${t}">${n}
+        <span class="game-troop">${troopSvg(t, 54)}</span><b>${T.name}</b>
+        ${lock || `<span class="game-price">${costHtml({ water: T.cost }, state.res)}</span>`}</button>`;
+    }).join('');
+    trainEl.hidden = false;
+    refreshQueue(Date.now());
+  }
+  function refreshQueue(now) {
+    const q = state.queue || [], t = trainEl.querySelector('[data-q]');
+    if (t) t.innerHTML = q.length ? `${clockSvg}${faDigits(fmtLeft(Math.max(0, q[q.length - 1].end - now)))}` : '';
+  }
+  trainEl.onclick = e => {
+    const un = e.target.closest('[data-un]');
+    if (un) { const g = untrain(state, un.dataset.un, Date.now()); if (g) { commit(g); openTrain(); } return; }
+    const b = e.target.closest('[data-troop]');
+    if (!b) { if (!e.target.closest('.game-sheet')) trainEl.hidden = true; return; }
+    const g = train(state, b.dataset.troop, Date.now());
+    if (!g) { b.animate([{ transform: 'translateX(0)' }, { transform: 'translateX(-6px)' }, { transform: 'translateX(6px)' }, { transform: 'translateX(0)' }], 260); return; }
+    commit(g); openTrain();
+  };
+
+  /* ---- the road of div forts and the battle (GAME.md §8, §9) ---- */
+
+  const mapEl = el.querySelector('.game-map');
+  function openMap() {
+    closeInfo(); hideSheets();
+    const has = armyCount(state) > 0;
+    mapEl.querySelector('.game-list').innerHTML = `<div class="game-row game-have">${TROOP_ORDER.filter(t => state.army?.[t]).map(t => `<span>${troopSvg(t, 22)}${fa(state.army[t])}</span>`).join('') || `<span class="game-lock">${builderSvg(16)}۰</span>`}</div>` +
+      FORTS.map(f => {
+        const open = fortOpen(state, f.id), st = state.forts?.[f.id]?.stars || 0, loot = fortLayout(state, f.id).loot;
+        const stars = [0, 1, 2].map(i => `<i class="${i < st ? 'on' : ''}"></i>`).join('');
+        const right = !open ? `<span class="game-lock">${lockSvg}</span>`
+          : `<button class="game-btn${has ? '' : ' off'}" data-fort="${f.id}" aria-label="حمله">${swordSvg.replace(/14/g, '20')}</button>`;
+        return `<div class="game-row"><span class="game-stars">${stars}</span><b>${f.name}</b>${costHtml(loot)}${right}</div>`;
+      }).join('');
+    mapEl.hidden = false;
+  }
+  el.querySelector('[data-attack]').onclick = () => (mapEl.hidden ? openMap() : (mapEl.hidden = true));
+  mapEl.onclick = e => {
+    const b = e.target.closest('[data-fort]');
+    if (!b) { if (!e.target.closest('.game-list')) mapEl.hidden = true; return; }
+    if (!armyCount(state)) { openTrainOrShake(b); return; }
+    const id = b.dataset.fort;
+    hideSheets();
+    scene.scene.sleep();
+    openBattle({ game: L.game, el, dpr, layout: fortLayout(state, id), army: { ...state.army }, resIcon: RES_ICON,
+      onEnd: (r) => { const e2 = endFort(state, id, r, give); commit(e2.game); return { got: e2.got }; },
+      onClose: () => { scene.scene.wake(); showBar(); } });
+  };
+  function openTrainOrShake(b) { b.animate([{ transform: 'translateX(0)' }, { transform: 'translateX(-6px)' }, { transform: 'translateX(6px)' }, { transform: 'translateX(0)' }], 260); }
+
   /* ---- achievements (GAME.md §10) ---- */
 
   const achEl = el.querySelector('.game-achs');
   function openAch() {
-    closeInfo(); shopEl.hidden = true;
+    closeInfo(); hideSheets();
     achEl.querySelector('.game-list').innerHTML = achievements(state).map(a => {
       const stars = [0, 1, 2].map(i => `<i class="${i < a.claimed ? 'on' : ''}"></i>`).join('');
       const right = a.ready ? `<button class="game-btn gem" data-claim="${a.id}">${costHtml({ gem: a.gems })}</button>`
