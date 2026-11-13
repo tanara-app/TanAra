@@ -20,6 +20,9 @@ So at the start of every session:
    them to the user before anything else, as `FEEDBACK.md` says. Mark the ones you showed as `seen`.
 5. Commit only the files you changed, never `git add -A`. Before pushing, fetch again and merge or rebase
    if `origin/main` moved.
+6. Commit and push finished, checked work on your own, without asking the user each time (they asked for this
+   on 2026-11-13: «انقدر از من نپرس… خودت خودکار انجام بده»). Still check the diff for sensitive data first, and
+   keep big binaries (like the 44 MB Meshy GLB models in `art/models/`) out of git.
 
 Memory files under `~/.claude/` are per account, so the other Claude can't see yours. Anything the other
 one needs to know goes in this file or in the project docs, not only in your own memory.

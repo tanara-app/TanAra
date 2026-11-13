@@ -21,8 +21,9 @@ const ZMIN = 0.55, ZMAX = 2.2;
 const coinSvg = (s = 20) => `<img src="img/game/test/coin.webp" width="${s}" height="${s}" alt="" draggable="false">`;
 
 // Buildings that already have an image (style «ماکت», art/STYLE.md); the rest are still drawn.
-// For now the palace is the ChatGPT style-test image, until its Meshy + Blender render.
-const ART = { palace: 'img/game/test/palace-c.webp' };
+// The palace is a Blender render of its Meshy model (art/models/palace-3.glb), cropped to the building:
+// rotated 45°, 30° down (2:1 footprint), transparent background. See IDEAS.md («سرزمین»).
+const ART = { palace: 'img/game/palace.webp' };
 const hammerSvg = '<svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4l6 6-3 3-6-6z"/><path d="M11 7L4 14l3 3 7-7"/><path d="M5.5 15.5L3 20l4.5-2.5"/></svg>';
 const clockSvg = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>';
 
