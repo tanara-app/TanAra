@@ -24,6 +24,14 @@ So at the start of every session:
 Memory files under `~/.claude/` are per account, so the other Claude can't see yours. Anything the other
 one needs to know goes in this file or in the project docs, not only in your own memory.
 
+The user opens many conversations, and either Claude may pick up any task. So write each decision the user
+makes, and anything new you learn that the other Claude would need (what a tool or service can or can't do, a
+connection set up, a price, a limit, a workaround that worked), into the project docs (`IDEAS.md`, `art/STYLE.md`,
+`REDESIGN.md`, `HOOSHVAREH.md` or this file) as soon as it happens, with the date, not at the end of the session:
+what was decided or found, what was rejected, and where the work stands. Before starting on a topic, read what is already written about it, so two decisions on the same thing never
+exist side by side. When a new decision replaces an old one, change or mark the old line instead of leaving both.
+(The user asked for this on 2026-11-13.)
+
 ## Practical details
 
 - The folder belongs to `m.b.a`; `ClaudeAccount` writes through an ACL. If a write fails with
