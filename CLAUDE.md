@@ -86,6 +86,8 @@ exist side by side. When a new decision replaces an old one, change or mark the 
 - `art/STYLE.md`: the art style guide and ChatGPT prompts for the «سرزمین» game images.
 - `REDESIGN.md`: the rebuild of «امروز» and «رژیم» into one part, step by step: what the user decided so far. Read it before
   touching the today screen, «سهم وعده» or «رژیم».
+- `GAME.md`: the design of the «سرزمین» game (core loop, resources, buildings, builders, land, divs, phases). Read it
+  before any work on the game; its sections are proposals until marked «تأیید شد».
 - `IDEAS.md`: ideas for daily "hooks" that bring members back, with the ones the user picked. When one gets built,
   mark it there.
 - `VOICE.md` / `ELEVENLABS.md`: the mascot Heimerdinger's lines and the brief for recording them
