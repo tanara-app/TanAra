@@ -10,21 +10,22 @@
   building opens its sheet (level, upgrade, finish now with gems); tapping an obstacle offers to clear
   it. Jobs finish by themselves when their time comes.
   Logged meals give coins, active days water, full weeks gems (claimed when this page opens or the
-  data changes).
+  data changes); a day with breakfast, lunch and dinner logged puts a chest on the palace (tap it).
+  The badge by the bar is the player's level (experience); the cup opens the achievements.
 */
 import * as store from '../data/store.js';
 import { today } from '../lib/dates.js';
 import { fa, faDigits } from '../lib/fa.js';
 import { icon } from './dom.js';
 import {
-  KINDS, ROCKS, SHOP, SIZE, load, claimAll, settle, fits, freeSpot, place, collect, stored, itemAt, rockAt, left,
+  KINDS, ROCKS, SHOP, GROUPS, SIZE, EDGE, load, claimAll, settle, fits, freeSpot, place, collect, stored, itemAt, rockAt, left,
   fmtLeft, cap, builders, busy, whyNot, priceOf, countOf, maxCount, maxLv, whyNotUp, upgrade, level, whyNotClear,
-  clearRock, speedCost, speedUp,
+  clearRock, speedCost, speedUp, chestReady, openChest, xpLevel, achievements, claimAch,
 } from '../domain/game.js';
 import { TW, TH, iso, polys, scaffoldPolys, drawPreview } from './gameArt.js';
 
 const PHASER = 'https://cdn.jsdelivr.net/npm/phaser@4.2.1/dist/phaser.min.js';
-const ZMIN = 0.45, ZMAX = 2.2;
+const ZMIN = 0.2, ZMAX = 2.2;
 
 const coinSvg = (s = 20) => `<img src="img/game/test/coin.webp" width="${s}" height="${s}" alt="" draggable="false">`;
 const waterSvg = (s = 20) => `<svg viewBox="0 0 24 24" width="${s}" height="${s}"><path d="M12 2.5C9 7 5.5 10.6 5.5 14.5a6.5 6.5 0 0 0 13 0C18.5 10.6 15 7 12 2.5z" fill="#4aa8e0" stroke="#1f5f8f" stroke-width="1.4"/><path d="M9 14.5a3 3 0 0 0 3 3" stroke="#d6f0ff" stroke-width="1.6" fill="none" stroke-linecap="round"/></svg>`;
@@ -33,15 +34,20 @@ const builderSvg = (s = 18) => `<svg viewBox="0 0 24 24" width="${s}" height="${
 const lockSvg = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>';
 const upSvg = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>';
 const RES_ICON = { coin: coinSvg, water: waterSvg, gem: gemSvg };
+const swordSvg = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M14 4h6v6L9 21l-6-6z"/><path d="M5 13l6 6"/></svg>';
 
-// Buildings that already have a picture (art/STYLE.md); the rest are still drawn.
+// Buildings that already have a picture (art/STYLE.md); the rest are still drawn (gameArt.js).
 // The palace (bright chunky style, 2026-11-14) is a Blender render of its Meshy model (art/models/palace-5.glb)
 // by art/blender/building.py. Every image is framed exactly on its footprint by art/blender/common.py
 // (frame_footprint): as wide as the footprint, its bottom edge on the front corner, so it scales as it is.
-const ART = { palace: 'img/game/palace.webp', rock: 'img/game/rock.webp', dune: 'img/game/dune.webp', tree: 'img/game/tree.webp', bush: 'img/game/bush.webp' };
+// The old desert obstacles (tree, bush, dune) are drawn until the green valley's art (GAME.md §12).
+const ART = { palace: 'img/game/palace.webp', rock: 'img/game/rock.webp' };
 const FIT = {};
-// The ground (art/blender/land.py): the plot inside its curb with MARGIN tiles of desert all round.
-const LAND = 'img/game/land.webp', MARGIN = 6;
+// The ground until its picture (§12): green grass, a lighter ring where troops are placed, and a dark
+// band of woods round it. OUT tiles of woods are visible past each side.
+const OUT = 8;
+const trophySvg = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 4h8v5a4 4 0 0 1-8 0z"/><path d="M8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4M12 13v4M8 20h8M9 17h6"/></svg>';
+const chestSvg = '<svg viewBox="0 0 24 24" width="22" height="22"><rect x="3" y="9" width="18" height="11" rx="2" fill="#a0612b" stroke="#4a2c12" stroke-width="1.4"/><path d="M3 11a9 5 0 0 1 18 0" fill="#c47a35" stroke="#4a2c12" stroke-width="1.4"/><rect x="10.5" y="10" width="3" height="4" rx="1" fill="#f2c14e" stroke="#4a2c12" stroke-width="1"/></svg>';
 const hammerSvg = '<svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4l6 6-3 3-6-6z"/><path d="M11 7L4 14l3 3 7-7"/><path d="M5.5 15.5L3 20l4.5-2.5"/></svg>';
 const clockSvg = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>';
 
@@ -89,10 +95,15 @@ export function renderGame(root) {
         <div class="game-res" data-res="gem" aria-label="گوهر">${gemSvg(20)}<b></b></div>
         <div class="game-res game-bld" aria-label="معمار">${builderSvg()}<b data-builders></b></div>
       </div>
+      <div class="game-side">
+        <div class="game-xp" aria-label="سطح"><b data-xp></b><i></i></div>
+        <button class="game-ach" data-ach aria-label="دستاوردها">${trophySvg}<span class="game-dot" hidden></span></button>
+      </div>
       <button class="game-build" data-shop aria-label="ساختن">${hammerSvg}</button>
       <div class="game-place" hidden><button data-ok aria-label="بگذار">${icon.check}</button><button data-no aria-label="نه">${icon.close}</button></div>
-      <div class="game-shop" hidden><div class="game-cards"></div></div>
+      <div class="game-shop" hidden><div class="game-sheet"><div class="game-tabs"></div><div class="game-cards"></div></div></div>
       <div class="game-info" hidden></div>
+      <div class="game-shop game-achs" hidden><div class="game-list"></div></div>
       <p class="game-wait">در حال بارگذاری…</p>
     </section>`;
   const el = root.querySelector('.game');
@@ -135,6 +146,10 @@ function start(el, L) {
       if (fill) { fill.style.width = `${Math.min(100, 100 * state.res[r] / c)}%`; box.classList.toggle('full', state.res[r] >= c); }
     }
     el.querySelector('[data-builders]').textContent = `${fa(builders(state) - busy(state))}/${fa(builders(state))}`;
+    const x = xpLevel(state.xp);
+    el.querySelector('[data-xp]').textContent = fa(x.lv);
+    el.querySelector('.game-xp i').style.height = `${100 * x.into / x.need}%`;
+    el.querySelector('.game-ach .game-dot').hidden = !achievements(state).some(a => a.ready);
   }
   showBar();
 
@@ -142,13 +157,12 @@ function start(el, L) {
     preload() {
       for (const [kind, file] of Object.entries(ART)) this.load.image(`art-${kind}`, file);
       this.load.image('coinImg', 'img/game/test/coin.webp');
-      this.load.image('land', LAND);
     }
 
     create() {
       scene = this;
       const cam = this.cameras.main;
-      cam.setBackgroundColor('#c98f55');
+      cam.setBackgroundColor('#2f5e2c');
       this.drawGround();
       this.zoomTo(0.8);
       const [mx, my] = iso(SIZE / 2, SIZE / 2);
@@ -162,6 +176,7 @@ function start(el, L) {
       for (const r of state.rocks) this.addThing(r);
       this.input.addPointer(1);
       this.bindInput();
+      this.showChest();
       el.querySelector('.game-wait').remove();
       const { gained } = L.firstGain || {};
       if (gained) this.time.delayedCall(400, () => flyAll(gained, null));
@@ -174,21 +189,29 @@ function start(el, L) {
     }
 
     drawGround() {
-      const full = SIZE + 2 * MARGIN;
-      const [cx, cy] = iso(SIZE / 2, SIZE / 2);
-      this.add.image(cx, cy, 'land').setDisplaySize(full * TW, full * TH).setDepth(0);
+      const g = this.add.graphics().setDepth(0);
+      const dia = (x0, y0, x1, y1) => [iso(x0, y0), iso(x1, y0), iso(x1, y1), iso(x0, y1)].map(([x, y]) => ({ x, y }));
+      g.fillStyle(0x2f5e2c, 1); g.fillPoints(dia(-OUT * 3, -OUT * 3, SIZE + OUT * 3, SIZE + OUT * 3), true);
+      g.fillStyle(0x6fae4a, 1); g.fillPoints(dia(0, 0, SIZE, SIZE), true);
+      g.fillStyle(0x7dbd55, 1); g.fillPoints(dia(EDGE, EDGE, SIZE - EDGE, SIZE - EDGE), true);
+      // a few lighter patches so the grass isn't flat
+      let seed = 7; const r = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+      for (let i = 0; i < 60; i++) {
+        const x = EDGE + r() * (SIZE - 2 * EDGE - 3), y = EDGE + r() * (SIZE - 2 * EDGE - 3), w = 1 + r() * 2.5;
+        g.fillStyle(r() < 0.5 ? 0x86c55e : 0x74b44e, 0.7); g.fillPoints(dia(x, y, x + w, y + w * (0.6 + r() * 0.8)), true);
+      }
       this.grid = this.add.graphics().setDepth(1);
-      const [x0] = iso(-MARGIN, SIZE + MARGIN), [x1] = iso(SIZE + MARGIN, -MARGIN), [, y0] = iso(-MARGIN, -MARGIN), [, y1] = iso(SIZE + MARGIN, SIZE + MARGIN);
-      this.cameras.main.setBounds(x0 + 40, y0 + 20, x1 - x0 - 80, y1 - y0 - 40);
+      const [x0] = iso(-OUT, SIZE + OUT), [x1] = iso(SIZE + OUT, -OUT), [, y0] = iso(-OUT, -OUT), [, y1] = iso(SIZE + OUT, SIZE + OUT);
+      this.cameras.main.setBounds(x0, y0, x1 - x0, y1 - y0);
     }
 
     // The tile grid, shown only while a building is being placed.
     showGrid(on) {
       this.grid.clear();
       if (!on) return;
-      this.grid.lineStyle(1, 0xfff4d6, 0.28);
-      for (let i = 0; i <= SIZE; i++) {
-        const a = iso(i, 0), b = iso(i, SIZE), c = iso(0, i), d = iso(SIZE, i);
+      this.grid.lineStyle(1, 0xffffff, 0.22);
+      for (let i = EDGE; i <= SIZE - EDGE; i++) {
+        const a = iso(i, EDGE), b = iso(i, SIZE - EDGE), c = iso(EDGE, i), d = iso(SIZE - EDGE, i);
         this.grid.lineBetween(a[0], a[1], b[0], b[1]); this.grid.lineBetween(c[0], c[1], d[0], d[1]);
       }
     }
@@ -256,6 +279,22 @@ function start(el, L) {
       } else if (n < 3 && s.bubble) { s.bubble.destroy(); s.bubble = null; }
     }
 
+    // The daily chest floats over the palace while it is ready (GAME.md §3).
+    showChest() {
+      const ready = chestReady(state, store.get().entries, today());
+      if (!ready) { this.chest?.destroy(); this.chest = null; return; }
+      if (this.chest) return;
+      const p = state.items.find(i => i.kind === 'palace'), k = KINDS.palace;
+      const [cx, cy] = iso(p.x + k.size / 2, p.y + k.size / 2);
+      const g = this.add.graphics({ x: cx, y: cy - k.size * 34 - 20 }).setDepth(5500);
+      g.fillStyle(0x4a2c12, 1); g.fillRoundedRect(-17, -9, 34, 24, 4);
+      g.fillStyle(0xa0612b, 1); g.fillRoundedRect(-15, -7, 30, 20, 3);
+      g.fillStyle(0xc47a35, 1); g.fillRoundedRect(-15, -15, 30, 10, { tl: 8, tr: 8, bl: 0, br: 0 });
+      g.fillStyle(0xf2c14e, 1); g.fillRect(-3, -6, 6, 8);
+      this.tweens.add({ targets: g, y: g.y - 8, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+      this.chest = g;
+    }
+
     bounce(c) {
       this.tweens.killTweensOf(c); c.setScale(1);
       this.tweens.add({ targets: c, scaleY: { from: 0.86, to: 1 }, scaleX: { from: 1.08, to: 1 }, duration: 380, ease: 'Back.easeOut' });
@@ -308,7 +347,7 @@ function start(el, L) {
         if (down.ghost) {
           const t = this.tileAt(p.x, p.y);
           const s = KINDS[placing.kind].size;
-          const x = Phaser.Math.Clamp(t.x - down.ghost.dx, 0, SIZE - s), y = Phaser.Math.Clamp(t.y - down.ghost.dy, 0, SIZE - s);
+          const x = Phaser.Math.Clamp(t.x - down.ghost.dx, EDGE, SIZE - EDGE - s), y = Phaser.Math.Clamp(t.y - down.ghost.dy, EDGE, SIZE - EDGE - s);
           if (x !== placing.x || y !== placing.y) { placing.x = x; placing.y = y; this.drawGhost(); }
           return;
         }
@@ -334,13 +373,17 @@ function start(el, L) {
     tap(t) {
       if (placing) {
         const s = KINDS[placing.kind].size;
-        placing.x = Phaser.Math.Clamp(t.x - Math.floor(s / 2), 0, SIZE - s);
-        placing.y = Phaser.Math.Clamp(t.y - Math.floor(s / 2), 0, SIZE - s);
+        placing.x = Phaser.Math.Clamp(t.x - Math.floor(s / 2), EDGE, SIZE - EDGE - s);
+        placing.y = Phaser.Math.Clamp(t.y - Math.floor(s / 2), EDGE, SIZE - EDGE - s);
         this.drawGhost(); return;
       }
       const it = itemAt(state, t.x, t.y) || rockAt(state, t.x, t.y);
       if (!it) { closeInfo(); return; }
       const s = this.sprites.get(it.id), now = Date.now();
+      if (it.kind === 'palace' && this.chest) {
+        const o = openChest(state, store.get().entries, today());
+        if (o) { commit(o.game); this.showChest(); this.bounce(s.c); this.sparks(s.c.x, s.c.y - 60); flyAll(o.got, s.c); return; }
+      }
       if (!s.rock && !it.job) {
         const c = collect(state, it.id, now);
         if (c?.gained) {
@@ -387,6 +430,7 @@ function start(el, L) {
       if (now - (this.last || 0) < 250) return;
       this.last = now;
       const r = settle(state, now);
+      if (r.grown.length) { commit(r.game); for (const o of r.grown) this.addThing(o); }
       if (r.done.length) {
         commit(r.game);
         for (const id of r.done) {
@@ -465,6 +509,8 @@ function start(el, L) {
     if (!L) return '';
     if (K.makes) return `<span class="game-stat">${RES_ICON[K.makes](14)}${fa(L.rate)}/ساعت</span>`;
     if (K.keeps) return `<span class="game-stat">${RES_ICON[K.keeps](14)}${fa(L.store)}</span>`;
+    if (L.dps) return `<span class="game-stat">${swordSvg}${fa(L.dps)}</span>`;
+    if (L.room) return `<span class="game-stat">${builderSvg(14)}${fa(L.room)}</span>`;
     return '';
   }
   function actionHtml(act, label, price, why, extra = '') {
@@ -506,10 +552,13 @@ function start(el, L) {
 
   /* ---- the shop ---- */
 
+  let tab = 'res';
   function openShop() {
-    closeInfo();
+    closeInfo(); achEl.hidden = true;
+    const kinds = SHOP.filter(k => KINDS[k].group === tab);
+    shopEl.querySelector('.game-tabs').innerHTML = Object.entries(GROUPS).map(([g, name]) => `<button class="game-tab${g === tab ? ' on' : ''}" data-tab="${g}">${name}</button>`).join('');
     const cards = shopEl.querySelector('.game-cards');
-    cards.innerHTML = SHOP.map(k => {
+    cards.innerHTML = kinds.map(k => {
       const K = KINDS[k], why = whyNot(state, k), mx = maxCount(state, k);
       const lock = why === 'palace' ? `<span class="game-lock">${lockSvg}کاخ سطح ${fa(K.count.findIndex(n => n > 0) + 1)}</span>`
         : why === 'count' ? `<span class="game-lock">${fa(countOf(state, k))}/${fa(mx)}</span>`
@@ -519,11 +568,15 @@ function start(el, L) {
         ${lock || `<span class="game-price">${costHtml(priceOf(state, k), state.res)}${timeHtml(K.levels[0].time)}</span><span class="game-count">${fa(countOf(state, k))}/${fa(mx)}</span>`}
       </button>`;
     }).join('');
+    cards.scrollLeft = 0;
     shopEl.hidden = false;
     cards.querySelectorAll('[data-kind]').forEach(b => drawPreview(b.querySelector('canvas'), b.dataset.kind, KINDS[b.dataset.kind].size));
   }
   buildBtn.onclick = () => (shopEl.hidden ? openShop() : (shopEl.hidden = true));
   shopEl.onclick = e => {
+    const t = e.target.closest('[data-tab]');
+    if (t) { tab = t.dataset.tab; openShop(); return; }
+    if (e.target.closest('.game-tabs')) return;
     const b = e.target.closest('[data-kind]');
     if (!b) { shopEl.hidden = true; return; }
     if (whyNot(state, b.dataset.kind)) { b.animate([{ transform: 'translateX(0)' }, { transform: 'translateX(-6px)' }, { transform: 'translateX(6px)' }, { transform: 'translateX(0)' }], 260); return; }
@@ -555,6 +608,29 @@ function start(el, L) {
     }
   };
 
+  /* ---- achievements (GAME.md §10) ---- */
+
+  const achEl = el.querySelector('.game-achs');
+  function openAch() {
+    closeInfo(); shopEl.hidden = true;
+    achEl.querySelector('.game-list').innerHTML = achievements(state).map(a => {
+      const stars = [0, 1, 2].map(i => `<i class="${i < a.claimed ? 'on' : ''}"></i>`).join('');
+      const right = a.ready ? `<button class="game-btn gem" data-claim="${a.id}">${costHtml({ gem: a.gems })}</button>`
+        : a.next ? `<span class="game-prog">${fa(Math.min(a.n, a.next))}/${fa(a.next)}</span>` : '';
+      return `<div class="game-row"><span class="game-stars">${stars}</span><b>${a.name}</b>${right}</div>`;
+    }).join('');
+    achEl.hidden = false;
+  }
+  el.querySelector('[data-ach]').onclick = () => (achEl.hidden ? openAch() : (achEl.hidden = true));
+  achEl.onclick = e => {
+    const b = e.target.closest('[data-claim]');
+    if (!b) { if (!e.target.closest('.game-list')) achEl.hidden = true; return; }
+    const g = claimAch(state, b.dataset.claim);
+    if (!g) return;
+    const got = g.res.gem - state.res.gem;
+    commit(g); fly('gem', got, null); openAch();
+  };
+
   L.sync = () => { // the store changed (maybe a meal was logged elsewhere, or another device saved)
     const { game, gained } = current();
     if (game === state) return;
@@ -562,6 +638,7 @@ function start(el, L) {
     state = game;
     showBar();
     flyAll(gained, null);
+    scene?.showChest();
     const key = (g) => [...g.items, ...g.rocks].map(o => `${o.id}:${o.x}:${o.y}:${o.lv}:${o.job?.end || 0}`).join('|');
     if (scene && key(before) !== key(game)) scene.redraw();
     if (selected) openInfo(selected);

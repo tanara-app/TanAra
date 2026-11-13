@@ -111,8 +111,28 @@ const PARTS = {
   // Obstacles.
   rock: () => [block(0.2, 0.3, 1.2, 1.1, 0, 14, '#9b9184'), block(0.9, 0.7, 0.9, 0.9, 0, 20, '#8a8075'), block(1.0, 0.8, 0.6, 0.6, 20, 5, '#a59b8d')],
   dune: () => [block(0.1, 0.2, 1.8, 1.6, 0, 6, '#d6b277'), block(0.5, 0.5, 1.1, 1.0, 6, 6, '#dfbe86'), block(0.8, 0.8, 0.5, 0.5, 12, 4, '#e6c894')],
-  tree: () => [block(0.42, 0.42, 0.16, 0.16, 0, 26, '#6e5038'), block(0.2, 0.45, 0.3, 0.08, 18, 2, '#6e5038'), block(0.5, 0.25, 0.08, 0.3, 22, 2, '#6e5038')],
-  bush: () => [cone(0.35, 0.5, 0, 9, 10, '#8c8a4a'), cone(0.6, 0.45, 0, 8, 12, '#7a7a3e'), cone(0.5, 0.7, 0, 9, 9, '#94914f')],
+  tree: () => [block(0.9, 0.9, 0.2, 0.2, 0, 14, '#6e5038'), cone(1, 1, 10, 26, 46, '#3f8a3c'), cone(0.6, 1.3, 0, 12, 30, '#2f6b3a')],
+  bush: () => [cone(0.35, 0.5, 0, 9, 10, '#5d9a3e'), cone(0.6, 0.45, 0, 8, 12, '#4f8a35'), cone(0.5, 0.7, 0, 9, 9, '#68a646')],
+  stump: () => [block(0.3, 0.3, 0.4, 0.4, 0, 8, '#7a5a3c'), block(0.33, 0.33, 0.34, 0.34, 8, 1, '#c9a173')],
+  // Army (placeholders until the pictures): a drill yard with a hall, a camp of tents round a fire,
+  // an observatory, the family keep, and the hero's tomb.
+  barracks: () => [block(0.15, 0.15, 2.7, 2.7, 0, 3, shade(SAND, 0.9)), block(0.3, 0.3, 1.3, 2.4, 3, 24, CLAY), block(0.25, 0.25, 1.4, 2.5, 27, 4, '#a4462f'),
+    block(2.1, 0.6, 0.12, 0.12, 3, 30, DARK), block(2.1, 2.2, 0.12, 0.12, 3, 30, DARK), block(2.1, 0.6, 0.12, 1.72, 30, 3, DARK)],
+  camp: () => [block(0.2, 0.2, 3.6, 3.6, 0, 1, '#b99a63'), block(1.75, 1.75, 0.5, 0.5, 1, 4, '#5b4330'), cone(2, 2, 5, 9, 16, '#ff9a3c'),
+    cone(0.9, 0.9, 1, 22, 30, '#d8c08c'), cone(3.1, 0.9, 1, 22, 30, '#d0b47c'), cone(0.9, 3.1, 1, 22, 30, '#d0b47c'), cone(3.1, 3.1, 1, 22, 30, '#c9a96c')],
+  lab: () => [block(0.3, 0.3, 3.4, 3.4, 0, 8, STONE), block(0.9, 0.9, 2.2, 2.2, 8, 26, shade(STONE, 0.95)), dome(2, 2, 34, 34, '#3f6fb0'), block(1.9, 1.9, 0.2, 0.2, 66, 10, '#d9a93b')],
+  castle: () => [block(0.2, 0.2, 2.6, 2.6, 0, 30, '#a99a86'), block(0.15, 0.15, 2.7, 2.7, 30, 4, '#8f8170'),
+    block(0.15, 0.15, 0.4, 0.4, 34, 8, '#a99a86'), block(2.45, 0.15, 0.4, 0.4, 34, 8, '#a99a86'), block(0.15, 2.45, 0.4, 0.4, 34, 8, '#a99a86'), block(2.45, 2.45, 0.4, 0.4, 34, 8, '#a99a86'),
+    block(1.4, 1.4, 0.1, 0.1, 34, 30, DARK), block(1.5, 1.4, 0.5, 0.08, 52, 12, '#3f6fb0')],
+  hero: () => [block(0.2, 0.2, 2.6, 2.6, 0, 6, STONE), block(0.6, 0.6, 1.8, 1.8, 6, 6, shade(STONE, 0.95)), block(1.3, 1.3, 0.4, 0.4, 12, 34, '#b98b4a'), dome(1.5, 1.5, 46, 12, '#d9a93b')],
+  // Defences: a stone-thrower, a catapult, an air tower, a fire temple, and the two traps.
+  cannon: () => [block(0.4, 0.4, 2.2, 2.2, 0, 10, STONE), block(1.1, 1.1, 0.8, 0.8, 10, 14, '#7a5a3c'), block(1.4, 0.3, 0.2, 1.6, 22, 4, DARK), block(1.3, 0.3, 0.4, 0.4, 26, 8, '#8a8075')],
+  catapult: () => [block(0.3, 0.3, 2.4, 2.4, 0, 8, shade(SAND, 0.95)), block(0.9, 0.9, 0.15, 1.2, 8, 22, '#7a5a3c'), block(1.95, 0.9, 0.15, 1.2, 8, 22, '#7a5a3c'),
+    block(0.9, 1.4, 1.2, 0.15, 28, 4, '#7a5a3c'), block(1.45, 0.4, 0.1, 1.5, 30, 3, '#6e5038')],
+  airtower: () => [block(0.6, 0.6, 1.8, 1.8, 0, 10, STONE), block(1.1, 1.1, 0.8, 0.8, 10, 46, '#5c86c4'), block(0.85, 0.85, 1.3, 1.3, 56, 5, '#3f6fb0'), cone(1.5, 1.5, 61, 12, 18, '#d9a93b')],
+  fire: () => [block(0.3, 0.3, 2.4, 2.4, 0, 8, STONE), block(0.7, 0.7, 1.6, 1.6, 8, 20, shade(STONE, 0.92)), block(1.1, 1.1, 0.8, 0.8, 28, 6, '#5b4330'), cone(1.5, 1.5, 34, 12, 24, '#ff7a2a'), cone(1.5, 1.5, 34, 7, 16, '#ffd25a')],
+  pit: () => [block(0.2, 0.2, 0.6, 0.6, 0, 1, '#6b5a3c')],
+  sling: () => [block(0.2, 0.4, 0.6, 0.2, 0, 3, '#8a5a2b'), block(0.45, 0.45, 0.1, 0.1, 3, 8, '#6e5038')],
   // A windcatcher of Yazd: a tower with dark vents between its corner posts.
   badgir: () => {
     const p = [block(0.12, 0.12, 0.76, 0.76, 0, 12, shade(SAND, 0.95))];
@@ -131,12 +151,19 @@ function scaffold(size) {
   return p;
 }
 
+// The footprint each shape was drawn for, where it differs from the kind's size now (rules v2 made
+// many buildings bigger): the shape is scaled to fit.
+const DRAWN = { palace: 3, caravan: 2, qanat: 2, treasury: 2, cistern: 2, tower: 2, tree: 2 };
+
 // Polygons of one building, in pixels relative to the middle of its footprint.
 export function polys(kind, size, { building = false } = {}) {
-  const parts = [...PARTS[kind](), ...(building ? scaffold(size) : [])];
-  parts.sort((a, b) => a.depth - b.depth || a.z - b.z);
+  const base = DRAWN[kind] || size, f = size / base;
+  const [bx, by] = iso(base / 2, base / 2);
+  const shape = PARTS[kind]().sort((a, b) => a.depth - b.depth || a.z - b.z)
+    .flatMap(p => p.polys.map(q => ({ ...q, pts: q.pts.map((v, i) => (v - (i % 2 ? by : bx)) * f) })));
+  if (!building) return shape;
   const [cx, cy] = iso(size / 2, size / 2);
-  return parts.flatMap(p => p.polys.map(q => ({ ...q, pts: q.pts.map((v, i) => v - (i % 2 ? cy : cx)) })));
+  return [...shape, ...scaffold(size).sort((a, b) => a.depth - b.depth || a.z - b.z).flatMap(p => p.polys.map(q => ({ ...q, pts: q.pts.map((v, i) => v - (i % 2 ? cy : cx)) })))];
 }
 
 // Only the scaffolding, for a building that has a picture while it is being upgraded.
