@@ -41,7 +41,13 @@ export const fieldsHtml = {
       ${Object.entries(CONDITIONS).map(([k, l]) => `
         <label class="check"><input type="checkbox" value="${k}" ${d.conditions?.includes(k) ? 'checked' : ''}><span>${l}</span></label>`).join('')}
     </div>
-    <label class="field"><span>داروهایی که مصرف می‌کنید <em>اختیاری</em></span><textarea name="medications" rows="2" placeholder="مثلاً متفورمین، لوزارتان…">${esc(d.medications || '')}</textarea></label>`,
+    <label class="check"><input type="checkbox" name="glucoseMeds" ${d.glucoseMeds ? 'checked' : ''}><span>انسولین یا قرص پایین‌آورنده‌ی قند (مثل گلی‌بنکلامید یا گلیکلازید)</span></label>
+    <label class="field"><span>داروهایی که مصرف می‌کنید <em>اختیاری</em></span><textarea name="medications" rows="2" placeholder="مثلاً متفورمین، لوزارتان…">${esc(d.medications || '')}</textarea></label>
+    <div class="field" data-for-female ${d.sex === 'female' ? '' : 'hidden'}><span>بارداری و شیردهی</span>
+      <div class="seg" data-name="pregnancy">
+        ${PREGNANCY.map(([k, l]) => `<button type="button" data-v="${k}" class="${d.pregnancy === k ? 'on' : ''}">${l}</button>`).join('')}
+      </div>
+    </div>`,
   ed: d => `
     <p class="muted small">سابقه‌ی اختلال خوردن (مثل پرخوری عصبی، بی‌اشتهایی یا بولیمیا) دارید؟</p>
     <div class="choices" data-name="edHistory">
@@ -50,10 +56,13 @@ export const fieldsHtml = {
     </div>`,
 };
 
+// Asked of women (the onboarding needs an answer): in pregnancy and while breastfeeding the targets change (targets.js).
+export const PREGNANCY = [['no', 'هیچ‌کدام'], ['pregnant', 'باردارم'], ['breastfeeding', 'شیر می‌دهم']];
+
 // Reads every known field present in root into d.
 export function readFields(root, d) {
   root.querySelectorAll('input[name], textarea[name]').forEach(el => {
-    if (el.type === 'checkbox') return;
+    if (el.type === 'checkbox') { if (el.name === 'glucoseMeds') d.glucoseMeds = el.checked; return; }
     const v = el.value;
     if (['age', 'heightCm', 'weightKg', 'waistCm'].includes(el.name)) {
       const n = parseNum(v);
@@ -74,6 +83,8 @@ export function bindChoices(root, d) {
       if (!b) return;
       group.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
       d[group.dataset.name] = b.dataset.v;
+      // the pregnancy question is for women only
+      if (group.dataset.name === 'sex') root.querySelectorAll('[data-for-female]').forEach(el => { el.hidden = b.dataset.v !== 'female'; });
     });
   });
 }
@@ -93,10 +104,13 @@ export function targetsHtml(t) {
   <dl class="calc">
     ${t.teen ? '' : `<div><dt>سوخت‌وساز پایه</dt><dd>${kcal50(t.bmr)}</dd></div>`}
     <div><dt>مصرف روزانه با فعالیت</dt><dd>${kcal50(t.tdee)}</dd></div>
-    <div><dt>کسری روزانه</dt><dd>${fa(500)}</dd></div>
+    <div><dt>کسری روزانه</dt><dd>${fa(t.deficit ?? 500)}</dd></div>
     <div><dt>وزن مرجع برای پروتئین</dt><dd>${fa(t.refWeight, 1)} کیلو</dd></div>
   </dl>
   ${t.teen ? `<p class="muted small">چون هنوز زیر ۱۸ سال هستی، مصرف بدن با فرمول مخصوص نوجوان‌ها حساب شده که انرژی لازم برای رشد را هم در نظر می‌گیرد، و حداقل ایمن کالری هم برای تو بالاتر است (${fa(t.floor)}).</p>` : ''}
+  ${t.hold === 'pregnant' ? '<p class="note doctor small">در بارداری کالری کم نمی‌شود؛ هدف همان مصرف بدن است. افزایش وزن بارداری را با پزشک یا ماما دنبال کنید.</p>' : ''}
+  ${t.hold === 'underweight' ? '<p class="note doctor small">وزن‌تان برای قدتان کمتر از حد سالم است، برای همین کالری کم نمی‌شود. لطفاً با پزشک مشورت کنید.</p>' : ''}
+  ${t.nursing ? `<p class="muted small">در شیردهی کسری کمتر است و هدف از ${fa(1800)} پایین‌تر نمی‌رود.</p>` : ''}
   ${t.hitFloor ? `<p class="muted small">عدد محاسبه‌شده از حداقل ایمن (${fa(t.floor)}) کمتر بود، برای همین روی حداقل ایمن گذاشته شد.</p>` : ''}
   <p class="muted small">همه‌ی این عددها تخمینی‌اند و کالری‌ها به نزدیک‌ترین ۵۰ گرد شده‌اند.</p>`;
 }
@@ -105,7 +119,7 @@ const STEPS = [
   { title: 'سلام! چند سؤال کوتاه', sub: 'برای اینکه هدف‌ها را درست حساب کنیم.', html: d => fieldsHtml.basics(d), check: d => (!(d.age >= 16 && d.age <= 100) ? 'سن را بین ۱۶ تا ۱۰۰ وارد کنید.' : !d.sex ? 'جنس را انتخاب کنید.' : null) },
   { title: 'قد و وزن', sub: 'عددها را تقریبی هم وارد کنید اشکالی ندارد.', html: d => fieldsHtml.body(d), check: d => validate({ ...d, activity: 'x', age: 30, sex: 'm' }) },
   { title: 'روزهای‌تان چقدر پرتحرک است؟', sub: '', html: d => fieldsHtml.activity(d), check: d => (!d.activity ? 'یکی را انتخاب کنید.' : null) },
-  { title: 'سلامت', sub: 'این‌ها فقط برای این است که اگر لازم بود، پیشنهاد مشورت با پزشک بدهیم.', html: d => fieldsHtml.health(d), check: () => null },
+  { title: 'سلامت', sub: 'این‌ها فقط برای این است که اگر لازم بود، پیشنهاد مشورت با پزشک بدهیم.', html: d => fieldsHtml.health(d), check: d => (d.sex === 'female' && !d.pregnancy ? 'بارداری و شیردهی را انتخاب کنید.' : null) },
   { title: 'یک سؤال دیگر', sub: '', html: d => fieldsHtml.ed(d), check: d => (!d.edHistory ? 'یکی را انتخاب کنید.' : null) },
 ];
 
@@ -160,6 +174,7 @@ export function renderOnboarding(root, onDone) {
       store.saveProfile({
         sex: d.sex, age: d.age, heightCm: d.heightCm, waistCm: d.waistCm || null,
         activity: d.activity, conditions: d.conditions, medications: (d.medications || '').trim(), edHistory: d.edHistory,
+        glucoseMeds: !!d.glucoseMeds, glucoseMedsAsked: true, pregnancy: d.sex === 'female' ? d.pregnancy || 'no' : null,
         startDate: start, onboarded: true, kidneyAsked: true,
         targets: { kcal: t.kcal, protein: t.protein, baseWeight: d.weightKg, computedAt: start, tdee: t.tdee, source: 'formula' },
       });

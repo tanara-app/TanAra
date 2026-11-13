@@ -136,10 +136,25 @@ const TEEN = `# They are a teenager (16 or 17): rules on top of everything else
 - Praise habits (regular meals, vegetables, moving, sleep), never thinness or a lower number on the scale.
 - If they ask, or it matters, be clear that you are an AI, not a doctor or a person.`;
 
+// Safety holds the app applies (targets.js holdOf; 2026-11-13): what Hooshvareh must say along with them.
+const HOLDS: Record<string, string> = {
+  pregnant: `# They are pregnant: rules on top of everything else
+- The app takes no calories off in pregnancy: their target is what their body uses. Never suggest losing weight, a deficit, fasting, skipping meals or slimming products while pregnant; weight gain in pregnancy is normal and is followed by their doctor or midwife.
+- Help with regular, varied meals: protein, dairy, iron-rich foods, vegetables and fruit; no raw or undercooked meat, eggs or fish, no unpasteurised dairy; caffeine within what their doctor allows.
+- Bleeding, strong pain, severe vomiting, swelling with headache or blurred vision: tell them to see a doctor at once.`,
+  underweight: `# Their weight is under the healthy range for their height (BMI under 18.5): rules on top of everything else
+- The app takes no calories off: their target is what their body uses. Never suggest losing weight, a deficit, fasting or skipping meals; suggest seeing a doctor, kindly.
+- Praise regular, sufficient meals and strength, never thinness or a lower number on the scale.`,
+};
+const NURSING = `# They are breastfeeding: rules on top of everything else
+- The app keeps a gentle deficit (300 kcal) and never goes under 1800 kcal; losing about 0.5 kg a week is enough. Never suggest less, fasting, skipping meals or slimming products, and say a drop in milk supply means eating more and seeing their doctor or midwife.`;
+const GLUCOSE = `# They take insulin or a sugar-lowering pill (like glibenclamide or gliclazide)
+- Eating less can bring their blood sugar too low: never suggest skipping meals or long gaps, and say their doctor should adjust the dose as they eat less. Know the signs of a low (shaking, cold sweat, sudden hunger, confusion) and that a low is treated with about 15 g of fast sugar and then a check.`;
+
 type Ctx = {
   today: string; todayFa?: string; now?: string;
   profile?: Record<string, unknown> | null;
-  targets?: { kcal: number; protein: number; floor: number; teen?: boolean };
+  targets?: { kcal: number; protein: number; floor: number; teen?: boolean; hold?: string | null; nursing?: boolean };
   pattern?: { days: number; eaten: Record<string, number>; usual: Record<string, any[]>; use?: { days: number; options: any[] } | null } | null;
   foods?: any[]; entries?: any[]; weights?: any[]; waists?: any[]; reviews?: any[]; motivations?: any[]; notes?: any[];
   phase?: {
@@ -236,7 +251,7 @@ function sections(c: Ctx) {
     yesterday: addDays(c.today, -1),
     detailFrom,
     now: () => `# Now\ntoday: ${c.today}${c.todayFa ? ` (${c.todayFa})` : ""}${c.now ? `, local time ${c.now}` : ""}`,
-    profile: () => `# Profile (from the onboarding questionnaire)\n${JSON.stringify(c.profile || {})}${c.targets?.teen ? `\n\n${TEEN}` : ""}`,
+    profile: () => `# Profile (from the onboarding questionnaire)\n${JSON.stringify(c.profile || {})}${c.targets?.teen ? `\n\n${TEEN}` : ""}${c.targets?.hold && HOLDS[c.targets.hold] ? `\n\n${HOLDS[c.targets.hold]}` : ""}${c.targets?.nursing ? `\n\n${NURSING}` : ""}${(c.profile as any)?.glucoseMeds ? `\n\n${GLUCOSE}` : ""}`,
     targets: () => c.targets ? `# Daily targets\ncalories: ${c.targets.kcal} kcal, protein: ${c.targets.protein} g, safety floor (never go below): ${c.targets.floor} kcal` : "",
     mode: () => `# Mode they are using now\n${c.mode === "plan" ? "رژیم (diet plan)" : "شمارش کالری (calorie counting)"}`,
     plan: () => pl ? `# Current diet plan (you designed it), ${pl.start} to ${pl.end}, for ${pl.kcal} kcal/day\n${(pl.slots || []).map((s: any) => `## ${s.slot} — they pick ${s.pick}\n${s.options.map((o: string, n: number) => `${n + 1}. ${o}`).join("\n")}`).join("\n")}\nFree when hungry: ${(pl.free || []).join("، ") || "-"}\nWhat you told them about it: ${pl.note || "-"}${pl.previous ? `\nPlan before it: from ${pl.previous.start}, ${pl.previous.kcal} kcal/day, ${pl.previous.adherence.done} of ${pl.previous.adherence.of} occasions eaten as planned` : ""}` : "",

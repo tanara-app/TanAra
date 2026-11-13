@@ -7,7 +7,9 @@ import { effectiveTargets, isTeen, proteinFor } from '../domain/targets.js';
 import { phaseNotes, bindPhase, phaseLabel } from './phase.js';
 import { lightOn } from '../domain/phase.js';
 import { MEALS, MEALS5, mealLabel, baseMeal, meal5, entriesOn, totals, daysLoggedInWeek, sortedWeights } from '../domain/stats.js';
-import { underEating, rapidLoss, rapidLimit } from '../domain/safety.js';
+import { underEating, rapidLoss, rapidLimit, slowPace } from '../domain/safety.js';
+import { bmiOf, UNDERWEIGHT_BMI } from '../domain/targets.js';
+import { recalcTargets } from './profile.js';
 import { fa, kcal50, round50, esc, qtyLabel } from '../lib/fa.js';
 import { amountLabel } from './units.js';
 import { today, addDays, relLabel, faDM, weekStart } from '../lib/dates.js';
@@ -75,6 +77,15 @@ function ring(consumed, target) {
 export function renderToday(root) {
   const s = store.get();
   const p = store.profile();
+  /*
+    The underweight hold goes by the weight the targets were set at: when the latest weight crosses
+    the line either way (with half a point to spare on the way up), they are worked out again.
+  */
+  const lastKg = sortedWeights(store.get().weights).at(-1)?.kg;
+  if (lastKg && p.targets?.baseWeight && Number(p.heightCm) > 0) {
+    const was = bmiOf(Number(p.targets.baseWeight), Number(p.heightCm)), now = bmiOf(Number(lastKg), Number(p.heightCm));
+    if ((was >= UNDERWEIGHT_BMI && now < UNDERWEIGHT_BMI) || (was < UNDERWEIGHT_BMI && now >= UNDERWEIGHT_BMI + 0.5)) { recalcTargets(); return; }
+  }
   const t = effectiveTargets(p, day);
   const list = entriesOn(s.entries, day);
   const tot = totals(list);
@@ -103,9 +114,23 @@ export function renderToday(root) {
     if (ue && !dismissed('under', ue.days[0])) {
       notices.push({ key: 'under', mark: ue.days[0], html: `<strong>چند روز است کم خورده‌اید</strong><p>سه روز گذشته کالری‌تان از حداقل ایمن (${fa(t.floor)}) کمتر بوده. کم‌خوری زیاد معمولاً نتیجه‌ی برعکس دارد؛ بدن خسته می‌شود و ادامه دادن سخت‌تر. کمی بیشتر خوردن کاملاً اشکالی ندارد.</p>` });
     }
-    const rl = rapidLoss(s.weights, p.startDate, today(), rapidLimit(isTeen(p), p.conditions));
+    const rl = rapidLoss(s.weights, p.startDate, today(), rapidLimit(isTeen(p), p.conditions, slowPace(p)));
     if (rl && !dismissed('rapid', weekStart(today()))) {
       notices.push({ key: 'rapid', mark: weekStart(today()), cls: 'doctor', html: `<strong>سرعت کاهش وزن زیاد است</strong><p>سه هفته‌ی پشت‌سرهم بیشتر از ${fa(rl.perWeek, 1)} کیلو در هفته کم کرده‌اید. لطفاً با پزشک‌تان مشورت کنید.</p>` });
+    }
+    // safety holds (targets.js): no deficit in pregnancy or underweight, a gentle one while breastfeeding
+    if (t.hold === 'pregnant' && !dismissed('hold', 'pregnant')) notices.push({ key: 'hold', mark: 'pregnant', cls: 'doctor', html: '<strong>در بارداری کالری کم نمی‌شود</strong><p>هدف روزانه همان مصرف بدن است. افزایش وزن بارداری را با پزشک یا ماما دنبال کن.</p>' });
+    if (t.hold === 'underweight' && !dismissed('hold', 'underweight')) notices.push({ key: 'hold', mark: 'underweight', cls: 'doctor', html: '<strong>وزنت کمتر از حد سالم است</strong><p>برای همین کالری کم نمی‌شود و هدف همان مصرف بدن است. لطفاً با پزشک مشورت کن.</p>' });
+    // insulin or a sugar-lowering pill: a deficit can bring the sugar too low
+    if (p.glucoseMeds && !dismissed('glucose', '1')) notices.push({ key: 'glucose', mark: '1', cls: 'doctor', html: '<strong>با انسولین یا قرص قند</strong><p>کم کردن کالری ممکن است قندت را پایین بیاورد. مقدار دارو را با پزشکت تنظیم کن و نشانه‌های افت قند را بشناس: لرزش، عرق سرد، گرسنگی ناگهانی، گیجی.</p>' });
+    // asked once of members who joined before these questions
+    if (p.sex === 'female' && !p.pregnancy) {
+      notices.push({ key: 'askpreg', mark: '1', cls: 'doctor', keep: true, html: `<strong>باردار هستی یا شیر می‌دهی؟</strong><p>در این دو حالت هدف کالری فرق می‌کند.</p>
+        <div class="row gap">${[['no', 'هیچ‌کدام'], ['pregnant', 'باردارم'], ['breastfeeding', 'شیر می‌دهم']].map(([k, l], i) => `<button class="btn ${i ? '' : 'primary '}sm" data-preg="${k}">${l}</button>`).join('')}</div>` });
+    }
+    if (!p.glucoseMedsAsked && (p.conditions || []).some(c => c === 'diabetes' || c === 'prediabetes')) {
+      notices.push({ key: 'askglucose', mark: '1', cls: 'doctor', keep: true, html: `<strong>انسولین یا قرص پایین‌آورنده‌ی قند مصرف می‌کنی؟</strong><p>مثل گلی‌بنکلامید یا گلیکلازید.</p>
+        <div class="row gap"><button class="btn primary sm" data-glucose="no">نه</button><button class="btn sm" data-glucose="yes">بله</button></div>` });
     }
     // «بیماری کلیه» used to be one choice; it became two that the diet treats very differently
     if ((p.conditions || []).includes('kidney') && !p.kidneyAsked) {
@@ -273,6 +298,9 @@ export function renderToday(root) {
     // a motivation drawn inside the closed fold had no height to take
     if (fold.open) fold.querySelector('.mot-track')?.dispatchEvent(new Event('scroll'));
   };
+  // the answers change the targets: worked out again at once
+  root.querySelectorAll('[data-preg]').forEach(b => b.onclick = () => { store.saveProfile({ ...store.profile(), pregnancy: b.dataset.preg }); recalcTargets(); });
+  root.querySelectorAll('[data-glucose]').forEach(b => b.onclick = () => { store.saveProfile({ ...store.profile(), glucoseMeds: b.dataset.glucose === 'yes', glucoseMedsAsked: true }); });
   root.querySelectorAll('[data-kidney]').forEach(b => b.onclick = () => {
     const pr = store.profile();
     const v = b.dataset.kidney;

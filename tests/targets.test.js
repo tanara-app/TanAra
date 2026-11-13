@@ -37,8 +37,37 @@ suite('targets', () => {
   test('effective target: manual wins, but not under the floor', () => {
     const p = { sex: 'male', targets: { kcal: 1850, protein: 113, manualKcal: 1300 } };
     eq(effectiveTargets(p, '2026-01-10').kcal, 1500);
-    eq(effectiveTargets({ sex: 'male', targets: { kcal: 1850, protein: 113, manualKcal: 2000, manualProtein: 120 } }, '2026-01-10'), { kcal: 2000, protein: 120, proteinMax: false, floor: 1500, phase: 'loss', teen: false, manual: true });
+    eq(effectiveTargets({ sex: 'male', targets: { kcal: 1850, protein: 113, manualKcal: 2000, manualProtein: 120 } }, '2026-01-10'), { kcal: 2000, protein: 120, proteinMax: false, floor: 1500, phase: 'loss', teen: false, manual: true, hold: null, nursing: false });
     eq(effectiveTargets(null).kcal, 0);
+  });
+
+  test('pregnancy: no deficit, the target is what the body uses, even over a target set by hand', () => {
+    const w = { sex: 'female', age: 30, heightCm: 165, weightKg: 85, activity: 'light' };
+    const t = computeTargets({ ...w, pregnancy: 'pregnant' });
+    eq([t.hold, t.deficit, t.kcal], ['pregnant', 0, t.tdee]);
+    const p = { ...w, pregnancy: 'pregnant', targets: { kcal: 1500, tdee: t.tdee, baseWeight: 85, manualKcal: 1300 } };
+    eq(effectiveTargets(p, '2026-11-13').kcal, t.tdee);
+    eq(effectiveTargets(p, '2026-11-13').hold, 'pregnant');
+  });
+
+  test('breastfeeding: a gentle deficit and never under 1800', () => {
+    const w = { sex: 'female', age: 30, heightCm: 165, weightKg: 85, activity: 'light' };
+    const t = computeTargets({ ...w, pregnancy: 'breastfeeding' });
+    eq([t.nursing, t.deficit], [true, 300]);
+    ok(t.kcal >= 1800 && t.kcal >= t.tdee - 300, `${t.kcal}`);
+    const small = computeTargets({ ...w, weightKg: 60, heightCm: 155, activity: 'sedentary', pregnancy: 'breastfeeding' });
+    ok(small.kcal >= 1800, `${small.kcal}`);
+    const p = { ...w, pregnancy: 'breastfeeding', targets: { kcal: 1400, tdee: 2300, baseWeight: 85, manualKcal: 1300 } };
+    eq(effectiveTargets(p, '2026-11-13').kcal, 2000);
+  });
+
+  test('underweight: no deficit', () => {
+    const t = computeTargets({ sex: 'female', age: 25, heightCm: 170, weightKg: 52, activity: 'light' }); // BMI 18.0
+    eq([t.hold, t.deficit, t.kcal], ['underweight', 0, t.tdee]);
+    const ok19 = computeTargets({ sex: 'female', age: 25, heightCm: 170, weightKg: 56, activity: 'light' }); // BMI 19.4
+    eq(ok19.hold, null);
+    const p = { sex: 'female', heightCm: 170, targets: { kcal: 1500, tdee: 2000, baseWeight: 52 } };
+    eq(effectiveTargets(p, '2026-11-13').kcal, 2000);
   });
 
   test('kidney disease: protein becomes a limit of 0.8 g per kg of the reference weight', () => {

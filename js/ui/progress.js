@@ -2,7 +2,7 @@
 // forms (measure.js, activity.js), one card for asking Hooshvareh, and the details folded away.
 import * as store from '../data/store.js';
 import { sortedWeights, rate4w, waistSeries, waistToHeight, WHTR_GOAL } from '../domain/stats.js';
-import { rapidLoss, rapidLimit } from '../domain/safety.js';
+import { rapidLoss, rapidLimit, slowPace } from '../domain/safety.js';
 import { shouldSuggestRecalc, phaseOn, maintenanceKcal, isTeen } from '../domain/targets.js';
 import { nextTargets, ENERGY } from '../domain/energy.js';
 import { fa, signed, kcal50 } from '../lib/fa.js';
@@ -122,7 +122,7 @@ export function renderProgress(root) {
   const sorted = sortedWeights(s.weights);
   const t = today();
   const latest = sorted[sorted.length - 1];
-  const rapid = rapidLoss(s.weights, p.startDate, t, rapidLimit(isTeen(p, t), p.conditions));
+  const rapid = rapidLoss(s.weights, p.startDate, t, rapidLimit(isTeen(p, t), p.conditions, slowPace(p)));
   const m = measureLine();
   const seg = `<div class="seg small prog-tab" data-tab role="tablist" aria-label="پیشرفت چه کسی">
       <button type="button" role="tab" data-v="me" aria-selected="${tab === 'me'}" class="${tab === 'me' ? 'on' : ''}">من</button>

@@ -6,6 +6,26 @@ export const DEFICIT = 500; // kcal below what the body uses, while losing weigh
 export const RAMP_STEP = 150; // kcal added each week while climbing from the deficit to maintenance
 export const CORRECT_KCAL = 300; // kcal below maintenance during a short correction (see phase.js)
 
+/*
+  Safety holds (2026-11-13, checked against the guidelines):
+  - pregnancy: no deficit at all; weight loss is not advised in pregnancy (ACOG, NICE); the target
+    is what the body uses, and gaining is followed with the doctor or midwife;
+  - breastfeeding: a gentle deficit (NURSING_DEFICIT) and never under NURSING_FLOOR, so the milk
+    supply holds (about 0.5 kg a week is safe: Academy of Nutrition and Dietetics, NICE);
+  - underweight (BMI under 18.5 at the weight the targets were set at): no deficit.
+  `pregnancy` in the profile: 'no' | 'pregnant' | 'breastfeeding' (asked of women only).
+*/
+export const NURSING_DEFICIT = 300;
+export const NURSING_FLOOR = 1800;
+export const UNDERWEIGHT_BMI = 18.5;
+export const bmiOf = (kg, heightCm) => (kg > 0 && heightCm > 0 ? kg / (heightCm / 100) ** 2 : null);
+// why the app does not take calories off, or null
+export function holdOf({ pregnancy, weightKg, heightCm } = {}) {
+  if (pregnancy === 'pregnant') return 'pregnant';
+  const b = bmiOf(Number(weightKg), Number(heightCm));
+  return b !== null && b < UNDERWEIGHT_BMI ? 'underweight' : null;
+}
+
 export const ACTIVITY = {
   sedentary: { label: 'کم‌تحرک', factor: 1.2, hint: 'بیشتر روز نشسته، ورزش منظم ندارم' },
   light: { label: 'کمی فعال', factor: 1.375, hint: 'پیاده‌روی یا ورزش سبک ۱ تا ۳ روز در هفته' },
@@ -103,16 +123,20 @@ export const proteinFor = p => Math.round((kidney(p) ? KIDNEY_PROTEIN_PER_KG : P
 // given, it replaces the formula's estimate.
 // For a teen (see above) the formula and the floor are the teen ones. startDate, when given,
 // moves the age on from the one given at sign-up.
-export function computeTargets({ sex, age: age0, heightCm, weightKg, activity, measuredTdee, startDate, conditions }) {
+export function computeTargets({ sex, age: age0, heightCm, weightKg, activity, measuredTdee, startDate, conditions, pregnancy }) {
   const age = ageOn({ age: age0, startDate });
   const teen = age < ADULT_AGE;
   const bmr = 10 * weightKg + 6.25 * heightCm - 5 * age + (sex === 'male' ? 5 : -161);
   const formula = teen ? teenEnergy(sex, age, heightCm, weightKg, activity) : bmr * (ACTIVITY[activity]?.factor ?? 1.2);
   const measured = Number(measuredTdee) > 0;
   const tdee = measured ? Number(measuredTdee) : formula;
-  const floor = teen ? teenFloor(sex, age, heightCm, weightKg) : safeFloor(sex);
-  const raw = round50(tdee - DEFICIT);
+  const hold = holdOf({ pregnancy, weightKg, heightCm });
+  const nursing = !hold && pregnancy === 'breastfeeding';
+  const deficit = hold ? 0 : nursing ? NURSING_DEFICIT : DEFICIT;
+  const floor = Math.max(teen ? teenFloor(sex, age, heightCm, weightKg) : safeFloor(sex), nursing ? NURSING_FLOOR : 0);
+  const raw = round50(tdee - deficit);
   return {
+    hold, nursing, deficit,
     bmr: Math.round(bmr),
     tdee: round50(tdee),
     formulaTdee: round50(formula),
@@ -172,8 +196,14 @@ export function effectiveTargets(p, day = today()) {
   const floor = floorFor(p, day);
   const t = p.targets || {};
   const phase = phaseOn(p, day);
-  const loss = Math.max(floor, Number(t.manualKcal) || t.kcal || floor);
-  const full = Math.max(loss, round50(maintenanceKcal(p)));
+  const hold = holdOf({ pregnancy: p.pregnancy, weightKg: t.baseWeight, heightCm: p.heightCm });
+  const nursing = !hold && p.pregnancy === 'breastfeeding';
+  const maint = round50(maintenanceKcal(p));
+  // a hold overrides even a target set by hand: no deficit; breastfeeding keeps a gentle one
+  const loss = hold ? Math.max(floor, maint)
+    : nursing ? Math.max(floor, NURSING_FLOOR, Number(t.manualKcal) || 0, round50(maint - NURSING_DEFICIT))
+    : Math.max(floor, Number(t.manualKcal) || t.kcal || floor);
+  const full = Math.max(loss, maint);
   const kcal = phase === 'loss' ? loss
     : correcting(p, day) ? Math.max(floor, round50(maintenanceKcal(p) - CORRECT_KCAL))
     : rampKcal(p, day) ?? full;
@@ -181,13 +211,14 @@ export function effectiveTargets(p, day = today()) {
   // targets set before kidney disease was entered (or before this rule) still get the limit
   const limit = kidney(p) && Number(p.heightCm) > 0 ? Math.round(KIDNEY_PROTEIN_PER_KG * refWeight(Number(p.heightCm))) : 0;
   const protein = manualProtein || (limit ? Math.min(limit, t.protein || limit) : t.protein || 0);
-  return { kcal, protein, proteinMax: !manualProtein && !!limit, floor, phase, teen: isTeen(p, day), manual: !!(t.manualKcal || t.manualProtein) };
+  return { kcal, protein, proteinMax: !manualProtein && !!limit, floor, phase, teen: isTeen(p, day), manual: !!(t.manualKcal || t.manualProtein), hold, nursing };
 }
 
 export const clampKcal = (p, kcal) => Math.max(floorFor(p), Math.round(kcal));
 
 export function hasMedicalFlag(p) {
-  return (p.conditions?.length > 0) || !!(p.medications || '').trim() || p.edHistory === 'yes' || p.edHistory === 'unsure';
+  return (p.conditions?.length > 0) || !!(p.medications || '').trim() || p.edHistory === 'yes' || p.edHistory === 'unsure'
+    || !!p.glucoseMeds || p.pregnancy === 'pregnant' || p.pregnancy === 'breastfeeding';
 }
 
 // Suggest recalculating after every 5 kg lost since targets were last set.

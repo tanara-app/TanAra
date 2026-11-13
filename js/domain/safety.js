@@ -41,7 +41,10 @@ export function rapidLoss(weights, startDay, day, perWeek = 1.5) {
   a week; faster loss can worsen liver inflammation).
 */
 export const SLOW_LOSS = ['gout', 'gallstone', 'liver'];
-export const rapidLimit = (teen, conditions = []) => (teen || conditions.some(c => SLOW_LOSS.includes(c)) ? 1 : 1.5);
+// …and 1 kg too while breastfeeding or on insulin or a sugar-lowering pill (`slow`: the profile's
+// pregnancy / glucoseMeds), where a fast loss risks the milk or a low blood sugar.
+export const slowPace = p => !!p?.glucoseMeds || p?.pregnancy === 'breastfeeding';
+export const rapidLimit = (teen, conditions = [], slow = false) => (teen || slow || conditions.some(c => SLOW_LOSS.includes(c)) ? 1 : 1.5);
 
 /*
   Under-eating: three days in a row (before today) each logged as a full day and below the
