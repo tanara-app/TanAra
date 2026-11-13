@@ -2,26 +2,23 @@
   «سرزمین»: the battle screen (GAME.md §8). A second Phaser scene over the same game, with its own
   HTML bar; the village scene sleeps meanwhile. The fight itself is js/domain/battle.js.
 
-  Top: time left, destruction and stars; the flag ends the battle. Bottom: the troops still to place
-  (tap one to pick it). Tap the ground to place one, hold to place a stream. Troops can't go down in
+  Laid out as in the genre (GAME.md §13b): top left the fort's name and the loot still there; top right
+  the time left; bottom right the stars and destruction; bottom left the red flag that ends the battle;
+  along the bottom the troops still to place, with their counts (tap one to pick it). Tap the ground to place one, hold to place a stream. Troops can't go down in
   the red zone round the buildings; it shows at the start and wherever a tap is refused. When the
   battle is over a sheet shows the stars and the loot; ✓ goes back to the village.
   A replay (opts.plan, a raid from js/domain/raid.js) places the troops by itself and takes no taps.
 */
 import { fa, faDigits } from '../lib/fa.js';
-import { icon } from './dom.js';
+import { I, troopIcon } from './gameIcons.js';
 import { SIZE, KINDS } from '../domain/game.js';
 import { TROOPS, TROOP_ORDER } from '../domain/army.js';
 import { makeBattle, deploy, canDeploy, step, result, over, BATTLE_TIME, STEP } from '../domain/battle.js';
 import { TW, TH, iso, polys } from './gameArt.js';
 
 const OUT = 8;
-const starSvg = (on, s = 26) => `<svg viewBox="0 0 24 24" width="${s}" height="${s}"><path d="M12 2.5l2.9 6.1 6.6.8-4.9 4.6 1.3 6.6L12 17.3 6.1 20.6l1.3-6.6L2.5 9.4l6.6-.8z" fill="${on ? '#f2c14e' : '#5a4630'}" stroke="#3b2a17" stroke-width="1.2" stroke-linejoin="round"/></svg>`;
-const flagSvg = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21V4M5 4h11l-2 4 2 4H5"/></svg>';
-export const troopSvg = (t, s = 34) => {
-  const T = TROOPS[t];
-  return `<svg viewBox="0 0 24 24" width="${s}" height="${s}"><circle cx="12" cy="12" r="10" fill="${T.color}" stroke="#3b2a17" stroke-width="1.5"/>${T.air ? '<path d="M3 10q4-4 9 0q5-4 9 0" fill="none" stroke="#fff" stroke-width="1.6"/>' : ''}<circle cx="12" cy="${T.air ? 14 : 12}" r="${2 + T.room ** 0.5}" fill="#fff" opacity=".85"/></svg>`;
-};
+const starSvg = (on, s = 26) => I.star(s, on);
+const troopSvg = (t, s = 34) => troopIcon(t, TROOPS[t].color, s);
 
 /*
   Opens a battle. opts: { game (Phaser.Game), el (the .game section), layout, army, dpr, title,
@@ -42,8 +39,10 @@ export function openBattle(opts) {
   const hud = document.createElement('div');
   hud.className = `battle-hud${plan ? ' replay' : ''}`;
   hud.innerHTML = `
-    <div class="battle-top"><b data-time></b><span data-pct></span><span class="battle-stars" data-stars></span></div>
-    <button class="battle-end" data-end aria-label="پایان">${flagSvg}</button>
+    <div class="bh-name"><b>${opts.title || ''}</b><span class="bh-loot" data-loot></span></div>
+    <div class="bh-time"><span>پایان نبرد در</span><b data-time></b></div>
+    <div class="bh-score"><span class="gstars" data-stars></span><b data-pct></b></div>
+    <button class="bh-end" data-end aria-label="پایان">${I.flag(24)}<span>پایان</span></button>
     <div class="battle-troops" data-troops></div>
     <div class="battle-over" hidden></div>`;
   el.appendChild(hud);
@@ -51,13 +50,15 @@ export function openBattle(opts) {
 
   function bar() {
     $('[data-troops]').innerHTML = TROOP_ORDER.filter(t => army[t] > 0).map(t =>
-      `<button class="battle-troop${t === pick ? ' on' : ''}${b.left[t] ? '' : ' none'}" data-t="${t}">${troopSvg(t)}<b>${fa(b.left[t] || 0)}</b></button>`).join('');
+      `<button class="battle-troop${t === pick ? ' on' : ''}${b.left[t] ? '' : ' none'}" data-t="${t}"><b>×${fa(b.left[t] || 0)}</b>${troopSvg(t, 46)}</button>`).join('');
   }
   function top() {
     const r = result(b), left = Math.max(0, BATTLE_TIME - b.t);
     $('[data-time]').textContent = faDigits(`${Math.floor(left / 60)}:${String(Math.floor(left % 60)).padStart(2, '0')}`);
     $('[data-pct]').textContent = `${fa(r.pct)}٪`;
-    $('[data-stars]').innerHTML = [0, 1, 2].map(i => starSvg(i < r.stars, 20)).join('');
+    $('[data-stars]').innerHTML = [0, 1, 2].map(i => starSvg(i < r.stars, 26)).join('');
+    const left2 = { coin: Math.max(0, (layout.loot?.coin || 0) - b.got.coin), water: Math.max(0, (layout.loot?.water || 0) - b.got.water) };
+    $('[data-loot]').innerHTML = ['coin', 'water'].map(k => `<span class="gc">${opts.resIcon[k](20)}<b>${fa(left2[k])}</b></span>`).join('');
   }
   bar(); top();
   $('[data-troops]').onclick = e => { const t = e.target.closest('[data-t]'); if (t) { pick = t.dataset.t; bar(); } };
@@ -68,13 +69,13 @@ export function openBattle(opts) {
     ended = true;
     const r = result(b);
     const { got } = opts.onEnd?.(r) || { got: r.loot };
-    const lootHtml = ['coin', 'water'].map(k => `<span class="battle-loot">${opts.resIcon[k](22)}<b>${fa(got[k] || 0)}</b></span>`).join('');
+    const lootHtml = ['coin', 'water'].map(k => `<span class="battle-loot">${opts.resIcon[k](30)}<b>${fa(got[k] || 0)}</b></span>`).join('');
     const box = $('.battle-over');
     box.innerHTML = `<div class="battle-card">
-      <div class="battle-big">${[0, 1, 2].map(i => starSvg(i < r.stars, 46)).join('')}</div>
+      <div class="battle-big">${[0, 1, 2].map(i => starSvg(i < r.stars, 58)).join('')}</div>
       <div class="battle-pct">${fa(r.pct)}٪</div>
       <div class="battle-loots">${lootHtml}</div>
-      <button class="game-btn" data-back aria-label="برگشت">${icon.check}</button></div>`;
+      <button class="gb green big" data-back aria-label="برگشت">${I.check(30)}</button></div>`;
     box.hidden = false;
     box.querySelector('[data-back]').onclick = close;
     scene.pauseSim = true;
