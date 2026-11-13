@@ -6,6 +6,7 @@
   (tap one to pick it). Tap the ground to place one, hold to place a stream. Troops can't go down in
   the red zone round the buildings; it shows at the start and wherever a tap is refused. When the
   battle is over a sheet shows the stars and the loot; ✓ goes back to the village.
+  A replay (opts.plan, a raid from js/domain/raid.js) places the troops by itself and takes no taps.
 */
 import { fa, faDigits } from '../lib/fa.js';
 import { icon } from './dom.js';
@@ -26,14 +27,20 @@ export const troopSvg = (t, s = 34) => {
   Opens a battle. opts: { game (Phaser.Game), el (the .game section), layout, army, dpr, title,
   onEnd(result) → { got } (applies it to the saved game and returns what went in), onClose() }.
 */
+// The same nudge as a raid (js/domain/raid.js): a spot in the red zone moves a little further out.
+function nudge(b, p) {
+  for (let d = 0.5; d < 3; d += 0.5) for (const [dx, dy] of [[0, -d], [d, 0], [0, d], [-d, 0]]) if (canDeploy(b, p.x + dx, p.y + dy)) { deploy(b, p.t, p.x + dx, p.y + dy); return; }
+}
+
 export function openBattle(opts) {
   const { game, el, layout, army, dpr } = opts;
   const b = makeBattle(layout, army);
-  let pick = TROOP_ORDER.find(t => army[t] > 0) || null, ended = false;
+  const plan = opts.plan || null;
+  let pick = plan ? null : TROOP_ORDER.find(t => army[t] > 0) || null, ended = false, k = 0;
 
   el.classList.add('in-battle');
   const hud = document.createElement('div');
-  hud.className = 'battle-hud';
+  hud.className = `battle-hud${plan ? ' replay' : ''}`;
   hud.innerHTML = `
     <div class="battle-top"><b data-time></b><span data-pct></span><span class="battle-stars" data-stars></span></div>
     <button class="battle-end" data-end aria-label="پایان">${flagSvg}</button>
@@ -60,7 +67,7 @@ export function openBattle(opts) {
     if (ended) return;
     ended = true;
     const r = result(b);
-    const { got } = opts.onEnd(r) || { got: r.loot };
+    const { got } = opts.onEnd?.(r) || { got: r.loot };
     const lootHtml = ['coin', 'water'].map(k => `<span class="battle-loot">${opts.resIcon[k](22)}<b>${fa(got[k] || 0)}</b></span>`).join('');
     const box = $('.battle-over');
     box.innerHTML = `<div class="battle-card">
@@ -147,6 +154,7 @@ export function openBattle(opts) {
       let down = null, pinch = null, hold = null;
       const tile = (px, py) => { const p = cam.getWorldPoint(px, py); const a = p.x / (TW / 2), c = p.y / (TH / 2); return { x: (a + c) / 2, y: (c - a) / 2 }; };
       const place = (p) => {
+        if (plan) return;
         if (ended || !pick || !(b.left[pick] > 0)) return;
         const t = tile(p.x, p.y);
         if (!deploy(b, pick, t.x, t.y)) { if (!canDeploy(b, t.x, t.y)) this.showZone(); return; }
@@ -184,11 +192,16 @@ export function openBattle(opts) {
       if (this.pauseSim) return;
       this.acc += Math.min(delta, 250) / 1000;
       const shots = [], booms = [];
-      while (this.acc >= STEP) { this.acc -= STEP; step(b, STEP); shots.push(...b.shots); booms.push(...b.booms); if (over(b)) break; }
+      while (this.acc >= STEP) {
+        this.acc -= STEP;
+        if (plan) { while (k < plan.length && plan[k].s <= b.clock + 1e-9) { const p = plan[k++]; if (!deploy(b, p.t, p.x, p.y)) nudge(b, p); } bar(); }
+        step(b, STEP); b.clock += STEP; shots.push(...b.shots); booms.push(...b.booms);
+        if (over(b) && (!plan || k >= plan.length)) break;
+      }
       for (const s of this.sprites.values()) if (s.o.dead && !s.down) this.rubble(s);
       this.draw(shots, booms);
       top();
-      if (over(b) && !ended) this.time.delayedCall(700, finish);
+      if (over(b) && (!plan || k >= plan.length) && !ended) { ended = true; this.time.delayedCall(700, () => { ended = false; finish(); }); }
     }
     draw(shots, booms) {
       const u = this.units, f = this.fx;

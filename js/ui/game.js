@@ -14,6 +14,8 @@
   The badge by the bar is the player's level (experience); the cup opens the achievements.
   A barracks or camp sheet has a sword that opens training (GAME.md §7); the crossed swords at the
   bottom open the road of div forts, and a fort opens the battle (js/ui/battle.js).
+  Raids by the divs (GAME.md §9, js/domain/raid.js) are fought when the page opens; a sheet then shows
+  what happened, with a replay. The side shows the medals and, while there is one, the shield's time.
 */
 import * as store from '../data/store.js';
 import { today } from '../lib/dates.js';
@@ -28,6 +30,7 @@ import { TW, TH, iso, polys, scaffoldPolys, drawPreview } from './gameArt.js';
 import { TROOPS, TROOP_ORDER, train, untrain, settleArmy, armyRoom, armyUsed, whyNotTrain, opensAt, armyCount } from '../domain/army.js';
 import { FORTS, fortLayout, fortOpen, endFort } from '../domain/battle.js';
 import { openBattle, troopSvg } from './battle.js';
+import { runRaids, unseen, markSeen, shieldLeft } from '../domain/raid.js';
 
 const PHASER = 'https://cdn.jsdelivr.net/npm/phaser@4.2.1/dist/phaser.min.js';
 const ZMIN = 0.2, ZMAX = 2.2;
@@ -52,6 +55,9 @@ const FIT = {};
 // band of woods round it. OUT tiles of woods are visible past each side.
 const OUT = 8;
 const swordsSvg = '<svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4l10 10M4 4h4M4 4v4M20 4L10 14M20 4h-4M20 4v4"/><path d="M8 16l-3 3M16 16l3 3M11 13l-4 4M13 13l4 4"/></svg>';
+const medalSvg = '<svg viewBox="0 0 24 24" width="18" height="18"><path d="M8 2h3l1 5-3 1zM16 2h-3l-1 5 3 1z" fill="#c0392b"/><circle cx="12" cy="14" r="6.5" fill="#f2c14e" stroke="#8a5a2b" stroke-width="1.4"/><path d="M12 10.5l1.1 2.2 2.4.3-1.8 1.6.5 2.4-2.2-1.2-2.2 1.2.5-2.4-1.8-1.6 2.4-.3z" fill="#fff6d6"/></svg>';
+const shieldSvg = '<svg viewBox="0 0 24 24" width="18" height="18"><path d="M12 2.5l8 3v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10v-6z" fill="#4aa8e0" stroke="#1f5f8f" stroke-width="1.4"/><path d="M12 5.5v13" stroke="#d6f0ff" stroke-width="1.4"/></svg>';
+const playSvg = '<svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M7 4.5v15l12-7.5z"/></svg>';
 const trophySvg = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 4h8v5a4 4 0 0 1-8 0z"/><path d="M8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4M12 13v4M8 20h8M9 17h6"/></svg>';
 const chestSvg = '<svg viewBox="0 0 24 24" width="22" height="22"><rect x="3" y="9" width="18" height="11" rx="2" fill="#a0612b" stroke="#4a2c12" stroke-width="1.4"/><path d="M3 11a9 5 0 0 1 18 0" fill="#c47a35" stroke="#4a2c12" stroke-width="1.4"/><rect x="10.5" y="10" width="3" height="4" rx="1" fill="#f2c14e" stroke="#4a2c12" stroke-width="1"/></svg>';
 const hammerSvg = '<svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4l6 6-3 3-6-6z"/><path d="M11 7L4 14l3 3 7-7"/><path d="M5.5 15.5L3 20l4.5-2.5"/></svg>';
@@ -70,14 +76,16 @@ function loadPhaser() {
   return phaser;
 }
 
-// The saved game, with new logs turned into resources and finished jobs completed.
-function current() {
+// The saved game, with new logs turned into resources and finished jobs completed (and, when the page
+// opens, the raids that came due while it was closed).
+function current(opening = false) {
   const p = store.profile() || {};
   const d = store.get();
   const g0 = load(p.game, today());
   const { game: g1, gained } = claimAll(g0, { entries: d.entries, activity: d.activity }, today());
   const { game: g2 } = settle(g1, Date.now());
-  const { game } = settleArmy(g2, Date.now());
+  const { game: g3 } = settleArmy(g2, Date.now());
+  const game = opening ? runRaids(g3, Date.now()) : g3;
   if (game !== p.game) save(game);
   return { game, gained };
 }
@@ -104,6 +112,8 @@ export function renderGame(root) {
       </div>
       <div class="game-side">
         <div class="game-xp" aria-label="سطح"><b data-xp></b><i></i></div>
+        <div class="game-chip" aria-label="نشان افتخار">${medalSvg}<b data-medals></b></div>
+        <div class="game-chip game-shield" aria-label="سپر" hidden>${shieldSvg}<b data-shield></b></div>
         <button class="game-ach" data-ach aria-label="دستاوردها">${trophySvg}<span class="game-dot" hidden></span></button>
       </div>
       <button class="game-build" data-shop aria-label="ساختن">${hammerSvg}</button>
@@ -114,6 +124,7 @@ export function renderGame(root) {
       <div class="game-shop game-achs" hidden><div class="game-list"></div></div>
       <div class="game-shop game-train" hidden><div class="game-sheet"><div class="game-army"></div><div class="game-cards"></div></div></div>
       <div class="game-shop game-map" hidden><div class="game-list"></div></div>
+      <div class="game-shop game-news" hidden><div class="game-list"></div></div>
       <p class="game-wait">در حال بارگذاری…</p>
     </section>`;
   const el = root.querySelector('.game');
@@ -142,12 +153,17 @@ function start(el, L) {
   const [w, h] = size();
   const placeBar = el.querySelector('.game-place'), shopEl = el.querySelector('.game-shop'), buildBtn = el.querySelector('[data-shop]');
   const infoEl = el.querySelector('.game-info');
-  L.firstGain = current();
+  L.firstGain = current(true);
   let state = L.firstGain.game;
   let placing = null; // { kind, x, y }
   let selected = null; // id of the building or obstacle whose sheet is open
   let scene;
 
+  function showShield(now) {
+    const left = shieldLeft(state, now), box = el.querySelector('.game-shield');
+    box.hidden = !left;
+    if (left) box.querySelector('b').textContent = faDigits(fmtLeft(left).replace(/:\d\d$/, ''));
+  }
   function showBar() {
     for (const r of ['coin', 'water', 'gem']) {
       const box = el.querySelector(`[data-res="${r}"]`);
@@ -160,6 +176,8 @@ function start(el, L) {
     el.querySelector('[data-xp]').textContent = fa(x.lv);
     el.querySelector('.game-xp i').style.height = `${100 * x.into / x.need}%`;
     el.querySelector('.game-ach .game-dot').hidden = !achievements(state).some(a => a.ready);
+    el.querySelector('[data-medals]').textContent = fa(state.medals || 0);
+    showShield(Date.now());
   }
   showBar();
 
@@ -190,6 +208,7 @@ function start(el, L) {
       el.querySelector('.game-wait').remove();
       const { gained } = L.firstGain || {};
       if (gained) this.time.delayedCall(400, () => flyAll(gained, null));
+      if (unseen(state).length) this.time.delayedCall(600, openNews);
     }
 
     makeTextures() {
@@ -458,6 +477,7 @@ function start(el, L) {
       for (const s of this.sprites.values()) if (s.it.job || KINDS[s.it.kind]?.makes) this.status(s, now);
       if (selected && find(selected)?.job) refreshTimer();
       if (!trainEl.hidden) refreshQueue(now);
+      if (now % 1000 < 260) showShield(now);
     }
   }
 
@@ -626,7 +646,7 @@ function start(el, L) {
   /* ---- training (GAME.md §7) ---- */
 
   const trainEl = el.querySelector('.game-train');
-  const hideSheets = () => { for (const x of [shopEl, achEl, trainEl, mapEl]) x.hidden = true; };
+  const hideSheets = () => { for (const x of [shopEl, achEl, trainEl, mapEl, newsEl]) x.hidden = true; };
   function openTrain() {
     closeInfo(); hideSheets();
     const q = state.queue || [];
@@ -687,6 +707,34 @@ function start(el, L) {
       onEnd: (r) => { const e2 = endFort(state, id, r, give); commit(e2.game); return { got: e2.got }; },
       onClose: () => { scene.scene.wake(); showBar(); } });
   };
+  /* ---- the divs' raids (GAME.md §9) ---- */
+
+  const newsEl = el.querySelector('.game-news');
+  function openNews() {
+    closeInfo(); hideSheets();
+    const list = (state.raids || []).slice(0, 5);
+    if (!list.length) return;
+    newsEl.querySelector('.game-list').innerHTML = list.map((x, i) => {
+      const stars = [0, 1, 2].map(n => `<i class="${n < x.stars ? 'on red' : ''}"></i>`).join('');
+      const money = x.stars ? costHtml({ coin: x.lost.coin, water: x.lost.water }).replace(/game-cost/g, 'game-cost lost') : costHtml(x.won);
+      return `<div class="game-row${x.seen ? '' : ' new'}"><span class="game-stars">${stars}</span><span class="game-prog">${fa(x.pct)}٪</span>${money}
+        <span class="game-chip-in">${medalSvg}${x.medals > 0 ? '+' : ''}${fa(x.medals)}</span>
+        <button class="game-btn" data-replay="${i}" aria-label="بازپخش">${playSvg}</button></div>`;
+    }).join('');
+    newsEl.hidden = false;
+    if (unseen(state).length) commit(markSeen(state));
+  }
+  newsEl.onclick = e => {
+    const b = e.target.closest('[data-replay]');
+    if (!b) { if (!e.target.closest('.game-list')) newsEl.hidden = true; return; }
+    const x = state.raids[+b.dataset.replay];
+    hideSheets();
+    scene.scene.sleep();
+    openBattle({ game: L.game, el, dpr, layout: { items: x.items, loot: x.loot, keepShare: 0 }, army: { ...x.army }, plan: x.plan, resIcon: RES_ICON,
+      onClose: () => { scene.scene.wake(); showBar(); } });
+  };
+  el.querySelector('.game-chip').onclick = openNews;
+
   function openTrainOrShake(b) { b.animate([{ transform: 'translateX(0)' }, { transform: 'translateX(-6px)' }, { transform: 'translateX(6px)' }, { transform: 'translateX(0)' }], 260); }
 
   /* ---- achievements (GAME.md §10) ---- */

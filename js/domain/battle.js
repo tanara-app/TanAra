@@ -5,7 +5,7 @@
 
   A battle is a mutable object (it lives only while the battle screen is open):
     makeBattle(layout, army) → b;  deploy(b, troop, x, y);  step(b, dt) many times;  result(b).
-  layout: { items: [{ id, kind, lv, x, y }], loot: { coin, water } }.
+  layout: { items: [{ id, kind, lv, x, y }], loot: { coin, water }, keepShare (the keep's part of the loot, 0.2) }.
   Positions are in tiles (floats); a building covers [x, x + size) × [y, y + size).
 
   Rules, after the genre: troops are placed only outside the red zone (a tile round every building);
@@ -23,14 +23,14 @@ const ZONE = 1;                    // the red zone: tiles round every building w
 
 const counts = (K) => K.group !== 'decor' && !K.trap && K !== KINDS.wall;
 
-function lootShares(items, loot) {
+function lootShares(items, loot, keepShare = 0.2) {
   const share = new Map(items.map(i => [i.id, { coin: 0, water: 0 }]));
   for (const res of ['coin', 'water']) {
     const total = loot?.[res] || 0;
     if (!total) continue;
     const keep = items.find(i => i.kind === 'palace');
     const holders = items.filter(i => KINDS[i.kind].makes === res || KINDS[i.kind].keeps === res);
-    const toKeep = holders.length ? (keep ? Math.round(total * 0.2) : 0) : total;
+    const toKeep = holders.length ? (keep ? Math.round(total * keepShare) : 0) : (keep ? total : 0);
     if (keep) share.get(keep.id)[res] += toKeep;
     const each = holders.length ? Math.floor((total - toKeep) / holders.length) : 0;
     holders.forEach((h, n) => { share.get(h.id)[res] += each + (n === 0 ? total - toKeep - each * holders.length : 0); });
@@ -40,7 +40,7 @@ function lootShares(items, loot) {
 
 export function makeBattle(layout, army) {
   const items = layout.items.filter(i => KINDS[i.kind] && i.lv > 0 && (KINDS[i.kind].levels[0].hp || KINDS[i.kind].trap));
-  const loot = lootShares(items, layout.loot);
+  const loot = lootShares(items, layout.loot, layout.keepShare ?? 0.2);
   const blds = items.map(i => {
     const K = KINDS[i.kind], L = level(i.kind, Math.min(i.lv, K.levels.length));
     return { id: i.id, kind: i.kind, x: i.x, y: i.y, s: K.size, hp: L.hp || 1, max: L.hp || 1, dead: false,
@@ -49,7 +49,7 @@ export function makeBattle(layout, army) {
       loot: loot.get(i.id), lock: null };
   });
   const walls = new Map(blds.filter(b => b.wall).map(b => [`${b.x},${b.y}`, b]));
-  return { t: 0, blds, walls, troops: [], left: { ...army }, used: {}, got: { coin: 0, water: 0 }, shots: [], booms: [], next: 1, deployed: false };
+  return { t: 0, clock: 0, blds, walls, troops: [], left: { ...army }, used: {}, got: { coin: 0, water: 0 }, shots: [], booms: [], next: 1, deployed: false };
 }
 
 const cx = (b) => b.x + b.s / 2, cy = (b) => b.y + b.s / 2;
