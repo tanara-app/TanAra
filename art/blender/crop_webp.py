@@ -3,14 +3,16 @@ import numpy as np
 
 argv = sys.argv[sys.argv.index("--") + 1:]
 src, dst, out_w = argv[0], argv[1], int(argv[2])
-nocrop = len(argv) > 3 and argv[3] == "nocrop"  # keep the whole frame (renders framed by common.frame_footprint)
+mode = argv[3] if len(argv) > 3 else ""
+nocrop = mode == "nocrop"  # keep the whole frame (renders framed by common.frame_footprint)
+top = mode == "top"        # cut only the empty rows above: keeps the footprint framing (art/blender/building.py)
 
 img = bpy.data.images.load(src)
 w, h = img.size
 px = np.array(img.pixels[:], dtype=np.float32).reshape(h, w, 4)  # rows bottom-up
 alpha = px[:, :, 3] > 0.02
 ys, xs = np.where(alpha)
-x0, x1, y0, y1 = (0, w, 0, h) if nocrop else (xs.min(), xs.max() + 1, ys.min(), ys.max() + 1)
+x0, x1, y0, y1 = (0, w, 0, h) if nocrop else (0, w, 0, ys.max() + 1) if top else (xs.min(), xs.max() + 1, ys.min(), ys.max() + 1)
 print("BBOX", x0, x1, y0, y1, "of", w, h)
 crop = px[y0:y1, x0:x1].copy()
 ch, cw = crop.shape[:2]

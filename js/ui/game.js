@@ -34,13 +34,12 @@ const lockSvg = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" str
 const upSvg = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>';
 const RES_ICON = { coin: coinSvg, water: waterSvg, gem: gemSvg };
 
-// Buildings that already have a picture (style «ماکت», art/STYLE.md); the rest are still drawn.
-// The palace is a Blender render of its Meshy model (art/models/palace-3.glb), cropped to the building:
-// rotated 45°, 30° down (2:1 footprint), transparent background, front to the lower right. See IDEAS.md.
+// Buildings that already have a picture (art/STYLE.md); the rest are still drawn.
+// The palace (bright chunky style, 2026-11-14) is a Blender render of its Meshy model (art/models/palace-5.glb)
+// by art/blender/building.py. Every image is framed exactly on its footprint by art/blender/common.py
+// (frame_footprint): as wide as the footprint, its bottom edge on the front corner, so it scales as it is.
 const ART = { palace: 'img/game/palace.webp', rock: 'img/game/rock.webp', dune: 'img/game/dune.webp', tree: 'img/game/tree.webp', bush: 'img/game/bush.webp' };
-// The palace image is cropped to the building (a little wider than its footprint); the others are framed
-// exactly on their footprint by art/blender/common.py (frame_footprint), so they scale to it as they are.
-const FIT = { palace: 1.04 };
+const FIT = {};
 // The ground (art/blender/land.py): the plot inside its curb with MARGIN tiles of desert all round.
 const LAND = 'img/game/land.webp', MARGIN = 6;
 const hammerSvg = '<svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4l6 6-3 3-6-6z"/><path d="M11 7L4 14l3 3 7-7"/><path d="M5.5 15.5L3 20l4.5-2.5"/></svg>';
