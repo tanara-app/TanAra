@@ -74,6 +74,7 @@ export function openEat({ day = today(), meal = null, budgetFor, start = null })
   let why = null;           // the food whose «why» line is open
   let openRow = null;       // the food whose ready numbers are open
   let editing = false;      // the pencil: amounts can be changed and foods taken off
+  let making = false;       // «+ بسته»: the foods ticked become a new pack instead of a meal
   const locks = new Map();  // food → amount set by a tap, in its own unit
   const shown = new Map();  // food → the unit it is shown in now: 'u', 'u2' or 'g'
   let unsub = null;
@@ -105,13 +106,14 @@ export function openEat({ day = today(), meal = null, budgetFor, start = null })
         </div>
         <label class="eat-search${query ? ' on' : ''}">
           ${icon.search}
-          <input type="search" placeholder="جست‌وجو" value="${esc(query)}" autocomplete="off" aria-label="جست‌وجوی خوراکی">
+          <input type="search" placeholder="${making ? 'خوراکی‌های بسته' : 'جست‌وجو'}" value="${esc(query)}" autocomplete="off" aria-label="جست‌وجوی خوراکی">
           ${query ? `<button type="button" class="eat-sbtn" data-clear aria-label="پاک کردن">${icon.close}</button>` : `
           <button type="button" class="eat-sbtn" data-via="scan" aria-label="بارکد">${barcodeIcon}</button>
           ${aiAvailable() ? `<button type="button" class="eat-sbtn" data-via="photo" aria-label="عکس">${cameraIcon}</button>` : ''}`}
         </label>
         <div class="eat-main"></div>
-        ${picked.length ? `<button type="button" class="eat-bar" data-amounts><b>چقدر بخورم؟</b><span>${picked.map(f => esc(shortName(f.name))).join('، ')}</span></button>` : ''}`;
+        ${picked.length ? `<button type="button" class="eat-bar${making ? ' making' : ''}" ${making ? 'data-make' : 'data-amounts'} ${making && packable().length < 2 ? 'disabled' : ''}>
+          ${making ? `${icon.bookmark}<b>ذخیره‌ی بسته</b>` : '<b>چقدر بخورم؟</b>'}<span>${picked.map(f => esc(shortName(f.name))).join('، ')}</span></button>` : ''}`;
       const input = body.querySelector('input');
       const main = body.querySelector('.eat-main');
       drawMain(main);
@@ -126,6 +128,7 @@ export function openEat({ day = today(), meal = null, budgetFor, start = null })
       body.querySelector('[data-pick-meal]').onclick = pickMeal;
       body.querySelector('[data-clear]')?.addEventListener('click', () => { query = ''; why = null; drawHome(); });
       body.querySelector('[data-amounts]')?.addEventListener('click', drawPlate);
+      body.querySelector('[data-make]')?.addEventListener('click', makePack);
       body.querySelectorAll('[data-via]').forEach(b => b.onclick = e => {
         e.preventDefault();
         openLogSheet({ day, meal: cur, via: b.dataset.via, onPick: f => { tick(f, true); drawHome(); } });
@@ -223,7 +226,8 @@ export function openEat({ day = today(), meal = null, budgetFor, start = null })
         locks.clear(); shown.clear(); openRow = null; editing = false;
         return drawPlate();
       }
-      if (e.target.closest('[data-new-pack]')) { from = null; const i = body.querySelector('input'); i.focus(); return; }
+      // «+ بسته»: tick two or more foods (search or the free ones), then «ذخیره‌ی بسته» names it
+      if (e.target.closest('[data-new-pack]')) { making = true; from = null; drawHome(); body.querySelector('input').focus(); return; }
       if (e.target.closest('[data-type-in]')) openLogSheet({ day, meal: cur, via: 'custom', query, onPick: f => { tick(f, true); drawHome(); } });
     }
 
@@ -390,6 +394,19 @@ export function openEat({ day = today(), meal = null, budgetFor, start = null })
         sheet.close();
         toast(name ? `${name} ثبت شد` : n > 1 ? `${fa(n)} مورد ثبت شد` : `${first} ثبت شد`);
       };
+    }
+
+    // a pack holds foods of the bank only (one typed in has no id)
+    const packable = () => [...new Set(picked.map(f => f.id).filter(Boolean))];
+    async function makePack() {
+      const ids = packable();
+      if (ids.length < 2) return;
+      const name = await askPackName('');
+      if (!name) return;
+      savePack({ name, meal: cur, ids });
+      making = false; picked = []; query = ''; why = null;
+      toast('بسته ذخیره شد');
+      drawHome();
     }
 
     async function keep() {
