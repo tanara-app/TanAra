@@ -17,7 +17,7 @@ import * as store from '../data/store.js';
 import { MEALS5, mealLabel, baseMeal, frequentFoods, lastAmountFor } from '../domain/stats.js';
 import { meal5ForNow } from '../domain/meals.js';
 import { GRAM } from '../data/seedFoods.js';
-import { norm, esc, fa, qtyLabel } from '../lib/fa.js';
+import { norm, esc, fa, qtyLabel, parseNum } from '../lib/fa.js';
 import { mealForNow, today } from '../lib/dates.js';
 import { sheet, toast, confirmBox, choose, icon } from './dom.js';
 import { amountLabel, hasGrams, hasUnit2 } from './units.js';
@@ -282,8 +282,10 @@ export function openEat({ day = today(), meal = null, budgetFor, start = null })
       const m = modeOf(f, it.qty);
       const g = Number(f.grams);
       let q = it.qty, units = it.qty, unit = f.unit;
-      if (m === 'g') { q = Math.max(5, Math.round(it.qty * g / 5) * 5); units = q / g; unit = GRAM; }
-      if (m === 'u2') { q = Math.max(0.5, Math.round(it.qty * g / Number(f.grams2) * 2) / 2); units = q * Number(f.grams2) / g; unit = f.unit2; }
+      // the app's amount rounds to what can be measured; one they typed stays as they typed it
+      const exact = locks.has(f);
+      if (m === 'g') { q = exact ? Math.round(it.qty * g) : Math.max(5, Math.round(it.qty * g / 5) * 5); units = q / g; unit = GRAM; }
+      if (m === 'u2') { const x = it.qty * g / Number(f.grams2); q = exact ? Math.round(x * 100) / 100 : Math.max(0.5, Math.round(x * 2) / 2); units = q * Number(f.grams2) / g; unit = f.unit2; }
       const nums = m === 'g' || f.unit === GRAM ? GRAMS : m === 'u' && it.step === 1 ? COUNTS : NUMS;
       const toUnits = n => (m === 'g' ? n / g : m === 'u2' ? n * Number(f.grams2) / g : n);
       return { m, q, unit, units, nums, toUnits, kcal: units * (Number(f.kcal) || 0), protein: units * (Number(f.protein) || 0) };
@@ -326,6 +328,7 @@ export function openEat({ day = today(), meal = null, budgetFor, start = null })
               </button>
             </div>
             ${isOpen ? `<div class="eat-nums">${v.nums.map(n => `<button type="button" class="eat-n${Math.abs(n - v.q) < 1e-6 ? ' on' : ''}" data-set="${i}" data-n="${n}">${amountText(n, v.unit)}</button>`).join('')}
+              <input class="eat-n eat-type${v.nums.some(n => Math.abs(n - v.q) < 1e-6) ? '' : ' on'}" type="text" inputmode="decimal" enterkeyhint="done" autocomplete="off" data-type="${i}" value="${v.nums.some(n => Math.abs(n - v.q) < 1e-6) ? '' : amountText(v.q, v.unit)}" placeholder="…" aria-label="مقدار دلخواه به ${esc(v.unit)}">
               ${more ? `<button type="button" class="eat-n g" data-unit="${i}">${icon.swap}</button>` : ''}</div>` : ''}
           </div>`;
         }).join('')}</div>
@@ -361,6 +364,19 @@ export function openEat({ day = today(), meal = null, budgetFor, start = null })
         const i = Number(x.dataset.set);
         locks.set(picked[i], views[i].toUnits(Number(x.dataset.n)));
         drawPlate();
+      });
+      // any amount, in the unit shown (Persian digits and «٫» are fine); nothing happens on a blank or a 0
+      body.querySelectorAll('[data-type]').forEach(x => {
+        const apply = () => {
+          const i = Number(x.dataset.type);
+          const n = parseNum(x.value);
+          const most = views[i].unit === GRAM ? 3000 : 50;
+          if (!(n > 0) || n > most || Math.abs(n - views[i].q) < 1e-6) return;
+          locks.set(picked[i], views[i].toUnits(n));
+          drawPlate();
+        };
+        x.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); apply(); } });
+        x.addEventListener('change', apply);
       });
       body.querySelector('[data-save]').onclick = () => {
         picked.forEach((f, i) => {
