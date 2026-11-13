@@ -19,6 +19,7 @@ import './family.test.js';
 import './portion.test.js';
 import './combos.test.js';
 import './meals.test.js';
+import './quality.test.js';
 import './chatText.test.js';
 import './game.test.js';
 

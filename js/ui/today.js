@@ -27,7 +27,8 @@ import { checkinCard, bindCheckin } from './checkin.js';
 import { weekCard, bindWeekCard } from './review.js';
 import { greetCard, bindGreet } from './mascot.js';
 import { mealBudget, mealSharesFrom, mealShares5From, mealStanding } from '../domain/portion.js';
-import { planAvoid } from '../ai/foodTags.js';
+import { planAvoid, foodTags } from '../ai/foodTags.js';
+import { dayQuality, hasVeg } from '../domain/quality.js';
 import { TAG_SAYS } from '../domain/health.js';
 import { packRow, bindPacks } from './packs.js';
 import { mealRowsHtml, bindMealRows, openMeal } from './meal.js';
@@ -168,12 +169,16 @@ export function renderToday(root) {
     const all = Object.values(sh).reduce((a, b) => a + b, 0);
     return {
       kcal: mealBudget(asShown(st.entries), day, m, t.kcal, sh), label: meals[m] || mealLabel(m), meals,
+      main: MAIN_MEALS.has(m),
       proteinMax: t.proteinMax && all ? Math.round(t.protein * (sh[m] || 0) / all) : null,
       // a main meal's part of the day's protein, 15–40 g (snacks have none; with a kidney limit, the limit rules)
       proteinMin: !t.proteinMax && all && MAIN_MEALS.has(m) ? Math.min(40, Math.max(15, Math.round(t.protein * (sh[m] || 0) / all))) : null,
     };
   };
-  const standing = m => mealStanding(asShown(store.get().entries), day, m, t.kcal, sharesNow());
+  // the quality of the day beside its calories (quality.js): in the summary card of the rebuilt «امروز»
+  const q = eat ? dayQuality(list, s.foods, day, t.kcal, foodTags) : null;
+  const pct = (a, b) => (b ? Math.min(100, a / b * 100) : a ? 100 : 0);
+  const standing = m =>mealStanding(asShown(store.get().entries), day, m, t.kcal, sharesNow());
   const shownList = asShown(list);
   const avoid = eat ? planAvoid() : null;
   // a meal whose share is used up: three foods free to eat anyway (a tap opens their amounts)
@@ -206,19 +211,26 @@ export function renderToday(root) {
             : `<b>${fa(-remaining)}</b><span>کالری بیشتر از هدف</span>`}
         </div>
       </div>
-      <div class="sum-side">
+      ${q ? `<div class="sum-side q">
+        <div class="kv"><span>پروتئین</span><b>${fa(Math.round(tot.protein))} <small>از ${fa(t.protein)} گرم</small></b></div>
+        <div class="bar"><i style="width:${pct(tot.protein, t.protein)}%"></i></div>
+        <div class="kv"><span>سبزی و میوه</span><b>${qtyLabel(q.veg)} <small>از ${fa(q.vegGoal)} وعده</small></b></div>
+        <div class="bar veg"><i style="width:${pct(q.veg, q.vegGoal)}%"></i></div>
+        <div class="kv"><span>شیرینی</span><b class="${q.sweet > q.sweetMax ? 'over' : ''}">${fa(q.sweet)} <small>از ${fa(q.sweetMax)} کالری</small></b></div>
+        <div class="bar sweet"><i class="${q.sweet > q.sweetMax ? 'over' : ''}" style="width:${pct(q.sweet, q.sweetMax)}%"></i></div>
+      </div>` : `<div class="sum-side">
         <div class="kv"><span>خورده‌شده</span><b>${kcal50(tot.kcal)}</b></div>
         <div class="kv"><span>هدف</span><b>${kcal50(t.kcal)}</b></div>
         <div class="protein">
           <div class="kv"><span>پروتئین</span><b>${fa(Math.round(tot.protein))} <small>از ${fa(t.protein)} گرم</small></b></div>
-          <div class="bar"><i style="width:${t.protein ? Math.min(100, tot.protein / t.protein * 100) : 0}%"></i></div>
+          <div class="bar"><i style="width:${pct(tot.protein, t.protein)}%"></i></div>
         </div>
-      </div>
+      </div>`}
     </section>` : ''}
 
     <div class="pills">
       ${ramadan ? `<button type="button" class="pill fast-pill${fast ? ' on' : ''}" data-fast aria-pressed="${fast}" aria-label="${isToday ? 'امروز' : 'این روز'} روزه‌ام">${MOON}</button>` : ''}
-      <div class="pill">${icon.leaf}<span>سبزی ${isToday ? 'امروز' : ''}: <b>${qtyLabel(Math.round(tot.veg * 2) / 2)}</b> وعده</span></div>
+      ${q ? '' : `<div class="pill">${icon.leaf}<span>سبزی ${isToday ? 'امروز' : ''}: <b>${qtyLabel(Math.round(tot.veg * 2) / 2)}</b> وعده</span></div>`}
       <div class="pill"><span>این هفته <b>${fa(logged)}</b> روز ثبت کرده‌اید${lightOn(p, sortedWeights(s.weights), today()) ? ' · ثبت سبک' : ''}</span></div>
       ${t.phase !== 'loss' ? `<div class="pill"><span>مرحله: <b>${phaseLabel(p, day)}</b></span></div>` : ''}
     </div>
@@ -239,7 +251,7 @@ export function renderToday(root) {
         const st = eat ? standing(k) : null;
         return `<div class="meal card">
           <div class="meal-head">
-            <h2>${label}</h2>
+            <h2>${label}${eat && items.length && MAIN_MEALS.has(k) ? `<i class="meal-leaf${hasVeg(items) ? ' on' : ''}" aria-label="${hasVeg(items) ? 'سبزی دارد' : 'سبزی ندارد'}">${icon.leaf}</i>` : ''}</h2>
             ${st ? (items.length
               ? `<span class="meal-share"><b class="${st.over ? 'over' : ''}">${fa(st.eaten)}</b> از ${fa(st.share)}</span>`
               : `<span class="meal-share">${fa(st.share)}</span>`)

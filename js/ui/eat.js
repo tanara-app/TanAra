@@ -338,7 +338,7 @@ export function openEat({ day = today(), meal = null, budgetFor, start = null })
         }).join('')}</div>
         <div class="eat-total"><span><b>${fa(Math.round(total))}</b>${budget ? ` از ${fa(budget)}` : ''} کالری · <b class="${r.proteinShort ? 'short' : ''}">${fa(Math.round(protein))}</b>${b.proteinMin ? ` از ${fa(b.proteinMin)}` : ''} گرم پروتئین</span>
           ${editing && locks.size ? `<button type="button" class="icon-btn sm" data-reset aria-label="مقدارهای اپ">${icon.undo}</button>` : ''}</div>
-        ${r.proteinShort ? proteinRow() : ''}
+        ${suggestRow(b, r)}
         ${r.over ? `<p class="small warn-text eat-over">${fa(r.over)} کالری بیشتر${r.drop != null && picked.length > 1 ? `؛ بدون «${esc(shortName(picked[r.drop].name))}» جا می‌شود` : ''}</p>` : ''}
         ${editing ? `<button type="button" class="eat-more" data-more>${icon.plus} خوراکی دیگر</button>` : ''}
         <div class="eat-savebar">
@@ -423,15 +423,36 @@ export function openEat({ day = today(), meal = null, budgetFor, start = null })
       const avoid = avoidOf();
       const on = new Set(picked.map(f => f.id).filter(Boolean));
       const rich = f => Number(f.kcal) > 0 && (Number(f.protein) || 0) * 4 / Number(f.kcal) >= 0.2;
+      return byMeal(s.foods.filter(f => rich(f) && !on.has(f.id) && !avoid(f.id) && roleOf(f) !== 'drink'),
+        (a, b) => (Number(b.protein) / Number(b.kcal)) - (Number(a.protein) / Number(a.kcal)));
+    }
+    /*
+      A main meal with no vegetable on the plate: two to add (a leaf on them), the ones they have with
+      this meal first, then the starter ones of its combos, the lightest first (a plain salad before one
+      with mayonnaise).
+    */
+    function vegRow() {
+      const s = store.get();
+      const avoid = avoidOf();
+      const light = f => (Number(f.kcal) || 0) / (Number(f.grams) || 100);
+      return byMeal(s.foods.filter(f => f.is_veg && !avoid(f.id) && roleOf(f) === 'veg'), (a, b) => light(a) - light(b));
+    }
+    // the first two of `foods`: the ones eaten in this meal first, then the ones of the app's combos for it, then `then`
+    function byMeal(foods, then) {
+      const s = store.get();
       const freq = new Map(frequentFoods(s.entries, s.foods, day, cur, 60).map((x, n) => [x.food.id, n]));
       // foods that belong to this meal: in the app's combos for it (an egg at breakfast, not a chicken breast)
       const fits = new Set(COMBOS.filter(c => c.meals.includes(baseMeal(cur) === 'snack' ? 'snack' : cur === 'snack2' ? 'lunch' : cur)).flatMap(c => c.foods).map(norm));
-      const list = s.foods.filter(f => rich(f) && !on.has(f.id) && !avoid(f.id) && roleOf(f) !== 'drink')
-        .sort((a, b) => (freq.get(a.id) ?? 99) - (freq.get(b.id) ?? 99)
-          || (fits.has(norm(b.name)) ? 1 : 0) - (fits.has(norm(a.name)) ? 1 : 0)
-          || (Number(b.protein) / Number(b.kcal)) - (Number(a.protein) / Number(a.kcal)))
-        .slice(0, 2);
-      return list.length ? `<div class="eat-protein">${list.map(f => `<button type="button" class="eat-chip" data-addp="${f.id}">${icon.plus}<span>${esc(shortName(f.name))}</span></button>`).join('')}</div>` : '';
+      return foods.sort((a, b) => (freq.get(a.id) ?? 99) - (freq.get(b.id) ?? 99)
+        || (fits.has(norm(b.name)) ? 1 : 0) - (fits.has(norm(a.name)) ? 1 : 0)
+        || then(a, b)).slice(0, 2);
+    }
+    // the plate's suggestions in one row: vegetables (main meals without one), then protein (short of it)
+    function suggestRow(b, r) {
+      const veg = b.main && !picked.some(f => f.is_veg) ? vegRow() : [];
+      const prot = r.proteinShort ? proteinRow() : [];
+      const chip = (f, ic) => `<button type="button" class="eat-chip" data-addp="${f.id}">${ic}<span>${esc(shortName(f.name))}</span></button>`;
+      return veg.length || prot.length ? `<div class="eat-suggest">${veg.map(f => chip(f, icon.leaf)).join('')}${prot.map(f => chip(f, icon.plus)).join('')}</div>` : '';
     }
 
     async function keep() {

@@ -9,6 +9,7 @@
   --accent-ink: #062018;
   --accent-soft: rgba(95, 211, 168, .14);
   --protein: #e9b872;
+  --sweet: #b994e0;
   --doctor: #8fb6ff;
   --doctor-soft: rgba(143, 182, 255, .12);
   --radius: 18px;
@@ -36,6 +37,7 @@
   --accent-ink: #ffffff;
   --accent-soft: rgba(12, 132, 96, .1);
   --protein: #a86b12;
+  --sweet: #7c4fb0;
   --doctor: #2f5fc4;
   --doctor-soft: rgba(47, 95, 196, .08);
   --ai: #6a4fd6;
@@ -336,6 +338,16 @@ dl.calc dd { margin: 0; text-align: left; }
 .protein { margin-top: 4px; }
 .bar { height: 8px; background: var(--surface-2); border-radius: 8px; overflow: hidden; margin-top: 4px; }
 .bar i { display: block; height: 100%; background: var(--protein); border-radius: 8px; }
+.sum-side.q { gap: 4px; }
+.sum-side.q .bar { height: 6px; margin: 0 0 6px; }
+.sum-side.q .bar:last-child { margin-bottom: 0; }
+.bar.veg i { background: var(--accent); }
+.bar.sweet i { background: var(--sweet); }
+.bar.sweet i.over { background: var(--protein); }
+.kv b.over { color: var(--protein); }
+.meal-leaf { display: inline-flex; vertical-align: middle; margin-inline-start: 6px; color: var(--muted); opacity: .45; }
+.meal-leaf.on { color: var(--accent); opacity: 1; }
+.meal-leaf svg { width: 15px; height: 15px; }
 
 .today-more { margin-bottom: 12px; }
 .today-more > summary { background: var(--surface); border-radius: var(--radius); padding: 14px 16px; }
@@ -443,7 +455,7 @@ dl.calc dd { margin: 0; text-align: left; }
 .eat-total b { color: var(--text); font-size: 1.05rem; }
 .eat-over { text-align: center; margin-top: -6px; }
 .eat-total b.short { color: var(--protein); }
-.eat-protein { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px; margin-top: -4px; }
+.eat-suggest { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px; margin-top: -4px; }
 .eat-more { display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 48px; border-radius: 14px; border: 1px dashed var(--line); background: none; color: var(--muted); font: inherit; cursor: pointer; }
 .eat-more svg { width: 18px; height: 18px; }
 .eat-savebar { position: sticky; bottom: calc(-18px - var(--safe-b)); margin-top: auto; padding: 10px 0 4px; background: var(--surface); display: flex; gap: 10px; }
