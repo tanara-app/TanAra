@@ -1,5 +1,20 @@
 # «سرزمین»: سند سبک تصویرها
 
+> **تصمیم تازه (۲۰۲۶-۱۱-۱۳): سبک «ماکت» واقع‌گرا کنار گذاشته شد.** سازنده سبک **روشن، پررنگ و تپل** در حس ژانر کلش
+> می‌خواهد (طراحی و شخصیت‌ها مال خود بازی، تم ایران و خاورمیانه‌ی قدیم؛ هیچ چیزی از کلش کپی نمی‌شود). کاخ صفوی فعلی،
+> زمین و موانع با سبک قبلی‌اند و باید با سبک تازه دوباره ساخته شوند. دوربین، زاویه، جهت (جلوی بنا رو به پایین‌راست) و
+> روند Meshy + Blender (`art/blender/`) همان می‌ماند. بخش «Style» پایین فقط سابقه است؛ از متن سبک تازه استفاده کن:
+>
+> ```text
+> Style: bright, colourful stylized 3D game art for a mobile strategy game: chunky, rounded, slightly exaggerated
+> proportions (thick walls, big roofs and domes, oversized details), saturated warm colours (sandstone, terracotta,
+> turquoise and lapis tiles, gold), clean soft lighting with gentle ambient occlusion, smooth hand-painted-looking
+> textures, very readable silhouette at thumbnail size. Cheerful and inviting. Original design inspired by ancient
+> Iran and the Middle East; do not copy or imitate Clash of Clans, Supercell or any existing game's buildings,
+> characters, icons or art.
+> ```
+> زمین: چمن سبز روشن و خاک روشن (نه شن کم‌رنگ)، با جوی آب، گل و درختچه، تا مثل یک آبادی سرسبز وسط بیابان باشد.
+
 تصویرهای بازی با ChatGPT ساخته می‌شوند، در یک پروژه به اسم «سرزمین — تصویرها» (حساب سازنده).
 تصمیم ۲۰۲۶-۱۱-۱۱: بناهای ثابت **مستقیم همان تصویر ChatGPT** هستند. Meshy (و Tripo) امتحان شد و جزئیات را خراب
 می‌کرد (مثلاً سر پرنده‌ی بالدار درنمی‌آمد)؛ اشتراکش فعلاً گرفته نمی‌شود. سه‌بعدی (Meshy + Blender) فقط شاید بعداً
