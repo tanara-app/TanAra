@@ -1,2 +1,12 @@
 .claude/
 .DS_Store
+
+# «سرزمین» art work files, kept out of git on purpose (see GAME.md): Meshy models (big),
+# intermediate Blender renders, and the two palace concepts that weren't chosen.
+art/models/
+art/renders/land/
+art/renders/palace-3-check-front.png
+art/renders/palace-3-iso-30.png
+art/renders/palace-3-iso-35.png
+art/views/palace-1-*
+art/views/palace-2-*
