@@ -1302,7 +1302,7 @@ body.kb .toast, body.chat-mode .toast { bottom: calc(var(--nav-h) + var(--safe-b
 
 /* «سرزمین» (beta): the city-builder, full screen over the app (js/ui/game.js) */
 body.game-mode .nav { display: none; }
-.game { position: fixed; inset: 0; z-index: 40; background: #b98e57; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; }
+.game { position: fixed; inset: 0; z-index: 40; background: #c98f55; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; }
 .game-stage { position: absolute; inset: 0; }
 .game-stage canvas { display: block; }
 .game-wait { position: absolute; inset: 0; display: grid; place-items: center; margin: 0; color: #3b2a17; }

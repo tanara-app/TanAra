@@ -37,7 +37,12 @@ const RES_ICON = { coin: coinSvg, water: waterSvg, gem: gemSvg };
 // Buildings that already have a picture (style «ماکت», art/STYLE.md); the rest are still drawn.
 // The palace is a Blender render of its Meshy model (art/models/palace-3.glb), cropped to the building:
 // rotated 45°, 30° down (2:1 footprint), transparent background, front to the lower right. See IDEAS.md.
-const ART = { palace: 'img/game/palace.webp' };
+const ART = { palace: 'img/game/palace.webp', rock: 'img/game/rock.webp', dune: 'img/game/dune.webp', tree: 'img/game/tree.webp', bush: 'img/game/bush.webp' };
+// The palace image is cropped to the building (a little wider than its footprint); the others are framed
+// exactly on their footprint by art/blender/common.py (frame_footprint), so they scale to it as they are.
+const FIT = { palace: 1.04 };
+// The ground (art/blender/land.py): the plot inside its curb with MARGIN tiles of desert all round.
+const LAND = 'img/game/land.webp', MARGIN = 6;
 const hammerSvg = '<svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4l6 6-3 3-6-6z"/><path d="M11 7L4 14l3 3 7-7"/><path d="M5.5 15.5L3 20l4.5-2.5"/></svg>';
 const clockSvg = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>';
 
@@ -138,17 +143,17 @@ function start(el, L) {
     preload() {
       for (const [kind, file] of Object.entries(ART)) this.load.image(`art-${kind}`, file);
       this.load.image('coinImg', 'img/game/test/coin.webp');
+      this.load.image('land', LAND);
     }
 
     create() {
       scene = this;
       const cam = this.cameras.main;
-      cam.setBackgroundColor('#b98e57');
-      this.zoomLevel = 0.8;
-      cam.setZoom(this.zoomLevel * dpr);
+      cam.setBackgroundColor('#c98f55');
+      this.drawGround();
+      this.zoomTo(0.8);
       const [mx, my] = iso(SIZE / 2, SIZE / 2);
       cam.centerOn(mx, my - 20);
-      this.drawGround();
       this.textures.exists('spark') || this.makeTextures();
       this.sprites = new Map();
       this.ghost = null;
@@ -170,17 +175,23 @@ function start(el, L) {
     }
 
     drawGround() {
-      const g = this.add.graphics().setDepth(0);
-      const M = 6; // desert around the land
-      const dia = (x0, y0, x1, y1) => [iso(x0, y0), iso(x1, y0), iso(x1, y1), iso(x0, y1)].map(([x, y]) => ({ x, y }));
-      g.fillStyle(0xc9a467, 1); g.fillPoints(dia(-M, -M, SIZE + M, SIZE + M), true);
-      g.fillStyle(0xa8834f, 1); g.fillPoints(dia(-0.6, -0.6, SIZE + 0.6, SIZE + 0.6), true);
-      for (let y = 0; y < SIZE; y++) for (let x = 0; x < SIZE; x++) {
-        g.fillStyle((x + y) % 2 ? 0xd8bd84 : 0xd2b57a, 1);
-        g.fillPoints(dia(x, y, x + 1, y + 1), true);
+      const full = SIZE + 2 * MARGIN;
+      const [cx, cy] = iso(SIZE / 2, SIZE / 2);
+      this.add.image(cx, cy, 'land').setDisplaySize(full * TW, full * TH).setDepth(0);
+      this.grid = this.add.graphics().setDepth(1);
+      const [x0] = iso(-MARGIN, SIZE + MARGIN), [x1] = iso(SIZE + MARGIN, -MARGIN), [, y0] = iso(-MARGIN, -MARGIN), [, y1] = iso(SIZE + MARGIN, SIZE + MARGIN);
+      this.cameras.main.setBounds(x0 + 40, y0 + 20, x1 - x0 - 80, y1 - y0 - 40);
+    }
+
+    // The tile grid, shown only while a building is being placed.
+    showGrid(on) {
+      this.grid.clear();
+      if (!on) return;
+      this.grid.lineStyle(1, 0xfff4d6, 0.28);
+      for (let i = 0; i <= SIZE; i++) {
+        const a = iso(i, 0), b = iso(i, SIZE), c = iso(0, i), d = iso(SIZE, i);
+        this.grid.lineBetween(a[0], a[1], b[0], b[1]); this.grid.lineBetween(c[0], c[1], d[0], d[1]);
       }
-      const [cx0] = iso(-M, SIZE + M), [cx1] = iso(SIZE + M, -M), [, cyt] = iso(-M, -M), [, cyb] = iso(SIZE + M, SIZE + M);
-      this.cameras.main.setBounds(cx0 + 120, cyt + 60, cx1 - cx0 - 240, cyb - cyt - 120);
     }
 
     // One building or obstacle: a container at the middle of its footprint (so it bounces from its base).
@@ -201,14 +212,14 @@ function start(el, L) {
       const k = KINDS[it.kind] || ROCKS[it.kind];
       g.clear();
       s.img?.destroy(); s.img = null;
-      const art = ART[it.kind] && it.lv > 0 && `art-${it.kind}`;
+      const art = ART[it.kind] && (s.rock || it.lv > 0) && `art-${it.kind}`;
       if (art) {
         // the image's bottom edge on the footprint's front corner, as wide as the footprint
         s.img = this.add.image(0, k.size * TH / 2, art).setOrigin(0.5, 1);
-        s.img.setScale(k.size * TW * 1.04 / s.img.width);
+        s.img.setScale(k.size * TW * (FIT[it.kind] || 1) / s.img.width);
         s.c.addAt(s.img, 0);
       }
-      const list = art ? (it.job ? scaffoldPolys(k.size) : []) : polys(it.kind, k.size, { building: !!it.job && !s.rock });
+      const list = art ? (it.job && !s.rock ? scaffoldPolys(k.size) : []) : polys(it.kind, k.size, { building: !!it.job && !s.rock });
       for (const q of list) {
         g.fillStyle(parseInt(q.fill.slice(1), 16), it.job && !art && !s.rock ? 0.8 : 1);
         const pts = []; for (let i = 0; i < q.pts.length; i += 2) pts.push({ x: q.pts[i], y: q.pts[i + 1] });
@@ -313,8 +324,11 @@ function start(el, L) {
       this.input.on('wheel', (p, objs, dx, dy) => this.zoomTo(this.zoomLevel * (dy > 0 ? 0.9 : 1.1)));
     }
 
+    // Never zoomed out past the ground picture: the screen must fit inside it (the bounds, set in drawGround).
     zoomTo(z) {
-      this.zoomLevel = Phaser.Math.Clamp(z, ZMIN, ZMAX);
+      const b = this.cameras.main.getBounds(), [vw, vh] = size();
+      const fit = Math.max(vw / b.width, vh / b.height);
+      this.zoomLevel = Phaser.Math.Clamp(z, Math.max(ZMIN, fit), ZMAX);
       this.cameras.main.setZoom(this.zoomLevel * dpr);
     }
 
@@ -345,6 +359,7 @@ function start(el, L) {
 
     drawGhost() {
       this.ghost?.destroy(); this.foot.clear();
+      this.showGrid(!!placing);
       if (!placing) { this.ghost = null; return; }
       const k = KINDS[placing.kind], ok = fits(state, placing.kind, placing.x, placing.y);
       const pts = [iso(placing.x, placing.y), iso(placing.x + k.size, placing.y), iso(placing.x + k.size, placing.y + k.size), iso(placing.x, placing.y + k.size)].map(([x, y]) => ({ x, y }));
@@ -554,7 +569,7 @@ function start(el, L) {
   };
 
   L.game = new Phaser.Game({
-    type: Phaser.AUTO, parent: stage, backgroundColor: '#b98e57',
+    type: Phaser.AUTO, parent: stage, backgroundColor: '#c98f55',
     scale: { mode: Phaser.Scale.NONE, width: w * dpr, height: h * dpr, zoom: 1 / dpr },
     input: { activePointers: 2 },
     banner: false, scene: Land,
