@@ -303,7 +303,7 @@ export function openEat({ day = today(), meal = null, budgetFor, start = null })
       if (!picked.length) { from = null; editing = false; return drawHome(); }
       const b = budgetFor(cur);
       const budget = Math.max(0, Math.round(b.kcal));
-      const r = fitMeal(picked, budget, Object.fromEntries(picked.map((f, i) => [i, locks.get(f)]).filter(([, q]) => q != null)), { proteinMax: b.proteinMax ?? null, usual: usualAmounts(store.get().entries, store.get().foods, day) });
+      const r = fitMeal(picked, budget, Object.fromEntries(picked.map((f, i) => [i, locks.get(f)]).filter(([, q]) => q != null)), { proteinMax: b.proteinMax ?? null, proteinMin: b.proteinMin ?? null, usual: usualAmounts(store.get().entries, store.get().foods, day) });
       const views = picked.map((f, i) => view(f, r.items[i]));
       const total = views.reduce((t, v) => t + v.kcal, 0);
       const protein = views.reduce((t, v) => t + v.protein, 0);
@@ -336,8 +336,9 @@ export function openEat({ day = today(), meal = null, budgetFor, start = null })
               ${more ? `<button type="button" class="eat-n g" data-unit="${i}">${icon.swap}</button>` : ''}</div>` : ''}
           </div>`;
         }).join('')}</div>
-        <div class="eat-total"><span><b>${fa(Math.round(total))}</b>${budget ? ` از ${fa(budget)}` : ''} کالری · <b>${fa(Math.round(protein))}</b> گرم پروتئین</span>
+        <div class="eat-total"><span><b>${fa(Math.round(total))}</b>${budget ? ` از ${fa(budget)}` : ''} کالری · <b class="${r.proteinShort ? 'short' : ''}">${fa(Math.round(protein))}</b>${b.proteinMin ? ` از ${fa(b.proteinMin)}` : ''} گرم پروتئین</span>
           ${editing && locks.size ? `<button type="button" class="icon-btn sm" data-reset aria-label="مقدارهای اپ">${icon.undo}</button>` : ''}</div>
+        ${r.proteinShort ? proteinRow() : ''}
         ${r.over ? `<p class="small warn-text eat-over">${fa(r.over)} کالری بیشتر${r.drop != null && picked.length > 1 ? `؛ بدون «${esc(shortName(picked[r.drop].name))}» جا می‌شود` : ''}</p>` : ''}
         ${editing ? `<button type="button" class="eat-more" data-more>${icon.plus} خوراکی دیگر</button>` : ''}
         <div class="eat-savebar">
@@ -346,6 +347,10 @@ export function openEat({ day = today(), meal = null, budgetFor, start = null })
         </div>`;
 
       body.querySelector('[data-back]').onclick = () => { editing = false; drawHome(); };
+      body.querySelectorAll('[data-addp]').forEach(x => x.onclick = () => {
+        const f = store.get().foods.find(y => y.id === x.dataset.addp);
+        if (f) { picked.push(f); if (from) edited = true; drawPlate(); }
+      });
       body.querySelector('[data-pick-meal]').onclick = pickMeal;
       body.querySelector('[data-edit]').onclick = () => { editing = !editing; openRow = null; drawPlate(); };
       body.querySelector('[data-more]')?.addEventListener('click', () => { query = ''; editing = false; drawHome(); body.querySelector('input').focus(); });
@@ -407,6 +412,26 @@ export function openEat({ day = today(), meal = null, budgetFor, start = null })
       making = false; picked = []; query = ''; why = null;
       toast('بسته ذخیره شد');
       drawHome();
+    }
+
+    /*
+      A main meal short of its protein with no protein-rich food on the plate: two to add, the ones
+      they eat in this meal first, then the starter foods they would have at home, protein-richest first.
+    */
+    function proteinRow() {
+      const s = store.get();
+      const avoid = avoidOf();
+      const on = new Set(picked.map(f => f.id).filter(Boolean));
+      const rich = f => Number(f.kcal) > 0 && (Number(f.protein) || 0) * 4 / Number(f.kcal) >= 0.2;
+      const freq = new Map(frequentFoods(s.entries, s.foods, day, cur, 60).map((x, n) => [x.food.id, n]));
+      // foods that belong to this meal: in the app's combos for it (an egg at breakfast, not a chicken breast)
+      const fits = new Set(COMBOS.filter(c => c.meals.includes(baseMeal(cur) === 'snack' ? 'snack' : cur === 'snack2' ? 'lunch' : cur)).flatMap(c => c.foods).map(norm));
+      const list = s.foods.filter(f => rich(f) && !on.has(f.id) && !avoid(f.id) && roleOf(f) !== 'drink')
+        .sort((a, b) => (freq.get(a.id) ?? 99) - (freq.get(b.id) ?? 99)
+          || (fits.has(norm(b.name)) ? 1 : 0) - (fits.has(norm(a.name)) ? 1 : 0)
+          || (Number(b.protein) / Number(b.kcal)) - (Number(a.protein) / Number(a.kcal)))
+        .slice(0, 2);
+      return list.length ? `<div class="eat-protein">${list.map(f => `<button type="button" class="eat-chip" data-addp="${f.id}">${icon.plus}<span>${esc(shortName(f.name))}</span></button>`).join('')}</div>` : '';
     }
 
     async function keep() {

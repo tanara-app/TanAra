@@ -40,6 +40,8 @@ let day = today();
 // a fasting day of the rebuilt «امروز» (beta `eat`): its three meals and their part of the day
 const FAST_MEALS = { breakfast: 'سحری', snack2: 'افطار', dinner: 'شام' };
 const FAST_SHARES5 = { breakfast: 0.4, snack2: 0.3, dinner: 0.3 };
+// the meals that carry protein (on a fasting day افطار is one: it sits in 'snack2', see fastNotes)
+const MAIN_MEALS_ALL = new Set(['breakfast', 'lunch', 'dinner']);
 const MOON = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg>';
 // what a fasting day asks of some illnesses (the same words as the diet's)
 function fastNotes(conditions) {
@@ -152,6 +154,7 @@ export function renderToday(root) {
   const meals = fast ? FAST_MEALS : eat ? MEALS5 : MEALS;
   const fastMeal = m => (m === 'snack1' ? 'breakfast' : m === 'lunch' || m === 'snack' ? 'snack2' : m);
   const asShown = es => es.map(e => (eat ? { ...e, meal: fast && e.day === day ? fastMeal(meal5(e)) : meal5(e) } : e.meal !== baseMeal(e.meal) ? { ...e, meal: baseMeal(e.meal) } : e));
+  const MAIN_MEALS = fast ? new Set(['breakfast', 'snack2', 'dinner']) : MAIN_MEALS_ALL;
   const sharesNow = () => {
     if (fast) return FAST_SHARES5;
     const st = store.get();
@@ -166,6 +169,8 @@ export function renderToday(root) {
     return {
       kcal: mealBudget(asShown(st.entries), day, m, t.kcal, sh), label: meals[m] || mealLabel(m), meals,
       proteinMax: t.proteinMax && all ? Math.round(t.protein * (sh[m] || 0) / all) : null,
+      // a main meal's part of the day's protein, 15–40 g (snacks have none; with a kidney limit, the limit rules)
+      proteinMin: !t.proteinMax && all && MAIN_MEALS.has(m) ? Math.min(40, Math.max(15, Math.round(t.protein * (sh[m] || 0) / all))) : null,
     };
   };
   const standing = m => mealStanding(asShown(store.get().entries), day, m, t.kcal, sharesNow());

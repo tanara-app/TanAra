@@ -442,6 +442,8 @@ dl.calc dd { margin: 0; text-align: left; }
 .eat-total { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; color: var(--muted); font-size: .9rem; }
 .eat-total b { color: var(--text); font-size: 1.05rem; }
 .eat-over { text-align: center; margin-top: -6px; }
+.eat-total b.short { color: var(--protein); }
+.eat-protein { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px; margin-top: -4px; }
 .eat-more { display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 48px; border-radius: 14px; border: 1px dashed var(--line); background: none; color: var(--muted); font: inherit; cursor: pointer; }
 .eat-more svg { width: 18px; height: 18px; }
 .eat-savebar { position: sticky; bottom: calc(-18px - var(--safe-b)); margin-top: auto; padding: 10px 0 4px; background: var(--surface); display: flex; gap: 10px; }

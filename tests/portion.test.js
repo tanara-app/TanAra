@@ -157,6 +157,29 @@ suite('portion', () => {
     ok(Math.abs(r.total - 150) <= 20, `total ${r.total}`);
   });
 
+  test('a main meal\'s protein: more of the protein food, room made from the bread, never a dish turned around', () => {
+    const bc = [seed('نان سنگک'), seed('پنیر سفید'), seed('گوجه‌فرنگی')];
+    const plain = fitMeal(bc, 450), goal = fitMeal(bc, 450, {}, { proteinMin: 25 });
+    ok(goal.items[1].qty > plain.items[1].qty, `cheese ${plain.items[1].qty} → ${goal.items[1].qty}`);
+    ok(goal.protein > plain.protein);
+    ok(Math.abs(goal.total - 450) <= 30, `total ${goal.total}`);
+    const lunch = [seed('برنج سفید (کته یا چلو)'), seed('قیمه (بدون روغن رو)'), seed('روغن خورش / غذا'), seed('سالاد شیرازی (بدون روغن)')];
+    ok(fitMeal(lunch, 600, {}, { proteinMin: 30 }).items[0].qty >= 1, 'rice keeps at least a کفگیر');
+  });
+
+  test('no protein food on the plate: the shortfall is reported for the screen to suggest one', () => {
+    const r = fitMeal([seed('نان سنگک'), seed('ارده'), SHIRE], 450, {}, { proteinMin: 25 });
+    ok(r.proteinShort >= 5, `${r.proteinShort}`);
+    eq(fitMeal([seed('نان سنگک'), seed('ارده'), SHIRE], 450).proteinShort, 0, 'no goal, nothing reported');
+    eq(fitMeal([seed('تخم‌مرغ آب‌پز'), seed('نان سنگک')], 400, {}, { proteinMin: 25 }).proteinShort, 0);
+  });
+
+  test('a kidney limit wins over a protein goal', () => {
+    const r = fitMeal([seed('نان سنگک'), seed('پنیر سفید')], 450, {}, { proteinMin: 25, proteinMax: 15 });
+    eq(r.proteinShort, 0);
+    ok(r.protein <= 15.5 || r.items[1].qty <= 1, `${r.protein}`);
+  });
+
   test('their own usual amount comes first', () => {
     const dates = seed('خرما');
     const day = '2026-11-13';

@@ -153,7 +153,7 @@ export function usualAmounts(entries, foods, day, { days = 120 } = {}) {
   over (calories past the budget even at the least of each), spare (calories left because every
   food reached its most), drop (index of a food whose going makes the meal fit, or null) }.
 */
-export function fitMeal(foods, kcal, locked = {}, { proteinMax = null, usual = null } = {}) {
+export function fitMeal(foods, kcal, locked = {}, { proteinMax = null, proteinMin = null, usual = null } = {}) {
   const budget = Math.max(0, Number(kcal) || 0);
   const info = foods.map((f, i) => {
     const role = roleOf(f);
@@ -220,6 +220,32 @@ export function fitMeal(foods, kcal, locked = {}, { proteinMax = null, usual = n
       x.target = Math.min(x.target, x.qty);
     }
   }
+  /*
+    `proteinMin`: the main meal's part of the day's protein (about 20–35 g: enough at a meal for
+    fullness and to keep muscle while losing). While it is short, a step goes to the protein-rich
+    food that gives the most protein for its calories (up to its most), and the calories are made
+    room for by taking steps off the other foods (the spread and the bread before the dish); a step
+    that cannot be made room for is not taken. Nothing is added when no protein-rich food is there:
+    the screen suggests one (`proteinShort`).
+  */
+  if (proteinMin != null && proteinMax == null) {
+    const perKcal = y => (Number(y.f.protein) || 0) / y.per;
+    for (let n = 0; n < 30 && prot() < proteinMin - 0.5; n++) {
+      const x = flex.filter(y => dense(y) && y.qty + y.step <= y.max + 1e-9).sort((a, b) => perKcal(b) - perKcal(a))[0];
+      if (!x) break;
+      const saved = flex.map(y => y.qty);
+      x.qty = Math.round((x.qty + x.step) * 100) / 100;
+      for (let k = 0; k < 20 && sum() > budget + TOL; k++) {
+        // never below 75% of where the bread, rice or dish should be (60% for a spread): more stew must
+        // not leave half a کفگیر of rice, and more cheese not a lone palm of bread under the ارده
+        const y = flex.filter(z => !dense(z) && z.per > 0 && z.qty - z.step >= z.min - 1e-9 && z.qty - z.step >= z.target * (z.e >= 0.8 ? 0.75 : 0.6) - 1e-9).sort((a, b) => a.e - b.e || prefer(a, b, -1))[0]; // a spread or a sweet gives way before the bread
+        if (!y) break;
+        y.qty = Math.round((y.qty - y.step) * 100) / 100;
+      }
+      if (sum() > budget + TOL) { flex.forEach((y, i) => { y.qty = saved[i]; }); break; }
+      x.target = Math.max(x.target, x.qty);
+    }
+  }
   // rounding down left room: a step to the food it moves closest to its place
   for (let n = 0; n < 50; n++) {
     const gap = budget - sum();
@@ -247,6 +273,8 @@ export function fitMeal(foods, kcal, locked = {}, { proteinMax = null, usual = n
       atMax: !x.fixed && x.qty >= x.max - 1e-9, atMin: !x.fixed && x.qty <= x.min + 1e-9,
     })),
     total, protein: prot(),
+    // grams of protein still short of `proteinMin`, from 5 g (0 when near it or none asked)
+    proteinShort: proteinMin != null && proteinMax == null && prot() < proteinMin - 4.5 ? Math.round(proteinMin - prot()) : 0,
     // only a food whose going makes the meal fit: «بدون نان جا می‌شود» must be true
     over, spare, drop: over > 0 && foods.length > 1 ? cand.find(({ x }) => x.qty * x.per >= over - TOL)?.i ?? null : null,
   };
