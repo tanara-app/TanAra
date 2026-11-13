@@ -79,6 +79,40 @@ const PARTS = {
     for (const [x, y] of [[0.45, 0.45], [1.55, 0.45], [0.45, 1.55], [1.55, 1.55]]) p.push(cone(x, y, 3, 7, 30, '#2f6b3a'));
     return p;
   },
+  // The builder's house: a small adobe house with a flat roof and a pile of bricks.
+  builder: () => [
+    block(0.2, 0.2, 1.3, 1.3, 0, 16, CLAY), block(0.15, 0.15, 1.4, 1.4, 16, 3, shade(CLAY, 0.9)),
+    block(1.55, 1.1, 0.35, 0.35, 0, 5, '#b5683c'), block(1.6, 1.15, 0.25, 0.25, 5, 4, '#c27445'),
+  ],
+  // A qanat: the round mouth of the well shaft, a little dome over it, and the channel coming out.
+  qanat: () => [
+    block(0.1, 0.1, 1.8, 1.8, 0, 2, shade(SAND, 0.9)),
+    block(0.55, 0.55, 0.9, 0.9, 2, 10, CLAY), dome(1, 1, 12, 16, shade(CLAY, 1.05)),
+    block(0.9, 1.45, 0.2, 0.45, 2, 1, '#3d8fc4'),
+  ],
+  // A treasury: a thick stone strongroom with a gold band and a heavy door.
+  treasury: () => [
+    block(0.15, 0.15, 1.7, 1.7, 0, 20, STONE), block(0.1, 0.1, 1.8, 1.8, 20, 4, '#d9a93b'),
+    block(0.35, 0.35, 1.3, 1.3, 24, 6, shade(STONE, 0.95)), block(0.85, 1.83, 0.3, 0.05, 2, 12, DARK),
+  ],
+  // An ab-anbar: a domed cistern with windcatchers at its corners.
+  cistern: () => {
+    const p = [block(0.1, 0.1, 1.8, 1.8, 0, 6, shade(SAND, 0.95)), dome(1, 1, 6, 24, CLAY)];
+    for (const [x, y] of [[0.15, 0.15], [1.6, 1.6]]) p.push(block(x, y, 0.25, 0.25, 6, 26, shade(SAND, 1.05)), block(x + 0.06, y + 0.06, 0.13, 0.13, 22, 8, DARK));
+    return p;
+  },
+  // A piece of the city wall, with a crenellation on top.
+  wall: () => [block(0.15, 0.15, 0.7, 0.7, 0, 18, shade(CLAY, 0.95)), block(0.3, 0.3, 0.4, 0.4, 18, 5, CLAY)],
+  // An archers' tower: a tall brick tower with a lookout platform.
+  tower: () => [
+    block(0.4, 0.4, 1.2, 1.2, 0, 34, CLAY), block(0.25, 0.25, 1.5, 1.5, 34, 5, shade(CLAY, 1.1)),
+    block(0.25, 0.25, 0.2, 0.2, 39, 6, CLAY), block(1.55, 0.25, 0.2, 0.2, 39, 6, CLAY), block(0.25, 1.55, 0.2, 0.2, 39, 6, CLAY), block(1.55, 1.55, 0.2, 0.2, 39, 6, CLAY),
+  ],
+  // Obstacles.
+  rock: () => [block(0.2, 0.3, 1.2, 1.1, 0, 14, '#9b9184'), block(0.9, 0.7, 0.9, 0.9, 0, 20, '#8a8075'), block(1.0, 0.8, 0.6, 0.6, 20, 5, '#a59b8d')],
+  dune: () => [block(0.1, 0.2, 1.8, 1.6, 0, 6, '#d6b277'), block(0.5, 0.5, 1.1, 1.0, 6, 6, '#dfbe86'), block(0.8, 0.8, 0.5, 0.5, 12, 4, '#e6c894')],
+  tree: () => [block(0.42, 0.42, 0.16, 0.16, 0, 26, '#6e5038'), block(0.2, 0.45, 0.3, 0.08, 18, 2, '#6e5038'), block(0.5, 0.25, 0.08, 0.3, 22, 2, '#6e5038')],
+  bush: () => [cone(0.35, 0.5, 0, 9, 10, '#8c8a4a'), cone(0.6, 0.45, 0, 8, 12, '#7a7a3e'), cone(0.5, 0.7, 0, 9, 9, '#94914f')],
   // A windcatcher of Yazd: a tower with dark vents between its corner posts.
   badgir: () => {
     const p = [block(0.12, 0.12, 0.76, 0.76, 0, 12, shade(SAND, 0.95))];
@@ -101,6 +135,13 @@ function scaffold(size) {
 export function polys(kind, size, { building = false } = {}) {
   const parts = [...PARTS[kind](), ...(building ? scaffold(size) : [])];
   parts.sort((a, b) => a.depth - b.depth || a.z - b.z);
+  const [cx, cy] = iso(size / 2, size / 2);
+  return parts.flatMap(p => p.polys.map(q => ({ ...q, pts: q.pts.map((v, i) => v - (i % 2 ? cy : cx)) })));
+}
+
+// Only the scaffolding, for a building that has a picture while it is being upgraded.
+export function scaffoldPolys(size) {
+  const parts = scaffold(size).sort((a, b) => a.depth - b.depth || a.z - b.z);
   const [cx, cy] = iso(size / 2, size / 2);
   return parts.flatMap(p => p.polys.map(q => ({ ...q, pts: q.pts.map((v, i) => v - (i % 2 ? cy : cx)) })));
 }

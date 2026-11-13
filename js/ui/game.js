@@ -1,28 +1,42 @@
 /*
   «سرزمین» (beta): the city-builder, opened from «بیشتر» (#/game). Full screen, portrait.
-  Drawn with Phaser 4 (loaded from the CDN only when this page opens); the buttons and the coin
-  count are plain HTML over it. Logic is in js/domain/game.js, the placeholder art in gameArt.js.
+  Drawn with Phaser 4 (loaded from the CDN only when this page opens); the bars, buttons and sheets
+  are plain HTML over it. Logic is in js/domain/game.js (design in GAME.md), the placeholder art in
+  gameArt.js, the finished pictures in img/game/.
 
-  Drag to look around, pinch (or the wheel) to zoom. The hammer opens the shop; a bought building
-  appears on a free spot as a ghost that can be dragged, and ✓ places it. Construction takes time;
-  a finished one is tapped to open it. The caravanserai fills with coins to collect.
-  Every meal logged in the app gives coins once (claimed when this page opens or the data changes).
+  Drag to look around, pinch (or the wheel) to zoom. Top: coins, water and gems (with their caps)
+  and the free builders. The hammer opens the shop; a bought building appears on a free spot as a
+  ghost that can be dragged, and ✓ places it. Tapping a producer collects what it holds; tapping any
+  building opens its sheet (level, upgrade, finish now with gems); tapping an obstacle offers to clear
+  it. Jobs finish by themselves when their time comes.
+  Logged meals give coins, active days water, full weeks gems (claimed when this page opens or the
+  data changes).
 */
 import * as store from '../data/store.js';
 import { today } from '../lib/dates.js';
 import { fa, faDigits } from '../lib/fa.js';
 import { icon } from './dom.js';
-import { KINDS, SHOP, SIZE, newGame, claimMeals, fits, freeSpot, place, finish, collect, stored, itemAt, left, fmtLeft, canBuy } from '../domain/game.js';
-import { TW, TH, iso, polys, drawPreview } from './gameArt.js';
+import {
+  KINDS, ROCKS, SHOP, SIZE, load, claimAll, settle, fits, freeSpot, place, collect, stored, itemAt, rockAt, left,
+  fmtLeft, cap, builders, busy, whyNot, priceOf, countOf, maxCount, maxLv, whyNotUp, upgrade, level, whyNotClear,
+  clearRock, speedCost, speedUp,
+} from '../domain/game.js';
+import { TW, TH, iso, polys, scaffoldPolys, drawPreview } from './gameArt.js';
 
 const PHASER = 'https://cdn.jsdelivr.net/npm/phaser@4.2.1/dist/phaser.min.js';
-const ZMIN = 0.55, ZMAX = 2.2;
+const ZMIN = 0.45, ZMAX = 2.2;
 
 const coinSvg = (s = 20) => `<img src="img/game/test/coin.webp" width="${s}" height="${s}" alt="" draggable="false">`;
+const waterSvg = (s = 20) => `<svg viewBox="0 0 24 24" width="${s}" height="${s}"><path d="M12 2.5C9 7 5.5 10.6 5.5 14.5a6.5 6.5 0 0 0 13 0C18.5 10.6 15 7 12 2.5z" fill="#4aa8e0" stroke="#1f5f8f" stroke-width="1.4"/><path d="M9 14.5a3 3 0 0 0 3 3" stroke="#d6f0ff" stroke-width="1.6" fill="none" stroke-linecap="round"/></svg>`;
+const gemSvg = (s = 20) => `<svg viewBox="0 0 24 24" width="${s}" height="${s}"><path d="M6 3h12l4 6-10 12L2 9z" fill="#38c48f" stroke="#17664a" stroke-width="1.4" stroke-linejoin="round"/><path d="M2 9h20M9 3l3 18 3-18" stroke="#17664a" stroke-width="1" fill="none"/></svg>`;
+const builderSvg = (s = 18) => `<svg viewBox="0 0 24 24" width="${s}" height="${s}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="7" r="3"/><path d="M6 21v-2a6 6 0 0 1 12 0v2"/><path d="M8 5.5h8"/></svg>`;
+const lockSvg = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>';
+const upSvg = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>';
+const RES_ICON = { coin: coinSvg, water: waterSvg, gem: gemSvg };
 
-// Buildings that already have an image (style «ماکت», art/STYLE.md); the rest are still drawn.
+// Buildings that already have a picture (style «ماکت», art/STYLE.md); the rest are still drawn.
 // The palace is a Blender render of its Meshy model (art/models/palace-3.glb), cropped to the building:
-// rotated 45°, 30° down (2:1 footprint), transparent background. See IDEAS.md («سرزمین»).
+// rotated 45°, 30° down (2:1 footprint), transparent background, front to the lower right. See IDEAS.md.
 const ART = { palace: 'img/game/palace.webp' };
 const hammerSvg = '<svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4l6 6-3 3-6-6z"/><path d="M11 7L4 14l3 3 7-7"/><path d="M5.5 15.5L3 20l4.5-2.5"/></svg>';
 const clockSvg = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>';
@@ -40,15 +54,21 @@ function loadPhaser() {
   return phaser;
 }
 
-// The saved game, with any newly logged meals turned into coins.
+// The saved game, with new logs turned into resources and finished jobs completed.
 function current() {
   const p = store.profile() || {};
-  const g = p.game?.v ? p.game : newGame(today());
-  const { game, gained } = claimMeals(g, store.get().entries, today());
+  const d = store.get();
+  const g0 = load(p.game, today());
+  const { game: g1, gained } = claimAll(g0, { entries: d.entries, activity: d.activity }, today());
+  const { game } = settle(g1, Date.now());
   if (game !== p.game) save(game);
   return { game, gained };
 }
 function save(game) { store.saveProfile({ ...store.profile(), game }); }
+
+const costHtml = (cost, have) => Object.entries(cost).filter(([, v]) => v > 0)
+  .map(([k, v]) => `<span class="game-cost${have && (have[k] || 0) < v ? ' short' : ''}">${RES_ICON[k](15)}${fa(v)}</span>`).join('');
+const timeHtml = (ms) => ms ? `<span class="game-time">${clockSvg}${faDigits(fmtLeft(ms))}</span>` : '';
 
 export function renderGame(root) {
   if (live && root.contains(live.root)) { live.sync(); return; }
@@ -59,10 +79,16 @@ export function renderGame(root) {
     <section class="game">
       <div class="game-stage"></div>
       <button class="game-back" data-back aria-label="برگشت">${icon.chevR}</button>
-      <div class="game-coins" aria-label="سکه">${coinSvg(22)}<b data-coins></b></div>
+      <div class="game-bar">
+        <div class="game-res" data-res="coin" aria-label="سکه">${coinSvg(20)}<b></b><i></i></div>
+        <div class="game-res" data-res="water" aria-label="آب">${waterSvg(20)}<b></b><i></i></div>
+        <div class="game-res" data-res="gem" aria-label="گوهر">${gemSvg(20)}<b></b></div>
+        <div class="game-res game-bld" aria-label="معمار">${builderSvg()}<b data-builders></b></div>
+      </div>
       <button class="game-build" data-shop aria-label="ساختن">${hammerSvg}</button>
       <div class="game-place" hidden><button data-ok aria-label="بگذار">${icon.check}</button><button data-no aria-label="نه">${icon.close}</button></div>
       <div class="game-shop" hidden><div class="game-cards"></div></div>
+      <div class="game-info" hidden></div>
       <p class="game-wait">در حال بارگذاری…</p>
     </section>`;
   const el = root.querySelector('.game');
@@ -79,7 +105,6 @@ function stop() {
   if (!live) return;
   window.removeEventListener('hashchange', live.onHash);
   live.ro?.disconnect();
-  clearInterval(live.tick);
   live.game?.destroy(true);
   live = null;
   document.body.classList.remove('game-mode');
@@ -90,15 +115,24 @@ function start(el, L) {
   const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
   const size = () => [Math.max(1, stage.clientWidth), Math.max(1, stage.clientHeight)];
   const [w, h] = size();
-  const coinsEl = el.querySelector('[data-coins]');
   const placeBar = el.querySelector('.game-place'), shopEl = el.querySelector('.game-shop'), buildBtn = el.querySelector('[data-shop]');
+  const infoEl = el.querySelector('.game-info');
   L.firstGain = current();
   let state = L.firstGain.game;
   let placing = null; // { kind, x, y }
+  let selected = null; // id of the building or obstacle whose sheet is open
   let scene;
 
-  const showCoins = () => { coinsEl.textContent = fa(state.coins); };
-  showCoins();
+  function showBar() {
+    for (const r of ['coin', 'water', 'gem']) {
+      const box = el.querySelector(`[data-res="${r}"]`);
+      box.querySelector('b').textContent = fa(state.res[r]);
+      const c = cap(state, r), fill = box.querySelector('i');
+      if (fill) { fill.style.width = `${Math.min(100, 100 * state.res[r] / c)}%`; box.classList.toggle('full', state.res[r] >= c); }
+    }
+    el.querySelector('[data-builders]').textContent = `${fa(builders(state) - busy(state))}/${fa(builders(state))}`;
+  }
+  showBar();
 
   class Land extends Phaser.Scene {
     preload() {
@@ -110,7 +144,7 @@ function start(el, L) {
       scene = this;
       const cam = this.cameras.main;
       cam.setBackgroundColor('#b98e57');
-      this.zoomLevel = 1;
+      this.zoomLevel = 0.8;
       cam.setZoom(this.zoomLevel * dpr);
       const [mx, my] = iso(SIZE / 2, SIZE / 2);
       cam.centerOn(mx, my - 20);
@@ -119,25 +153,25 @@ function start(el, L) {
       this.sprites = new Map();
       this.ghost = null;
       this.foot = this.add.graphics().setDepth(1);
-      for (const it of state.items) this.addItem(it);
+      this.sel = this.add.graphics().setDepth(2);
+      for (const it of state.items) this.addThing(it);
+      for (const r of state.rocks) this.addThing(r);
       this.input.addPointer(1);
       this.bindInput();
       el.querySelector('.game-wait').remove();
       const { gained } = L.firstGain || {};
-      if (gained) this.time.delayedCall(400, () => flyCoins(gained, null));
+      if (gained) this.time.delayedCall(400, () => flyAll(gained, null));
     }
 
     makeTextures() {
       const g = this.make.graphics({ x: 0, y: 0 }, false);
       g.fillStyle(0xfff2b0, 1); g.fillPoints([{ x: 6, y: 0 }, { x: 12, y: 6 }, { x: 6, y: 12 }, { x: 0, y: 6 }], true);
-      g.generateTexture('spark', 12, 12); g.clear();
-      g.fillStyle(0xf2c14e, 1); g.fillCircle(10, 10, 10); g.lineStyle(2, 0xc98f1c, 1); g.strokeCircle(10, 10, 6.5);
-      g.generateTexture('coin', 20, 20); g.destroy();
+      g.generateTexture('spark', 12, 12); g.destroy();
     }
 
     drawGround() {
       const g = this.add.graphics().setDepth(0);
-      const M = 7; // desert around the land
+      const M = 6; // desert around the land
       const dia = (x0, y0, x1, y1) => [iso(x0, y0), iso(x1, y0), iso(x1, y1), iso(x0, y1)].map(([x, y]) => ({ x, y }));
       g.fillStyle(0xc9a467, 1); g.fillPoints(dia(-M, -M, SIZE + M, SIZE + M), true);
       g.fillStyle(0xa8834f, 1); g.fillPoints(dia(-0.6, -0.6, SIZE + 0.6, SIZE + 0.6), true);
@@ -145,29 +179,18 @@ function start(el, L) {
         g.fillStyle((x + y) % 2 ? 0xd8bd84 : 0xd2b57a, 1);
         g.fillPoints(dia(x, y, x + 1, y + 1), true);
       }
-      // a few palms in the desert
-      // a few palms in the desert, each in its place in the depth order
-      const palm = (x, y) => {
-        const [px, py] = iso(x, y);
-        const p = this.add.graphics().setDepth(10 + py);
-        p.fillStyle(0x7a5532, 1); p.fillRect(px - 2, py - 34, 4, 34);
-        p.fillStyle(0x4f8a3c, 1);
-        for (const a of [-2.6, -2, -1.2, -0.5, 0.1]) p.fillTriangle(px, py - 36, px + Math.cos(a) * 22, py - 36 + Math.sin(a) * 10 + 8, px + Math.cos(a) * 18, py - 36 + Math.sin(a) * 10 + 2);
-      };
-      for (const [x, y] of [[-3, 3], [-4, 8], [SIZE + 3, 2], [SIZE + 3, 9], [4, -3], [9, SIZE + 3], [-3, SIZE + 2]]) palm(x, y);
-      const [cx0, cy0] = iso(-M, SIZE + M), [cx1] = iso(SIZE + M, -M), [, cyt] = iso(-M, -M), [, cyb] = iso(SIZE + M, SIZE + M);
+      const [cx0] = iso(-M, SIZE + M), [cx1] = iso(SIZE + M, -M), [, cyt] = iso(-M, -M), [, cyb] = iso(SIZE + M, SIZE + M);
       this.cameras.main.setBounds(cx0 + 120, cyt + 60, cx1 - cx0 - 240, cyb - cyt - 120);
-      void cy0;
     }
 
-    // One building: a container at the middle of its footprint (so it bounces from its base).
-    addItem(it) {
-      const k = KINDS[it.kind];
+    // One building or obstacle: a container at the middle of its footprint (so it bounces from its base).
+    addThing(it) {
+      const k = KINDS[it.kind] || ROCKS[it.kind];
       const [cx, cy] = iso(it.x + k.size / 2, it.y + k.size / 2);
       const c = this.add.container(cx, cy).setDepth(10 + cy);
       const g = this.add.graphics();
       c.add(g);
-      const s = { c, g, it, bar: null, text: null, bubble: null };
+      const s = { c, g, it, rock: !KINDS[it.kind], bar: null, text: null, bubble: null };
       this.sprites.set(it.id, s);
       this.paint(s);
       return s;
@@ -175,23 +198,25 @@ function start(el, L) {
 
     paint(s) {
       const { it, g } = s;
-      const k = KINDS[it.kind];
+      const k = KINDS[it.kind] || ROCKS[it.kind];
       g.clear();
       s.img?.destroy(); s.img = null;
-      const art = ART[it.kind] && !it.done && `art-${it.kind}`;
+      const art = ART[it.kind] && it.lv > 0 && `art-${it.kind}`;
       if (art) {
         // the image's bottom edge on the footprint's front corner, as wide as the footprint
         s.img = this.add.image(0, k.size * TH / 2, art).setOrigin(0.5, 1);
         s.img.setScale(k.size * TW * 1.04 / s.img.width);
         s.c.addAt(s.img, 0);
       }
-      if (!art) for (const q of polys(it.kind, k.size, { building: !!it.done })) {
-        g.fillStyle(parseInt(q.fill.slice(1), 16), it.done ? 0.8 : 1);
+      const list = art ? (it.job ? scaffoldPolys(k.size) : []) : polys(it.kind, k.size, { building: !!it.job && !s.rock });
+      for (const q of list) {
+        g.fillStyle(parseInt(q.fill.slice(1), 16), it.job && !art && !s.rock ? 0.8 : 1);
         const pts = []; for (let i = 0; i < q.pts.length; i += 2) pts.push({ x: q.pts[i], y: q.pts[i + 1] });
         g.fillPoints(pts, true);
       }
+      if (art && it.job) s.c.bringToTop(g);
       s.text?.destroy(); s.bar?.destroy(); s.text = s.bar = null;
-      if (it.done) {
+      if (it.job) {
         s.bar = this.add.graphics(); s.c.add(s.bar);
         s.text = this.add.text(0, -k.size * 22 - 46, '', { fontFamily: 'Vazirmatn, Tahoma', fontSize: '15px', color: '#fff', stroke: '#3b2a17', strokeThickness: 4 }).setOrigin(0.5);
         s.c.add(s.text);
@@ -199,28 +224,28 @@ function start(el, L) {
       this.status(s, Date.now());
     }
 
-    // Timer and progress bar while building; a coin bubble when there is something to collect.
+    // Timer and progress bar while a builder works; a bubble when a producer has something to collect.
     status(s, now) {
-      const { it } = s, k = KINDS[it.kind];
-      if (it.done) {
-        const rest = left(it, now), y = -k.size * 22 - 30;
-        s.text.setText(rest ? faDigits(fmtLeft(rest)) : '');
+      const { it } = s, k = KINDS[it.kind] || ROCKS[it.kind];
+      if (it.job) {
+        const rest = left(it, now), y = -k.size * 22 - 30, all = it.job.end - it.job.start;
+        s.text.setText(faDigits(fmtLeft(rest)));
         s.bar.clear();
-        const p = k.time ? 1 - rest / k.time : 1;
+        const p = all ? 1 - rest / all : 1;
         s.bar.fillStyle(0x2a1d10, 0.85); s.bar.fillRoundedRect(-30, y, 60, 9, 4);
-        s.bar.fillStyle(rest ? 0x6cc070 : 0xf2c14e, 1); s.bar.fillRoundedRect(-29, y + 1, 58 * p, 7, 3);
-        if (!rest && !s.ready) { s.ready = true; this.pulse(s.c); }
+        s.bar.fillStyle(0x6cc070, 1); s.bar.fillRoundedRect(-29, y + 1, 58 * p, 7, 3);
         return;
       }
-      const n = stored(it, now);
+      if (s.rock) return;
+      const n = stored(it, now), makes = KINDS[it.kind].makes;
       if (n >= 3 && !s.bubble) {
-        s.bubble = this.add.image(0, -k.size * 22 - 34, 'coinImg').setScale(28 / 128);
+        if (makes === 'coin') s.bubble = this.add.image(0, -k.size * 22 - 34, 'coinImg').setScale(28 / 128);
+        else { s.bubble = this.add.graphics({ x: 0, y: -k.size * 22 - 34 }); s.bubble.fillStyle(0x4aa8e0, 1); s.bubble.fillCircle(0, 2, 9); s.bubble.fillTriangle(-8, -1, 8, -1, 0, -14); }
         s.c.add(s.bubble);
         this.tweens.add({ targets: s.bubble, y: s.bubble.y - 6, duration: 600, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
       } else if (n < 3 && s.bubble) { s.bubble.destroy(); s.bubble = null; }
     }
 
-    pulse(c) { this.tweens.add({ targets: c, scaleX: 1.06, scaleY: 1.06, duration: 260, yoyo: true, repeat: 2 }); }
     bounce(c) {
       this.tweens.killTweensOf(c); c.setScale(1);
       this.tweens.add({ targets: c, scaleY: { from: 0.86, to: 1 }, scaleX: { from: 1.08, to: 1 }, duration: 380, ease: 'Back.easeOut' });
@@ -230,9 +255,18 @@ function start(el, L) {
       p.explode(18); this.time.delayedCall(900, () => p.destroy());
     }
     label(s, text) {
-      const k = KINDS[s.it.kind];
+      const k = KINDS[s.it.kind] || ROCKS[s.it.kind];
       const t = this.add.text(s.c.x, s.c.y - k.size * 22 - 40, text, { fontFamily: 'Vazirmatn, Tahoma', fontSize: '16px', color: '#fff', stroke: '#3b2a17', strokeThickness: 4 }).setOrigin(0.5).setDepth(6000);
       this.tweens.add({ targets: t, y: t.y - 14, alpha: { from: 1, to: 0 }, delay: 700, duration: 600, onComplete: () => t.destroy() });
+    }
+
+    // The outline of the selected thing's footprint.
+    mark(o) {
+      this.sel.clear();
+      if (!o) return;
+      const s = (KINDS[o.kind] || ROCKS[o.kind]).size;
+      const pts = [iso(o.x, o.y), iso(o.x + s, o.y), iso(o.x + s, o.y + s), iso(o.x, o.y + s)].map(([x, y]) => ({ x, y }));
+      this.sel.lineStyle(3, 0xfff2b0, 0.95); this.sel.strokePoints(pts, true);
     }
 
     tileAt(px, py) {
@@ -291,28 +325,22 @@ function start(el, L) {
         placing.y = Phaser.Math.Clamp(t.y - Math.floor(s / 2), 0, SIZE - s);
         this.drawGhost(); return;
       }
-      const it = itemAt(state, t.x, t.y);
-      if (!it) return;
+      const it = itemAt(state, t.x, t.y) || rockAt(state, t.x, t.y);
+      if (!it) { closeInfo(); return; }
       const s = this.sprites.get(it.id), now = Date.now();
-      if (it.done) {
-        const g = finish(state, it.id, now);
-        if (!g) { this.bounce(s.c); return; }
-        commit(g);
-        s.it = state.items.find(i => i.id === it.id); s.ready = false;
-        this.paint(s); this.bounce(s.c); this.sparks(s.c.x, s.c.y - 20);
-        try { navigator.vibrate?.(20); } catch { /* not allowed */ }
-        return;
-      }
-      const c = collect(state, it.id, now);
-      if (c) {
-        commit(c.game);
-        s.it = state.items.find(i => i.id === it.id);
-        this.status(s, now); this.bounce(s.c);
-        flyCoins(c.gained, s.c);
-        return;
+      if (!s.rock && !it.job) {
+        const c = collect(state, it.id, now);
+        if (c?.gained) {
+          commit(c.game);
+          s.it = state.items.find(i => i.id === it.id);
+          this.status(s, now); this.bounce(s.c);
+          fly(c.res, c.gained, s.c);
+          return;
+        }
+        if (c?.full) this.label(s, 'انبار پر است');
       }
       this.bounce(s.c);
-      this.label(s, KINDS[it.kind].name);
+      openInfo(it.id);
     }
 
     drawGhost() {
@@ -332,19 +360,44 @@ function start(el, L) {
       placeBar.querySelector('[data-ok]').disabled = !ok;
     }
 
+    // Rebuilds every sprite (after a big change, like another device saving).
+    redraw() {
+      for (const s of this.sprites.values()) s.c.destroy();
+      this.sprites.clear();
+      for (const o of [...state.items, ...state.rocks]) this.addThing(o);
+      this.mark(selected && find(selected));
+    }
+
     update() {
       const now = Date.now();
       if (now - (this.last || 0) < 250) return;
       this.last = now;
-      for (const s of this.sprites.values()) if (s.it.done || KINDS[s.it.kind].rate) this.status(s, now);
+      const r = settle(state, now);
+      if (r.done.length) {
+        commit(r.game);
+        for (const id of r.done) {
+          const s = this.sprites.get(id);
+          if (!s) continue;
+          if (s.rock) { s.c.destroy(); this.sprites.delete(id); this.sparks(s.c.x, s.c.y); if (s.it.gem) fly('gem', s.it.gem, s.c); continue; }
+          s.it = state.items.find(i => i.id === id);
+          this.paint(s); this.bounce(s.c); this.sparks(s.c.x, s.c.y - 20);
+        }
+        try { navigator.vibrate?.(20); } catch { /* not allowed */ }
+        if (selected) { r.done.includes(selected) && !find(selected) ? closeInfo() : openInfo(selected); }
+      }
+      for (const s of this.sprites.values()) if (s.it.job || KINDS[s.it.kind]?.makes) this.status(s, now);
+      if (selected && find(selected)?.job) refreshTimer();
     }
   }
 
-  function commit(g) { state = g; save(g); showCoins(); }
+  const find = (id) => state.items.find(i => i.id === id) || state.rocks.find(r => r.id === id);
 
-  // Coins fly from a building (or the middle of the screen) to the counter.
-  function flyCoins(n, from) {
-    const box = el.querySelector('.game-coins'), r = box.getBoundingClientRect(), sr = stage.getBoundingClientRect();
+  function commit(g) { state = g; save(g); showBar(); }
+
+  // A resource flies from a building (or the middle of the screen) to its counter.
+  function fly(res, n, from) {
+    if (!n) return;
+    const box = el.querySelector(`[data-res="${res}"]`), r = box.getBoundingClientRect(), sr = stage.getBoundingClientRect();
     let sx = sr.width / 2, sy = sr.height / 2;
     if (from && scene) {
       const cam = scene.cameras.main;
@@ -353,7 +406,7 @@ function start(el, L) {
     const k = Math.min(8, Math.max(3, Math.ceil(n / 5)));
     for (let i = 0; i < k; i++) {
       const c = document.createElement('span');
-      c.className = 'game-fly'; c.innerHTML = coinSvg(18);
+      c.className = 'game-fly'; c.innerHTML = RES_ICON[res](18);
       c.style.left = `${sx}px`; c.style.top = `${sy}px`;
       el.appendChild(c);
       const dx = r.left - sr.left + 12 - sx, dy = r.top - sr.top + 12 - sy;
@@ -364,16 +417,92 @@ function start(el, L) {
     plus.className = 'game-plus'; plus.textContent = `+${fa(n)}`;
     box.appendChild(plus); setTimeout(() => plus.remove(), 1400);
   }
+  const flyAll = (gained, from) => { let d = 0; for (const r of ['coin', 'water', 'gem']) if (gained[r]) { setTimeout(() => fly(r, gained[r], from), d); d += 350; } };
 
-  // Shop: one card per building, with its picture, cost and time.
+  /* ---- the sheet of one building or obstacle ---- */
+
+  const REASON = { cost: null, builder: 'معمار آزاد نیست', palace: null, max: 'بالاترین سطح', busy: null, count: null };
+  function openInfo(id) {
+    const o = find(id);
+    if (!o) { closeInfo(); return; }
+    selected = id; scene?.mark(o);
+    shopEl.hidden = true;
+    const now = Date.now();
+    let body = '';
+    if (ROCKS[o.kind]) {
+      const R = ROCKS[o.kind];
+      body = o.job ? jobHtml(o, now) : actionHtml('clear', 'پاک کردن', costHtml({ coin: R.cost }, state.res) + timeHtml(R.time), whyNotClear(state, id));
+      infoEl.innerHTML = `<div class="game-info-head"><b>${R.name}</b></div>${body}`;
+    } else {
+      const K = KINDS[o.kind], next = level(o.kind, o.lv + 1);
+      const lv = o.lv ? `<span class="game-lv">سطح ${fa(o.lv)}</span>` : '';
+      if (o.job) body = jobHtml(o, now);
+      else if (next) {
+        const why = whyNotUp(state, id);
+        const extra = why === 'palace' ? `<span class="game-lock">${lockSvg}کاخ سطح ${fa(K.maxLv.findIndex(m => m > o.lv) + 1)}</span>` : '';
+        body = actionHtml('up', upSvg, costHtml(next.cost, state.res) + timeHtml(next.time), why, extra);
+      }
+      infoEl.innerHTML = `<div class="game-info-head"><b>${K.name}</b>${lv}${statHtml(o)}</div>${body}`;
+    }
+    infoEl.hidden = false;
+  }
+  function statHtml(o) {
+    const K = KINDS[o.kind], L = o.lv ? level(o.kind, o.lv) : null;
+    if (!L) return '';
+    if (K.makes) return `<span class="game-stat">${RES_ICON[K.makes](14)}${fa(L.rate)}/ساعت</span>`;
+    if (K.keeps) return `<span class="game-stat">${RES_ICON[K.keeps](14)}${fa(L.store)}</span>`;
+    return '';
+  }
+  function actionHtml(act, label, price, why, extra = '') {
+    const off = why && why !== 'cost' ? ' off' : why === 'cost' ? ' short' : '';
+    const note = extra || (REASON[why] ? `<span class="game-lock">${REASON[why]}</span>` : '');
+    return `<div class="game-act"><button class="game-btn${off}" data-act="${act}" ${why ? 'aria-disabled="true"' : ''}>${label}<span class="game-price">${price}</span></button>${note}</div>`;
+  }
+  function jobHtml(o, now) {
+    const gems = speedCost(o.job, now);
+    return `<div class="game-act"><span class="game-time big" data-timer>${clockSvg}${faDigits(fmtLeft(left(o, now)))}</span>
+      <button class="game-btn gem${state.res.gem < gems ? ' short' : ''}" data-act="speed">تمام کن<span class="game-price">${costHtml({ gem: gems })}</span></button></div>`;
+  }
+  function refreshTimer() {
+    const o = find(selected), t = infoEl.querySelector('[data-timer]');
+    if (o?.job && t) t.innerHTML = `${clockSvg}${faDigits(fmtLeft(left(o, Date.now())))}`;
+  }
+  function closeInfo() { selected = null; infoEl.hidden = true; scene?.mark(null); }
+
+  infoEl.onclick = e => {
+    const b = e.target.closest('[data-act]');
+    if (!b || !selected) return;
+    const now = Date.now(), id = selected, act = b.dataset.act;
+    let g = null;
+    if (act === 'up') g = upgrade(state, id, now);
+    else if (act === 'clear') g = clearRock(state, id, now);
+    else if (act === 'speed') g = speedUp(state, id, now);
+    if (!g) { b.animate([{ transform: 'translateX(0)' }, { transform: 'translateX(-6px)' }, { transform: 'translateX(6px)' }, { transform: 'translateX(0)' }], 260); return; }
+    const was = find(id);
+    commit(g);
+    const s = scene.sprites.get(id), now2 = find(id);
+    if (!now2) { // an obstacle cleared at once with gems
+      if (s) { s.c.destroy(); scene.sprites.delete(id); scene.sparks(s.c.x, s.c.y); if (was.gem) fly('gem', was.gem, s.c); }
+      closeInfo(); return;
+    }
+    if (s) { s.it = now2; scene.paint(s); scene.bounce(s.c); if (!now2.job) scene.sparks(s.c.x, s.c.y - 20); }
+    try { navigator.vibrate?.(15); } catch { /* not allowed */ }
+    openInfo(id);
+  };
+
+  /* ---- the shop ---- */
+
   function openShop() {
+    closeInfo();
     const cards = shopEl.querySelector('.game-cards');
     cards.innerHTML = SHOP.map(k => {
-      const K = KINDS[k], ok = canBuy(state, k);
-      return `<button class="game-card${ok ? '' : ' off'}" data-kind="${k}">
+      const K = KINDS[k], why = whyNot(state, k), mx = maxCount(state, k);
+      const lock = why === 'palace' ? `<span class="game-lock">${lockSvg}کاخ سطح ${fa(K.count.findIndex(n => n > 0) + 1)}</span>`
+        : why === 'count' ? `<span class="game-lock">${fa(countOf(state, k))}/${fa(mx)}</span>`
+          : why === 'builder' ? `<span class="game-lock">${REASON.builder}</span>` : '';
+      return `<button class="game-card${why && why !== 'cost' ? ' off' : ''}" data-kind="${k}">
         <canvas></canvas><b>${K.name}</b>
-        <span class="game-cost">${coinSvg(15)}${fa(K.cost)}</span>
-        <span class="game-time">${clockSvg}${fa(Math.round(K.time / 60000))} دقیقه</span>
+        ${lock || `<span class="game-price">${costHtml(priceOf(state, k), state.res)}${timeHtml(K.levels[0].time)}</span><span class="game-count">${fa(countOf(state, k))}/${fa(mx)}</span>`}
       </button>`;
     }).join('');
     shopEl.hidden = false;
@@ -383,7 +512,7 @@ function start(el, L) {
   shopEl.onclick = e => {
     const b = e.target.closest('[data-kind]');
     if (!b) { shopEl.hidden = true; return; }
-    if (b.classList.contains('off')) { b.animate([{ transform: 'translateX(0)' }, { transform: 'translateX(-6px)' }, { transform: 'translateX(6px)' }, { transform: 'translateX(0)' }], 260); return; }
+    if (whyNot(state, b.dataset.kind)) { b.animate([{ transform: 'translateX(0)' }, { transform: 'translateX(-6px)' }, { transform: 'translateX(6px)' }, { transform: 'translateX(0)' }], 260); return; }
     const spot = freeSpot(state, b.dataset.kind);
     if (!spot) return;
     shopEl.hidden = true;
@@ -396,14 +525,20 @@ function start(el, L) {
   const endPlacing = () => { placing = null; scene.drawGhost(); placeBar.hidden = true; buildBtn.hidden = false; };
   placeBar.querySelector('[data-no]').onclick = endPlacing;
   placeBar.querySelector('[data-ok]').onclick = () => {
-    const g = placing && place(state, placing.kind, placing.x, placing.y, Date.now());
+    const kind = placing?.kind;
+    const g = placing && place(state, kind, placing.x, placing.y, Date.now());
     if (!g) return;
     commit(g);
     const it = g.items[g.items.length - 1];
     endPlacing();
-    const s = scene.addItem(it);
+    const s = scene.addThing(it);
     scene.bounce(s.c); scene.sparks(s.c.x, s.c.y);
     try { navigator.vibrate?.(15); } catch { /* not allowed */ }
+    // walls go one after another: offer the next piece right away
+    if (kind === 'wall' && !whyNot(state, 'wall')) {
+      const spot = freeSpot(state, 'wall');
+      if (spot) { placing = { kind, ...spot }; buildBtn.hidden = true; placeBar.hidden = false; scene.drawGhost(); }
+    }
   };
 
   L.sync = () => { // the store changed (maybe a meal was logged elsewhere, or another device saved)
@@ -411,13 +546,11 @@ function start(el, L) {
     if (game === state) return;
     const before = state;
     state = game;
-    showCoins();
-    if (gained) flyCoins(gained, null);
-    if (scene && game.items.some(it => !before.items.find(b => b.id === it.id && b.x === it.x && b.y === it.y && b.done === it.done))) {
-      for (const s of scene.sprites.values()) s.c.destroy();
-      scene.sprites.clear();
-      for (const it of state.items) scene.addItem(it);
-    }
+    showBar();
+    flyAll(gained, null);
+    const key = (g) => [...g.items, ...g.rocks].map(o => `${o.id}:${o.x}:${o.y}:${o.lv}:${o.job?.end || 0}`).join('|');
+    if (scene && key(before) !== key(game)) scene.redraw();
+    if (selected) openInfo(selected);
   };
 
   L.game = new Phaser.Game({
