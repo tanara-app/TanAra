@@ -42,7 +42,7 @@ export const troopSvg = (t, s) => troopIcon(t, TROOPS[t].color, s);
 // by art/blender/building.py. Every image is framed exactly on its footprint by art/blender/common.py
 // (frame_footprint): as wide as the footprint, its bottom edge on the front corner, so it scales as it is.
 // The old desert obstacles (tree, bush, dune) are drawn until the green valley's art (GAME.md §12).
-const ART = { palace: 'img/game/palace.webp', rock: 'img/game/rock.webp' };
+const ART = { palace: 'img/game/palace.webp', caravan: 'img/game/caravan.webp', rock: 'img/game/rock.webp' };
 const FIT = {};
 // The ground until its picture (§12): green grass, a lighter ring where troops are placed, and a dark
 // band of woods round it. OUT tiles of woods are visible past each side.
