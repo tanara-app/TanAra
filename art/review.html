@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>بازبینی تصویرهای سرزمین</title>
+<!--
+  A page to look at every building picture of «سرزمین» at its true shape, and the moving ones in motion,
+  on a grass tile grid like the game's (GAME.md, step 4). The builder looks here before a picture goes
+  into the game (the video's lesson: a review page instead of Claude judging alone). Open it from the dev
+  server: http://127.0.0.1:5190/art/review.html
+-->
+<style>
+  body { margin: 0; padding: 16px; background: #2f5e2c; font-family: Vazirmatn, Tahoma, sans-serif; color: #fff; }
+  h1 { font-size: 1.2rem; margin: 0 0 12px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
+  .card { background: #7dbd55; border-radius: 14px; padding: 10px; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .card b { text-shadow: 0 1px 0 #2b1a0c; }
+  .stage { position: relative; width: 240px; }
+  .stage img, .stage .anim { position: absolute; display: block; }
+  .tile { position: absolute; left: 0; bottom: 0; }
+  @keyframes spin { to { background-position-x: calc(-1 * var(--n) * var(--w)); } }
+  .anim { background-repeat: no-repeat; animation: spin var(--t) steps(var(--n)) infinite; }
+</style>
+</head>
+<body>
+<h1>بازبینی تصویرهای سرزمین</h1>
+<div class="grid" id="grid"></div>
+<script>
+const SIZES = { palace: 4, caravan: 3, qanat: 3, treasury: 3, cistern: 3, builder: 2, barracks: 3, camp: 4, lab: 4, castle: 3, hero: 3,
+  cannon: 3, tower: 3, catapult: 3, airtower: 3, fire: 3, sling: 1, garden: 2, badgir: 1 };
+const NAMES = { palace: 'کاخ', caravan: 'کاروانسرا', qanat: 'قنات', treasury: 'خزانه', cistern: 'آب‌انبار', builder: 'خانه‌ی معمار', barracks: 'سربازخانه',
+  camp: 'اردوگاه', lab: 'رصدخانه', castle: 'دژ خاندان', hero: 'آرامگاه پهلوان', cannon: 'سنگ‌انداز', tower: 'برج کمان‌دار', catapult: 'منجنیق',
+  airtower: 'برج تیر هوایی', fire: 'آتشکده', sling: 'تله‌ی فلاخن', garden: 'باغ ایرانی', badgir: 'بادگیر' };
+// the moving ones: the same numbers as ANIM in js/ui/game.js
+const ANIM = { qanat: { frames: 24, w: 182, h: 244, x: 395, y: 170, W: 768, fps: 10, front: { x: 393, y: 182, w: 182, h: 233 } } };
+const grid = document.getElementById('grid');
+for (const [kind, n] of Object.entries(SIZES)) {
+  const card = document.createElement('div'); card.className = 'card';
+  const stage = document.createElement('div'); stage.className = 'stage';
+  const W = 240, tileW = W / n;
+  const img = new Image(); img.src = `../img/game/${kind}.webp?${Date.now()}`;
+  img.onload = () => {
+    const k = W / img.naturalWidth, H = img.naturalHeight * k;
+    stage.style.height = `${H}px`;
+    // the footprint's diamond under the picture, to see that the building sits on its tiles
+    const svg = `<svg class="tile" width="${W}" height="${W / 2}" viewBox="0 0 ${W} ${W / 2}">${[...Array(n + 1)].map((_, i) =>
+      `<line x1="${i * tileW / 2}" y1="${W / 4 + i * tileW / 4}" x2="${W / 2 + i * tileW / 2}" y2="${i * tileW / 4}" stroke="#fff" stroke-opacity=".5"/>
+       <line x1="${i * tileW / 2}" y1="${W / 4 - i * tileW / 4}" x2="${W / 2 + i * tileW / 2}" y2="${W / 2 - i * tileW / 4}" stroke="#fff" stroke-opacity=".5"/>`).join('')}</svg>`;
+    stage.insertAdjacentHTML('afterbegin', svg);
+    img.style.cssText = `left:0;bottom:0;width:${W}px`;
+    const A = ANIM[kind];
+    if (A) {
+      const s = W / A.W, d = document.createElement('div'); d.className = 'anim';
+      d.style.cssText = `left:${A.x * s}px;top:${A.y * s}px;width:${A.w * s}px;height:${A.h * s}px;background-image:url(../img/game/${kind}-anim.webp);background-size:${A.w * s * A.frames}px ${A.h * s}px;--n:${A.frames};--w:${A.w * s}px;--t:${A.frames / A.fps}s`;
+      stage.appendChild(d);
+      if (A.front) { const f = new Image(); f.src = `../img/game/${kind}-front.webp`; f.style.cssText = `left:${A.front.x * s}px;top:${A.front.y * s}px;width:${A.front.w * s}px`; stage.appendChild(f); }
+    }
+  };
+  stage.appendChild(img);
+  card.append(stage); card.insertAdjacentHTML('beforeend', `<b>${NAMES[kind]}${ANIM[kind] ? ' (متحرک)' : ''}</b>`);
+  grid.appendChild(card);
+}
+</script>
+</body>
+</html>

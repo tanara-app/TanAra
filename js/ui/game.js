@@ -47,6 +47,13 @@ export const troopSvg = (t, s) => troopIcon(t, TROOPS[t].color, s);
 const ART = { palace: 'img/game/palace.webp', rock: 'img/game/rock.webp',
   ...Object.fromEntries(['caravan', 'qanat', 'treasury', 'cistern', 'builder', 'barracks', 'camp', 'lab', 'castle', 'hero', 'cannon', 'tower', 'catapult', 'airtower', 'fire', 'sling', 'garden', 'badgir'].map(k => [k, `img/game/${k}.webp`])) };
 const FIT = {};
+// Buildings with a moving part (GAME.md step 4, «حرکت»): the still picture is a Blender render of a low-poly
+// Meshy model without that part; the part's frames lie on it, and what of the building stands in front of
+// the part is a third layer on top. Made by art/blender/animate.py (spec in art/blender/anim/<kind>.json),
+// which prints these numbers: the frames' size and place in the still picture (W = its width in pixels).
+const ANIM = {
+  qanat: { frames: 24, w: 182, h: 244, x: 395, y: 170, W: 768, fps: 10, front: { x: 393, y: 182, w: 182, h: 233 } },
+};
 // The ground until its picture (§12): green grass, a lighter ring where troops are placed, and a dark
 // band of woods round it. OUT tiles of woods are visible past each side.
 const OUT = 8;
@@ -180,6 +187,10 @@ function start(el, L) {
     preload() {
       for (const [kind, file] of Object.entries(ART)) this.load.image(`art-${kind}`, file);
       this.load.image('coinImg', 'img/game/test/coin.webp');
+      for (const [kind, a] of Object.entries(ANIM)) {
+        this.load.spritesheet(`anim-${kind}`, `img/game/${kind}-anim.webp`, { frameWidth: a.w, frameHeight: a.h });
+        if (a.front) this.load.image(`front-${kind}`, `img/game/${kind}-front.webp`);
+      }
     }
 
     create() {
@@ -257,13 +268,22 @@ function start(el, L) {
       const { it, g } = s;
       const k = KINDS[it.kind] || ROCKS[it.kind];
       g.clear();
-      s.img?.destroy(); s.img = null;
+      s.img?.destroy(); s.img = null; s.anim?.destroy(); s.anim = null; s.front?.destroy(); s.front = null;
       const art = ART[it.kind] && (s.rock || it.lv > 0) && `art-${it.kind}`;
       if (art) {
         // the image's bottom edge on the footprint's front corner, as wide as the footprint
         s.img = this.add.image(0, k.size * TH / 2, art).setOrigin(0.5, 1);
         s.img.setScale(k.size * TW * (FIT[it.kind] || 1) / s.img.width);
         s.c.addAt(s.img, 0);
+        const A = ANIM[it.kind];
+        if (A && !it.job) { // the moving part, and what stands in front of it
+          const k2 = s.img.scaleX * s.img.width / A.W, left = -s.img.displayWidth / 2, top = k.size * TH / 2 - s.img.displayHeight;
+          const key = `anim-${it.kind}`;
+          if (!this.anims.exists(key)) this.anims.create({ key, frames: this.anims.generateFrameNumbers(key), frameRate: A.fps, repeat: -1 });
+          s.anim = this.add.sprite(left + (A.x + A.w / 2) * k2, top + (A.y + A.h / 2) * k2, key).setScale(k2).play(key);
+          s.c.addAt(s.anim, 1);
+          if (A.front) { s.front = this.add.image(left + (A.front.x + A.front.w / 2) * k2, top + (A.front.y + A.front.h / 2) * k2, `front-${it.kind}`).setScale(k2); s.c.addAt(s.front, 2); }
+        }
       }
       const list = art ? (it.job && !s.rock ? scaffoldPolys(k.size) : []) : polys(it.kind, k.size, { building: !!it.job && !s.rock });
       for (const q of list) {

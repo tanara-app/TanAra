@@ -1,0 +1,4 @@
+{ "model": "art/models/qanat.glb", "name": "qanat", "size": 3, "rot": 0,
+  "part": { "min": [0.19, -0.26, -0.42], "max": [0.34, 0.26, 0.1],
+            "hub": [0.265, 0.015, -0.15], "radius": 0.23, "floor": -0.385 },
+  "axis": "x", "turn": 360, "frames": 24 }
