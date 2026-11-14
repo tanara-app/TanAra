@@ -124,8 +124,8 @@ export function openBattle(opts) {
       const [cx, cy] = iso(o.x + o.s / 2, o.y + o.s / 2);
       const c = this.add.container(cx, cy).setDepth(10 + cy);
       if (o.trap) { c.setVisible(false); }
-      if (o.kind === 'palace' && this.textures.exists('art-palace')) {
-        const img = this.add.image(0, o.s * TH / 2, 'art-palace').setOrigin(0.5, 1);
+      if (this.textures.exists(`art-${o.kind}`)) { // the village scene loaded the pictures
+        const img = this.add.image(0, o.s * TH / 2, `art-${o.kind}`).setOrigin(0.5, 1);
         img.setScale(o.s * TW / img.width); c.add(img);
       } else {
         const g = this.add.graphics();

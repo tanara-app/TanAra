@@ -37,12 +37,15 @@ const ZMIN = 0.2, ZMAX = 2.2;
 export const RES_ICON = { coin: I.coin, water: I.water, gem: I.gem };
 export const troopSvg = (t, s) => troopIcon(t, TROOPS[t].color, s);
 
-// Buildings that already have a picture (art/STYLE.md); the rest are still drawn (gameArt.js).
+// Buildings that already have a picture (art/STYLE.md); the rest (walls, pits, obstacles) are still drawn
+// (gameArt.js). All but the palace were made by Meshy (gpt-image-2) with the palace as reference, cropped
+// to the building with art/blender/crop_webp.py (GAME.md step 4).
 // The palace (bright chunky style, 2026-11-14) is a Blender render of its Meshy model (art/models/palace-5.glb)
 // by art/blender/building.py. Every image is framed exactly on its footprint by art/blender/common.py
 // (frame_footprint): as wide as the footprint, its bottom edge on the front corner, so it scales as it is.
 // The old desert obstacles (tree, bush, dune) are drawn until the green valley's art (GAME.md §12).
-const ART = { palace: 'img/game/palace.webp', caravan: 'img/game/caravan.webp', rock: 'img/game/rock.webp' };
+const ART = { palace: 'img/game/palace.webp', rock: 'img/game/rock.webp',
+  ...Object.fromEntries(['caravan', 'qanat', 'treasury', 'cistern', 'builder', 'barracks', 'camp', 'lab', 'castle', 'hero', 'cannon', 'tower', 'catapult', 'airtower', 'fire', 'sling', 'garden', 'badgir'].map(k => [k, `img/game/${k}.webp`])) };
 const FIT = {};
 // The ground until its picture (§12): green grass, a lighter ring where troops are placed, and a dark
 // band of woods round it. OUT tiles of woods are visible past each side.
@@ -611,7 +614,7 @@ function start(el, L) {
     }).join('');
   }
   function preview(kind) {
-    return kind === 'palace' ? `<img class="gw-pic" src="${ART.palace}" alt="">` : `<canvas class="gw-pic" data-prev="${kind}"></canvas>`;
+    return ART[kind] ? `<img class="gw-pic" src="${ART[kind]}" alt="">` : `<canvas class="gw-pic" data-prev="${kind}"></canvas>`;
   }
   function drawPreviews() { winBody.querySelectorAll('[data-prev]').forEach(c => drawPreview(c, c.dataset.prev, KINDS[c.dataset.prev].size)); }
 
@@ -646,7 +649,7 @@ function start(el, L) {
       const lock = why === 'palace' ? `<span class="gk-lock">${I.lock(26)}<b>کاخ سطح ${fa(K.count.findIndex(c => c > 0) + 1)}</b></span>` : '';
       return `<button class="gk${why && why !== 'cost' ? ' off' : ''}" data-kind="${k}">
         <span class="gk-n${n >= mx && mx ? ' full' : ''}">${fa(n)}/${fa(mx)}</span>
-        <canvas data-prev="${k}"></canvas><b class="gk-name">${K.name}</b>
+        ${ART[k] ? `<img class="gk-pic" src="${ART[k]}" alt="">` : `<canvas data-prev="${k}"></canvas>`}<b class="gk-name">${K.name}</b>
         ${lock || `${timeHtml(K.levels[0].time)}<span class="gk-price">${costHtml(priceOf(state, k), state.res) || '<span class="gc"><b>رایگان</b></span>'}</span>`}
         ${why === 'builder' ? `<span class="gk-note">${REASON.builder}</span>` : ''}</button>`;
     }).join('');
