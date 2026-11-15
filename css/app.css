@@ -436,23 +436,18 @@ dl.calc dd { margin: 0; text-align: left; }
 .eat-q b { font-size: 1.85rem; font-weight: 800; line-height: 1.15; }
 .eat-q small { display: inline-flex; align-items: center; gap: 4px; font-size: .76rem; color: var(--muted); }
 .eat-q small svg { width: 12px; height: 12px; }
-.eat-answer.editing .eat-q { background: var(--surface); border-color: var(--line); }
-.eat-line.open .eat-q { border-color: var(--accent); }
+/* the pencil: the amount is a box to type in (keyboard of digits), the unit under it a tap to another */
+.eat-q.typing { min-width: 104px; max-width: 132px; cursor: text; padding: 4px 6px 6px; background: var(--surface); border-color: var(--line); }
+.eat-q.typing:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.eat-q.typing input { width: 100%; min-width: 0; border: 0; outline: 0; background: none; padding: 0; margin: 0; height: auto; box-shadow: none; text-align: center; font: inherit; font-size: 1.85rem; font-weight: 800; line-height: 1.15; color: inherit; caret-color: var(--accent); }
+.eat-q.typing input::placeholder { color: var(--muted); opacity: .45; }
+.eat-qu { display: inline-flex; white-space: nowrap; max-width: 100%; align-items: center; gap: 4px; padding: 2px 8px; margin-top: 2px; border: 0; border-radius: 999px; background: var(--surface-2); color: var(--muted); font: inherit; font-size: .76rem; cursor: pointer; }
+.eat-qu svg { width: 12px; height: 12px; }
 .eat-line.hand .eat-q { color: var(--text); }
 .eat-edit { flex: none; width: 56px; height: 56px; display: grid; place-items: center; border: 0; border-radius: 16px; background: var(--surface-2); color: var(--text); cursor: pointer; }
 .eat-edit.on { background: var(--accent-soft); color: var(--accent); }
-.eat-n.g svg { width: 16px; height: 16px; }
 .eat-x { flex: none; width: 32px; height: 32px; margin-inline-end: -6px; display: grid; place-items: center; border: 0; border-radius: 50%; background: none; color: var(--muted); cursor: pointer; padding: 0; }
 .eat-x svg { width: 18px; height: 18px; }
-.eat-nums { display: flex; gap: 6px; padding: 0 0 14px; }
-.eat-n { flex: 1; min-width: 0; height: 44px; display: inline-flex; align-items: center; justify-content: center; border-radius: 12px; border: 1px solid var(--line); background: none; color: var(--text); font: inherit; font-weight: 700; line-height: 1; cursor: pointer; padding: 0; }
-.eat-n svg { display: block; flex: none; }
-.eat-n.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
-.eat-type { flex: 1.5; text-align: center; padding: 0 4px !important; line-height: 44px; background: none !important; border: 1px dashed var(--line) !important; font-size: .95rem; color: var(--text); }
-.eat-type.on { border: 1px solid var(--accent) !important; color: var(--accent); }
-.eat-type::placeholder { color: var(--muted); }
-.eat-n.g { flex: 1.3; font-size: .8rem; color: var(--muted); }
-.eat-n.g.on { background: none; border-color: var(--line); color: var(--muted); }
 .eat-total { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; color: var(--muted); font-size: .9rem; }
 .eat-total b { color: var(--text); font-size: 1.05rem; }
 .eat-over { text-align: center; margin-top: -6px; }

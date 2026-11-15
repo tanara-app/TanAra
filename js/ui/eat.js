@@ -35,9 +35,6 @@ import { cheer } from './mascot.js';
 
 const SUGGEST = 3;        // suggested packs shown while they have fewer than two of their own
 const RESULTS = 40;       // search results shown
-const NUMS = [0.5, 1, 1.5, 2, 3];
-const COUNTS = [1, 2, 3, 4, 5];   // a food counted whole (a walnut, a date)
-const GRAMS = [50, 100, 150, 200, 300];
 // the unit each food was last shown in (a tap on the unit), so it comes back that way: { food id: 'u' | 'u2' | 'g' }
 const UNIT_KEY = 'unit_pref';
 const unitPrefs = () => store.note(UNIT_KEY)?.data || {};
@@ -72,7 +69,6 @@ export function openEat({ day = today(), meal = null, budgetFor, start = null })
   let from = null;          // the pack the foods came from
   let edited = false;       // its foods changed since
   let why = null;           // the food whose «why» line is open
-  let openRow = null;       // the food whose ready numbers are open
   let editing = false;      // the pencil: amounts can be changed and foods taken off
   let making = false;       // «+ بسته»: the foods ticked become a new pack instead of a meal
   const locks = new Map();  // food → amount set by a tap, in its own unit
@@ -223,7 +219,7 @@ export function openEat({ day = today(), meal = null, budgetFor, start = null })
         const c = packsFor(day, cur).find(x => x.key === p.dataset.pack);
         if (!c) return;
         picked = [...c.foods]; from = c; edited = false;
-        locks.clear(); shown.clear(); openRow = null; editing = false;
+        locks.clear(); shown.clear(); editing = false;
         return drawPlate();
       }
       // «+ بسته»: tick two or more foods (search or the free ones), then «ذخیره‌ی بسته» names it
@@ -290,9 +286,8 @@ export function openEat({ day = today(), meal = null, budgetFor, start = null })
       const exact = locks.has(f);
       if (m === 'g') { q = exact ? Math.round(it.qty * g) : Math.max(5, Math.round(it.qty * g / 5) * 5); units = q / g; unit = GRAM; }
       if (m === 'u2') { const x = it.qty * g / Number(f.grams2); q = exact ? Math.round(x * 100) / 100 : Math.max(0.5, Math.round(x * 2) / 2); units = q * Number(f.grams2) / g; unit = f.unit2; }
-      const nums = m === 'g' || f.unit === GRAM ? GRAMS : m === 'u' && it.step === 1 ? COUNTS : NUMS;
       const toUnits = n => (m === 'g' ? n / g : m === 'u2' ? n * Number(f.grams2) / g : n);
-      return { m, q, unit, units, nums, toUnits, kcal: units * (Number(f.kcal) || 0), protein: units * (Number(f.protein) || 0) };
+      return { m, q, unit, units, toUnits, kcal: units * (Number(f.kcal) || 0), protein: units * (Number(f.protein) || 0) };
     };
     const amountText = (q, unit) => (unit === GRAM ? fa(q) : qtyLabel(q));
 
@@ -322,18 +317,18 @@ export function openEat({ day = today(), meal = null, budgetFor, start = null })
           const v = views[i];
           const bad = f.id && avoid(f.id);
           const more = modesOf(f, it.qty).length > 1;
-          const isOpen = editing && openRow === f;
-          return `<div class="eat-line${locks.has(f) ? ' hand' : ''}${isOpen ? ' open' : ''}">
+          return `<div class="eat-line${locks.has(f) ? ' hand' : ''}">
             <div class="eat-ltop">
               ${editing ? `<button type="button" class="eat-x" data-drop="${i}" aria-label="برداشتن ${esc(f.name)}">${icon.close}</button>` : ''}
               <div class="eat-lname"><b>${esc(shortName(f.name))}${bad ? '<i class="sick-dot"></i>' : ''}</b><small>${it.free ? 'کالری ندارد' : `${fa(Math.round(v.kcal))} کالری`}</small></div>
-              <button type="button" class="eat-q" ${editing ? `data-row="${i}" aria-expanded="${isOpen}"` : more ? `data-unit="${i}" aria-label="${esc(amountLabel(v.q, v.unit))}، واحد دیگر"` : 'disabled'}>
-                <b>${amountText(v.q, v.unit)}</b><small>${esc(v.unit)}${!editing && more ? icon.swap : ''}</small>
-              </button>
+              ${editing
+                // the pencil turns the amount into a box to type in, in the unit under it (a tap on the unit: another one)
+                ? `<label class="eat-q typing"><input type="text" inputmode="decimal" enterkeyhint="done" autocomplete="off" data-type="${i}" value="${amountText(v.q, v.unit)}" aria-label="مقدار ${esc(shortName(f.name))} به ${esc(v.unit)}">
+                    ${more ? `<button type="button" class="eat-qu" data-unit="${i}" aria-label="واحد دیگر">${esc(v.unit)}${icon.swap}</button>` : `<small>${esc(v.unit)}</small>`}</label>`
+                : `<button type="button" class="eat-q" ${more ? `data-unit="${i}" aria-label="${esc(amountLabel(v.q, v.unit))}، واحد دیگر"` : 'disabled'}>
+                    <b>${amountText(v.q, v.unit)}</b><small>${esc(v.unit)}${more ? icon.swap : ''}</small>
+                  </button>`}
             </div>
-            ${isOpen ? `<div class="eat-nums">${v.nums.map(n => `<button type="button" class="eat-n${Math.abs(n - v.q) < 1e-6 ? ' on' : ''}" data-set="${i}" data-n="${n}">${amountText(n, v.unit)}</button>`).join('')}
-              <input class="eat-n eat-type${v.nums.some(n => Math.abs(n - v.q) < 1e-6) ? '' : ' on'}" type="text" inputmode="decimal" enterkeyhint="done" autocomplete="off" data-type="${i}" value="${v.nums.some(n => Math.abs(n - v.q) < 1e-6) ? '' : amountText(v.q, v.unit)}" placeholder="…" aria-label="مقدار دلخواه به ${esc(v.unit)}">
-              ${more ? `<button type="button" class="eat-n g" data-unit="${i}">${icon.swap}</button>` : ''}</div>` : ''}
           </div>`;
         }).join('')}</div>
         <div class="eat-total"><span><b>${fa(Math.round(total))}</b>${budget ? ` از ${fa(budget)}` : ''} کالری · <b class="${r.proteinShort ? 'short' : ''}">${fa(Math.round(protein))}</b>${b.proteinMin ? ` از ${fa(b.proteinMin)}` : ''} گرم پروتئین</span>
@@ -350,7 +345,7 @@ export function openEat({ day = today(), meal = null, budgetFor, start = null })
       // from foods they ticked themselves keeps the ticks, to add or take away one
       body.querySelector('[data-back]').onclick = () => {
         editing = false;
-        if (from) { picked = []; from = null; edited = false; locks.clear(); shown.clear(); openRow = null; }
+        if (from) { picked = []; from = null; edited = false; locks.clear(); shown.clear(); }
         drawHome();
       };
       body.querySelectorAll('[data-addp]').forEach(x => x.onclick = () => {
@@ -358,11 +353,10 @@ export function openEat({ day = today(), meal = null, budgetFor, start = null })
         if (f) { picked.push(f); if (from) edited = true; drawPlate(); }
       });
       body.querySelector('[data-pick-meal]').onclick = pickMeal;
-      body.querySelector('[data-edit]').onclick = () => { editing = !editing; openRow = null; drawPlate(); };
+      body.querySelector('[data-edit]').onclick = () => { editing = !editing; drawPlate(); };
       body.querySelector('[data-more]')?.addEventListener('click', () => { query = ''; editing = false; drawHome(); body.querySelector('input').focus(); });
       body.querySelector('[data-reset]')?.addEventListener('click', () => { locks.clear(); drawPlate(); });
       body.querySelector('[data-keep]')?.addEventListener('click', keep);
-      body.querySelectorAll('[data-row]').forEach(x => x.onclick = () => { const f = picked[Number(x.dataset.row)]; openRow = openRow === f ? null : f; drawPlate(); });
       // another unit: only how it is shown (and remembered for this food), never the amount
       body.querySelectorAll('[data-unit]').forEach(x => x.onclick = () => {
         const i = Number(x.dataset.unit);
@@ -375,11 +369,6 @@ export function openEat({ day = today(), meal = null, budgetFor, start = null })
         drawPlate();
       });
       body.querySelectorAll('[data-drop]').forEach(x => x.onclick = () => { picked.splice(Number(x.dataset.drop), 1); if (from) edited = true; drawPlate(); });
-      body.querySelectorAll('[data-set]').forEach(x => x.onclick = () => {
-        const i = Number(x.dataset.set);
-        locks.set(picked[i], views[i].toUnits(Number(x.dataset.n)));
-        drawPlate();
-      });
       // any amount, in the unit shown (Persian digits and «٫» are fine); nothing happens on a blank or a 0
       body.querySelectorAll('[data-type]').forEach(x => {
         const apply = () => {
@@ -390,7 +379,11 @@ export function openEat({ day = today(), meal = null, budgetFor, start = null })
           locks.set(picked[i], views[i].toUnits(n));
           drawPlate();
         };
-        x.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); apply(); } });
+        // a tap empties the box (the amount stays there faintly), so what they type replaces it; left
+        // empty, the amount comes back
+        x.addEventListener('focus', () => { if (x.value) { x.placeholder = x.value; x.value = ''; } });
+        x.addEventListener('blur', () => { if (!x.value.trim()) x.value = x.placeholder; });
+        x.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); x.blur(); } });
         x.addEventListener('change', apply);
       });
       body.querySelector('[data-save]').onclick = () => {
