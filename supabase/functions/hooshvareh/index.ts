@@ -157,6 +157,7 @@ type Ctx = {
   profile?: Record<string, unknown> | null;
   targets?: { kcal: number; protein: number; floor: number; teen?: boolean; hold?: string | null; nursing?: boolean };
   pattern?: { days: number; eaten: Record<string, number>; usual: Record<string, any[]>; use?: { days: number; options: any[] } | null } | null;
+  trend?: { first: string; last: string; kg: number; change: number; rate4w: number | null } | null;
   foods?: any[]; entries?: any[]; weights?: any[]; waists?: any[]; reviews?: any[]; motivations?: any[]; notes?: any[];
   phase?: {
     phase: string; goalKg?: number | null; breakUntil?: string | null; maintainFrom?: { day: string; kg: number; kcal?: number } | null; lossWeeks?: number | null; maintenance?: number | null;
@@ -265,7 +266,7 @@ function sections(c: Ctx) {
       return `# How they really eat (the app worked this out from ${m.days} full days they chose for themselves, in the last 60)\nShare of the day's calories: ${Object.entries(m.eaten).map(([k, v]) => `${k} ${v}%`).join(", ")}\nUsual foods, by meal (food: usual amount, times logged):\n${Object.entries(m.usual).map(([k, l]: any) => `${k}: ${l.map((u: any) => `${u.name} ${u.qty} ${u.unit}, ${u.n}×`).join("؛ ")}`).join("\n")}${use}`;
     },
     adherence: () => pl ? `# Following the plan, last 4 weeks (day | occasions eaten as planned of that day's occasions: 5, or 3 on a Ramadan fasting day; the last row, today, is still in progress)\n${(pl.days || []).map((d: any) => `${d.day} | ${d.done}/${d.of}`).join("\n") || "none"}${(pl.rooms || []).length ? `\n\n# Today's occasions changed by off-plan food (the app takes calories eaten over an occasion's share first from earlier occasions of the same day that were skipped or left short, then from the later ones, at most 30% of each, and shows their options smaller)\n${pl.rooms.map((r: any) => `${r.slot}: ${r.left >= 0 ? `${r.left} kcal left` : `${-r.left} kcal over`}${r.owed ? `, after ${r.owed} kcal taken off for ${r.back ? "a later occasion's excess" : "earlier occasions"}` : ""}${r.locked ? ", options locked" : ""}`).join("\n")}` : ""}` : "",
-    weights: () => `# Weigh-ins (day | kg), all\n${[...(c.weights || [])].sort((a, b) => (a.day < b.day ? -1 : 1)).map(w => `${w.day} | ${r1(w.kg)}`).join("\n") || "none yet"}${(c.waists || []).length ? `\n\n# Waist measurements (day | cm)${(c.profile as any)?.heightCm ? `; height ${(c.profile as any).heightCm} cm` : ""}\n${[...c.waists!].sort((a, b) => (a.day < b.day ? -1 : 1)).map(w => `${w.day} | ${r1(w.cm)}`).join("\n")}` : ""}${c.measure?.weigh || c.measure?.waist ? `\n\nDue today in the app's check-in (one form on the Progress screen, «پیشرفت», takes both): ${[c.measure.weigh ? "weight" : "", c.measure.waist ? "waist" : ""].filter(Boolean).join(" and ")}` : ""}`,
+    weights: () => `${c.trend ? `# The app's weight figures (what the Progress screen, «پیشرفت», shows them)\nchange since the first weigh-in (${c.trend.first}): ${c.trend.change > 0 ? "+" : ""}${c.trend.change} kg; pace over the last 4 weeks (a straight line through those weigh-ins): ${c.trend.rate4w == null ? "not enough weigh-ins yet" : `${c.trend.rate4w > 0 ? "+" : ""}${c.trend.rate4w} kg/week`}\nWhen you give a change or a pace, use these exact figures (they see them on «پیشرفت»); never work out your own from the list below. If you need a different window, name it plainly (e.g. "since 1 Aban") so it is not mistaken for these.\n\n` : ""}# Weigh-ins (day | kg), all\n${[...(c.weights || [])].sort((a, b) => (a.day < b.day ? -1 : 1)).map(w => `${w.day} | ${r1(w.kg)}`).join("\n") || "none yet"}${(c.waists || []).length ? `\n\n# Waist measurements (day | cm)${(c.profile as any)?.heightCm ? `; height ${(c.profile as any).heightCm} cm` : ""}\n${[...c.waists!].sort((a, b) => (a.day < b.day ? -1 : 1)).map(w => `${w.day} | ${r1(w.cm)}`).join("\n")}` : ""}${c.measure?.weigh || c.measure?.waist ? `\n\nDue today in the app's check-in (one form on the Progress screen, «پیشرفت», takes both): ${[c.measure.weigh ? "weight" : "", c.measure.waist ? "waist" : ""].filter(Boolean).join(" and ")}` : ""}`,
     phase: () => {
       const ph = c.phase;
       if (!ph) return "";
@@ -278,7 +279,7 @@ function sections(c: Ctx) {
       const m = c.energy;
       if (!m) return "";
       if (!m.ready) return `# Measured energy use\nNot enough data yet: it needs ${m.needDays || 0} more fully logged days (at least two meals each, or a day they marked «all logged») and ${m.needWeighs || 0} more weigh-ins, over four weeks, or six when they weigh in once a week (that is enough, they need not weigh more often). Until then the targets come from a formula${m.formula ? ` (about ${m.formula} kcal/day)` : ""}.`;
-      return `# Measured energy use (from their own log, ${m.from} to ${m.to})\nabout ${m.tdee} kcal/day: they ate ${m.intake} kcal/day on ${m.days} fully logged days while their weight changed ${r1(m.perWeek)} kg/week (${m.weighs} weigh-ins).${m.formula ? ` The formula had estimated ${m.formula}.` : ""}${m.clamped ? " The raw figure was further from the formula than is plausible (probably gaps in logging), so it is held within 25% of it." : ""} Their current target is based on: ${m.source || "formula"}.`;
+      return `# Measured energy use (from their own log, ${m.from} to ${m.to})\nabout ${m.tdee} kcal/day: they ate ${m.intake} kcal/day on ${m.days} fully logged days while their weight changed ${r1(m.perWeek)} kg/week (${m.weighs} weigh-ins; this window is not the 4-week pace on «پیشرفت», so do not give it as their pace).${m.formula ? ` The formula had estimated ${m.formula}.` : ""}${m.clamped ? " The raw figure was further from the formula than is plausible (probably gaps in logging), so it is held within 25% of it." : ""} Their current target is based on: ${m.source || "formula"}.`;
     },
 
     // what changes from day to day in maintenance: where the 7-day average sits in the band
@@ -822,8 +823,10 @@ note: 2–3 short Persian sentences to them: the idea behind this plan, naming a
             properties: {
               n: { type: "integer", description: "the food's n as given" },
               tags: { type: "array", items: { type: "string", enum: ["purine", "sweetDrink", "sugary", "fatty", "salty"] } },
+              carbs: { type: "number", description: "grams of carbohydrate (all of it, starch and sugar) in ONE of the food's unit as given" },
+              sodium: { type: "number", description: "milligrams of sodium in ONE of the food's unit as given" },
             },
-            required: ["n", "tags"], additionalProperties: false,
+            required: ["n", "tags", "carbs", "sodium"], additionalProperties: false,
           },
         },
       },
@@ -835,6 +838,7 @@ note: 2–3 short Persian sentences to them: the idea behind this plan, naming a
 - sugary: sweets, pastries, cakes, biscuits, chocolate, ice cream, jam, honey, sugar, حلوا, شله‌زرد, شیربرنج, a dish or breakfast cooked or served with added sugar. Not plain fruit, dates or dried fruit.
 - fatty: fried in oil (سرخ‌کرده، سوخاری، کتلت، کوکو), fatty or processed red meat (کوبیده, sausage, کالباس, burger, fatty lamb), کله‌پاچه, butter, cream, سرشیر, cheesy fast food, creamy pastries. Not oil-free or lightly cooked خورش, grilled lean meat, chicken, fish, nuts, olive oil.
 - salty: pickles (ترشی، خیارشور), sausage and cured meat, chips and puffs, کشک, instant soups and noodles, salty fast food. Not ordinary home food or cheese.
+Also give, for ONE of the food's unit as given (its unit, grams, kcal and protein are there), the grams of carbohydrate (all of it) and the milligrams of sodium, as cooked in an Iranian home with the usual salt (bread from the bakery: about 500 mg of sodium per 100 g; rice and stews about 170–300 mg per 100 g; Iranian white cheese about 1000 mg per 100 g; کشک and دوغ very salty). For a recipe, from its ingredients. Carbohydrate × 4 + protein × 4 must not pass the calories by more than a little (fibre). A unit of grams (گرم) means per gram.
 Return every food by its n.
 
 ${JSON.stringify((Array.isArray(i.foods) ? i.foods : []).slice(0, 40).map((f: any) => ({ n: Number(f.n), name: String(f.name || "").slice(0, 80), unit: String(f.unit || "").slice(0, 30), grams: Number(f.grams) || null, kcal: Number(f.kcal) || 0, protein: Number(f.protein) || 0, ...(Array.isArray(f.ingredients) ? { ingredients: f.ingredients.slice(0, 30).map((x: any) => String(x).slice(0, 60)) } : {}) })))}`,
@@ -882,7 +886,7 @@ This is NOT an analysis of their data: don't mention their numbers, logs or prog
     effort: "medium",
     data: (S) => [S.now(), S.profile(), S.targets(), S.phase(), S.standing(), S.energy(), S.mode(), S.adherence(), S.weights(), S.totals(), S.reviews(), S.checkins()],
     schema: { type: "object", properties: { text: str("Persian, simple Markdown, max ~110 words") }, required: ["text"], additionalProperties: false },
-    prompt: () => `Analyse their weight trend for the Progress screen: the overall direction and pace (use weekly averages, not single weigh-ins — daily water swings are normal), how it relates to their eating, whether the pace is healthy (0.25–1 kg/week is a good range while losing; in maintenance or on a diet break, holding steady is the aim), and one encouraging, practical next step. If there are waist measurements, read them together with the weight: a shrinking waist with a flat weight is progress. If measured energy use is in the data and differs from the formula by more than about 150 kcal, say in one sentence what that means for their target. If there are too few weigh-ins, say what's needed.`,
+    prompt: () => `Analyse their weight trend for the Progress screen: the overall direction and pace (the pace is the app's 4-week figure shown right above your text, so give that one; read the direction from weekly averages, not single weigh-ins — daily water swings are normal), how it relates to their eating, whether the pace is healthy (0.25–1 kg/week is a good range while losing; in maintenance or on a diet break, holding steady is the aim), and one encouraging, practical next step. If there are waist measurements, read them together with the weight: a shrinking waist with a flat weight is progress. If measured energy use is in the data and differs from the formula by more than about 150 kcal, say in one sentence what that means for their target. If there are too few weigh-ins, say what's needed.`,
   },
   // once a month in maintenance, on «پیشرفت»
   maintain: {

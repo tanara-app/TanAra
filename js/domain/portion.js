@@ -149,11 +149,12 @@ export function usualAmounts(entries, foods, day, { days = 120 } = {}) {
 
   `locked` ({ index: qty }): amounts set by hand; the rest is fitted around them.
   `usual`: their own usual amounts (usualAmounts). `proteinMax`: a protein limit for the meal.
+  `carbMax` with `carbsOf(food)` (grams in one unit): a carbohydrate limit for the meal (diabetes).
   Returns { items: [{ qty, kcal, protein, role, free, locked, step, atMax, atMin }], total, protein,
   over (calories past the budget even at the least of each), spare (calories left because every
   food reached its most), drop (index of a food whose going makes the meal fit, or null) }.
 */
-export function fitMeal(foods, kcal, locked = {}, { proteinMax = null, proteinMin = null, usual = null } = {}) {
+export function fitMeal(foods, kcal, locked = {}, { proteinMax = null, proteinMin = null, usual = null, carbMax = null, carbsOf = null } = {}) {
   const budget = Math.max(0, Number(kcal) || 0);
   const info = foods.map((f, i) => {
     const role = roleOf(f);
@@ -246,13 +247,44 @@ export function fitMeal(foods, kcal, locked = {}, { proteinMax = null, proteinMi
       x.target = Math.max(x.target, x.qty);
     }
   }
+  /*
+    `carbMax` (diabetes, nutrients.js): the meal's part of the day's carbohydrate. While past it, a
+    step comes off a food that carries carbohydrate (a sweet or a spread first, then the one whose
+    step holds the most), down to its least helping (a spread or a sweet down to one step, and it is
+    not given steps back); the calories freed go to the other foods below
+    (up to their most, not only near their place),
+    and a carbohydrate food is not given a step that takes the meal past the limit again. What is
+    still past it is returned (`carbOver`).
+  */
+  const cPer = y => (carbsOf ? Number(carbsOf(y.f)) || 0 : 0);
+  const carbs = () => info.reduce((t, x) => t + x.qty * cPer(x), 0);
+  // carbohydrate is a good part of its calories: rice, bread, fruit, sweets (not a stew with a few split peas)
+  const carby = y => y.per > 0 && cPer(y) * 4 / y.per >= 0.35;
+  const capCarbs = carbMax != null && !!carbsOf;
+  let carbCut = false;
+  if (capCarbs) {
+    // a little past it is let be (an apple and a few almonds, 24 g, where the snack has 20, are not cut in half)
+    for (let n = 0; n < 50 && carbs() > carbMax + Math.max(4, carbMax * 0.1); n++) {
+      carbCut = true;
+      // a spread or a sweet may go down to one step (half a spoon of jam), so the bread can stay
+      const x = flex.filter(y => carby(y) && y.qty - y.step >= (y.e < 0.8 ? y.step : y.min) - 1e-9)
+        .sort((a, b) => (b.role === 'treat') - (a.role === 'treat') || a.e - b.e || cPer(b) * b.step - cPer(a) * a.step)[0];
+      if (!x) break;
+      x.qty = Math.round((x.qty - x.step) * 100) / 100;
+      x.target = Math.min(x.target, x.qty);
+    }
+  }
   // rounding down left room: a step to the food it moves closest to its place
   for (let n = 0; n < 50; n++) {
     const gap = budget - sum();
     // never a step that takes a food far past its place (a whole spoon of oil where half was its share)
     const x = flex.filter(y => y.qty + y.step <= y.max + 1e-9 && y.per > 0 && y.step * y.per <= gap + TOL
-      && off(y, y.qty + y.step) <= (y.e >= 0.8 ? 0.6 : 0.35) // a spread or a sweet even less: it would pass the bread's partner
-      && (proteinMax == null || !dense(y) || prot() + pOf(y) <= proteinMax + 0.5))
+      // a spread or a sweet even less: it would pass the bread's partner; once carbohydrate was taken
+      // off, the cheese, egg or stew may take its calories up to their most (not butter or ارده)
+      && ((carbCut && !carby(y) && (dense(y) || y.e >= 0.6)) || off(y, y.qty + y.step) <= (y.e >= 0.8 ? 0.6 : 0.35))
+      && (proteinMax == null || !dense(y) || prot() + pOf(y) <= proteinMax + 0.5)
+      && (!capCarbs || !carby(y) || (carbs() + cPer(y) * y.step <= carbMax + 0.5 && !(carbCut && y.e < 0.8)))
+      && !(carbCut && !carby(y) && !dense(y) && y.e < 0.6)) // nor more ارده or butter on less bread
       .sort((a, b) => prefer(a, b, 1))[0];
     if (!x) break;
     x.qty = Math.round((x.qty + x.step) * 100) / 100;
@@ -273,6 +305,8 @@ export function fitMeal(foods, kcal, locked = {}, { proteinMax = null, proteinMi
       atMax: !x.fixed && x.qty >= x.max - 1e-9, atMin: !x.fixed && x.qty <= x.min + 1e-9,
     })),
     total, protein: prot(),
+    // grams of carbohydrate, and how far past `carbMax` it still is, from 5 g
+    carbs: carbs(), carbOver: capCarbs && carbs() > carbMax + 4.5 ? Math.round(carbs() - carbMax) : 0,
     // grams of protein still short of `proteinMin`, from 5 g (0 when near it or none asked)
     proteinShort: proteinMin != null && proteinMax == null && prot() < proteinMin - 4.5 ? Math.round(proteinMin - prot()) : 0,
     // only a food whose going makes the meal fit: «بدون نان جا می‌شود» must be true

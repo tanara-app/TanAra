@@ -10,6 +10,8 @@
   --accent-soft: rgba(95, 211, 168, .14);
   --protein: #e9b872;
   --sweet: #b994e0;
+  --carb: #7fb2e8;
+  --salt: #a3b0b6;
   --doctor: #8fb6ff;
   --doctor-soft: rgba(143, 182, 255, .12);
   --radius: 18px;
@@ -38,6 +40,8 @@
   --accent-soft: rgba(12, 132, 96, .1);
   --protein: #a86b12;
   --sweet: #7c4fb0;
+  --carb: #2f6fb0;
+  --salt: #6b7a80;
   --doctor: #2f5fc4;
   --doctor-soft: rgba(47, 95, 196, .08);
   --ai: #6a4fd6;
@@ -343,7 +347,9 @@ dl.calc dd { margin: 0; text-align: left; }
 .sum-side.q .bar:last-child { margin-bottom: 0; }
 .bar.veg i { background: var(--accent); }
 .bar.sweet i { background: var(--sweet); }
-.bar.sweet i.over { background: var(--protein); }
+.bar.carb i { background: var(--carb); }
+.bar.salt i { background: var(--salt); }
+.bar.sweet i.over, .bar.carb i.over, .bar.salt i.over { background: var(--protein); }
 .kv b.over { color: var(--protein); }
 .meal-leaf { display: inline-flex; vertical-align: middle; margin-inline-start: 6px; color: var(--muted); opacity: .45; }
 .meal-leaf.on { color: var(--accent); opacity: 1; }
@@ -452,6 +458,7 @@ dl.calc dd { margin: 0; text-align: left; }
 .eat-total b { color: var(--text); font-size: 1.05rem; }
 .eat-over { text-align: center; margin-top: -6px; }
 .eat-total b.short { color: var(--protein); }
+.eat-total.eat-carb { min-height: 0; margin-top: -10px; }
 .eat-suggest { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px; margin-top: -4px; }
 .eat-more { display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 48px; border-radius: 14px; border: 1px dashed var(--line); background: none; color: var(--muted); font: inherit; cursor: pointer; }
 .eat-more svg { width: 18px; height: 18px; }

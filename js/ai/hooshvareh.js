@@ -13,7 +13,7 @@ import { effectiveTargets, computeTargets, phaseOn, maintenanceKcal, rampKcal, c
 import { SLOTS, planOn, planEnd, previousPlan, adherence, optionText, picksOn, offOn, slotExtras, dayRooms, carriesOver, fastOn, fastPlan } from '../domain/plan.js';
 import { measuredTdee } from '../domain/energy.js';
 import { lossStart, zone, maintainWeeks, lightOn } from '../domain/phase.js';
-import { sortedWeights, measureDue, activityWeek, weekStart, ACTIVITY_GOAL, logMarks } from '../domain/stats.js';
+import { sortedWeights, rate4w, measureDue, activityWeek, weekStart, ACTIVITY_GOAL, logMarks } from '../domain/stats.js';
 import { upcoming } from '../domain/occasions.js';
 import { today, parse, addDays, diffDays } from '../lib/dates.js';
 import { perUnit } from '../domain/recipe.js';
@@ -120,6 +120,16 @@ function energyContext(s, p, t) {
   return { ...m, formula: Number.isFinite(formula) ? formula : null, source: p.targets?.manualKcal ? 'manual' : p.targets?.source || 'formula' };
 }
 
+// what «پیشرفت» shows above the weight chart: the change from the first weigh-in and the 4-week pace
+// (a straight line through the last 28 days, rate4w), with the same rounding
+function trendContext(weights, t) {
+  const w = sortedWeights(weights);
+  if (w.length < 2) return null;
+  const r2 = x => Math.round(x * 100) / 100;
+  const rate = rate4w(w, t);
+  return { first: w[0].day, last: w[w.length - 1].day, kg: Number(w[w.length - 1].kg), change: r2(w[w.length - 1].kg - w[0].kg), rate4w: rate == null ? null : r2(rate) };
+}
+
 function context() {
   const s = store.get();
   const tagNote = s.ai_notes.find(n => n.key === TAGS_KEY)?.data || {};
@@ -145,6 +155,8 @@ function context() {
     // what they said about a day's log: true «ثبت کامل» (all they ate, even one meal), false «ثبت ناقص»
     logdays: Object.fromEntries(logMarks(s.ai_notes)),
     weights: s.weights.map(({ day, kg }) => ({ day, kg })),
+    // the figures «پیشرفت» shows, so the assistant quotes the same ones instead of working out its own
+    trend: trendContext(s.weights, t),
     waists: s.waists.map(({ day, cm }) => ({ day, cm })),
     // what the check-in asks for today (the two are entered together on «پیشرفت»)
     measure: p ? (({ weigh, waist }) => ({ weigh, waist }))(measureDue(s.weights, s.waists, p, t, p.reminders?.weigh?.every)) : null,

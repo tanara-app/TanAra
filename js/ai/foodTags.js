@@ -8,6 +8,7 @@ import * as store from '../data/store.js';
 import { SEED_FOODS } from '../data/seedFoods.js';
 import { TAGS_KEY, tagSig, tagsOf, untagged, avoidTest, avoidedTags, cleanTags } from '../domain/health.js';
 import { ask, aiOnline } from './hooshvareh.js';
+import { nutrOf, countsCarbs, countsSalt } from '../domain/nutrients.js';
 
 const SEED_NAMES = new Set(SEED_FOODS.map(f => f.name));
 const BATCH = 40;
@@ -19,6 +20,9 @@ const recipeOf = food => store.get().ai_notes.find(n => n.kind === 'recipe' && n
 const conditions = () => store.profile()?.conditions || [];
 
 export const foodTags = food => tagsOf(food, saved(), SEED_NAMES, recipeOf);
+// carbohydrate (g) and sodium (mg) in one unit of the food, or null (js/domain/nutrients.js)
+export const foodNutr = food => nutrOf(food, saved(), SEED_NAMES, recipeOf);
+const needNutr = () => countsCarbs(conditions()) || countsSalt(conditions());
 
 // food id → the tag their conditions keep out, or null; null when nothing is kept out.
 export const planAvoid = () => avoidTest(conditions(), store.get().foods, saved(), SEED_NAMES, recipeOf);
@@ -29,7 +33,7 @@ export const planAvoid = () => avoidTest(conditions(), store.get().foods, saved(
 export async function ensureTags() {
   if (!avoidedTags(conditions()).size || !aiOnline() || Date.now() - failedAt < RETRY_MS) return 0;
   let done = 0;
-  const todo = untagged(store.get().foods, saved(), SEED_NAMES, recipeOf);
+  const todo = untagged(store.get().foods, saved(), SEED_NAMES, recipeOf, needNutr());
   for (let i = 0; i < todo.length; i += BATCH) {
     const part = todo.slice(i, i + BATCH);
     let res;
@@ -42,9 +46,14 @@ export async function ensureTags() {
       });
     } catch { failedAt = Date.now(); return done; }
     const next = { ...saved() };
-    const got = new Map((res?.foods || []).map(a => [Number(a.n), cleanTags(a.tags)]));
+    const got = new Map((res?.foods || []).map(a => [Number(a.n), a]));
+    const num = x => (Number.isFinite(Number(x)) && Number(x) >= 0 ? Math.round(Number(x) * 100) / 100 : null);
     // a food left out of the answer counts as having none of the tags, so it isn't asked forever
-    part.forEach((f, n) => { next[f.id] = { s: tagSig(f, recipeOf(f)), t: got.get(n) || [] }; done++; });
+    part.forEach((f, n) => {
+      const a = got.get(n);
+      next[f.id] = { s: tagSig(f, recipeOf(f)), t: cleanTags(a?.tags), c: a ? num(a.carbs) : null, na: a ? num(a.sodium) : null };
+      done++;
+    });
     // foods no longer in the bank go
     const ids = new Set(store.get().foods.map(f => f.id));
     for (const id of Object.keys(next)) if (!ids.has(id)) delete next[id];

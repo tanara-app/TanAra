@@ -10,7 +10,7 @@ import { MEALS, MEALS5, mealLabel, baseMeal, meal5, entriesOn, totals, daysLogge
 import { underEating, rapidLoss, rapidLimit, slowPace } from '../domain/safety.js';
 import { bmiOf, UNDERWEIGHT_BMI } from '../domain/targets.js';
 import { recalcTargets } from './profile.js';
-import { fa, kcal50, round50, esc, qtyLabel } from '../lib/fa.js';
+import { fa, kcal50, round50, esc, qtyLabel, norm } from '../lib/fa.js';
 import { amountLabel } from './units.js';
 import { today, addDays, relLabel, faDM, weekStart } from '../lib/dates.js';
 import { icon } from './dom.js';
@@ -27,7 +27,8 @@ import { checkinCard, bindCheckin } from './checkin.js';
 import { weekCard, bindWeekCard } from './review.js';
 import { greetCard, bindGreet } from './mascot.js';
 import { mealBudget, mealSharesFrom, mealShares5From, mealStanding } from '../domain/portion.js';
-import { planAvoid, foodTags } from '../ai/foodTags.js';
+import { planAvoid, foodTags, foodNutr } from '../ai/foodTags.js';
+import { nutrTotals, countsCarbs, countsSalt, carbLimit, SALT_MAX_G } from '../domain/nutrients.js';
 import { dayQuality, hasVeg } from '../domain/quality.js';
 import { TAG_SAYS } from '../domain/health.js';
 import { packRow, bindPacks } from './packs.js';
@@ -173,14 +174,28 @@ export function renderToday(root) {
     return {
       kcal: mealBudget(asShown(st.entries), day, m, t.kcal, sh), label: meals[m] || mealLabel(m), meals,
       main: MAIN_MEALS.has(m),
+      // diabetes: the meal's part of the day's carbohydrate, the same share of its own calories (nutrients.js)
+      carbMax: countsCarbs(p.conditions) ? carbLimit(Math.max(0, mealBudget(asShown(st.entries), day, m, t.kcal, sh))) : null,
       proteinMax: t.proteinMax && all ? Math.round(t.protein * (sh[m] || 0) / all) : null,
       // a main meal's part of the day's protein, 15–40 g (snacks have none; with a kidney limit, the limit rules)
       proteinMin: !t.proteinMax && all && MAIN_MEALS.has(m) ? Math.min(40, Math.max(15, Math.round(t.protein * (sh[m] || 0) / all))) : null,
     };
   };
   // the quality of the day beside its calories (quality.js): in the summary card of the rebuilt «امروز»
-  const q = eat ? dayQuality(list, s.foods, day, t.kcal, foodTags) : null;
+  const q = eat ? { ...dayQuality(list, s.foods, day, t.kcal, foodTags), ...dayNutr() } : null;
   const pct = (a, b) => (b ? Math.min(100, a / b * 100) : a ? 100 : 0);
+  // with diabetes carbohydrate takes the place of sweets, with blood pressure (heart, kidney) salt comes under them (nutrients.js)
+  function dayNutr() {
+    const cond = p.conditions || [];
+    const carbs = countsCarbs(cond), salt = countsSalt(cond);
+    if (!carbs && !salt) return {};
+    const byId = new Map(s.foods.map(f => [f.id, f]));
+    const byName = new Map(s.foods.map(f => [norm(f.name), f]));
+    const n = nutrTotals(list, e => byId.get(e.food_id) || byName.get(norm(e.name)), foodNutr);
+    return { carbs: n.carbs, carbMax: carbs ? carbLimit(t.kcal) : null, salt: n.salt, saltMax: salt ? SALT_MAX_G : null };
+  }
+  const qRow = (name, shown, val, max, unit, cls, over) => `<div class="kv"><span>${name}</span><b class="${over ? 'over' : ''}">${shown} <small>از ${fa(max)} ${unit}</small></b></div>
+        <div class="bar${cls ? ` ${cls}` : ''}"><i class="${over ? 'over' : ''}" style="width:${pct(val, max)}%"></i></div>`;
   const standing = m =>mealStanding(asShown(store.get().entries), day, m, t.kcal, sharesNow());
   const shownList = asShown(list);
   const avoid = eat ? planAvoid() : null;
@@ -223,12 +238,11 @@ export function renderToday(root) {
         </div>
       </div>
       ${q ? `<div class="sum-side q">
-        <div class="kv"><span>پروتئین</span><b>${fa(Math.round(tot.protein))} <small>از ${fa(t.protein)} گرم</small></b></div>
-        <div class="bar"><i style="width:${pct(tot.protein, t.protein)}%"></i></div>
-        <div class="kv"><span>سبزی و میوه</span><b>${qtyLabel(q.veg)} <small>از ${fa(q.vegGoal)} وعده</small></b></div>
-        <div class="bar veg"><i style="width:${pct(q.veg, q.vegGoal)}%"></i></div>
-        <div class="kv"><span>شیرینی</span><b class="${q.sweet > q.sweetMax ? 'over' : ''}">${fa(q.sweet)} <small>از ${fa(q.sweetMax)} کالری</small></b></div>
-        <div class="bar sweet"><i class="${q.sweet > q.sweetMax ? 'over' : ''}" style="width:${pct(q.sweet, q.sweetMax)}%"></i></div>
+        ${qRow('پروتئین', fa(Math.round(tot.protein)), tot.protein, t.protein, 'گرم', '', false)}
+        ${qRow('سبزی و میوه', qtyLabel(q.veg), q.veg, q.vegGoal, 'وعده', 'veg', false)}
+        ${q.carbMax != null ? qRow('کربوهیدرات', fa(q.carbs), q.carbs, q.carbMax, 'گرم', 'carb', q.carbs > q.carbMax)
+          : qRow('شیرینی', fa(q.sweet), q.sweet, q.sweetMax, 'کالری', 'sweet', q.sweet > q.sweetMax)}
+        ${q.saltMax != null ? qRow('نمک', fa(q.salt, 1), q.salt, q.saltMax, 'گرم', 'salt', q.salt > q.saltMax) : ''}
       </div>` : `<div class="sum-side">
         <div class="kv"><span>خورده‌شده</span><b>${kcal50(tot.kcal)}</b></div>
         <div class="kv"><span>هدف</span><b>${kcal50(t.kcal)}</b></div>

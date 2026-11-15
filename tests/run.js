@@ -20,6 +20,7 @@ import './portion.test.js';
 import './combos.test.js';
 import './meals.test.js';
 import './quality.test.js';
+import './nutrients.test.js';
 import './chatText.test.js';
 import './rewards.test.js';
 

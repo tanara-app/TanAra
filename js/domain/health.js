@@ -118,9 +118,11 @@ export function tagsOf(food, saved = {}, seedNames = new Set(), recipeOf = () =>
   return s && s.s === tagSig(food, recipeOf(food)) ? s.t || [] : null;
 }
 
-// The foods whose tags are not known yet (only worth asking when a condition needs them).
-export const untagged = (foods, saved, seedNames, recipeOf) =>
-  foods.filter(f => tagsOf(f, saved, seedNames, recipeOf) === null);
+// The foods whose tags are not known yet (only worth asking when a condition needs them); with
+// `nutr`, also the own foods not yet asked for their carbohydrate and sodium (js/domain/nutrients.js;
+// null there: asked, but left out of the answer, so not asked forever).
+export const untagged = (foods, saved, seedNames, recipeOf, nutr = false) =>
+  foods.filter(f => tagsOf(f, saved, seedNames, recipeOf) === null || (nutr && !seedNames.has(f.name) && saved?.[f.id]?.c === undefined));
 
 /*
   The test the diet plan uses: food id → the first tag of it their conditions keep out, or

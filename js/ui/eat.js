@@ -25,7 +25,7 @@ import { fitMeal, usualCombos, roleOf, packKey, usualAmounts } from '../domain/p
 import { mealCombos, shortName, libKey, freeFoods } from '../domain/combos.js';
 import { COMBOS } from '../data/combos.js';
 import { packs, savePack, askPackName, deletePack, hideKey, hidden } from './packs.js';
-import { planAvoid } from '../ai/foodTags.js';
+import { planAvoid, foodNutr } from '../ai/foodTags.js';
 import { TAG_SAYS } from '../domain/health.js';
 import { openLogSheet } from './logFood.js';
 import { aiAvailable } from '../ai/hooshvareh.js';
@@ -298,7 +298,7 @@ export function openEat({ day = today(), meal = null, budgetFor, start = null })
       if (!picked.length) { from = null; editing = false; return drawHome(); }
       const b = budgetFor(cur);
       const budget = Math.max(0, Math.round(b.kcal));
-      const r = fitMeal(picked, budget, Object.fromEntries(picked.map((f, i) => [i, locks.get(f)]).filter(([, q]) => q != null)), { proteinMax: b.proteinMax ?? null, proteinMin: b.proteinMin ?? null, usual: usualAmounts(store.get().entries, store.get().foods, day) });
+      const r = fitMeal(picked, budget, Object.fromEntries(picked.map((f, i) => [i, locks.get(f)]).filter(([, q]) => q != null)), { proteinMax: b.proteinMax ?? null, proteinMin: b.proteinMin ?? null, usual: usualAmounts(store.get().entries, store.get().foods, day), carbMax: b.carbMax ?? null, carbsOf: f => foodNutr(f)?.c ?? 0 });
       const views = picked.map((f, i) => view(f, r.items[i]));
       const total = views.reduce((t, v) => t + v.kcal, 0);
       const protein = views.reduce((t, v) => t + v.protein, 0);
@@ -333,6 +333,7 @@ export function openEat({ day = today(), meal = null, budgetFor, start = null })
         }).join('')}</div>
         <div class="eat-total"><span><b>${fa(Math.round(total))}</b>${budget ? ` از ${fa(budget)}` : ''} کالری · <b class="${r.proteinShort ? 'short' : ''}">${fa(Math.round(protein))}</b>${b.proteinMin ? ` از ${fa(b.proteinMin)}` : ''} گرم پروتئین</span>
           ${editing && locks.size ? `<button type="button" class="icon-btn sm" data-reset aria-label="مقدارهای اپ">${icon.undo}</button>` : ''}</div>
+        ${b.carbMax != null ? `<div class="eat-total eat-carb"><span><b class="${r.carbOver ? 'short' : ''}">${fa(Math.round(r.carbs))}</b> از ${fa(b.carbMax)} گرم کربوهیدرات</span></div>` : ''}
         ${suggestRow(b, r)}
         ${r.over ? `<p class="small warn-text eat-over">${fa(r.over)} کالری بیشتر${r.drop != null && picked.length > 1 ? `؛ بدون «${esc(shortName(picked[r.drop].name))}» جا می‌شود` : ''}</p>` : ''}
         ${editing ? `<button type="button" class="eat-more" data-more>${icon.plus} خوراکی دیگر</button>` : ''}
