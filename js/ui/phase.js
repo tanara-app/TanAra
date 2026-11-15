@@ -8,7 +8,7 @@ import * as store from '../data/store.js';
 import { effectiveTargets, isTeen, phaseOn, maintenanceKcal, rampKcal, correcting, RAMP_STEP, CORRECT_KCAL } from '../domain/targets.js';
 import { goalReached, goalProgress, breakDue, zone, correctionDue, lightDue, lightOn, lapse, milestone, maintainWeeks, withPhase, BREAK_DAYS, REGAIN_KG, BAND_KG, CORRECT_DAYS } from '../domain/phase.js';
 import { nextTargets } from '../domain/energy.js';
-import { sortedWeights, rollingAvg } from '../domain/stats.js';
+import { sortedWeights, rollingAvg, withoutGaps } from '../domain/stats.js';
 import { fa, kcal50, parseNum } from '../lib/fa.js';
 import { today, diffDays, faDM } from '../lib/dates.js';
 import { sheet, toast, confirmBox, icon } from './dom.js';
@@ -37,7 +37,7 @@ function toMaintain(p, t) {
   const now = currentKg();
   const kg = now !== null ? Math.round(now * 10) / 10 : p.targets?.baseWeight;
   const from = effectiveTargets(p, t).kcal;
-  const { t: next } = nextTargets(p, s.entries, s.weights, kg, t);
+  const { t: next } = nextTargets(p, withoutGaps(s.entries, s.ai_notes), s.weights, kg, t);
   const targets = { ...p.targets, kcal: next.kcal, protein: next.protein, baseWeight: kg, computedAt: t, tdee: next.tdee, source: next.measured ? 'measured' : 'formula' };
   return withPhase({ ...p, targets }, 'maintain', { day: t, kg, kcal: from });
 }

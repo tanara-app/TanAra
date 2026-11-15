@@ -12,6 +12,7 @@
 import { addDays } from '../lib/dates.js';
 import { baseMeal } from './meals.js';
 import { SLOTS, planOn, picksOn, planEnd, fastOn } from './plan.js';
+import { gapDays } from './stats.js';
 
 export const PATTERN = {
   WINDOW: 60,    // days looked at, ending yesterday
@@ -59,8 +60,10 @@ export function eatingPattern(entries, notes, day) {
   const byDay = new Map();
   for (const e of list) (byDay.get(e.day) || byDay.set(e.day, []).get(e.day)).push(e);
   const byMeal = {};
+  const gaps = gapDays(notes);
   let days = 0;
   for (const [d, es] of byDay) {
+    if (gaps.has(d)) continue; // they said not everything was logged that day
     if (new Set(es.map(e => baseMeal(e.meal))).size < 2) continue;
     if (Object.keys(picksOn(notes, es, d)).length) continue;
     if (fastOn(notes, d)) continue; // a fasting day says nothing about their usual meals

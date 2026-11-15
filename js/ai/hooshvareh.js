@@ -13,7 +13,7 @@ import { effectiveTargets, computeTargets, phaseOn, maintenanceKcal, rampKcal, c
 import { SLOTS, planOn, planEnd, previousPlan, adherence, optionText, picksOn, offOn, slotExtras, dayRooms, carriesOver, fastOn, fastPlan } from '../domain/plan.js';
 import { measuredTdee } from '../domain/energy.js';
 import { lossStart, zone, maintainWeeks, lightOn } from '../domain/phase.js';
-import { sortedWeights, measureDue, activityWeek, weekStart, ACTIVITY_GOAL } from '../domain/stats.js';
+import { sortedWeights, measureDue, activityWeek, weekStart, ACTIVITY_GOAL, withoutGaps, gapDays } from '../domain/stats.js';
 import { upcoming } from '../domain/occasions.js';
 import { today, parse, addDays, diffDays } from '../lib/dates.js';
 import { perUnit } from '../domain/recipe.js';
@@ -116,7 +116,7 @@ function energyContext(s, p, t) {
   if (!p?.startDate) return null;
   const w = sortedWeights(s.weights);
   const formula = computeTargets({ ...p, weightKg: w.length ? Number(w[w.length - 1].kg) : p.targets?.baseWeight }).tdee;
-  const m = measuredTdee(s.entries, s.weights, { day: t, startDate: p.startDate, formula });
+  const m = measuredTdee(withoutGaps(s.entries, s.ai_notes), s.weights, { day: t, startDate: p.startDate, formula });
   return { ...m, formula: Number.isFinite(formula) ? formula : null, source: p.targets?.manualKcal ? 'manual' : p.targets?.source || 'formula' };
 }
 
@@ -142,6 +142,8 @@ function context() {
     }),
     // ids are not shown to the model; the Edge Function needs them to point a correction at a record
     entries: s.entries.map(({ id, day, meal, name, qty, unit, kcal, protein, is_veg, created_at }) => ({ id, day, meal, name, qty, unit, kcal, protein, is_veg, created_at })),
+    // days they marked «ثبت ناقص»: not everything eaten that day was logged
+    gaps: [...gapDays(s.ai_notes)].sort(),
     weights: s.weights.map(({ day, kg }) => ({ day, kg })),
     waists: s.waists.map(({ day, cm }) => ({ day, cm })),
     // what the check-in asks for today (the two are entered together on «پیشرفت»)
@@ -165,7 +167,7 @@ function context() {
     // «برگشت به مسیر»: what they said when the diet slipped, what was planned, how it went
     checkins: s.ai_notes.filter(n => n.kind === 'checkin' && n.data).sort((a, b) => (a.key < b.key ? -1 : 1)).slice(-5)
       .map(({ key, data: d }) => ({ day: key.slice(8), signs: d.signs, mood: d.mood, causes: d.causes, said: d.said, cause: d.cause, steps: d.steps, goal: d.goal, outcome: d.outcome || null })),
-    notes: s.ai_notes.filter(n => !['thread', 'plan', 'pick', 'mag', 'recipe', 'shop', 'checkin', 'tags'].includes(n.kind)).map(({ key, text, created_at }) => ({ key, text, created_at })),
+    notes: s.ai_notes.filter(n => !['thread', 'plan', 'pick', 'mag', 'recipe', 'shop', 'checkin', 'tags', 'gap'].includes(n.kind)).map(({ key, text, created_at }) => ({ key, text, created_at })),
   };
 }
 

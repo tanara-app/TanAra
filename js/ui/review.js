@@ -17,7 +17,7 @@ export function renderReview(root) {
   const thisWeek = weekStart(today());
   if (!ws) ws = addDays(thisWeek, -7); // default: the week that just ended
   const s = store.get();
-  const sum = weekSummary(s.entries, s.weights, ws);
+  const sum = weekSummary(s.entries, s.weights, ws, s.ai_notes);
   const r = s.reviews.find(x => x.week_start === ws) || {};
   const isCurrent = ws === thisWeek;
   const plan = adherence(s.ai_notes, s.entries, ws, isCurrent ? today() : addDays(ws, 6));
@@ -92,7 +92,7 @@ export function weekCard() {
   const w = weekDue();
   if (!w) return '';
   const s = store.get();
-  const sum = weekSummary(s.entries, s.weights, w);
+  const sum = weekSummary(s.entries, s.weights, w, s.ai_notes);
   const line = [`${fa(sum.daysLogged)} روز از ۷ ثبت`];
   if (!edCare()) {
     if (sum.avgKcal !== null) line.push(`میانگین ${kcal50(sum.avgKcal)} کالری`);

@@ -6,7 +6,7 @@ import * as store from '../data/store.js';
 import { effectiveTargets, isTeen, proteinFor } from '../domain/targets.js';
 import { phaseNotes, bindPhase, phaseLabel } from './phase.js';
 import { lightOn } from '../domain/phase.js';
-import { MEALS, MEALS5, mealLabel, baseMeal, meal5, entriesOn, totals, daysLoggedInWeek, sortedWeights } from '../domain/stats.js';
+import { MEALS, MEALS5, mealLabel, baseMeal, meal5, entriesOn, totals, daysLoggedInWeek, sortedWeights, withoutGaps, gapDays, GAP_KEY } from '../domain/stats.js';
 import { underEating, rapidLoss, rapidLimit, slowPace } from '../domain/safety.js';
 import { bmiOf, UNDERWEIGHT_BMI } from '../domain/targets.js';
 import { recalcTargets } from './profile.js';
@@ -43,6 +43,8 @@ const FAST_MEALS = { breakfast: 'سحری', snack2: 'افطار', dinner: 'شا�
 const FAST_SHARES5 = { breakfast: 0.4, snack2: 0.3, dinner: 0.3 };
 // the meals that carry protein (on a fasting day افطار is one: it sits in 'snack2', see fastNotes)
 const MAIN_MEALS_ALL = new Set(['breakfast', 'lunch', 'dinner']);
+// «ثبت ناقص»: a circle half filled
+const HALF = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 3.5a8.5 8.5 0 0 1 0 17z" fill="currentColor" stroke="none"/></svg>';
 const MOON = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg>';
 // what a fasting day asks of some illnesses (the same words as the diet's)
 function fastNotes(conditions) {
@@ -113,7 +115,7 @@ export function renderToday(root) {
   // Safety notices only on today's view.
   const notices = [];
   if (isToday) {
-    const ue = underEating(s.entries, t.floor, today());
+    const ue = underEating(withoutGaps(s.entries, s.ai_notes), t.floor, today());
     if (ue && !dismissed('under', ue.days[0])) {
       notices.push({ key: 'under', mark: ue.days[0], html: `<strong>چند روز است کم خورده‌اید</strong><p>سه روز گذشته کالری‌تان از حداقل ایمن (${fa(t.floor)}) کمتر بوده. کم‌خوری زیاد معمولاً نتیجه‌ی برعکس دارد؛ بدن خسته می‌شود و ادامه دادن سخت‌تر. کمی بیشتر خوردن کاملاً اشکالی ندارد.</p>` });
     }
@@ -186,6 +188,13 @@ export function renderToday(root) {
     const free = freeFoods(s.foods, s.entries, day, m, { avoid, limit: 3 });
     return free.length ? `<div class="meal-free">${icon.leaf}${free.map(f => `<button type="button" class="eat-chip" data-free="${f.id}" data-free-meal="${m}">${esc(shortName(f.name))}</button>`).join('')}</div>` : '';
   };
+  /*
+    «ثبت ناقص»: they say not everything eaten this day went in (a day with something logged), so
+    it is left out of the measured energy use, the under-eating warning, the meal pattern and the
+    week's averages (stats.js gapDays).
+  */
+  const gap = gapDays(s.ai_notes).has(day);
+  const gapPill = list.length || gap ? `<button type="button" class="pill gap-pill${gap ? ' on' : ''}" data-gap aria-pressed="${gap}">${HALF}<span>ثبت ناقص</span></button>` : '';
   root.innerHTML = `
     <header class="day-nav">
       <button class="icon-btn" data-prev aria-label="روز قبل">${icon.chevR}</button>
@@ -230,6 +239,7 @@ export function renderToday(root) {
 
     <div class="pills">
       ${ramadan ? `<button type="button" class="pill fast-pill${fast ? ' on' : ''}" data-fast aria-pressed="${fast}" aria-label="${isToday ? 'امروز' : 'این روز'} روزه‌ام">${MOON}</button>` : ''}
+      ${gapPill}
       ${q ? '' : `<div class="pill">${icon.leaf}<span>سبزی ${isToday ? 'امروز' : ''}: <b>${qtyLabel(Math.round(tot.veg * 2) / 2)}</b> وعده</span></div>`}
       <div class="pill"><span>این هفته <b>${fa(logged)}</b> روز ثبت کرده‌اید${lightOn(p, sortedWeights(s.weights), today()) ? ' · ثبت سبک' : ''}</span></div>
       ${t.phase !== 'loss' ? `<div class="pill"><span>مرحله: <b>${phaseLabel(p, day)}</b></span></div>` : ''}
@@ -287,6 +297,10 @@ export function renderToday(root) {
   root.querySelector('[data-log]')?.addEventListener('click', () => (one ? openMeal({ day, budgetFor }) : eat ? openEat({ day, budgetFor }) : openLogSheet({ day, room })));
   if (one) bindMealRows(root, day, budgetFor);
   root.querySelector('[data-fast]')?.addEventListener('click', () => setFast(day, !fast));
+  root.querySelector('[data-gap]')?.addEventListener('click', () => {
+    if (gap) store.deleteNote(GAP_KEY(day));
+    else store.saveNote({ key: GAP_KEY(day), kind: 'gap' });
+  });
   root.querySelectorAll('[data-free]').forEach(b => b.onclick = () => {
     const f = store.get().foods.find(x => x.id === b.dataset.free);
     if (f) openEat({ day, meal: b.dataset.freeMeal, budgetFor, start: [f] });

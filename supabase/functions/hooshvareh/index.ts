@@ -152,6 +152,7 @@ const GLUCOSE = `# They take insulin or a sugar-lowering pill (like glibenclamid
 - Eating less can bring their blood sugar too low: never suggest skipping meals or long gaps, and say their doctor should adjust the dose as they eat less. Know the signs of a low (shaking, cold sweat, sudden hunger, confusion) and that a low is treated with about 15 g of fast sugar and then a check.`;
 
 type Ctx = {
+  gaps?: string[]; // days they marked «ثبت ناقص»: not everything eaten was logged
   today: string; todayFa?: string; now?: string;
   profile?: Record<string, unknown> | null;
   targets?: { kcal: number; protein: number; floor: number; teen?: boolean; hold?: string | null; nursing?: boolean };
@@ -229,6 +230,7 @@ function sections(c: Ctx) {
   const byDay = new Map<string, any[]>();
   for (const e of entries) (byDay.get(e.day) || byDay.set(e.day, []).get(e.day)!).push(e);
   const days = [...byDay.keys()].sort();
+  const gaps = new Set(c.gaps || []);
   const stats = (d: string) => {
     const l = byDay.get(d) || [];
     return {
@@ -300,13 +302,14 @@ function sections(c: Ctx) {
       for (const d of list.filter(d => d < cut)) { const w = weekStart(d); (weeks.get(w) || weeks.set(w, []).get(w)!).push(d); }
       const out: string[] = [];
       if (weeks.size) out.push(`# Weekly averages of the logged days older than ${TOTALS_DAYS} days (week starting Saturday | days logged | avg kcal | avg protein g | avg veg servings)\n${[...weeks].map(([w, ds]) => {
-        const t = ds.map(stats);
+        const full = ds.filter(d => !gaps.has(d));
+        const t = (full.length ? full : ds).map(stats);
         const avg = (f: (x: any) => number) => t.reduce((s, x) => s + f(x), 0) / t.length;
         return `${w} | ${ds.length} | ${Math.round(avg(x => x.k))} | ${Math.round(avg(x => x.p))} | ${r1(avg(x => x.v))}`;
       }).join("\n")}`);
-      out.push(`# Daily totals, every logged day${weeks.size ? ` of the last ${TOTALS_DAYS} days` : ""}${to < c.today ? " before today" : ""} (day | kcal | protein g | veg servings | meals logged)\n${list.filter(d => d >= cut).map(d => {
+      out.push(`# Daily totals, every logged day${weeks.size ? ` of the last ${TOTALS_DAYS} days` : ""}${to < c.today ? " before today" : ""} (day | kcal | protein g | veg servings | meals logged)${gaps.size ? `. A day marked «not all logged» is one they said not everything eaten went in: its totals are not what they ate, so don't read it as eating little, and leave it out of averages` : ""}\n${list.filter(d => d >= cut).map(d => {
         const t = stats(d);
-        return `${d} | ${Math.round(t.k)} | ${Math.round(t.p)} | ${r1(t.v)} | ${t.meals}`;
+        return `${d} | ${Math.round(t.k)} | ${Math.round(t.p)} | ${r1(t.v)} | ${t.meals}${gaps.has(d) ? " | not all logged" : ""}`;
       }).join("\n") || "nothing logged yet"}`);
       return out.join("\n\n");
     },

@@ -1,7 +1,7 @@
 // Progress answers «where am I?»: the numbers and the chart first, then two buttons that open the
 // forms (measure.js, activity.js), one card for asking Hooshvareh, and the details folded away.
 import * as store from '../data/store.js';
-import { sortedWeights, rate4w, waistSeries, waistToHeight, WHTR_GOAL } from '../domain/stats.js';
+import { sortedWeights, rate4w, waistSeries, waistToHeight, WHTR_GOAL, withoutGaps } from '../domain/stats.js';
 import { rapidLoss, rapidLimit, slowPace } from '../domain/safety.js';
 import { shouldSuggestRecalc, phaseOn, maintenanceKcal, isTeen } from '../domain/targets.js';
 import { nextTargets, ENERGY } from '../domain/energy.js';
@@ -36,7 +36,7 @@ const RANGES = { '1m': ['۱ ماه', 30], '3m': ['۳ ماه', 90], all: ['همه
 function energyCard(s, p, latestKg) {
   if (!p.startDate || !latestKg) return '';
   const t = today();
-  const { t: next, m } = nextTargets(p, s.entries, s.weights, latestKg, t);
+  const { t: next, m } = nextTargets(p, withoutGaps(s.entries, s.ai_notes), s.weights, latestKg, t);
   const fold = (sub, body, open = false) => `<details class="card fold"${open ? ' open' : ''}>
     <summary><span><h2>مصرف واقعی بدنت</h2><small>${sub}</small></span></summary>${body}</details>`;
   if (!m.ready) {

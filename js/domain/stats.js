@@ -4,6 +4,18 @@ import { addDays, weekStart, diffDays, range, parse } from '../lib/dates.js';
 import { baseMeal } from './meals.js';
 export { MEALS, MEALS5, mealLabel, baseMeal, meal5 } from './meals.js';
 
+/*
+  Days they marked «ثبت ناقص» (a note `gap:<day>`): not all of that day's food went in. Such a day
+  never counts as eaten in full: not for the measured energy use, the under-eating warning, the
+  meal pattern or the week's averages. It still counts as a day they logged.
+*/
+export const GAP_KEY = day => `gap:${day}`;
+export const gapDays = notes => new Set((notes || []).filter(n => n.kind === 'gap' && n.key?.startsWith('gap:')).map(n => n.key.slice(4)));
+export const withoutGaps = (entries, notes) => {
+  const gaps = gapDays(notes);
+  return gaps.size ? entries.filter(e => !gaps.has(e.day)) : entries;
+};
+
 export function entriesOn(entries, day) {
   return entries.filter(e => e.day === day);
 }
@@ -89,18 +101,21 @@ export function weekToReview(entries, day) {
   return daysLoggedInWeek(entries, ws) >= REVIEW_MIN_DAYS ? ws : null;
 }
 
-export function weekSummary(entries, weights, ws) {
+// `notes`: days marked «ثبت ناقص» count as logged but stay out of the averages.
+export function weekSummary(entries, weights, ws, notes = []) {
   const end = addDays(ws, 6);
   const inWeek = entries.filter(e => e.day >= ws && e.day <= end);
   const days = [...new Set(inWeek.map(e => e.day))];
-  const t = totals(inWeek);
+  const full = withoutGaps(inWeek, notes);
+  const fullDays = new Set(full.map(e => e.day)).size;
+  const t = totals(full);
   const sorted = sortedWeights(weights);
   const cur = weekAvg(sorted, ws);
   const prev = weekAvg(sorted, addDays(ws, -7));
   return {
     daysLogged: days.length,
-    avgKcal: days.length ? t.kcal / days.length : null,
-    avgProtein: days.length ? t.protein / days.length : null,
+    avgKcal: fullDays ? t.kcal / fullDays : null,
+    avgProtein: fullDays ? t.protein / fullDays : null,
     weightAvg: cur?.avg ?? null,
     weightChange: cur && prev ? cur.avg - prev.avg : null,
   };
