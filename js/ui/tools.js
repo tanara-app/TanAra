@@ -27,8 +27,8 @@ const TOOLS = {
   mag: { label: 'مجله', open: () => { location.hash = '#/mag'; } },
   share: { label: 'غذاهای تازه‌ی خانواده', only: shareAdmin, open: () => openFoodShare(() => checkShare(again, true)) },
   // beta, only for accounts with `game` in profile.beta (set from the database)
-  // beta, only for accounts with `rewards` in profile.beta: the «پرنیان» finish and what comes after it
-  rewards: { label: 'جوایز', beta: true, only: () => (store.profile()?.beta || []).includes('rewards'), open: () => openRewards() },
+  // what a member earns by keeping a habit (for everyone since 2026-11-15)
+  rewards: { label: 'جوایز', open: () => openRewards() },
   game: { label: 'سرزمین', beta: true, art: 'palace', only: () => (store.profile()?.beta || []).includes('game'), open: () => { location.hash = '#/game'; } },
 };
 

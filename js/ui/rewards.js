@@ -1,5 +1,5 @@
 /*
-  «جوایز» (a tile in «بیشتر», beta `rewards`): every reward of js/domain/rewards.js as one card the
+  «جوایز» (a tile in «بیشتر», for everyone): every reward of js/domain/rewards.js as one card the
   same way — a live showcase, its name, a few words on what it is, the goal, and the progress bar, or
   once earned a mark that says so. A finish is then worn from «ظاهر» (profile.js), not from here.
   Earned rewards are written down in profile.data.rewards the first time they are seen.
