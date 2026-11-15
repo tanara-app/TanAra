@@ -1,6 +1,11 @@
 /*
-  «باغ» (beta, first prototype, 2026-11-15): a small Persian garden (چهارباغ) as a living 3D model,
-  opened from «بیشتر» (#/garden). Full screen, no bottom bar. Design and plan in GARDEN.md.
+  «باغ» (beta, 2026-11-15): a small Persian garden (چهارباغ) as a living 3D model, opened from
+  «بیشتر» (#/garden). Full screen, no bottom bar. Design and plan in GARDEN.md.
+
+  The garden is an oasis («واحه»): a walled چهارباغ in the desert, mountains all round the horizon,
+  and a qanat that brings its water from them. It lives on the phone's clock («باغ زنده»): the sky,
+  the light and the shadows follow the real hour (domain/garden.js), and at night the lanterns are
+  lit, fireflies come out, and there are stars and a moon. (`?hour=19.5` in the address shows any hour.)
 
   Everything is built in code with three.js (loaded from the CDN only when this page opens): no
   pictures, so the light, colours and style are the same for every part, and anything can move.
@@ -10,6 +15,7 @@
   wheel) zooms. Nothing is saved yet and nothing is tied to logging yet.
 */
 import { icon } from './dom.js';
+import { daylight } from '../domain/garden.js';
 
 const THREE_URL = 'https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js';
 const STEPS = 6; // waterings from a sapling to a tree with fruit
@@ -59,7 +65,7 @@ const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a
 
 function start(THREE, el, L) {
   const stage = el.querySelector('.garden-stage');
-  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -68,28 +74,25 @@ function start(THREE, el, L) {
   stage.appendChild(renderer.domElement);
 
   const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(40, 1, 0.5, 200);
+  const camera = new THREE.PerspectiveCamera(40, 1, 0.5, 420);
   const mat = (color, extra = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.85, flatShading: true, ...extra });
   const shadowy = m => { m.castShadow = true; m.receiveShadow = true; return m; };
 
-  // ---- light: warm sun from the upper left, a sky-and-grass fill ----
-  scene.add(new THREE.HemisphereLight(0xfff1dc, 0x5d7f3e, 1.3));
+  // ---- light: the sun (the moon at night) and a sky-and-ground fill; both follow the hour, below ----
+  const hemi = new THREE.HemisphereLight(0xfff1dc, 0x5d7f3e, 1.3);
+  scene.add(hemi);
   const sun = new THREE.DirectionalLight(0xffe2b8, 2.4);
   sun.position.set(-7, 12, 6);
   sun.castShadow = true;
   sun.shadow.mapSize.set(1024, 1024);
-  Object.assign(sun.shadow.camera, { left: -9, right: 9, top: 9, bottom: -9, near: 1, far: 40 });
+  Object.assign(sun.shadow.camera, { left: -11, right: 11, top: 11, bottom: -11, near: 1, far: 60 });
   sun.shadow.bias = -0.0008;
   scene.add(sun);
 
-  // ---- the garden: a floating block of earth, grass on top, a stone path round the edge ----
-  const S = 10, H = 1.6;              // width of the garden, depth of the earth under it
+  // ---- the garden: grass beds on a stone floor, inside the wall ----
+  const S = 10;                       // width of the garden
   const garden = new THREE.Group();
   scene.add(garden);
-  const earth = new THREE.Mesh(new THREE.BoxGeometry(S, H, S), mat(0x9a6a43));
-  earth.position.y = -H / 2 - 0.2;
-  earth.receiveShadow = true;
-  garden.add(earth);
   const rim = shadowy(new THREE.Mesh(new THREE.BoxGeometry(S, 0.24, S), mat(0xe8d2a6)));
   rim.position.y = -0.08;
   garden.add(rim);
@@ -147,6 +150,139 @@ function start(THREE, el, L) {
   garden.add(pool);
   const spout = shadowy(new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.2, 0.5, 8), stone));
   spout.position.y = 0.5; garden.add(spout);
+
+  // ---- the world round the garden: sand, dunes, a ring of mountains, the wall, and the qanat ----
+  scene.fog = new THREE.Fog(0xf2dcb6, 70, 260);
+  const sand = new THREE.Mesh(new THREE.CircleGeometry(300, 48), mat(0xe9c88d));
+  sand.rotation.x = -Math.PI / 2; sand.position.y = -0.2; sand.receiveShadow = true; scene.add(sand);
+  const rw = rng(21);
+  // the qanat's line: an open channel out of the west wall, then the shaft mounds off to the mountains
+  const shafts = Array.from({ length: 10 }, (_, i) => [-16 - i * 2.4, -i * 3.8]);
+  const nearQanat = (x, z) => (x < -4 && x > -17 && Math.abs(z) < 7) || shafts.some(([sx, sz]) => Math.hypot(x - sx, z - sz) < 8);
+  const duneGeo = new THREE.IcosahedronGeometry(1, 1), duneMats = [0xe3be82, 0xf0d39e, 0xe8c68c].map(c2 => mat(c2));
+  for (let i = 0; i < 52; i++) {
+    const a = rw() * Math.PI * 2, d = 17 + rw() * 60, x = Math.sin(a) * d, z = Math.cos(a) * d;
+    const sx = 3 + rw() * 5, sy = 0.5 + rw() * 1.1, sz = 2 + rw() * 4, ry = rw() * 3;
+    if (nearQanat(x, z)) continue;
+    const m = new THREE.Mesh(duneGeo, duneMats[i % 3]);
+    m.position.set(x, -0.35, z); m.scale.set(sx, sy, sz); m.rotation.y = ry; m.receiveShadow = true; scene.add(m);
+  }
+  const rockMats = [0x8f7f9c, 0x7f7a9e, 0x9a8494].map(c2 => mat(c2)), snow = mat(0xf6efe6);
+  for (let i = 0; i < 54; i++) { // many low peaks that overlap into a range
+    const a = i / 54 * Math.PI * 2 + (rw() - 0.5) * 0.08, d = 122 + rw() * 30, h = 5 + rw() * 9;
+    const x = Math.sin(a) * d, z = Math.cos(a) * d, ry = rw() * 3;
+    const m = new THREE.Mesh(new THREE.ConeGeometry(h * 1.5, h, 6), rockMats[i % 3]);
+    m.position.set(x, h / 2 - 0.3, z); m.rotation.y = ry; scene.add(m);
+    const cap = new THREE.Mesh(new THREE.ConeGeometry(h * 0.42, h * 0.28, 6), snow);
+    cap.position.set(x, h * 0.86 - 0.28, z); cap.rotation.y = ry; scene.add(cap);
+  }
+  // the mud-brick wall, open where the qanat comes in, with a turquoise dome on each corner
+  const brick = mat(0xd9b27d), cope = mat(0xecd3a4), tile = mat(0x2fb5b2, { roughness: 0.4 });
+  const E = S / 2 - 0.15, WH = 0.6;   // where the wall stands, and its height
+  const wallPiece = (ax, pos, mid, len) => {
+    const w = shadowy(new THREE.Mesh(new THREE.BoxGeometry(ax === 'x' ? 0.3 : len, WH, ax === 'x' ? len : 0.3), brick));
+    w.position.set(ax === 'x' ? pos : mid, WH / 2, ax === 'x' ? mid : pos); garden.add(w);
+    const c = shadowy(new THREE.Mesh(new THREE.BoxGeometry(ax === 'x' ? 0.42 : len, 0.1, ax === 'x' ? len : 0.42), cope));
+    c.position.set(w.position.x, WH + 0.05, w.position.z); garden.add(c);
+  };
+  wallPiece('x', E, 0, 9.4); wallPiece('z', E, 0, 9.4); wallPiece('z', -E, 0, 9.4);
+  wallPiece('x', -E, 2.6, 4.2); wallPiece('x', -E, -2.6, 4.2);
+  for (const [x, z] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+    const t = shadowy(new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.38, 1, 8), brick));
+    t.position.set(x * E, 0.5, z * E); garden.add(t);
+    const d = shadowy(new THREE.Mesh(new THREE.SphereGeometry(0.34, 8, 5, 0, Math.PI * 2, 0, Math.PI / 2), tile));
+    d.position.set(x * E, 1, z * E); garden.add(d);
+  }
+  {
+    const len = 11.4, mid = -S / 2 - len / 2;
+    const tex = waterTex.clone(); tex.needsUpdate = true; tex.repeat.set(1, len / 1.4);
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(0.6, len), waterMat.clone());
+    m.material.map = tex; m.rotation.x = -Math.PI / 2; m.rotation.z = Math.PI / 2; m.position.set(mid, -0.12, 0);
+    scene.add(m); channels.push(tex);
+    for (const side of [-1, 1]) {
+      const e = shadowy(new THREE.Mesh(new THREE.BoxGeometry(len, 0.18, 0.14), stone));
+      e.position.set(mid, -0.11, side * 0.37); scene.add(e);
+    }
+    const mound = mat(0xd6b077), hole = mat(0x4a3524);
+    for (const [x, z] of shafts) {
+      const a = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 1.2, 0.5, 8), mound); a.position.set(x, 0.05, z); a.receiveShadow = true; scene.add(a);
+      const b = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.04, 8), hole); b.position.set(x, 0.31, z); scene.add(b);
+    }
+  }
+
+  // ---- the sky: a dome that follows the camera, with stars and a moon for the night ----
+  const skyU = { top: { value: new THREE.Color() }, hor: { value: new THREE.Color() } };
+  const sky = new THREE.Mesh(new THREE.SphereGeometry(380, 24, 12), new THREE.ShaderMaterial({
+    side: THREE.BackSide, depthWrite: false, fog: false, uniforms: skyU,
+    vertexShader: 'varying vec3 d; void main(){ d = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+    fragmentShader: 'uniform vec3 top; uniform vec3 hor; varying vec3 d; void main(){ gl_FragColor = vec4(mix(hor, top, pow(clamp(d.y, 0.0, 1.0), 0.3)), 1.0);\n#include <tonemapping_fragment>\n#include <colorspace_fragment>\n}',
+  }));
+  sky.renderOrder = -1; sky.frustumCulled = false; scene.add(sky);
+  const starPos = new Float32Array(280 * 3);
+  for (let i = 0; i < 280; i++) { // more of them low in the sky, where the camera looks
+    const a = rw() * Math.PI * 2, y = 0.03 + rw() * rw() * 0.92, rr = Math.sqrt(1 - y * y);
+    starPos.set([Math.cos(a) * rr * 370, y * 370, Math.sin(a) * rr * 370], i * 3);
+  }
+  const starGeo = new THREE.BufferGeometry(); starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
+  const stars = new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0xffffff, size: 1.8, sizeAttenuation: false, transparent: true, opacity: 0, fog: false, depthWrite: false }));
+  stars.frustumCulled = false; sky.add(stars);
+  const moon = new THREE.Mesh(new THREE.CircleGeometry(10, 24), new THREE.MeshBasicMaterial({ color: 0xfff4d6, transparent: true, opacity: 0, fog: false, depthWrite: false, toneMapped: false }));
+  sky.add(moon);
+
+  // ---- lanterns along the water and fireflies over the beds: both only show at night ----
+  const lampGlow = new THREE.MeshStandardMaterial({ color: 0xffe2b0, emissive: 0xffb04a, emissiveIntensity: 0 });
+  const lampLights = [], lampPost = mat(0x5a4632);
+  [[2.3, 0.78], [3.9, -0.78], [-2.3, 0.78], [-3.9, -0.78], [0.78, -2.3], [-0.78, -3.9], [0.78, 3.9], [-0.78, 2.3]].forEach(([x, z], i) => {
+    const post = shadowy(new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.04, 0.5, 5), lampPost)); post.position.set(x, 0.4, z); garden.add(post);
+    const lamp = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.2, 0.16), lampGlow); lamp.position.set(x, 0.75, z); garden.add(lamp);
+    const hat = shadowy(new THREE.Mesh(new THREE.ConeGeometry(0.15, 0.1, 4), tile)); hat.position.set(x, 0.9, z); hat.rotation.y = Math.PI / 4; garden.add(hat);
+    if (i % 2 === 0) { const pl = new THREE.PointLight(0xffb45a, 0, 5.5, 1.6); pl.position.set(x, 0.95, z); pl.visible = false; garden.add(pl); lampLights.push(pl); }
+  });
+  const FLIES = 40, flyPos = new Float32Array(FLIES * 3), flyBase = [];
+  for (let i = 0; i < FLIES; i++) flyBase.push([(rw() - 0.5) * 9, 0.5 + rw() * 1.5, (rw() - 0.5) * 9, rw() * 6]);
+  const flyGeo = new THREE.BufferGeometry(); flyGeo.setAttribute('position', new THREE.BufferAttribute(flyPos, 3));
+  const flies = new THREE.Points(flyGeo, new THREE.PointsMaterial({ color: 0xfff3a0, size: 0.13, transparent: true, opacity: 0, depthWrite: false, fog: false }));
+  flies.visible = false; garden.add(flies);
+
+  // ---- the hour: the colours of the sky and the light at four heights of the sun, blended between ----
+  const C = h => new THREE.Color(h);
+  const HOURS = [
+    { e: -0.3, top: C(0x0a0f2c), hor: C(0x232b58), hs: C(0x7088f8), hg: C(0x2c3a66), hi: 0.95, sc: C(0x9db2ff), si: 0.8 },  // night
+    { e: 0, top: C(0x353b82), hor: C(0xee9068), hs: C(0xe0b4c4), hg: C(0x6a5a4a), hi: 1.05, sc: C(0xff9457), si: 1.7 },      // sunrise, sunset
+    { e: 0.28, top: C(0x62a9e4), hor: C(0xf6d6a4), hs: C(0xffe9cf), hg: C(0x6a7f45), hi: 1.1, sc: C(0xffc890), si: 2.2 },   // the golden hour
+    { e: 0.65, top: C(0x4fa6ea), hor: C(0xc4e2f2), hs: C(0xfff1dc), hg: C(0x5d7f3e), hi: 1.3, sc: C(0xffe2b8), si: 2.4 },   // day
+  ];
+  const fixedHour = parseFloat(new URLSearchParams(location.search).get('hour'));
+  let night = 0, hourAt = -9;
+  function setHour() {
+    const now = new Date();
+    if (fixedHour >= 0 && fixedHour < 24) now.setHours(Math.floor(fixedHour), (fixedHour % 1) * 60, 0);
+    const { day, p, e } = daylight(now);
+    let i = 1; while (i < HOURS.length - 1 && e > HOURS[i].e) i++;
+    const a = HOURS[i - 1], b = HOURS[i], k = Math.min(1, Math.max(0, (e - a.e) / (b.e - a.e)));
+    skyU.top.value.copy(a.top).lerp(b.top, k); skyU.hor.value.copy(a.hor).lerp(b.hor, k);
+    scene.fog.color.copy(skyU.hor.value);
+    hemi.color.copy(a.hs).lerp(b.hs, k); hemi.groundColor.copy(a.hg).lerp(b.hg, k); hemi.intensity = a.hi + (b.hi - a.hi) * k;
+    sun.color.copy(a.sc).lerp(b.sc, k);
+    const si = a.si + (b.si - a.si) * k;
+    if (e > -0.12) { // the sun; just after it sets (or before it rises) its glow still comes from where it was
+      const th = Math.PI * (day ? p : p < 0.5 ? 1 : 0);
+      sun.position.set(-15 * Math.cos(th), Math.max(6, 15 * Math.sin(th)), 6);
+      sun.intensity = si * (1 - 0.85 * smooth(0, -0.12, e));
+    } else {         // the moon
+      const th = Math.PI * p;
+      sun.position.set(12 * Math.cos(th), 4 + 9 * Math.sin(th), -7);
+      sun.intensity = si * (0.15 + 0.85 * smooth(-0.12, -0.3, e));
+    }
+    night = smooth(0.06, -0.2, e);
+    stars.material.opacity = night; stars.visible = night > 0.01;
+    const th = Math.PI * (day ? 0.5 : p);
+    moon.position.set(12 * Math.cos(th), 4 + 9 * Math.sin(th), -7).normalize().multiplyScalar(350);
+    moon.material.opacity = smooth(-0.1, -0.28, e); moon.visible = moon.material.opacity > 0.01;
+    lampGlow.emissiveIntensity = 0.15 + night * 2.4;
+    for (const pl of lampLights) { pl.intensity = night * 6; pl.visible = night > 0.02; }
+    flies.material.opacity = night * 0.95; flies.visible = night > 0.02;
+  }
 
   // the fountain: drops that rise from the spout and fall back into the pool
   const N = 70, drops = new Float32Array(N * 3), vel = [];
@@ -244,7 +380,7 @@ function start(THREE, el, L) {
   tree.userData.parts = parts;
 
   // ---- camera: turns round the garden, keeps it in view on any screen ----
-  const view = { yaw: Math.PI / 4, pitch: 0.62, zoom: 1.12, target: new THREE.Vector3(0.9, 0.2, 0.9) };
+  const view = { yaw: Math.PI / 4, pitch: 0.33, zoom: 1.08, target: new THREE.Vector3(0, 3.8, 0) };
   const R = S * 0.78;
   function place() {
     const w = Math.max(1, stage.clientWidth), h = Math.max(1, stage.clientHeight);
@@ -270,7 +406,7 @@ function start(THREE, el, L) {
     const p = pts.get(e.pointerId); if (!p) return;
     if (pts.size === 1) {
       view.yaw -= (e.clientX - p.x) * 0.008;
-      view.pitch = Math.min(1.25, Math.max(0.3, view.pitch + (e.clientY - p.y) * 0.005));
+      view.pitch = Math.min(1.25, Math.max(0.22, view.pitch + (e.clientY - p.y) * 0.005));
     }
     p.x = e.clientX; p.y = e.clientY;
     if (pts.size === 2) {
@@ -309,6 +445,15 @@ function start(THREE, el, L) {
   function frame() {
     raf = requestAnimationFrame(frame);
     const dt = Math.min(clock.getDelta(), 0.05), t = clock.elapsedTime;
+    if (t - hourAt > 1) { hourAt = t; setHour(); }
+    sky.position.copy(camera.position);
+    moon.lookAt(camera.position);
+    if (flies.visible) {
+      flyBase.forEach(([x, y, z, ph], i) => {
+        flyPos[i * 3] = x + Math.sin(t * 0.7 + ph) * 0.4; flyPos[i * 3 + 1] = y + Math.sin(t * 1.1 + ph * 2) * 0.25; flyPos[i * 3 + 2] = z + Math.cos(t * 0.6 + ph) * 0.4;
+      });
+      flyGeo.attributes.position.needsUpdate = true;
+    }
     for (const tx of channels) tx.offset.y -= 0.25 * dt;
     poolTex.offset.x += 0.12 * dt; poolTex.offset.y += 0.09 * dt;
 
