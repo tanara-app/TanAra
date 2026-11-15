@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>نمونه‌های باغ</title>
+<link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+<div id="root"></div>
+<!--
+  Quick look-and-feel samples for the garden's next step (2026-11-15, GARDEN.md «سه جهت»). Not part of the app.
+  Open /art/garden-samples/?d=1 (واحه), ?d=2 (باغ روزها) or ?d=3 (باغ زنده) on the dev server.
+  The real garden (js/ui/garden.js) is rendered untouched; this page only catches its scene and adds
+  throwaway things on top, so nothing here is production code.
+-->
+<script type="module">
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js';
+import { renderGarden } from '/js/ui/garden.js';
+
+let scene, camera;
+const add0 = THREE.Object3D.prototype.add;
+THREE.Object3D.prototype.add = function (...a) { if (this.isScene) scene = this; return add0.apply(this, a); };
+const upm = THREE.PerspectiveCamera.prototype.updateProjectionMatrix;
+THREE.PerspectiveCamera.prototype.updateProjectionMatrix = function () { camera = this; return upm.call(this); };
+
+const d = new URLSearchParams(location.search).get('d') || '1';
+const root = document.getElementById('root');
+renderGarden(root);
+const wait = setInterval(() => {
+  if (!scene || root.querySelector('.garden-wait')) return;
+  clearInterval(wait);
+  setup();
+}, 100);
+
+function rng(seed) {
+  return () => {
+    seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+    let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+const mat = (c, e = {}) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.85, flatShading: true, ...e });
+const ticks = [];
+let cam = null; // { yaw, pitch, dist, t: [x,y,z] } when a sample wants its own view
+
+function setup() {
+  const garden = scene.children.find(o => o.isGroup);
+  const hemi = scene.children.find(o => o.isHemisphereLight), sun = scene.children.find(o => o.isDirectionalLight);
+  const tree = garden.children.find(o => o.userData.parts);
+  const earth = garden.children.find(o => o.geometry?.parameters?.height === 1.6);
+  const flowers = garden.children.filter(o => o.geometry?.parameters?.radius === 0.11 || o.geometry?.parameters?.radiusTop === 0.02);
+  const mesh = (geo, m, x = 0, y = 0, z = 0, parent = garden) => {
+    const o = new THREE.Mesh(geo, typeof m === 'number' ? mat(m) : m);
+    o.position.set(x, y, z); o.castShadow = o.receiveShadow = true; parent.add(o); return o;
+  };
+  const el = root.querySelector('.garden');
+  const B = 2.5; // a bed's centre is at (±B, ±B)
+  const ctx = { garden, hemi, sun, tree, earth, flowers, mesh, el, B };
+  ({ 1: oasis, 2: days, 3: alive })[d]?.(ctx);
+
+  const t0 = performance.now();
+  (function loop() {
+    requestAnimationFrame(loop);
+    const t = (performance.now() - t0) / 1000;
+    for (const f of ticks) f(t);
+    if (cam) {
+      const [x, y, z] = cam.t;
+      camera.position.set(x + cam.dist * Math.cos(cam.pitch) * Math.sin(cam.yaw), y + cam.dist * Math.sin(cam.pitch), z + cam.dist * Math.cos(cam.pitch) * Math.cos(cam.yaw));
+      camera.lookAt(x, y, z);
+    }
+  })();
+  document.body.dataset.ready = '1';
+}
+
+/* ---------- 1. «واحه»: the garden is an oasis in the desert; habits bring water, green spreads past the wall ---------- */
+function oasis({ garden, earth, mesh, el }) {
+  const r = rng(21);
+  earth.visible = false;
+  el.style.background = 'linear-gradient(#8fcdf0 0%, #cfe6ee 9%, #f2dcb6 15%, #f2dcb6 100%)';
+  scene.fog = new THREE.Fog(0xf2dcb6, 70, 230);
+  const ground = mesh(new THREE.CircleGeometry(140, 48), 0xe9c88d, 0, -0.2, 0, scene);
+  ground.rotation.x = -Math.PI / 2; ground.castShadow = false;
+  const duneGeo = new THREE.IcosahedronGeometry(1, 1);
+  for (let i = 0; i < 34; i++) {
+    const a = r() * Math.PI * 2, dist = 10 + r() * 55;
+    const m = mesh(duneGeo, [0xe3be82, 0xf0d39e, 0xe8c68c][i % 3], Math.sin(a) * dist, -0.35, Math.cos(a) * dist, scene);
+    m.scale.set(3 + r() * 6, 0.5 + r() * 1.1, 2 + r() * 4); m.rotation.y = r() * 3; m.castShadow = false;
+  }
+  for (let i = 0; i < 11; i++) { // mountains behind the garden, away from the camera
+    const a = Math.PI * 1.25 + (i - 5) * 0.2 + (r() - 0.5) * 0.1, dist = 100 + r() * 25, h = 11 + r() * 9;
+    const x = Math.sin(a) * dist, z = Math.cos(a) * dist;
+    const m = mesh(new THREE.ConeGeometry(h * 1.05, h, 6), [0x8f7f9c, 0x7f7a9e, 0x9a8494][i % 3], x, h / 2 - 0.3, z, scene);
+    m.rotation.y = r() * 3; m.castShadow = false;
+    const cap = mesh(new THREE.ConeGeometry(h * 0.33, h * 0.31, 6), 0xf6efe6, x, h * 0.85 - 0.25, z, scene);
+    cap.rotation.y = m.rotation.y; cap.castShadow = false;
+  }
+  // the mud-brick wall with a turquoise dome on each corner
+  const wall = mat(0xd9b27d), cope = mat(0xecd3a4), dome = mat(0x2fb5b2, { roughness: 0.4 });
+  for (const [ax, s] of [['x', 1], ['x', -1], ['z', 1], ['z', -1]]) {
+    const near = s > 0, h = near ? 0.5 : 0.9, len = 9.6;
+    const pos = s * 4.85;
+    const w = mesh(new THREE.BoxGeometry(ax === 'x' ? 0.3 : len, h, ax === 'x' ? len : 0.3), wall, ax === 'x' ? pos : 0, h / 2, ax === 'x' ? 0 : pos);
+    const c = mesh(new THREE.BoxGeometry(ax === 'x' ? 0.42 : len, 0.1, ax === 'x' ? len : 0.42), cope, w.position.x, h + 0.05, w.position.z);
+    void c;
+  }
+  for (const [x, z] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+    const h = x + z > 0 ? 0.8 : 1.3;
+    mesh(new THREE.CylinderGeometry(0.34, 0.38, h, 8), wall, x * 4.85, h / 2, z * 4.85);
+    mesh(new THREE.SphereGeometry(0.34, 8, 5, 0, Math.PI * 2, 0, Math.PI / 2), dome, x * 4.85, h, z * 4.85);
+  }
+  // the qanat: a line of shaft mounds from the mountains, then an open channel into the garden
+  const water = new THREE.MeshStandardMaterial({ color: 0x3fb4dd, roughness: 0.15, emissive: 0x0a3d55, emissiveIntensity: 0.25 });
+  const ch = mesh(new THREE.BoxGeometry(9, 0.06, 0.6), water, -9.5, -0.16, 0, scene); ch.castShadow = false;
+  for (const s of [-1, 1]) mesh(new THREE.BoxGeometry(9, 0.16, 0.14), 0xe3c99a, -9.5, -0.12, s * 0.37, scene);
+  for (let i = 0; i < 9; i++) {
+    const x = -15.5 - i * 2.4, z = -i * 3.8;
+    mesh(new THREE.CylinderGeometry(0.5, 1.2, 0.5, 8), 0xd6b077, x, 0.05, z, scene);
+    mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.04, 8), 0x4a3524, x, 0.31, z, scene);
+  }
+  // green that has already spread outside the wall, with shrubs and palms
+  const palm = (x, z, h) => {
+    const g = new THREE.Group(); g.position.set(x, -0.2, z); scene.add(g);
+    const tr = mesh(new THREE.CylinderGeometry(0.09, 0.14, h, 6), 0x9a7248, 0, h / 2, 0, g); tr.rotation.z = 0.06;
+    for (let i = 0; i < 7; i++) {
+      const hold = new THREE.Group(); hold.position.y = h; hold.rotation.y = i / 7 * Math.PI * 2; g.add(hold);
+      const f = mesh(new THREE.ConeGeometry(0.2, 1.3, 4), i % 2 ? 0x3f9a45 : 0x57b052, 0.55, -0.08, 0, hold);
+      f.rotation.z = -1.95; f.scale.z = 0.35;
+    }
+  };
+  const patches = [[7.6, 2.5, 2.4], [8.2, -2.2, 1.8], [2.6, 7.8, 2.2], [-2.4, 8, 1.6], [-8, 3.4, 2.6], [-9.5, -3, 2], [-13, 2.6, 1.4], [6.5, 6.6, 1.5]];
+  patches.forEach(([x, z, rad], i) => {
+    const p = mesh(new THREE.CylinderGeometry(rad, rad + 0.25, 0.08, 9), i % 2 ? 0x8fcb68 : 0x7cc45a, x, -0.17, z, scene); p.castShadow = false; p.rotation.y = r() * 3;
+    for (let k = 0; k < 4; k++) {
+      const a = r() * 6.28, q = r() * rad * 0.7;
+      const b = mesh(new THREE.IcosahedronGeometry(0.2 + r() * 0.16, 0), [0x4f9a3e, 0x6cbd52, 0x478c38][k % 3], x + Math.cos(a) * q, 0, z + Math.sin(a) * q, scene);
+      b.scale.y = 0.8;
+    }
+  });
+  palm(7.9, 2.9, 1.9); palm(-8.4, 3.9, 2.3); palm(2.3, 8.2, 1.6); palm(-9.2, -3.3, 1.8);
+  cam = { yaw: Math.PI / 4, pitch: 0.4, dist: 47, t: [-1.5, 2.5, -1.5] };
+}
+
+/* ---------- 2. «باغ روزها»: every day leaves one plant for good; four beds are the four weeks of a month ---------- */
+function days({ garden, tree, flowers, mesh, B }) {
+  tree.visible = false;
+  flowers.forEach(f => { f.visible = false; });
+  const petals = [0xf26d8a, 0xffd04d, 0xffffff, 0xb784f0, 0xff8b4d];
+  const ico = (rad, det = 0) => new THREE.IcosahedronGeometry(rad, det);
+  function plant(kind, g, i) {
+    const m = (geo, c, x, y, z) => mesh(geo, c, x, y, z, g);
+    if (kind === 'F') { // a logged day: a flower
+      m(new THREE.CylinderGeometry(0.03, 0.03, 0.4, 4), 0x3f8a34, 0, 0.2, 0);
+      m(ico(0.09), 0xffd04d, 0, 0.44, 0);
+      for (let k = 0; k < 5; k++) m(ico(0.1), petals[i % 5], Math.cos(k * 1.257) * 0.15, 0.42, Math.sin(k * 1.257) * 0.15);
+    } else if (kind === 'B') { // logged and moved: a shrub in bloom
+      const b = m(ico(0.36), 0x5fb04a, 0, 0.26, 0); b.scale.y = 0.8;
+      m(ico(0.24), 0x6cbd52, 0.2, 0.42, 0.1);
+      for (let k = 0; k < 5; k++) m(ico(0.075), petals[(i + k) % 5], Math.cos(k * 1.4) * 0.3, 0.38 + (k % 2) * 0.16, Math.sin(k * 1.4) * 0.3);
+    } else if (kind === 'T') { // a full day: a small fruit tree
+      m(new THREE.CylinderGeometry(0.05, 0.08, 0.6, 5), 0x8a5a33, 0, 0.3, 0);
+      m(ico(0.42), 0x4f9a3e, 0, 0.85, 0);
+      m(ico(0.3), 0x6cbd52, 0.22, 1.05, 0.1);
+      const fruit = i % 3 === 0 ? 0xff9a2e : 0xd8443a;
+      for (let k = 0; k < 4; k++) m(ico(0.09, 1), mat(fruit, { roughness: 0.5 }), Math.cos(k * 1.7 + i) * 0.4, 0.72 + (k % 2) * 0.2, Math.sin(k * 1.7 + i) * 0.4);
+    } else if (kind === 'G') { // a day with nothing logged: just grass, never a dead spot
+      for (let k = 0; k < 4; k++) { const c = m(new THREE.ConeGeometry(0.05, 0.3, 4), 0x5aa844, Math.cos(k * 1.6) * 0.09, 0.15, Math.sin(k * 1.6) * 0.09); c.rotation.z = (k - 1.5) * 0.2; }
+    } else if (kind === 'today') {
+      m(new THREE.CylinderGeometry(0.34, 0.38, 0.07, 10), 0x6e4a2c, 0, 0.03, 0);
+      m(new THREE.CylinderGeometry(0.025, 0.025, 0.24, 4), 0x5fb04a, 0, 0.18, 0);
+      for (const s of [-1, 1]) { const l = m(ico(0.09), 0x6cbd52, s * 0.09, 0.3, 0); l.scale.set(1, 0.45, 0.7); l.rotation.z = s * 0.5; }
+      const ring = m(new THREE.TorusGeometry(0.5, 0.035, 6, 28), new THREE.MeshStandardMaterial({ color: 0xffd76a, emissive: 0xffb300, emissiveIntensity: 1.6 }), 0, 0.09, 0);
+      ring.rotation.x = Math.PI / 2; ring.castShadow = false;
+      ticks.push(t => { ring.scale.setScalar(1 + Math.sin(t * 2.4) * 0.07); ring.material.emissiveIntensity = 1.3 + Math.sin(t * 2.4) * 0.6; });
+    } else {
+      m(new THREE.CylinderGeometry(0.2, 0.23, 0.05, 8), 0x9a7650, 0, 0.02, 0);
+    }
+  }
+  const past = 'TBFTTGBTFTTBTTFBT';
+  function month(parent, filled) {
+    const g = new THREE.Group(); g.name = 'days'; parent.add(g);
+    let day = 0;
+    for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+      for (let k = 0; k < 7; k++, day++) {
+        const a = k * Math.PI / 3 + 0.3, rad = k === 6 ? 0 : 1.2;
+        const spot = new THREE.Group(); spot.position.set(sx * B + Math.cos(a) * rad, 0.15, sz * B + Math.sin(a) * rad); g.add(spot);
+        plant(day < filled ? past[day % past.length] : day === filled ? 'today' : 'soon', spot, day);
+      }
+    }
+  }
+  month(garden, 17);
+  // the months already lived, floating behind: each one a finished garden
+  [[-10.5, 0.6, -3.5, 0.36], [-4, 2.4, -11.5, 0.3], [-13, 3.6, -11, 0.22]].forEach(([x, y, z, s]) => {
+    const g = garden.clone(); g.remove(g.getObjectByName('days')); month(g, 28);
+    g.scale.setScalar(s); g.position.set(x, y, z); g.rotation.y = 0.2; scene.add(g);
+    ticks.push(t => { g.position.y = y + Math.sin(t * 0.6 + x) * 0.12; });
+  });
+  cam = { yaw: Math.PI / 4, pitch: 0.6, dist: 45, t: [-1.2, 1.6, -1.2] };
+}
+
+/* ---------- 3. «باغ زنده»: the garden lives on the real clock, and habits bring guests ---------- */
+function alive({ garden, hemi, sun, mesh, el, B }) {
+  el.style.background = 'linear-gradient(#232a63 0%, #5a4a8a 30%, #d97f6e 62%, #f4bf86 100%)';
+  hemi.color.set(0x9aa6ea); hemi.groundColor.set(0x3a4a3a); hemi.intensity = 0.75;
+  sun.color.set(0xff9a5c); sun.intensity = 1.9; sun.position.set(-10, 4.5, 2);
+  const btn = root.querySelector('[data-water]');
+  for (let i = 0; i < 5; i++) setTimeout(() => btn.click(), 200 + i * 500); // the pomegranate, grown
+
+  // lanterns along the water
+  const glow = new THREE.MeshStandardMaterial({ color: 0xffd9a0, emissive: 0xffb04a, emissiveIntensity: 2.4 });
+  for (const [x, z] of [[2.2, 0.75], [3.9, -0.75], [-2.2, 0.75], [-3.9, -0.75], [0.75, -2.2], [-0.75, -3.9], [0.75, 3.9], [-0.75, 2.2]]) {
+    mesh(new THREE.CylinderGeometry(0.03, 0.04, 0.5, 5), 0x5a4632, x, 0.4, z);
+    const l = mesh(new THREE.BoxGeometry(0.16, 0.2, 0.16), glow, x, 0.75, z); l.castShadow = false;
+    mesh(new THREE.ConeGeometry(0.15, 0.1, 4), 0x2fb5b2, x, 0.9, z).rotation.y = Math.PI / 4;
+    const p = new THREE.PointLight(0xffb45a, 5, 4, 1.6); p.position.set(x, 0.9, z); garden.add(p);
+  }
+  // goldfish in the pool
+  const fish = [0, 1, 2, 3].map(i => mesh(new THREE.OctahedronGeometry(0.09), mat(i === 3 ? 0xffffff : 0xff7a2a, { emissive: 0x5a1c00, emissiveIntensity: 0.5 }), 0, 0.31, 0));
+  fish.forEach(f => { f.scale.set(0.55, 0.3, 1.5); f.castShadow = false; });
+  ticks.push(t => fish.forEach((f, i) => {
+    const a = t * (0.5 + i * 0.12) + i * 1.7, rad = 0.45 + i * 0.16;
+    f.position.set(Math.cos(a) * rad, 0.31, Math.sin(a) * rad); f.rotation.y = -a;
+  }));
+  // fireflies over the beds
+  const n = 46, pos = new Float32Array(n * 3), seed = rng(5), base = [];
+  for (let i = 0; i < n; i++) base.push([(seed() - 0.5) * 9, 0.5 + seed() * 1.6, (seed() - 0.5) * 9, seed() * 6]);
+  const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  garden.add(new THREE.Points(geo, new THREE.PointsMaterial({ color: 0xfff3a0, size: 0.13, transparent: true, opacity: 0.95 })));
+  ticks.push(t => {
+    base.forEach(([x, y, z, p], i) => { pos[i * 3] = x + Math.sin(t * 0.7 + p) * 0.4; pos[i * 3 + 1] = y + Math.sin(t * 1.1 + p * 2) * 0.25; pos[i * 3 + 2] = z + Math.cos(t * 0.6 + p) * 0.4; });
+    geo.attributes.position.needsUpdate = true;
+  });
+  // a hoopoe: buff body, black-and-white wings, a fan crest
+  function hoopoe(scale) {
+    const g = new THREE.Group(); g.scale.setScalar(scale); garden.add(g);
+    const buff = mat(0xe9a45c), dark = mat(0x2a2a2e), white = mat(0xf4f0e6);
+    const body = mesh(new THREE.IcosahedronGeometry(0.16, 1), buff, 0, 0, 0, g); body.scale.set(1, 0.9, 1.7);
+    mesh(new THREE.IcosahedronGeometry(0.1, 1), buff, 0, 0.13, 0.26, g);
+    const beak = mesh(new THREE.ConeGeometry(0.02, 0.22, 4), dark, 0, 0.11, 0.45, g); beak.rotation.x = Math.PI / 2;
+    for (let i = -2; i <= 2; i++) { const c = mesh(new THREE.ConeGeometry(0.028, 0.17, 4), i % 2 ? dark : buff, 0, 0.27, 0.2 + i * 0.035, g); c.rotation.x = -0.5 + i * 0.3; }
+    const tail = mesh(new THREE.BoxGeometry(0.13, 0.02, 0.26), dark, 0, -0.01, -0.36, g); void tail;
+    mesh(new THREE.BoxGeometry(0.135, 0.022, 0.07), white, 0, -0.008, -0.34, g);
+    const wings = [-1, 1].map(s => {
+      const piv = new THREE.Group(); piv.position.set(s * 0.1, 0.05, 0); g.add(piv);
+      mesh(new THREE.BoxGeometry(0.36, 0.02, 0.24), dark, s * 0.18, 0, 0, piv);
+      mesh(new THREE.BoxGeometry(0.37, 0.022, 0.06), white, s * 0.18, 0, 0.02, piv);
+      mesh(new THREE.BoxGeometry(0.37, 0.022, 0.05), white, s * 0.18, 0, -0.08, piv);
+      return piv;
+    });
+    return { g, wings };
+  }
+  [0, 1].forEach(i => { // two in the air
+    const b = hoopoe(0.95);
+    ticks.push(t => {
+      const a = t * 0.55 + i * 2.6, rad = 3.6 + i * 1.3;
+      b.g.position.set(Math.cos(a) * rad + 0.5, 3.3 + i * 0.7 + Math.sin(t * 1.3 + i) * 0.2, Math.sin(a) * rad + 0.5);
+      b.g.rotation.y = -a + Math.PI; b.g.rotation.z = 0.25;
+      const f = Math.sin(t * 13 + i) * 0.8; b.wings[0].rotation.z = -f; b.wings[1].rotation.z = f;
+    });
+  });
+  const sit = hoopoe(0.95); // one on the pool's edge, wings folded
+  sit.g.position.set(0.2, 0.47, 1.3); sit.g.rotation.y = 2.6;
+  sit.wings.forEach((w, i) => { w.rotation.z = (i ? -1 : 1) * 1.25; w.scale.x = 0.6; });
+  ticks.push(t => { sit.g.rotation.x = Math.max(0, Math.sin(t * 1.2)) * 0.5; });
+  // a cream Persian cat by the water
+  const cat = new THREE.Group(); cat.position.set(1.25, 0.33, 0.45); cat.rotation.y = -1.3; garden.add(cat);
+  const fur = mat(0xf2e7d5), ear = mat(0xd9b79a);
+  const cb = mesh(new THREE.IcosahedronGeometry(0.2, 1), fur, 0, 0.2, 0, cat); cb.scale.set(1, 1.25, 1.1);
+  mesh(new THREE.IcosahedronGeometry(0.15, 1), fur, 0, 0.52, 0.06, cat);
+  for (const s of [-1, 1]) mesh(new THREE.ConeGeometry(0.055, 0.11, 4), ear, s * 0.09, 0.68, 0.05, cat);
+  const tail = mesh(new THREE.CylinderGeometry(0.04, 0.05, 0.42, 5), fur, 0.2, 0.06, -0.14, cat); tail.rotation.set(Math.PI / 2, 0, 0.9);
+  ticks.push(t => { tail.rotation.z = 0.9 + Math.sin(t * 1.6) * 0.35; });
+  cam = { yaw: Math.PI / 4 - 0.45, pitch: 0.56, dist: 41, t: [-0.6, 1.6, -0.6] };
+}
+</script>
+</body>
+</html>
