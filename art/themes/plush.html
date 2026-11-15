@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>تم مخملی</title>
+<style>
+/* a small sample of the «مخملی» theme: deep fabric colour, a fine matte pile, a soft sheen falling
+   across it, and plush cards with an inner shadow. One block per palette of the app. */
+:root { --pile: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.1' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 .55 0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E"); }
+body { margin: 0; padding: 20px 16px; background: #0d0f10; font-family: system-ui, sans-serif; color: #f2efe8; }
+.row { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; }
+.phone { position: relative; width: 300px; padding: 18px 14px 20px; border-radius: 28px; overflow: hidden;
+  background:
+    radial-gradient(120% 70% at 85% 0%, var(--sheen) 0%, transparent 55%),
+    radial-gradient(90% 60% at 0% 100%, var(--sheen2) 0%, transparent 60%),
+    linear-gradient(160deg, var(--deep), var(--deeper)); }
+.phone::before { content: ''; position: absolute; inset: 0; background: var(--pile); opacity: .16; mix-blend-mode: overlay; pointer-events: none; }
+.phone > * { position: relative; }
+.name { font-size: 13px; opacity: .7; margin: 0 4px 10px; }
+.card { border-radius: 22px; padding: 14px; margin-bottom: 12px; position: relative; overflow: hidden;
+  background: linear-gradient(150deg, var(--card-hi), var(--card));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.10), inset 0 -10px 24px rgba(0,0,0,.28), 0 8px 18px rgba(0,0,0,.35); }
+.card::before { content: ''; position: absolute; inset: 0; background: var(--pile); opacity: .2; mix-blend-mode: overlay; }
+/* the band of light that falls across velvet where the pile turns toward it */
+.card::after { content: ''; position: absolute; inset: -40% -20%; pointer-events: none;
+  background: linear-gradient(115deg, transparent 30%, var(--sheen) 46%, transparent 62%); opacity: .55; mix-blend-mode: screen; }
+.card > * { position: relative; }
+.sum { display: flex; align-items: center; gap: 14px; }
+.ring { width: 92px; height: 92px; border-radius: 50%; display: grid; place-items: center; flex: none;
+  background: conic-gradient(var(--accent) 0 62%, rgba(0,0,0,.28) 0); box-shadow: inset 0 2px 6px rgba(0,0,0,.35); }
+.ring i { width: 74px; height: 74px; border-radius: 50%; display: grid; place-items: center; font-style: normal;
+  background: linear-gradient(150deg, var(--card-hi), var(--card)); font-weight: 800; font-size: 18px; box-shadow: inset 0 2px 8px rgba(0,0,0,.3); }
+.kv { font-size: 13px; line-height: 1.9; opacity: .9; } .kv b { font-weight: 800; }
+.meal { display: flex; align-items: center; justify-content: space-between; }
+.meal h3 { margin: 0; font-size: 16px; } .meal span { font-size: 13px; opacity: .75; }
+.bar { height: 6px; border-radius: 6px; background: rgba(0,0,0,.3); margin-top: 10px; box-shadow: inset 0 1px 2px rgba(0,0,0,.4); }
+.bar i { display: block; width: 70%; height: 100%; border-radius: 6px; background: linear-gradient(90deg, var(--accent), var(--accent-hi)); }
+.btn { display: block; width: 100%; height: 52px; border: 0; border-radius: 18px; font: inherit; font-weight: 800; font-size: 16px; color: var(--ink);
+  background: linear-gradient(160deg, var(--accent-hi), var(--accent));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.35), inset 0 -6px 14px rgba(0,0,0,.18), 0 6px 14px rgba(0,0,0,.35); }
+.mint { --deep:#0f3a2c; --deeper:#06150f; --sheen:rgba(95,211,168,.30); --sheen2:rgba(31,138,102,.25); --card:#0d2d22; --card-hi:#1a5a43; --accent:#3fbf8f; --accent-hi:#8de6c2; --ink:#05251a; }
+.anar { --deep:#4a0d18; --deeper:#16040a; --sheen:rgba(208,72,92,.32); --sheen2:rgba(127,22,38,.30); --card:#36070f; --card-hi:#6e1626; --accent:#d0485c; --accent-hi:#f29aa6; --ink:#2a0309; }
+.kashi { --deep:#12285e; --deeper:#050b1d; --sheen:rgba(90,134,214,.32); --sheen2:rgba(31,63,143,.30); --card:#0d1e48; --card-hi:#1f3f8f; --accent:#5a86d6; --accent-hi:#a9c3f2; --ink:#061233; }
+</style>
+</head>
+<body>
+<div class="row">
+  <div class="phone mint">
+    <p class="name">نعنا، مخملی</p>
+    <div class="card sum"><div class="ring"><i>۷۴۰</i></div><div class="kv">خورده‌شده <b>۱٬۲۶۰</b><br>هدف <b>۲٬۰۰۰</b><br>پروتئین <b>۸۲</b> از ۱۲۰</div></div>
+    <div class="card"><div class="meal"><h3>ناهار</h3><span>۴۱۰ از ۶۰۰</span></div><div class="bar"><i></i></div></div>
+    <button class="btn">ثبت غذا</button>
+  </div>
+  <div class="phone anar">
+    <p class="name">انار، مخملی</p>
+    <div class="card sum"><div class="ring"><i>۷۴۰</i></div><div class="kv">خورده‌شده <b>۱٬۲۶۰</b><br>هدف <b>۲٬۰۰۰</b><br>پروتئین <b>۸۲</b> از ۱۲۰</div></div>
+    <div class="card"><div class="meal"><h3>ناهار</h3><span>۴۱۰ از ۶۰۰</span></div><div class="bar"><i></i></div></div>
+    <button class="btn">ثبت غذا</button>
+  </div>
+  <div class="phone kashi">
+    <p class="name">کاشی، مخملی</p>
+    <div class="card sum"><div class="ring"><i>۷۴۰</i></div><div class="kv">خورده‌شده <b>۱٬۲۶۰</b><br>هدف <b>۲٬۰۰۰</b><br>پروتئین <b>۸۲</b> از ۱۲۰</div></div>
+    <div class="card"><div class="meal"><h3>ناهار</h3><span>۴۱۰ از ۶۰۰</span></div><div class="bar"><i></i></div></div>
+    <button class="btn">ثبت غذا</button>
+  </div>
+</div>
+</body>
+</html>
