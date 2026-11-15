@@ -13,7 +13,7 @@ import { drift, lastCheckin, checkinState } from '../domain/drift.js';
 import { effectiveTargets, phaseOn } from '../domain/targets.js';
 import { adherence } from '../domain/plan.js';
 import { lightOn } from '../domain/phase.js';
-import { sortedWeights } from '../domain/stats.js';
+import { sortedWeights, logMarks } from '../domain/stats.js';
 import { today, addDays, weekStart, faDM } from '../lib/dates.js';
 import { fa, esc } from '../lib/fa.js';
 import { sheet, toast, confirmBox, icon } from './dom.js';
@@ -43,6 +43,7 @@ export function signsNow() {
     entries: s.entries, weights: s.weights, waists: s.waists,
     phase: phaseOn(p, t), light: lightOn(p, sortedWeights(s.weights), t),
     kcalOn: d => effectiveTargets(p, d)?.kcal,
+    marks: logMarks(s.ai_notes),
     adherence: p.mode === 'plan' ? (from, to) => adherence(s.ai_notes, s.entries, from, to) : null,
   }, t);
 }

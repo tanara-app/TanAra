@@ -4,15 +4,15 @@
   plan they actually pick. Pure functions; no AI, so it costs nothing.
 
   Only days they chose for themselves count for the spread: a day with a ticked plan option shows
-  the plan's shares, not their habit. And only full days (at least two different meals, the rule
-  used everywhere), since a day with just breakfast logged says nothing about the rest of it.
+  the plan's shares, not their habit. And only full days (what they said about the day, else at
+  least two different meals: fullDay in stats.js, the rule used everywhere), since a day with just breakfast logged says nothing about the rest of it.
 
   The total stays the target, whatever the habit: this moves calories between meals, nothing else.
 */
 import { addDays } from '../lib/dates.js';
 import { baseMeal } from './meals.js';
 import { SLOTS, planOn, picksOn, planEnd, fastOn } from './plan.js';
-import { gapDays } from './stats.js';
+import { logMarks, fullDay } from './stats.js';
 
 export const PATTERN = {
   WINDOW: 60,    // days looked at, ending yesterday
@@ -60,11 +60,10 @@ export function eatingPattern(entries, notes, day) {
   const byDay = new Map();
   for (const e of list) (byDay.get(e.day) || byDay.set(e.day, []).get(e.day)).push(e);
   const byMeal = {};
-  const gaps = gapDays(notes);
+  const marks = logMarks(notes);
   let days = 0;
   for (const [d, es] of byDay) {
-    if (gaps.has(d)) continue; // they said not everything was logged that day
-    if (new Set(es.map(e => baseMeal(e.meal))).size < 2) continue;
+    if (!fullDay(d, new Set(es.map(e => baseMeal(e.meal))).size, marks)) continue;
     if (Object.keys(picksOn(notes, es, d)).length) continue;
     if (fastOn(notes, d)) continue; // a fasting day says nothing about their usual meals
     days++;

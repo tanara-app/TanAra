@@ -6,8 +6,8 @@
   energy used = energy eaten − energy that came out of (or went into) the body's stores, and
   the stores show up as the weight trend (about 7700 kcal per kg).
 
-  Only fully logged days count for the eating side (at least two different meals, the same
-  rule the under-eating check uses), and the first week of use is skipped: the early drop is
+  Only fully logged days count for the eating side (what they said about the day, else at least
+  two different meals: fullDay in stats.js, the rule the under-eating check uses too), and the first week of use is skipped: the early drop is
   mostly water and would make the body look hungrier than it is. Four weeks are looked at, or
   six for someone weighing once a week (the reminder's default): the wider span steadies the
   trend as much as more weigh-ins would, so nobody is asked to step on the scale more often.
@@ -17,7 +17,7 @@
 */
 import { addDays, diffDays } from '../lib/dates.js';
 import { baseMeal } from './meals.js';
-import { sortedWeights } from './stats.js';
+import { sortedWeights, fullDay } from './stats.js';
 import { computeTargets } from './targets.js';
 
 export const ENERGY = {
@@ -48,7 +48,7 @@ function slope(w) {
   isn't enough data, { ready: false, days, weighs, needDays, needWeighs, needSpan }.
   `formula` (the formula's figure, optional) bounds the result.
 */
-export function measuredTdee(entries, weights, { day, startDate, formula } = {}) {
+export function measuredTdee(entries, weights, { day, startDate, formula, marks } = {}) {
   const E = ENERGY;
   const to = addDays(day, -1);
   const since = n => {
@@ -61,12 +61,12 @@ export function measuredTdee(entries, weights, { day, startDate, formula } = {})
   const byDay = new Map();
   for (const e of entries) {
     if (e.day < from || e.day > to) continue;
-    const d = byDay.get(e.day) || { kcal: 0, meals: new Set() };
+    const d = byDay.get(e.day) || { day: e.day, kcal: 0, meals: new Set() };
     d.kcal += Number(e.kcal) || 0;
     d.meals.add(baseMeal(e.meal));
     byDay.set(e.day, d);
   }
-  const full = [...byDay.values()].filter(d => d.meals.size >= 2);
+  const full = [...byDay.values()].filter(d => fullDay(d.day, d.meals.size, marks));
   const w = weighed(from);
   const wSpan = w.length > 1 ? diffDays(w[w.length - 1].day, w[0].day) : 0;
   const span = diffDays(to, from) + 1;
@@ -89,8 +89,8 @@ export function measuredTdee(entries, weights, { day, startDate, formula } = {})
 
 // Targets for a profile at a weight: from the measured figure when there is one, else the formula.
 // Returns { t (as computeTargets), m (as measuredTdee) }.
-export function nextTargets(p, entries, weights, weightKg, day) {
+export function nextTargets(p, entries, weights, weightKg, day, marks) {
   const f = computeTargets({ ...p, weightKg });
-  const m = measuredTdee(entries, weights, { day, startDate: p.startDate, formula: f.tdee });
+  const m = measuredTdee(entries, weights, { day, startDate: p.startDate, formula: f.tdee, marks });
   return { t: m.ready ? computeTargets({ ...p, weightKg, measuredTdee: m.tdee }) : f, m };
 }

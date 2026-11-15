@@ -5,16 +5,15 @@ import { baseMeal } from './meals.js';
 export { MEALS, MEALS5, mealLabel, baseMeal, meal5 } from './meals.js';
 
 /*
-  Days they marked «ثبت ناقص» (a note `gap:<day>`): not all of that day's food went in. Such a day
-  never counts as eaten in full: not for the measured energy use, the under-eating warning, the
-  meal pattern or the week's averages. It still counts as a day they logged.
+  Whether a day was logged in full, the rule used everywhere (the measured energy use, the
+  under-eating warning, the meal pattern, the slip signs): what they said about that day if they
+  said anything (the «ثبت کامل» / «ثبت ناقص» pill on «امروز», a note `logday:<day>` with
+  data.full), else the app's guess: at least two different meals. They correct the guess both
+  ways: a light day of one meal that really was all they ate, or two meals with a third missing.
 */
-export const GAP_KEY = day => `gap:${day}`;
-export const gapDays = notes => new Set((notes || []).filter(n => n.kind === 'gap' && n.key?.startsWith('gap:')).map(n => n.key.slice(4)));
-export const withoutGaps = (entries, notes) => {
-  const gaps = gapDays(notes);
-  return gaps.size ? entries.filter(e => !gaps.has(e.day)) : entries;
-};
+export const LOGDAY_KEY = day => `logday:${day}`;
+export const logMarks = notes => new Map((notes || []).filter(n => n.kind === 'logday' && typeof n.data?.full === 'boolean').map(n => [n.key.slice(7), n.data.full]));
+export const fullDay = (day, meals, marks) => marks?.get(day) ?? meals >= 2;
 
 export function entriesOn(entries, day) {
   return entries.filter(e => e.day === day);
@@ -101,12 +100,13 @@ export function weekToReview(entries, day) {
   return daysLoggedInWeek(entries, ws) >= REVIEW_MIN_DAYS ? ws : null;
 }
 
-// `notes`: days marked «ثبت ناقص» count as logged but stay out of the averages.
+// `notes`: days they marked «ثبت ناقص» count as logged but stay out of the averages.
 export function weekSummary(entries, weights, ws, notes = []) {
   const end = addDays(ws, 6);
   const inWeek = entries.filter(e => e.day >= ws && e.day <= end);
   const days = [...new Set(inWeek.map(e => e.day))];
-  const full = withoutGaps(inWeek, notes);
+  const marks = logMarks(notes);
+  const full = inWeek.filter(e => marks.get(e.day) !== false);
   const fullDays = new Set(full.map(e => e.day)).size;
   const t = totals(full);
   const sorted = sortedWeights(weights);

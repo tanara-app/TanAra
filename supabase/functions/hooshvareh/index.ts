@@ -152,7 +152,7 @@ const GLUCOSE = `# They take insulin or a sugar-lowering pill (like glibenclamid
 - Eating less can bring their blood sugar too low: never suggest skipping meals or long gaps, and say their doctor should adjust the dose as they eat less. Know the signs of a low (shaking, cold sweat, sudden hunger, confusion) and that a low is treated with about 15 g of fast sugar and then a check.`;
 
 type Ctx = {
-  gaps?: string[]; // days they marked «ثبت ناقص»: not everything eaten was logged
+  logdays?: Record<string, boolean>; // what they said about a day's log: true all of it, false not all
   today: string; todayFa?: string; now?: string;
   profile?: Record<string, unknown> | null;
   targets?: { kcal: number; protein: number; floor: number; teen?: boolean; hold?: string | null; nursing?: boolean };
@@ -230,7 +230,8 @@ function sections(c: Ctx) {
   const byDay = new Map<string, any[]>();
   for (const e of entries) (byDay.get(e.day) || byDay.set(e.day, []).get(e.day)!).push(e);
   const days = [...byDay.keys()].sort();
-  const gaps = new Set(c.gaps || []);
+  const said = c.logdays || {};
+  const gaps = new Set(Object.keys(said).filter(d => said[d] === false));
   const stats = (d: string) => {
     const l = byDay.get(d) || [];
     return {
@@ -276,7 +277,7 @@ function sections(c: Ctx) {
     energy: () => {
       const m = c.energy;
       if (!m) return "";
-      if (!m.ready) return `# Measured energy use\nNot enough data yet: it needs ${m.needDays || 0} more fully logged days (at least two meals each) and ${m.needWeighs || 0} more weigh-ins, over four weeks, or six when they weigh in once a week (that is enough, they need not weigh more often). Until then the targets come from a formula${m.formula ? ` (about ${m.formula} kcal/day)` : ""}.`;
+      if (!m.ready) return `# Measured energy use\nNot enough data yet: it needs ${m.needDays || 0} more fully logged days (at least two meals each, or a day they marked «all logged») and ${m.needWeighs || 0} more weigh-ins, over four weeks, or six when they weigh in once a week (that is enough, they need not weigh more often). Until then the targets come from a formula${m.formula ? ` (about ${m.formula} kcal/day)` : ""}.`;
       return `# Measured energy use (from their own log, ${m.from} to ${m.to})\nabout ${m.tdee} kcal/day: they ate ${m.intake} kcal/day on ${m.days} fully logged days while their weight changed ${r1(m.perWeek)} kg/week (${m.weighs} weigh-ins).${m.formula ? ` The formula had estimated ${m.formula}.` : ""}${m.clamped ? " The raw figure was further from the formula than is plausible (probably gaps in logging), so it is held within 25% of it." : ""} Their current target is based on: ${m.source || "formula"}.`;
     },
 
@@ -307,9 +308,9 @@ function sections(c: Ctx) {
         const avg = (f: (x: any) => number) => t.reduce((s, x) => s + f(x), 0) / t.length;
         return `${w} | ${ds.length} | ${Math.round(avg(x => x.k))} | ${Math.round(avg(x => x.p))} | ${r1(avg(x => x.v))}`;
       }).join("\n")}`);
-      out.push(`# Daily totals, every logged day${weeks.size ? ` of the last ${TOTALS_DAYS} days` : ""}${to < c.today ? " before today" : ""} (day | kcal | protein g | veg servings | meals logged)${gaps.size ? `. A day marked «not all logged» is one they said not everything eaten went in: its totals are not what they ate, so don't read it as eating little, and leave it out of averages` : ""}\n${list.filter(d => d >= cut).map(d => {
+      out.push(`# Daily totals, every logged day${weeks.size ? ` of the last ${TOTALS_DAYS} days` : ""}${to < c.today ? " before today" : ""} (day | kcal | protein g | veg servings | meals logged)${Object.keys(said).length ? `. They said themselves how some days were logged: «not all logged» means not everything eaten went in, so its totals are not what they ate: don't read it as eating little, and leave it out of averages; «all logged» means that was everything they ate, even with one meal: take it as a real day (a light one may be too little)` : ""}\n${list.filter(d => d >= cut).map(d => {
         const t = stats(d);
-        return `${d} | ${Math.round(t.k)} | ${Math.round(t.p)} | ${r1(t.v)} | ${t.meals}${gaps.has(d) ? " | not all logged" : ""}`;
+        return `${d} | ${Math.round(t.k)} | ${Math.round(t.p)} | ${r1(t.v)} | ${t.meals}${said[d] === false ? " | not all logged" : said[d] === true ? " | all logged" : ""}`;
       }).join("\n") || "nothing logged yet"}`);
       return out.join("\n\n");
     },

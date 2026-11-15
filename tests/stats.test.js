@@ -1,5 +1,5 @@
 import { suite, test, eq, near } from './harness.js';
-import { totals, vegServings, daysLoggedInWeek, rollingAvg, weekAvg, rate4w, projectWeight, weekSummary, waistSeries, waistToHeight, measureDue, frequentFoods, lastAmountFor, activityWeek, streak, trendLine, weekToReview, gapDays, withoutGaps, GAP_KEY } from '../js/domain/stats.js';
+import { totals, vegServings, daysLoggedInWeek, rollingAvg, weekAvg, rate4w, projectWeight, weekSummary, waistSeries, waistToHeight, measureDue, frequentFoods, lastAmountFor, activityWeek, streak, trendLine, weekToReview, logMarks, fullDay, LOGDAY_KEY } from '../js/domain/stats.js';
 import { upcoming } from '../js/domain/occasions.js';
 import { weekStart, addDays, diffDays } from '../js/lib/dates.js';
 
@@ -81,14 +81,18 @@ suite('stats', () => {
     eq([s.daysLogged, s.avgKcal, s.avgProtein, s.weightAvg, s.weightChange], [2, 1900, 100, 90, -1]);
   });
 
+  test('a full day: what they said, else two meals or more', () => {
+    const notes = [{ key: LOGDAY_KEY('2026-10-11'), kind: 'logday', data: { full: false } }, { key: LOGDAY_KEY('2026-10-12'), kind: 'logday', data: { full: true } }, { key: 'logday:2026-10-13', kind: 'tip' }];
+    const marks = logMarks(notes);
+    eq([...marks], [['2026-10-11', false], ['2026-10-12', true]]);
+    eq([fullDay('2026-10-11', 3, marks), fullDay('2026-10-12', 1, marks), fullDay('2026-10-13', 1, marks), fullDay('2026-10-13', 2, marks)], [false, true, false, true]);
+  });
+
   test('a day marked «ثبت ناقص» counts as logged but stays out of the averages', () => {
     const entries = [{ day: '2026-10-10', kcal: 1800, protein: 90 }, { day: '2026-10-11', kcal: 600, protein: 20 }];
-    const notes = [{ key: GAP_KEY('2026-10-11'), kind: 'gap' }, { key: 'gap:2026-10-12', kind: 'tip' }];
-    eq([...gapDays(notes)], ['2026-10-11']);
-    eq(withoutGaps(entries, notes).map(e => e.day), ['2026-10-10']);
+    const notes = [{ key: LOGDAY_KEY('2026-10-11'), kind: 'logday', data: { full: false } }];
     const s = weekSummary(entries, [], '2026-10-10', notes);
     eq([s.daysLogged, s.avgKcal, s.avgProtein], [2, 1800, 90]);
-    eq(weekSummary(entries, [], '2026-10-10', [{ key: GAP_KEY('2026-10-10'), kind: 'gap' }, notes[0]]).avgKcal, null);
   });
 
   test('waist: the questionnaire value is the first point unless that day was measured', () => {

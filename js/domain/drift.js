@@ -13,6 +13,7 @@
 */
 import { addDays, diffDays } from '../lib/dates.js';
 import { baseMeal } from './meals.js';
+import { fullDay } from './stats.js';
 
 export const WEIGHT_KG = 0.7;
 export const WAIST_CM = 1.5;
@@ -51,15 +52,15 @@ export function loggingSign(entries, day) {
   return before >= 4 && now <= before - LOG_DROP + 1e-9 ? { before: r1(before), now } : null;
 }
 
-// Well-logged days (two meals or more) last week that went well over that day's target.
-export function overSign(entries, day, kcalOn) {
+// Well-logged days (fullDay: what they said, else two meals or more) last week that went well over that day's target.
+export function overSign(entries, day, kcalOn, marks) {
   const by = new Map();
   for (const e of entries) if (e.day >= addDays(day, -7) && e.day <= addDays(day, -1)) {
     const d = by.get(e.day) || { kcal: 0, meals: new Set() };
     d.kcal += Number(e.kcal) || 0; d.meals.add(baseMeal(e.meal));
     by.set(e.day, d);
   }
-  const over = [...by].filter(([d, x]) => x.meals.size >= 2 && kcalOn(d) && x.kcal > kcalOn(d) + OVER_KCAL)
+  const over = [...by].filter(([d, x]) => fullDay(d, x.meals.size, marks) && kcalOn(d) && x.kcal > kcalOn(d) + OVER_KCAL)
     .map(([d, x]) => Math.round(x.kcal - kcalOn(d)));
   return over.length >= OVER_DAYS ? { days: over.length, by: Math.round(mean(over)) } : null;
 }
@@ -78,13 +79,13 @@ export function planSign(adherence, day) {
   on a diet break (its first days bring water weight back), and in maintenance no weight sign.
   `light`: light logging is in force, so fewer logged days is expected.
 */
-export function drift({ entries = [], weights = [], waists = [], phase = 'loss', light = false, kcalOn, adherence = null }, day) {
+export function drift({ entries = [], weights = [], waists = [], phase = 'loss', light = false, kcalOn, adherence = null, marks }, day) {
   if (phase === 'break') return null;
   const signs = {
     weight: phase === 'loss' ? weightSign(weights, day) : null,
     waist: waistSign(waists, day),
     logging: light ? null : loggingSign(entries, day),
-    over: light || !kcalOn ? null : overSign(entries, day, kcalOn),
+    over: light || !kcalOn ? null : overSign(entries, day, kcalOn, marks),
     plan: adherence ? planSign(adherence, day) : null,
   };
   for (const k of Object.keys(signs)) if (!signs[k]) delete signs[k];

@@ -1,7 +1,7 @@
 // Fixed safety rules. Pure functions; the UI decides where to show them.
 import { addDays, weekStart } from '../lib/dates.js';
 import { baseMeal } from './meals.js';
-import { sortedWeights, weekAvg, totals } from './stats.js';
+import { sortedWeights, weekAvg, totals, fullDay } from './stats.js';
 
 /*
   Rapid loss: the weekly mean weight dropped by more than `perWeek` kg (1.5; 1 for a teen and
@@ -48,15 +48,15 @@ export const rapidLimit = (teen, conditions = [], slow = false) => (teen || slow
 
 /*
   Under-eating: three days in a row (before today) each logged as a full day and below the
-  safety floor. A "full day" means at least two different meals were logged — otherwise a day
-  where only breakfast was entered would look like starvation.
+  safety floor. A "full day" is what they said about it, else at least two different meals
+  logged (fullDay) — otherwise a day where only breakfast was entered would look like starvation.
 */
-export function underEating(entries, floor, day) {
+export function underEating(entries, floor, day, marks) {
   const days = [1, 2, 3].map(n => addDays(day, -n));
   for (const d of days) {
     const list = entries.filter(e => e.day === d);
     const meals = new Set(list.map(e => baseMeal(e.meal)));
-    if (meals.size < 2) return null;
+    if (!list.length || !fullDay(d, meals.size, marks)) return null;
     if (totals(list).kcal >= floor) return null;
   }
   return { days };

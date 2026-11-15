@@ -43,8 +43,13 @@ suite('pattern', () => {
   });
 
   test('a day marked «ثبت ناقص» does not count', () => {
-    const notes = Array.from({ length: 5 }, (_, i) => ({ key: `gap:${addDays(DAY, -1 - i)}`, kind: 'gap' }));
+    const notes = Array.from({ length: 5 }, (_, i) => ({ key: `logday:${addDays(DAY, -1 - i)}`, kind: 'logday', data: { full: false } }));
     eq(eatingPattern(log(20, { lunch: 800, dinner: 600 }), notes, DAY).days, 15);
+  });
+
+  test('a day of one meal they marked «ثبت کامل» counts', () => {
+    const notes = Array.from({ length: 4 }, (_, i) => ({ key: `logday:${addDays(DAY, -1 - i)}`, kind: 'logday', data: { full: true } }));
+    eq(eatingPattern(log(10, { lunch: 800 }), notes, DAY).days, 4);
   });
 
   test('a day with a ticked plan option shows the plan, not the habit, so it does not count', () => {

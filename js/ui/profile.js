@@ -3,7 +3,7 @@
 // data, account) live apart in «تنظیمات», a tall sheet opened by the gear in the header.
 import * as store from '../data/store.js';
 import { effectiveTargets, clampKcal, floorFor, hasMedicalFlag, ACTIVITY, CONDITIONS, correcting, rampKcal } from '../domain/targets.js';
-import { sortedWeights, withoutGaps } from '../domain/stats.js';
+import { sortedWeights, logMarks } from '../domain/stats.js';
 import { nextTargets } from '../domain/energy.js';
 import { fa, kcal50, parseNum, esc } from '../lib/fa.js';
 import { today, faDMY } from '../lib/dates.js';
@@ -32,7 +32,7 @@ export function recalcTargets() {
   const p = store.profile();
   const s = store.get();
   const kg = latestWeight() ?? p.targets?.baseWeight;
-  const { t } = nextTargets(p, withoutGaps(s.entries, s.ai_notes), s.weights, kg, today());
+  const { t } = nextTargets(p, s.entries, s.weights, kg, today(), logMarks(s.ai_notes));
   store.saveProfile({ ...p, targets: { kcal: t.kcal, protein: t.protein, baseWeight: kg, computedAt: today(), tdee: t.tdee, source: t.measured ? 'measured' : 'formula' } });
   return t;
 }

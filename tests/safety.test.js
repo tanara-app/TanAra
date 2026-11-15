@@ -47,6 +47,9 @@ suite('safety', () => {
     const t = '2026-02-10';
     const e = [...day(addDays(t, -1), ['lunch', 'dinner'], 500), ...day(addDays(t, -2), ['lunch'], 300), ...day(addDays(t, -3), ['lunch', 'dinner'], 500)];
     eq(underEating(e, 1500, t), null);
+    // …unless they said that one meal was all they ate that day; and a day they marked «ثبت ناقص» never alarms
+    eq(underEating(e, 1500, t, new Map([[addDays(t, -2), true]])).days.length, 3);
+    eq(underEating(e, 1500, t, new Map([[addDays(t, -2), true], [addDays(t, -1), false]])), null);
   });
 
   test('one day at the floor clears it; today itself is not judged', () => {
