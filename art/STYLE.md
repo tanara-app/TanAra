@@ -126,3 +126,16 @@ an embossed Simurgh (the mythical Persian bird) on its face, a ring of simple ge
 Icon only, centered, transparent background, no text or numbers. This is a UI icon, so the isometric
 building rules do not apply to it.
 ```
+
+## آیکون‌های «بیشتر» (`img/tools/`) — ۲۰۲۶-۱۱-۱۵
+
+سبک: سه‌بعدی نرم و خمیری، کرم و بژ با سبز ملایم، نور نرم از بالا چپ، نمای سه‌رخ از کمی بالا، بدون نوشته. ۲۵۶×۲۵۶ webp
+**بدون پس‌زمینه**، شیء حدود ۶۲٪ ضلع (میانه‌ی آیکون‌های فعلی). رنگ کاشی را CSS می‌دهد.
+
+روندی که برای «جوایز» (جعبه کادو) جواب داد، با ابزارهای تصویر ElevenLabs (MCP، روی حساب m.b.a):
+۱) `creative_create_flow`؛ ۲) سه آیکون فعلی را از گیت‌هاب عمومی (`raw.githubusercontent.com/tanara-app/TanAra/main/img/tools/...`)
+با `creative_attach_reference_file` نمونه کن؛ ۳) `creative_generate_image` با `gpt-image-2` و هر سه نمونه در `connect_from`
+(۴ نسخه حدود ۳۵۶۰ اعتبار، ۶۵ سنت؛ خروجی ۱۲۸۰×۷۲۰)؛ ۴) **پس‌زمینه را با مدل `birefnet-v2-bg-removal` خود ElevenLabs بردار**
+(`creative_edit_image`، ۳۰ اعتبار هر تصویر)، نه با اسکریپت: اسکریپت سفیدبُر خودمان سایه را لکه‌ی خاکستری روی کاشی کرد و
+سازنده ناراضی شد. قبل از خرج، هزینه را با `estimate_only` بگیر و بپرس. ۵) مربع کردن و ۲۵۶ با پایتون Blender
+(`Blender -b --python`، این شل PIL ندارد) و `cwebp -q 90 -alpha_q 100`. همیشه روی پس‌زمینه‌ی تند (سرخابی) چک کن.
