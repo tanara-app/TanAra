@@ -4,13 +4,15 @@
 // index.html applies them before first paint; keep its inline script in step with BAR here.
 const KEY = 'tanara:theme';     // mode: 'light' | 'dark' | missing = auto
 const PKEY = 'tanara:palette';  // palette: 'anar' | 'kashi' | missing = نعنا (the original green)
-// finish: a look laid over any palette, earned in «جوایز» (js/domain/rewards.js): 'parniyan' | missing
+// finish: a look laid over any palette, earned in «جوایز» (js/domain/rewards.js, kind 'finish'), worn from «ظاهر»
 const FKEY = 'tanara:finish';
 const BAR = {
   nana: { dark: '#0f1315', light: '#f3f5f6' },
   anar: { dark: '#160d0f', light: '#f7f1ec' },
   kashi: { dark: '#0d1424', light: '#eef2f8' },
 };
+import { REWARDS } from '../domain/rewards.js';
+
 const mq = matchMedia('(prefers-color-scheme: light)');
 
 export const THEMES = [
@@ -42,7 +44,7 @@ export function getPalette() {
   return p === 'anar' || p === 'kashi' ? p : 'nana';
 }
 
-export const getFinish = () => (read(FKEY) === 'parniyan' ? 'parniyan' : null);
+export const getFinish = () => { const f = read(FKEY); return f && REWARDS.some(r => r.kind === 'finish' && r.key === f) ? f : null; };
 export function setFinish(f) { write(FKEY, f); applyTheme(); }
 
 export function applyTheme() {

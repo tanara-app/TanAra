@@ -1346,21 +1346,30 @@ body.kb .toast, body.chat-mode .toast { bottom: calc(var(--nav-h) + var(--safe-b
   border-top-color: color-mix(in srgb, var(--accent) 22%, var(--line));
 }
 
-/* «جوایز» (js/ui/rewards.js): the showcase of «پرنیان», drawn live in the palette in use */
-.rw { display: flex; flex-direction: column; gap: 18px; padding-bottom: 8px; }
-.rw-info { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 6px; }
-.rw-info h3 { font-size: 1.5rem; font-weight: 900; letter-spacing: .5px; }
-.rw-info .btn { margin-top: 8px; max-width: 280px; }
-.rw-bar { width: 100%; max-width: 280px; height: 10px; border-radius: 10px; background: var(--surface-2); overflow: hidden; margin-top: 6px; }
-.rw-bar i { display: block; height: 100%; border-radius: 10px; background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 55%, #fff)); }
-.rw-count { color: var(--muted); font-size: .9rem; } .rw-count b { color: var(--text); font-size: 1.1rem; }
-.pn-show { position: relative; height: 330px; border-radius: 26px; overflow: hidden; display: grid; place-items: center;
+/* «جوایز» (js/ui/rewards.js): one card per reward, the same for every reward; the showcase is drawn
+   live in the palette in use (each reward styles its own inside .rw-<key>) */
+.rw-list { display: flex; flex-direction: column; gap: 16px; padding-bottom: 10px; }
+.rw-card { border-radius: 24px; overflow: hidden; background: var(--surface-2); }
+.rw-show { position: relative; height: 250px; display: grid; place-items: center; overflow: hidden;
   background:
     radial-gradient(60% 55% at 50% 45%, color-mix(in srgb, var(--accent) 45%, transparent), transparent 70%),
     radial-gradient(120% 80% at 100% 0%, color-mix(in srgb, var(--accent) 25%, transparent), transparent 60%),
     linear-gradient(165deg, color-mix(in srgb, var(--accent) 22%, #05080a), #05080a); }
-.pn-show::before { content: ''; position: absolute; inset: 0; background: var(--grain); opacity: .12; mix-blend-mode: overlay; }
-.pn-phone { position: relative; width: 196px; padding: 16px 12px 14px; border-radius: 30px;
+.rw-show::before { content: ''; position: absolute; inset: 0; background: var(--grain); opacity: .12; mix-blend-mode: overlay; }
+.rw-lock { position: absolute; top: 12px; left: 12px; width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center;
+  color: #fff; background: rgba(0,0,0,.45); backdrop-filter: blur(6px); }
+.rw-info { padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 6px; }
+.rw-title { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.rw-title h3 { font-size: 1.3rem; font-weight: 900; }
+.rw-title small { font-size: .74rem; color: var(--muted); padding: 2px 8px; border-radius: 999px; background: var(--surface); }
+.rw-goal { font-size: .88rem; color: var(--muted); }
+.rw-bar { height: 8px; border-radius: 8px; background: var(--surface); overflow: hidden; margin-top: 4px; }
+.rw-bar i { display: block; height: 100%; border-radius: 8px; background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 55%, #fff)); }
+.rw-count { color: var(--muted); font-size: .85rem; } .rw-count b { color: var(--text); font-size: 1rem; }
+.rw-got { display: inline-flex; align-items: center; gap: 6px; color: var(--accent); font-size: .88rem; font-weight: 700; }
+.rw-got svg { width: 18px; height: 18px; }
+/* «پرنیان»'s showcase: a tilted phone in the finish, glowing, with twinkling stars */
+.pn-phone { position: relative; width: 176px; padding: 16px 12px 14px; border-radius: 30px;
   transform: rotate(-7deg) translateY(4px);
   background:
     var(--grain),
@@ -1391,9 +1400,6 @@ body.kb .toast, body.chat-mode .toast { bottom: calc(var(--nav-h) + var(--safe-b
 .pn-star.s2 { width: 12px; height: 12px; bottom: 20%; left: 16%; animation-delay: 1s; }
 .pn-star.s3 { width: 14px; height: 14px; top: 28%; left: 22%; animation-delay: 2s; }
 @keyframes pn-twinkle { 0%, 100% { opacity: .2; transform: scale(.7); } 50% { opacity: 1; transform: scale(1); } }
-.pn-show.locked .pn-phone { filter: saturate(.85); }
-.pn-lock { position: absolute; top: 14px; left: 14px; width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center;
-  color: #fff; background: rgba(0,0,0,.45); backdrop-filter: blur(6px); }
 @media (prefers-reduced-motion: reduce) { .pn-card::after, .pn-star { animation: none; } }
 /* in light mode the plush shade stays faint, so white cards don't look grey at the bottom */
 :root[data-finish="parniyan"][data-theme="light"] .card,

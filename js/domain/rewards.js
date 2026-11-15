@@ -1,18 +1,29 @@
 /*
   «جوایز»: things a member earns by keeping a habit. Pure functions.
 
-  The first reward is the «پرنیان» finish (a soft, plush look laid over any of the colour themes,
-  css/app.css [data-finish="parniyan"]), for RUN full days in a row: a full day is the rule used
-  everywhere (stats.js fullDay: what they said about the day, else two meals or more). Earned once,
-  it stays earned (profile.data.rewards).
+  Each reward is one entry of REWARDS: what it is (`kind`, `name`, and `about`, the few words shown
+  under its name), and the goal that earns it (`goal`). Adding a reward = one more entry here (and,
+  for a new kind of goal, one more case in `progress`); the «جوایز» page lists them all the same way.
+  Earned once, a reward stays earned (profile.data.rewards: { key: day earned }).
+
+  Kinds: 'finish' — a look laid over any colour theme (css/app.css [data-finish]), worn from «ظاهر».
+  Goals: 'fullRun' — `of` full days in a row (stats.js fullDay: what they said about the day, else two
+  meals or more).
 */
 import { addDays } from '../lib/dates.js';
 import { baseMeal } from './meals.js';
 import { logMarks, fullDay } from './stats.js';
 
-export const REWARDS = {
-  parniyan: { name: 'پرنیان', run: 21 },
-};
+export const REWARDS = [
+  { key: 'parniyan', kind: 'finish', name: 'پرنیان', about: 'پوسته‌ی ظاهر اپ', goal: { type: 'fullRun', of: 21 } },
+];
+export const rewardOf = key => REWARDS.find(r => r.key === key) || null;
+
+// the goal in words, under the reward's name
+export function goalText(r, fa = String) {
+  if (r.goal.type === 'fullRun') return `${fa(r.goal.of)} روز پشت‌سرهم ثبت کامل`;
+  return '';
+}
 
 /*
   { best, now }: the longest run of full days so far (up to `day`), and the run going on now —
@@ -38,5 +49,20 @@ export function fullRuns(entries, notes, day) {
   return { best, now };
 }
 
-// Whether a reward is earned now (or was earlier: `earned`, from the profile).
-export const earnedNow = (key, runs, earned = {}) => !!earned[key] || runs.best >= REWARDS[key].run;
+/*
+  Where a member stands with each reward: [{ reward, earned, now, of }]. `earned` (from the profile)
+  keeps a reward earned; otherwise it is earned once its goal was ever met. `now`/`of`: the progress
+  shown while it is still ahead.
+*/
+export function progress({ entries = [], notes = [], earned = {} }, day) {
+  const runs = fullRuns(entries, notes, day);
+  return REWARDS.map(r => {
+    const of = r.goal.of;
+    const now = r.goal.type === 'fullRun' ? runs.now : 0;
+    const met = r.goal.type === 'fullRun' ? runs.best >= of : false;
+    return { reward: r, earned: !!earned[r.key] || met, now: Math.min(now, of), of };
+  });
+}
+
+// the finishes they may wear (earned ones)
+export const earnedFinishes = earned => REWARDS.filter(r => r.kind === 'finish' && earned?.[r.key]);

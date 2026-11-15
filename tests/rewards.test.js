@@ -1,5 +1,5 @@
 import { suite, test, eq, ok } from './harness.js';
-import { fullRuns, earnedNow, REWARDS } from '../js/domain/rewards.js';
+import { fullRuns, progress, earnedFinishes, rewardOf } from '../js/domain/rewards.js';
 import { addDays } from '../js/lib/dates.js';
 
 const DAY = '2026-03-01';
@@ -26,10 +26,16 @@ suite('rewards', () => {
     eq(fullRuns(e, [{ key: 'logday:2026-02-23', kind: 'logday', data: { full: true } }], DAY).best, 9);
   });
 
-  test('earned at the full run, and stays earned', () => {
-    const r = REWARDS.parniyan.run;
-    ok(!earnedNow('parniyan', { best: r - 1, now: 0 }));
-    ok(earnedNow('parniyan', { best: r, now: 0 }));
-    ok(earnedNow('parniyan', { best: 0, now: 0 }, { parniyan: '2026-01-01' }));
+  test('earned at the full run, and stays earned; progress stops at the goal', () => {
+    const of = rewardOf('parniyan').goal.of;
+    const at = n => progress({ entries: run(addDays(DAY, -n), n) }, DAY).find(x => x.reward.key === 'parniyan');
+    eq([at(of - 1).earned, at(of - 1).now, at(of - 1).of], [false, of - 1, of]);
+    eq([at(of).earned, at(of + 3).now], [true, of]);
+    ok(progress({ earned: { parniyan: '2026-01-01' } }, DAY)[0].earned);
+  });
+
+  test('only earned finishes can be worn', () => {
+    eq(earnedFinishes({}).length, 0);
+    eq(earnedFinishes({ parniyan: '2026-01-01' }).map(r => r.key), ['parniyan']);
   });
 });

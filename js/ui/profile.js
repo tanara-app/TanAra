@@ -14,7 +14,8 @@ import { phaseCard, bindPhase } from './phase.js';
 import { remindersLine, bindReminders } from './reminders.js';
 import { openUsage } from './usage.js';
 import { aiAvailable } from '../ai/hooshvareh.js';
-import { THEMES, PALETTES, getTheme, setTheme, getPalette, setPalette, shownMode } from './theme.js';
+import { THEMES, PALETTES, getTheme, setTheme, getPalette, setPalette, shownMode, getFinish, setFinish } from './theme.js';
+import { earnedFinishes } from '../domain/rewards.js';
 import { MODES, buddyMode, setBuddyMode } from './mascot.js';
 import { openFeedback, feedbackLine } from './feedback.js';
 
@@ -133,6 +134,8 @@ function openAppearance() {
   sheet.open(body => {
     const draw = () => {
       const pal = getPalette(), mode = getTheme(), on = shownMode();
+      // finishes earned in «جوایز» (none: no row); «ساده» is the app without one
+      const fins = earnedFinishes(store.profile()?.rewards), fin = getFinish();
       body.innerHTML = `
         <div class="sheet-head"><h2>ظاهر</h2><button class="icon-btn" data-close aria-label="بستن">${icon.close}</button></div>
         <div class="stack">
@@ -144,6 +147,9 @@ function openAppearance() {
               ${x.value === pal ? icon.check : ''}
             </button>`;
           }).join('')}</div>
+          ${fins.length ? `<div class="field"><span class="muted small">پوسته</span>
+            <div class="seg" data-fin><button type="button" data-v="" class="${fin ? '' : 'on'}">ساده</button>${fins.map(f => `<button type="button" data-v="${f.key}" class="${fin === f.key ? 'on' : ''}">${f.name}</button>`).join('')}</div>
+          </div>` : ''}
           <div class="field"><span class="muted small">روشن یا تیره</span>
             <div class="seg" data-mode>${THEMES.map(t => `<button type="button" data-v="${t.value}" class="${t.value === mode ? 'on' : ''}">${t.value === 'auto' ? 'خودکار' : t.label}</button>`).join('')}</div>
           </div>
@@ -151,6 +157,7 @@ function openAppearance() {
       body.querySelector('[data-close]').onclick = () => sheet.close();
       body.querySelectorAll('[data-pal]').forEach(b => b.onclick = () => { setPalette(b.dataset.pal); draw(); });
       body.querySelectorAll('[data-mode] button').forEach(b => b.onclick = () => { setTheme(b.dataset.v); draw(); });
+      body.querySelectorAll('[data-fin] button').forEach(b => b.onclick = () => { setFinish(b.dataset.v || null); draw(); });
     };
     draw();
   });
