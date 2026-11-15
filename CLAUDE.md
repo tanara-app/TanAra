@@ -69,7 +69,7 @@ exist side by side. When a new decision replaces an old one, change or mark the 
   and an action that can be an icon is an icon (undo instead of «برگشت به پیشنهاد اپ»). Before adding any
   sentence, label or link to the UI, ask whether the screen works without it.
 - Anything that only some members have (a beta in `profile.beta`, not yet released to everyone) carries the word
-  «آزمایشی» next to its name where it is opened (e.g. «سهم وعده آزمایشی» in its tab, «سرزمین» with «آزمایشی» under
+  «آزمایشی» next to its name where it is opened (e.g. «سهم وعده آزمایشی» in its tab, «باغ» with «آزمایشی» under
   its tile in «بیشتر»). The user asked for this on 2026-11-12. Remove the word when it is released to all.
 - On 2026-11-12 a «تازه‌ها» page (the app's changes, with an unread count and a one-time sheet) was built
   and removed the same day: the user didn't like it. Don't bring it back unless they ask.
@@ -84,11 +84,12 @@ exist side by side. When a new decision replaces an old one, change or mark the 
   and `remind` (push reminders).
 - `FEEDBACK.md`: how to read users' reports (table `feedback`, photos via `tools/feedback-photos.mjs`).
 - `HOOSHVAREH.md`: everything the AI assistant and the app do. Keep it up to date with every new feature.
-- `art/STYLE.md`: the art style guide and ChatGPT prompts for the «سرزمین» game images.
+- `art/STYLE.md`: how the app's own pictures (the «بیشتر» icons) are made.
 - `REDESIGN.md`: the rebuild of «امروز» and «رژیم» into one part, step by step: what the user decided so far. Read it before
   touching the today screen, «سهم وعده» or «رژیم».
-- `GAME.md`: the design of the «سرزمین» game (core loop, resources, buildings, builders, land, divs, phases). Read it
-  before any work on the game; its sections are proposals until marked «تأیید شد».
+- `GARDEN.md`: «باغ», the game inside the app (a living 3D Persian garden, all built in code with three.js), why it
+  replaced the old «سرزمین» city-builder (removed on 2026-11-15 at the user's request), how to work on it, and the plan.
+  Read it before any work on the game.
 - `IDEAS.md`: ideas for daily "hooks" that bring members back, with the ones the user picked. When one gets built,
   mark it there.
 - `VOICE.md` / `ELEVENLABS.md`: the mascot Heimerdinger's lines and the brief for recording them

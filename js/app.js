@@ -12,7 +12,7 @@ import { renderLogin } from './ui/login.js';
 import { renderChat } from './ui/chat.js';
 import { renderMagazine } from './ui/magazine.js';
 import { renderTools } from './ui/tools.js';
-import { renderGame } from './ui/game.js';
+import { renderGarden } from './ui/garden.js';
 import { configureAI, sparkle } from './ai/hooshvareh.js';
 import { disable as disableReminders } from './ui/reminders.js';
 import { applyTheme } from './ui/theme.js';
@@ -34,7 +34,7 @@ const ROUTES = {
   profile: { label: 'نمایه', icon: icon.user, render: renderProfile },
   // not in the bottom bar: opened from «بیشتر» (and the magazine card on «امروز»)
   mag: { label: 'مجله', render: renderMagazine, under: 'tools' },
-  game: { label: 'سرزمین', render: renderGame, under: 'tools' }, // beta: the city-builder
+  garden: { label: 'باغ', render: renderGarden, under: 'tools' }, // beta: the garden (GARDEN.md)
 
 };
 

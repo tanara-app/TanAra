@@ -21,9 +21,6 @@ import './combos.test.js';
 import './meals.test.js';
 import './quality.test.js';
 import './chatText.test.js';
-import './game.test.js';
-import './battle.test.js';
-import './raid.test.js';
 import './rewards.test.js';
 
 const results = await run();

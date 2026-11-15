@@ -14,10 +14,11 @@ import { openShopping, shopping } from './shopping.js';
 import { toBuy } from '../domain/shopping.js';
 import { openFoodBank, openRecipes } from './foodBank.js';
 import { shareAdmin, checkShare, openFoodShare } from './foodShare.js';
-import { drawPreview } from './gameArt.js';
-import { KINDS } from '../domain/game.js';
 import { openRewards } from './rewards.js';
 
+
+// the garden's tile: a pomegranate tree on a patch of grass
+const GARDEN_ICON = `<svg viewBox="0 0 64 64" aria-hidden="true"><ellipse cx="32" cy="52" rx="20" ry="6" fill="#7cbf5a"/><path d="M30 52V36h4v16z" fill="#8a5a33"/><circle cx="32" cy="27" r="15" fill="#4f9a3e"/><circle cx="24" cy="22" r="8" fill="#5fb04a"/><circle cx="39" cy="21" r="8" fill="#5fb04a"/><circle cx="26" cy="31" r="2.6" fill="#d8443a"/><circle cx="37" cy="29" r="2.6" fill="#d8443a"/><circle cx="32" cy="20" r="2.4" fill="#d8443a"/></svg>`;
 
 const again = () => { const v = document.querySelector('#view .tools'); if (v) renderTools(v.parentElement); };
 const TOOLS = {
@@ -26,10 +27,10 @@ const TOOLS = {
   recipes: { label: 'رسپی‌ها', open: () => openRecipes() },
   mag: { label: 'مجله', open: () => { location.hash = '#/mag'; } },
   share: { label: 'غذاهای تازه‌ی خانواده', only: shareAdmin, open: () => openFoodShare(() => checkShare(again, true)) },
-  // beta, only for accounts with `game` in profile.beta (set from the database)
   // what a member earns by keeping a habit (for everyone since 2026-11-15)
   rewards: { label: 'جوایز', open: () => openRewards() },
-  game: { label: 'سرزمین', beta: true, art: 'palace', only: () => (store.profile()?.beta || []).includes('game'), open: () => { location.hash = '#/game'; } },
+  // beta, only for accounts with `game` in profile.beta (set from the database; the key is older than the garden)
+  garden: { label: 'باغ', beta: true, svg: GARDEN_ICON, only: () => (store.profile()?.beta || []).includes('game'), open: () => { location.hash = '#/garden'; } },
 };
 
 // The member's order: what they arranged, then any tool added since, in its usual place.
@@ -53,7 +54,7 @@ export function renderTools(root) {
         ${keys.map(k => {
           const t = TOOLS[k], n = t.badge?.() || 0;
           return `<button class="tool" data-tool="${k}" aria-label="${t.label}${n ? `، ${fa(n)} مورد` : ''}">
-            <span class="tool-ic">${t.art ? `<canvas data-art="${t.art}"></canvas>` : `<img src="img/tools/${k}.webp" alt="" draggable="false">`}${n ? `<b class="tool-badge">${fa(n)}</b>` : ''}</span>
+            <span class="tool-ic">${t.svg ? t.svg : `<img src="img/tools/${k}.webp" alt="" draggable="false">`}${n ? `<b class="tool-badge">${fa(n)}</b>` : ''}</span>
             <span class="tool-name">${t.label}${t.beta ? '<small>آزمایشی</small>' : ''}</span>
           </button>`;
         }).join('')}
@@ -61,7 +62,6 @@ export function renderTools(root) {
     </section>`;
 
   const grid = root.querySelector('.tool-grid');
-  grid.querySelectorAll('canvas[data-art]').forEach(c => drawPreview(c, c.dataset.art, KINDS[c.dataset.art].size));
   const stop = () => { arranging = false; renderTools(root); };
   root.querySelector('[data-done]')?.addEventListener('click', stop);
   root.querySelector('.tools').addEventListener('click', e => {
