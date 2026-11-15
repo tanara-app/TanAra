@@ -74,6 +74,11 @@ exist side by side. When a new decision replaces an old one, change or mark the 
   its tile in «بیشتر»). The user asked for this on 2026-11-12. Remove the word when it is released to all.
 - On 2026-11-12 a «تازه‌ها» page (the app's changes, with an unread count and a one-time sheet) was built
   and removed the same day: the user didn't like it. Don't bring it back unless they ask.
+- **The game («باغ») is the exception to asking first** (the user, 2026-11-15: «کنترل و مسئولیت بخش بازی به عهده خودت باشه… دیگه از من
+  مشورت نخواه برای بخش بازی»). Whichever Claude works on the garden designs and builds it on its own judgment: rules, look, what comes
+  next. Don't ask the user to choose or approve game decisions; build, check it yourself at phone size, write what you decided and why in
+  `GARDEN.md`, commit and push, and tell them briefly what is new. The fixed limits in `GARDEN.md` («قیدها») still hold, it stays beta
+  until the user says otherwise, and this freedom is for the game only, not the rest of the app.
 - Build only what the user agreed to. When a reply could mean more than one of the options you offered,
   ask which ones before building (on 2026-11-08 a shared «team goal» was built that the user hadn't asked for).
 

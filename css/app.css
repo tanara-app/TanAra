@@ -1318,6 +1318,18 @@ body.garden-mode .nav { display: none; }
   display: grid; place-items: center; border: 0; border-radius: 50%; background: #fff; box-shadow: 0 6px 0 #c9dde6, 0 10px 22px rgba(0,0,0,.18); }
 .garden-water:active { transform: translateY(3px); box-shadow: 0 3px 0 #c9dde6, 0 6px 14px rgba(0,0,0,.18); }
 .garden-water.pop svg { animation: garden-pop .45s ease; }
+.garden-water.empty { opacity: .62; }
+.garden-water.no { animation: garden-no .3s ease; }
+@keyframes garden-no { 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
+.garden-count { position: absolute; top: -7px; inset-inline-end: -7px; min-width: 28px; height: 28px; padding: 0 7px; border-radius: 14px; display: grid; place-items: center;
+  background: #1d6f99; color: #fff; font-size: 14px; font-weight: 700; line-height: 1; box-shadow: 0 2px 6px rgba(0,0,0,.25); }
+.garden-today { position: absolute; bottom: calc(env(safe-area-inset-bottom) + 118px); left: 50%; translate: -50% 0; display: flex; gap: 7px; direction: ltr;
+  padding: 5px 10px; border-radius: 14px; background: rgba(255,255,255,.55); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+.garden-today i { display: block; line-height: 0; }
+.garden-today path { fill: none; stroke: #1d6f99; stroke-width: 1.5; stroke-linejoin: round; opacity: .55; }
+.garden-today .on path { fill: #5cc8f0; opacity: 1; }
+.garden-today .move path { stroke: #2f8a4a; }
+.garden-today .move.on path { fill: #7fd08a; }
 @keyframes garden-pop { 40% { transform: scale(1.25) rotate(-8deg); } }
 
 /* ---------------- «پرنیان»: a finish earned in «جوایز» (js/domain/rewards.js), over any palette ----------------

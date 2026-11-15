@@ -15,22 +15,26 @@
   wheel) zooms. Nothing is saved yet and nothing is tied to logging yet.
 */
 import { icon } from './dom.js';
-import { daylight } from '../domain/garden.js';
+import { fa } from '../lib/fa.js';
+import { today } from '../lib/dates.js';
+import * as store from '../data/store.js';
+import { daylight, CELL, TREE_STEPS, SHAFTS, cellKey, dropsByDay, earned, spent, canWater, frontier, nextCell } from '../domain/garden.js';
+import { makeLand } from './gardenLand.js';
 
 const THREE_URL = 'https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js';
-const STEPS = 6; // waterings from a sapling to a tree with fruit
 
 let live = null;
 
 export function renderGarden(root) {
-  if (live && root.contains(live.el)) return;
+  if (live && root.contains(live.el)) { live.refresh?.(); return; }
   stop();
   document.body.classList.add('garden-mode');
   root.innerHTML = `
     <section class="garden">
       <div class="garden-stage"></div>
       <button class="garden-back" data-back aria-label="برگشت">${icon.chevR}</button>
-      <button class="garden-water" data-water aria-label="آب بده">${DROP}</button>
+      <div class="garden-today" aria-hidden="true">${SMALL_DROP.repeat(3)}${SMALL_DROP.replace('<i>', '<i class="move">')}</div>
+      <button class="garden-water" data-water aria-label="آب بده">${DROP}<b class="garden-count"></b></button>
       <p class="garden-wait">در حال بارگذاری…</p>
     </section>`;
   const el = root.querySelector('.garden');
@@ -51,6 +55,8 @@ function stop() {
 }
 
 const DROP = '<svg viewBox="0 0 48 48" width="40" height="40" aria-hidden="true"><path d="M24 6C18 15 11 22 11 30a13 13 0 0 0 26 0c0-8-7-15-13-24z" fill="#5cc8f0" stroke="#1d6f99" stroke-width="2.5" stroke-linejoin="round"/><path d="M18 30a6 6 0 0 0 5 6" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" opacity=".8"/></svg>';
+
+const SMALL_DROP = '<i><svg viewBox="0 0 14 18" width="14" height="18"><path d="M7 1.5C4.6 5 2 7.8 2 11a5 5 0 0 0 10 0c0-3.2-2.6-6-5-9.5z"/></svg></i>';
 
 // a small seeded random, so the tree and the flowers are the same every time
 function rng(seed) {
@@ -84,8 +90,8 @@ function start(THREE, el, L) {
   const sun = new THREE.DirectionalLight(0xffe2b8, 2.4);
   sun.position.set(-7, 12, 6);
   sun.castShadow = true;
-  sun.shadow.mapSize.set(1024, 1024);
-  Object.assign(sun.shadow.camera, { left: -11, right: 11, top: 11, bottom: -11, near: 1, far: 60 });
+  sun.shadow.mapSize.set(2048, 2048);
+  Object.assign(sun.shadow.camera, { left: -26, right: 26, top: 26, bottom: -26, near: 1, far: 90 });
   sun.shadow.bias = -0.0008;
   scene.add(sun);
 
@@ -151,31 +157,11 @@ function start(THREE, el, L) {
   const spout = shadowy(new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.2, 0.5, 8), stone));
   spout.position.y = 0.5; garden.add(spout);
 
-  // ---- the world round the garden: sand, dunes, a ring of mountains, the wall, and the qanat ----
+  // ---- the world round the garden: the desert and the mountains (gardenLand.js), the wall, and the qanat ----
   scene.fog = new THREE.Fog(0xf2dcb6, 70, 260);
-  const sand = new THREE.Mesh(new THREE.CircleGeometry(300, 48), mat(0xe9c88d));
-  sand.rotation.x = -Math.PI / 2; sand.position.y = -0.2; sand.receiveShadow = true; scene.add(sand);
+  const uTime = { value: 0 };
+  const land = makeLand(THREE, scene, uTime);
   const rw = rng(21);
-  // the qanat's line: an open channel out of the west wall, then the shaft mounds off to the mountains
-  const shafts = Array.from({ length: 10 }, (_, i) => [-16 - i * 2.4, -i * 3.8]);
-  const nearQanat = (x, z) => (x < -4 && x > -17 && Math.abs(z) < 7) || shafts.some(([sx, sz]) => Math.hypot(x - sx, z - sz) < 8);
-  const duneGeo = new THREE.IcosahedronGeometry(1, 1), duneMats = [0xe3be82, 0xf0d39e, 0xe8c68c].map(c2 => mat(c2));
-  for (let i = 0; i < 52; i++) {
-    const a = rw() * Math.PI * 2, d = 17 + rw() * 60, x = Math.sin(a) * d, z = Math.cos(a) * d;
-    const sx = 3 + rw() * 5, sy = 0.5 + rw() * 1.1, sz = 2 + rw() * 4, ry = rw() * 3;
-    if (nearQanat(x, z)) continue;
-    const m = new THREE.Mesh(duneGeo, duneMats[i % 3]);
-    m.position.set(x, -0.35, z); m.scale.set(sx, sy, sz); m.rotation.y = ry; m.receiveShadow = true; scene.add(m);
-  }
-  const rockMats = [0x8f7f9c, 0x7f7a9e, 0x9a8494].map(c2 => mat(c2)), snow = mat(0xf6efe6);
-  for (let i = 0; i < 54; i++) { // many low peaks that overlap into a range
-    const a = i / 54 * Math.PI * 2 + (rw() - 0.5) * 0.08, d = 122 + rw() * 30, h = 5 + rw() * 9;
-    const x = Math.sin(a) * d, z = Math.cos(a) * d, ry = rw() * 3;
-    const m = new THREE.Mesh(new THREE.ConeGeometry(h * 1.5, h, 6), rockMats[i % 3]);
-    m.position.set(x, h / 2 - 0.3, z); m.rotation.y = ry; scene.add(m);
-    const cap = new THREE.Mesh(new THREE.ConeGeometry(h * 0.42, h * 0.28, 6), snow);
-    cap.position.set(x, h * 0.86 - 0.28, z); cap.rotation.y = ry; scene.add(cap);
-  }
   // the mud-brick wall, open where the qanat comes in, with a turquoise dome on each corner
   const brick = mat(0xd9b27d), cope = mat(0xecd3a4), tile = mat(0x2fb5b2, { roughness: 0.4 });
   const E = S / 2 - 0.15, WH = 0.6;   // where the wall stands, and its height
@@ -204,18 +190,18 @@ function start(THREE, el, L) {
       e.position.set(mid, -0.11, side * 0.37); scene.add(e);
     }
     const mound = mat(0xd6b077), hole = mat(0x4a3524);
-    for (const [x, z] of shafts) {
+    for (const [x, z] of SHAFTS) {
       const a = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 1.2, 0.5, 8), mound); a.position.set(x, 0.05, z); a.receiveShadow = true; scene.add(a);
       const b = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.04, 8), hole); b.position.set(x, 0.31, z); scene.add(b);
     }
   }
 
   // ---- the sky: a dome that follows the camera, with stars and a moon for the night ----
-  const skyU = { top: { value: new THREE.Color() }, hor: { value: new THREE.Color() } };
+  const skyU = { top: { value: new THREE.Color() }, hor: { value: new THREE.Color() }, sunDir: { value: new THREE.Vector3(0, 1, 0) }, sunCol: { value: new THREE.Color() } };
   const sky = new THREE.Mesh(new THREE.SphereGeometry(380, 24, 12), new THREE.ShaderMaterial({
     side: THREE.BackSide, depthWrite: false, fog: false, uniforms: skyU,
     vertexShader: 'varying vec3 d; void main(){ d = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-    fragmentShader: 'uniform vec3 top; uniform vec3 hor; varying vec3 d; void main(){ gl_FragColor = vec4(mix(hor, top, pow(clamp(d.y, 0.0, 1.0), 0.3)), 1.0);\n#include <tonemapping_fragment>\n#include <colorspace_fragment>\n}',
+    fragmentShader: 'uniform vec3 top; uniform vec3 hor; uniform vec3 sunDir; uniform vec3 sunCol; varying vec3 d; void main(){ vec3 n = normalize(d); float s = max(dot(n, sunDir), 0.0); vec3 c = mix(hor, top, pow(clamp(n.y, 0.0, 1.0), 0.3)) + sunCol * (pow(s, 1400.0) * 4.0 + pow(s, 60.0) * 0.4 + pow(s, 7.0) * 0.16); gl_FragColor = vec4(c, 1.0);\n#include <tonemapping_fragment>\n#include <colorspace_fragment>\n}',
   }));
   sky.renderOrder = -1; sky.frustumCulled = false; scene.add(sky);
   const starPos = new Float32Array(280 * 3);
@@ -249,8 +235,8 @@ function start(THREE, el, L) {
   const HOURS = [
     { e: -0.3, top: C(0x0a0f2c), hor: C(0x232b58), hs: C(0x7088f8), hg: C(0x2c3a66), hi: 0.95, sc: C(0x9db2ff), si: 0.8 },  // night
     { e: 0, top: C(0x353b82), hor: C(0xee9068), hs: C(0xe0b4c4), hg: C(0x6a5a4a), hi: 1.05, sc: C(0xff9457), si: 1.7 },      // sunrise, sunset
-    { e: 0.28, top: C(0x62a9e4), hor: C(0xf6d6a4), hs: C(0xffe9cf), hg: C(0x6a7f45), hi: 1.1, sc: C(0xffc890), si: 2.2 },   // the golden hour
-    { e: 0.65, top: C(0x4fa6ea), hor: C(0xc4e2f2), hs: C(0xfff1dc), hg: C(0x5d7f3e), hi: 1.3, sc: C(0xffe2b8), si: 2.4 },   // day
+    { e: 0.28, top: C(0x62a9e4), hor: C(0xf6d6a4), hs: C(0xffe9cf), hg: C(0x9a8458), hi: 1.1, sc: C(0xffc890), si: 2.2 },   // the golden hour
+    { e: 0.65, top: C(0x4fa6ea), hor: C(0xc4e2f2), hs: C(0xfff1dc), hg: C(0xa8935f), hi: 1.3, sc: C(0xffe2b8), si: 2.4 },   // day
   ];
   const fixedHour = parseFloat(new URLSearchParams(location.search).get('hour'));
   let night = 0, hourAt = -9;
@@ -274,6 +260,9 @@ function start(THREE, el, L) {
       sun.position.set(12 * Math.cos(th), 4 + 9 * Math.sin(th), -7);
       sun.intensity = si * (0.15 + 0.85 * smooth(-0.12, -0.3, e));
     }
+    const up = Math.PI * (day ? p : p < 0.5 ? 1 : 0); // where the sun's disc is in the sky; it sinks below the land at night
+    skyU.sunDir.value.set(-15 * Math.cos(up), day ? 15 * Math.sin(up) : -3, 6).normalize();
+    skyU.sunCol.value.copy(sun.color).multiplyScalar(smooth(-0.14, 0.04, e));
     night = smooth(0.06, -0.2, e);
     stars.material.opacity = night; stars.visible = night > 0.01;
     const th = Math.PI * (day ? 0.5 : p);
@@ -382,18 +371,22 @@ function start(THREE, el, L) {
   // ---- camera: turns round the garden, keeps it in view on any screen ----
   const view = { yaw: Math.PI / 4, pitch: 0.33, zoom: 1.08, target: new THREE.Vector3(0, 3.8, 0) };
   const R = S * 0.78;
+  let idle = 0; // the camera drifts a little when nobody is turning it
+  function look() {
+    const halfV = THREE.MathUtils.degToRad(camera.fov / 2), halfH = Math.atan(Math.tan(halfV) * camera.aspect);
+    const dist = R / Math.sin(Math.min(halfV, halfH)) / view.zoom, yaw = view.yaw + idle;
+    camera.position.set(
+      view.target.x + dist * Math.cos(view.pitch) * Math.sin(yaw),
+      view.target.y + dist * Math.sin(view.pitch),
+      view.target.z + dist * Math.cos(view.pitch) * Math.cos(yaw));
+    camera.lookAt(view.target);
+  }
   function place() {
     const w = Math.max(1, stage.clientWidth), h = Math.max(1, stage.clientHeight);
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
-    const halfV = THREE.MathUtils.degToRad(camera.fov / 2), halfH = Math.atan(Math.tan(halfV) * camera.aspect);
-    const dist = R / Math.sin(Math.min(halfV, halfH)) / view.zoom;
-    camera.position.set(
-      view.target.x + dist * Math.cos(view.pitch) * Math.sin(view.yaw),
-      view.target.y + dist * Math.sin(view.pitch),
-      view.target.z + dist * Math.cos(view.pitch) * Math.cos(view.yaw));
-    camera.lookAt(view.target);
     camera.updateProjectionMatrix();
+    look();
   }
   place();
   const ro = new ResizeObserver(place); ro.observe(stage);
@@ -401,9 +394,14 @@ function start(THREE, el, L) {
   const pts = new Map();
   let pinch0 = null;
   const cv = renderer.domElement;
-  cv.addEventListener('pointerdown', e => { cv.setPointerCapture(e.pointerId); pts.set(e.pointerId, { x: e.clientX, y: e.clientY }); });
+  let press = null; // a short press that does not move is a tap: it chooses where the water goes
+  cv.addEventListener('pointerdown', e => {
+    cv.setPointerCapture(e.pointerId); pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    press = pts.size === 1 ? { x: e.clientX, y: e.clientY, at: performance.now() } : null;
+  });
   cv.addEventListener('pointermove', e => {
     const p = pts.get(e.pointerId); if (!p) return;
+    if (press && Math.hypot(e.clientX - press.x, e.clientY - press.y) > 8) press = null;
     if (pts.size === 1) {
       view.yaw -= (e.clientX - p.x) * 0.008;
       view.pitch = Math.min(1.25, Math.max(0.22, view.pitch + (e.clientY - p.y) * 0.005));
@@ -411,32 +409,103 @@ function start(THREE, el, L) {
     p.x = e.clientX; p.y = e.clientY;
     if (pts.size === 2) {
       const [a, b] = [...pts.values()], d = Math.hypot(a.x - b.x, a.y - b.y);
-      if (pinch0) view.zoom = Math.min(2.6, Math.max(0.8, pinch0.z * d / pinch0.d)); else pinch0 = { d, z: view.zoom };
+      if (pinch0) view.zoom = Math.min(2.6, Math.max(0.5, pinch0.z * d / pinch0.d)); else pinch0 = { d, z: view.zoom };
     }
-    place();
+    look();
   });
-  const up = e => { pts.delete(e.pointerId); if (pts.size < 2) pinch0 = null; };
+  const up = e => {
+    pts.delete(e.pointerId); if (pts.size < 2) pinch0 = null;
+    if (press && e.type === 'pointerup' && performance.now() - press.at < 400) pick(e.clientX, e.clientY);
+    press = null;
+  };
   cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
-  cv.addEventListener('wheel', e => { e.preventDefault(); view.zoom = Math.min(2.6, Math.max(0.8, view.zoom * (e.deltaY < 0 ? 1.08 : 0.93))); place(); }, { passive: false });
+  cv.addEventListener('wheel', e => { e.preventDefault(); view.zoom = Math.min(2.6, Math.max(0.5, view.zoom * (e.deltaY < 0 ? 1.08 : 0.93))); look(); }, { passive: false });
 
-  // ---- watering: drops fall on the tree, the soil darkens, the tree grows one step ----
-  let step = 1, grow = 0.05, wetUntil = 0;
-  const rain = new THREE.Points(new THREE.BufferGeometry(), new THREE.PointsMaterial({ color: 0x7fd6ff, size: 0.12, transparent: true, opacity: 0.95 }));
+  // ---- the game (rules in domain/garden.js): water earned by logging is poured on the pomegranate and the desert ----
+  const kept = store.profile()?.garden;
+  const G = { tree: Math.min(TREE_STEPS, Math.max(1, kept?.tree || 1)), cells: { ...(kept?.cells || {}) } };
+  for (const [k, lv] of Object.entries(G.cells)) { const [i, j] = k.split(',').map(Number); land.setCell(i, j, lv); }
+  let water = 0, chosen = null, step = G.tree, grow = step / TREE_STEPS, wetUntil = 0, saving = 0;
+  const btn = el.querySelector('[data-water]'), countEl = el.querySelector('.garden-count'), todayEl = el.querySelector('.garden-today');
+  const TREE_AT = new THREE.Vector3(tree.position.x, 0.15, tree.position.z);
+  // where the next drop goes: what was tapped, while it can still take water; else the pomegranate, then the nearest land
+  function target() {
+    if (chosen === 'tree' && G.tree < TREE_STEPS) return 'tree';
+    if (Array.isArray(chosen) && canWater(G.cells, chosen[0], chosen[1])) return chosen;
+    chosen = null;
+    return G.tree < TREE_STEPS ? 'tree' : nextCell(G.cells);
+  }
+  // a white ring on the target, and a faint damp spot on every piece of dry land the water can reach
+  const mark = new THREE.Mesh(new THREE.TorusGeometry(1, 0.045, 6, 44), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.9, depthTest: false, fog: false }));
+  mark.rotation.x = Math.PI / 2; mark.renderOrder = 5; mark.visible = false; scene.add(mark);
+  const spotGeo = new THREE.CircleGeometry(0.4, 12); spotGeo.rotateX(-Math.PI / 2);
+  const spots = new THREE.InstancedMesh(spotGeo, new THREE.MeshBasicMaterial({ color: 0x7a5a30, transparent: true, opacity: 0.2, depthWrite: false }), 600);
+  spots.count = 0; spots.frustumCulled = false; scene.add(spots);
+  const spotM = new THREE.Matrix4();
+  function aim() {
+    const tg = water > 0 ? target() : null;
+    mark.visible = !!tg;
+    if (tg === 'tree') { mark.position.set(TREE_AT.x, 0.32, TREE_AT.z); mark.userData.r = 0.95; }
+    else if (tg) { mark.position.set(tg[0] * CELL, land.cellTop(tg[0], tg[1]) + 0.12, tg[1] * CELL); mark.userData.r = 1.15; }
+    let n = 0;
+    if (water > 0) for (const [i, j] of frontier(G.cells)) {
+      if (G.cells[cellKey(i, j)] || n >= 600) continue;
+      spots.setMatrixAt(n++, spotM.makeTranslation(i * CELL, land.cellTop(i, j) + 0.05, j * CELL));
+    }
+    spots.count = n; spots.instanceMatrix.needsUpdate = true;
+  }
+  function tally() {
+    const st = store.get(), day = today();
+    water = Math.max(0, earned(st.entries, st.activity, day) - spent(G));
+    countEl.textContent = fa(water); btn.classList.toggle('empty', !water);
+    const d = dropsByDay(st.entries, st.activity).get(day) || { meals: 0, move: 0 };
+    [...todayEl.children].forEach((c, k) => c.classList.toggle('on', k < 3 ? k < d.meals : d.move > 0));
+    aim();
+  }
+  const ray = new THREE.Raycaster(), floor = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0.2), hit = new THREE.Vector3(), ndc = new THREE.Vector2();
+  function pick(x, y) {
+    const r = cv.getBoundingClientRect();
+    ray.setFromCamera(ndc.set((x - r.left) / r.width * 2 - 1, -(y - r.top) / r.height * 2 + 1), camera);
+    if (!ray.ray.intersectPlane(floor, hit)) return;
+    if (hit.x > 0.5 && hit.z > 0.5 && hit.x < 4.7 && hit.z < 4.7) { if (G.tree >= TREE_STEPS) return; chosen = 'tree'; }
+    else {
+      const i = Math.round(hit.x / CELL), j = Math.round(hit.z / CELL);
+      if (!canWater(G.cells, i, j)) return;
+      chosen = [i, j];
+    }
+    aim();
+  }
+  const rain = new THREE.Points(new THREE.BufferGeometry(), new THREE.PointsMaterial({ color: 0x7fd6ff, size: 0.12, transparent: true, opacity: 0.95, fog: false }));
   const rainPos = new Float32Array(40 * 3), rainV = [];
   rain.geometry.setAttribute('position', new THREE.BufferAttribute(rainPos, 3));
-  rain.visible = false; tree.add(rain);
-  const btn = el.querySelector('[data-water]');
-  btn.onclick = () => {
-    const now = clock.elapsedTime;
-    wetUntil = now + 2.2;
-    const rr = rng((now * 1000) | 0);
-    for (let i = 0; i < 40; i++) {
-      rainV[i] = { x: (rr() - 0.5) * 1.2, z: (rr() - 0.5) * 1.2, t0: now + rr() * 0.6 };
+  rain.visible = false; rain.frustumCulled = false; scene.add(rain);
+  function save() {
+    clearTimeout(saving);
+    saving = setTimeout(() => { saving = 0; store.saveProfile({ ...store.profile(), garden: { tree: G.tree, cells: { ...G.cells } } }); }, 700);
+  }
+  function pour() {
+    const tg = water > 0 ? target() : null;
+    if (!tg) { btn.classList.remove('no'); void btn.offsetWidth; btn.classList.add('no'); return; }
+    const now = clock.elapsedTime, rr = rng((now * 1000) | 0);
+    if (tg === 'tree') { G.tree++; step = G.tree; wetUntil = now + 2.2; rain.position.copy(TREE_AT); }
+    else {
+      const [i, j] = tg, k = cellKey(i, j);
+      G.cells[k] = (G.cells[k] || 0) + 1;
+      land.setCell(i, j, G.cells[k], now + 0.3);
+      rain.position.set(i * CELL, land.cellTop(i, j), j * CELL);
     }
+    for (let i = 0; i < 40; i++) rainV[i] = { x: (rr() - 0.5) * 1.6, z: (rr() - 0.5) * 1.6, t0: now + rr() * 0.5 };
     rain.visible = true;
-    step = step >= STEPS ? 1 : step + 1; // the prototype starts over after the last step
     btn.classList.remove('pop'); void btn.offsetWidth; btn.classList.add('pop');
-  };
+    save(); tally();
+  }
+  // one press pours one drop; holding keeps pouring
+  let hold = 0, again = 0;
+  const release = () => { clearTimeout(hold); clearInterval(again); hold = again = 0; };
+  btn.addEventListener('pointerdown', e => { e.preventDefault(); release(); pour(); hold = setTimeout(() => { again = setInterval(pour, 210); }, 420); });
+  for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) btn.addEventListener(ev, release);
+  btn.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pour(); } });
+  L.refresh = tally; // the app calls this when its data changes (a meal logged on another device, say)
 
   // ---- each frame ----
   const clock = new THREE.Clock();
@@ -446,6 +515,10 @@ function start(THREE, el, L) {
     raf = requestAnimationFrame(frame);
     const dt = Math.min(clock.getDelta(), 0.05), t = clock.elapsedTime;
     if (t - hourAt > 1) { hourAt = t; setHour(); }
+    uTime.value = t;
+    land.update(t, dt);
+    if (!pts.size) { idle = Math.sin(t * 0.12) * 0.05; look(); }
+    if (mark.visible) { const k = mark.userData.r * (1 + Math.sin(t * 3.2) * 0.07); mark.scale.set(k, k, 1); mark.material.opacity = 0.75 + Math.sin(t * 3.2) * 0.2; }
     sky.position.copy(camera.position);
     moon.lookAt(camera.position);
     if (flies.visible) {
@@ -466,11 +539,10 @@ function start(THREE, el, L) {
     }
     dropGeo.attributes.position.needsUpdate = true;
 
-    const goal = step / STEPS; // the tree eases towards its step
+    const goal = step / TREE_STEPS; // the tree eases towards its step
     grow += (goal - grow) * Math.min(1, dt * 1.8);
-    if (goal < grow - 0.3) grow = goal; // started over
     const g = grow;
-    tree.scale.setScalar(0.45 + 0.55 * smooth(0, 1, g));
+    tree.scale.setScalar(0.34 + 0.36 * smooth(0, 1, g));
     for (const p of parts) {
       let s = smooth(p.from, p.to, g);
       if (p.until) s *= 1 - smooth(p.until - 0.04, p.until, g);
@@ -501,12 +573,14 @@ function start(THREE, el, L) {
     }
     renderer.render(scene, camera);
   }
+  tally();
   frame();
   el.querySelector('.garden-wait').remove();
 
   L.dispose = () => {
     cancelAnimationFrame(raf);
-    ro.disconnect();
+    ro.disconnect(); release();
+    if (saving) { clearTimeout(saving); store.saveProfile({ ...store.profile(), garden: { tree: G.tree, cells: { ...G.cells } } }); }
     scene.traverse(o => { o.geometry?.dispose(); [].concat(o.material || []).forEach(m => { m.map?.dispose(); m.dispose(); }); });
     renderer.dispose();
     renderer.domElement.remove();
