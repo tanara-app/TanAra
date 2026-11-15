@@ -346,7 +346,13 @@ export function openEat({ day = today(), meal = null, budgetFor, start = null })
           <button type="button" class="eat-edit${editing ? ' on' : ''}" data-edit aria-label="${editing ? 'تمام' : 'تغییر مقدارها'}" aria-pressed="${editing}">${editing ? icon.check : icon.edit}</button>
         </div>`;
 
-      body.querySelector('[data-back]').onclick = () => { editing = false; drawHome(); };
+      // back from a pack leaves it behind (its foods are not left ticked under «چقدر بخورم؟»); back
+      // from foods they ticked themselves keeps the ticks, to add or take away one
+      body.querySelector('[data-back]').onclick = () => {
+        editing = false;
+        if (from) { picked = []; from = null; edited = false; locks.clear(); shown.clear(); openRow = null; }
+        drawHome();
+      };
       body.querySelectorAll('[data-addp]').forEach(x => x.onclick = () => {
         const f = store.get().foods.find(y => y.id === x.dataset.addp);
         if (f) { picked.push(f); if (from) edited = true; drawPlate(); }
