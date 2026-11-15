@@ -4,6 +4,8 @@
 // index.html applies them before first paint; keep its inline script in step with BAR here.
 const KEY = 'tanara:theme';     // mode: 'light' | 'dark' | missing = auto
 const PKEY = 'tanara:palette';  // palette: 'anar' | 'kashi' | missing = نعنا (the original green)
+// finish: a look laid over any palette, earned in «جوایز» (js/domain/rewards.js): 'parniyan' | missing
+const FKEY = 'tanara:finish';
 const BAR = {
   nana: { dark: '#0f1315', light: '#f3f5f6' },
   anar: { dark: '#160d0f', light: '#f7f1ec' },
@@ -40,10 +42,14 @@ export function getPalette() {
   return p === 'anar' || p === 'kashi' ? p : 'nana';
 }
 
+export const getFinish = () => (read(FKEY) === 'parniyan' ? 'parniyan' : null);
+export function setFinish(f) { write(FKEY, f); applyTheme(); }
+
 export function applyTheme() {
   const p = getPalette(), on = shownMode();
   const html = document.documentElement;
   html.dataset.theme = on;
+  if (getFinish()) html.dataset.finish = getFinish(); else delete html.dataset.finish;
   if (p === 'nana') delete html.dataset.palette; else html.dataset.palette = p;
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content', BAR[p][on]);
   document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]')

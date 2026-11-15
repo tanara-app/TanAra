@@ -16,6 +16,7 @@ import { renderGame } from './ui/game.js';
 import { configureAI, sparkle } from './ai/hooshvareh.js';
 import { disable as disableReminders } from './ui/reminders.js';
 import { applyTheme } from './ui/theme.js';
+import { guardFinish } from './ui/rewards.js';
 import { maybeCelebrate } from './ui/celebrate.js';
 import { startFamily } from './ui/family.js';
 import * as shop from './data/shop.js';
@@ -109,6 +110,7 @@ function render() {
     return;
   }
   nav.hidden = false;
+  guardFinish();
   const r = route();
   document.body.classList.toggle('chat-mode', r === 'ai');
   view.classList.toggle('chat-view', r === 'ai');

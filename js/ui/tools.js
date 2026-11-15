@@ -16,6 +16,7 @@ import { openFoodBank, openRecipes } from './foodBank.js';
 import { shareAdmin, checkShare, openFoodShare } from './foodShare.js';
 import { drawPreview } from './gameArt.js';
 import { KINDS } from '../domain/game.js';
+import { openRewards } from './rewards.js';
 
 
 const again = () => { const v = document.querySelector('#view .tools'); if (v) renderTools(v.parentElement); };
@@ -26,6 +27,8 @@ const TOOLS = {
   mag: { label: 'مجله', open: () => { location.hash = '#/mag'; } },
   share: { label: 'غذاهای تازه‌ی خانواده', only: shareAdmin, open: () => openFoodShare(() => checkShare(again, true)) },
   // beta, only for accounts with `game` in profile.beta (set from the database)
+  // beta, only for accounts with `rewards` in profile.beta: the «پرنیان» finish and what comes after it
+  rewards: { label: 'جوایز', beta: true, only: () => (store.profile()?.beta || []).includes('rewards'), open: () => openRewards() },
   game: { label: 'سرزمین', beta: true, art: 'palace', only: () => (store.profile()?.beta || []).includes('game'), open: () => { location.hash = '#/game'; } },
 };
 
