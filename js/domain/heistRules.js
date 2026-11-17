@@ -38,8 +38,14 @@ export function ending(result) {
   return result === 'unfinished' ? 'timeout' : 'caught';
 }
 
-export function kitOk(gadgets) {
-  return Array.isArray(gadgets) && gadgets.length <= KIT_MAX && gadgets.every((g, i) => GADGETS.includes(g) && gadgets.indexOf(g) === i);
+// A raid's gadgets: known ones, no repeats, at most `slots`, and (phase 5) only ones the member owns.
+export function kitOk(gadgets, owned = GADGETS, slots = KIT_MAX) {
+  return Array.isArray(gadgets) && gadgets.length <= slots && gadgets.every((g, i) => GADGETS.includes(g) && owned.includes(g) && gadgets.indexOf(g) === i);
+}
+
+// Today in Tehran, as 'YYYY-MM-DD'.
+export function tehranDay(now = new Date()) {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tehran', year: 'numeric', month: '2-digit', day: '2-digit' }).format(now);
 }
 
 // The start of today in Tehran, as an ISO time (for "raids today").

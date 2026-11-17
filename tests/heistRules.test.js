@@ -1,5 +1,5 @@
 import { suite, test, eq, ok } from './harness.js';
-import { payout, ending, kitOk, tehranDayStart, seedOf, FEE, START_COINS } from '../js/domain/heistRules.js';
+import { payout, ending, kitOk, tehranDayStart, tehranDay, seedOf, FEE, START_COINS } from '../js/domain/heistRules.js';
 
 suite('heist money', () => {
   test('a getaway takes a fifth of the owner\'s coins (half with the alarm), the fee comes back, and the owner gets a shield', () => {
@@ -24,6 +24,10 @@ suite('heist money', () => {
   });
   test('a raid takes two known gadgets at most, no repeats', () => {
     eq([kitOk([]), kitOk(['emp', 'decoy']), kitOk(['emp', 'emp']), kitOk(['emp', 'smoke', 'decoy']), kitOk(['bomb']), kitOk('emp')], [true, true, false, false, false, false]);
+  });
+  test('only gadgets the member owns, and no more than their slots', () => {
+    eq([kitOk(['decoy'], ['emp', 'smoke']), kitOk(['emp', 'smoke', 'decoy'], ['emp', 'smoke', 'decoy'], 3), kitOk(['emp', 'smoke', 'decoy'], ['emp', 'smoke', 'decoy'], 2)], [false, true, false]);
+    eq([tehranDay(new Date('2026-11-17T20:00:00Z')), tehranDay(new Date('2026-11-17T21:00:00Z'))], ['2026-11-17', '2026-11-18']);
   });
   test('today starts at midnight in Tehran', () => {
     eq(tehranDayStart(new Date('2026-11-17T20:00:00Z')), '2026-11-16T20:30:00.000Z');   // 23:30 on the 17th in Tehran

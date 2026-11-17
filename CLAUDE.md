@@ -66,9 +66,11 @@ exist side by side. When a new decision replaces an old one, change or mark the 
   (commit 734e209, the `lab` mode for «آزمایش خون»); that deploy went through.
 - From 2026-11-16 04:22 UTC every `hooshvareh` call failed with 502: the Anthropic API answered «credit balance is too low». Only the
   user can add credit (console.anthropic.com, Plans & Billing). Check the function logs for it when the assistant stops answering.
-- The game's function `heist` (from 2026-11-17) imports the app's own `js/domain/heist.js`, `heistEdit.js` and `heistRules.js` by relative path; the CLI
-  (`npx supabase functions deploy heist --project-ref whmzjvmeyxdoqjtkukix --yes`, verify_jwt on) bundles them. Redeploy it whenever one of those three
-  files changes, or the server's rules drift from the app's. Through the MCP tool, upload those files too, at the same relative paths.
+- The game's function `heist` (from 2026-11-17) imports the app's own files by relative path: `js/domain/heist.js`, `heistEdit.js`, `heistRules.js`,
+  `heistDiet.js`, and through them `family.js`, `stats.js`, `targets.js`, `plan.js`, `meals.js`, `occasions.js`, `js/lib/dates.js`, `js/lib/fa.js`. The CLI
+  (`npx supabase functions deploy heist --project-ref whmzjvmeyxdoqjtkukix --yes`, verify_jwt on) bundles them all. **Redeploy `heist` whenever one of those
+  files changes** (even a change to the «ثبت کامل» rule in stats.js), or the server's rules drift from the app's. Through the MCP tool, upload them too, at
+  the same relative paths.
 - On 2026-11-17 the user installed the official Meshy plugin (claude.ai directory, by Meshy) with three skills:
   `meshy-3d-generation`, `meshy-3d-printing`, `meshy-openclaw`. It belongs to the claude.ai account, not this folder
   (on `m.b.a` it is cached under `~/Library/Application Support/Claude/local-agent-mode-sessions/…/rpm/plugin_01LLaHeMvnzBdyHYEGGSUNZi/`).

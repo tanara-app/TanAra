@@ -98,7 +98,8 @@ export function renderHeist(root) {
       <div class="heist-glow" aria-hidden="true"></div>
       <button class="heist-btn heist-back" data-back aria-label="برگشت">${icon.chevR}</button>
       <button class="heist-btn heist-sound" data-sound aria-label="صدا">${ICON.sound}</button>
-      <div class="heist-wallet" aria-hidden="true">${ICON.coin}<b></b><span class="heist-left"></span></div>
+      <div class="heist-wallet">${ICON.coin}<b></b><span class="heist-left" aria-hidden="true"></span><span class="heist-trophies" aria-label="فصل‌های برده"></span>
+        <button class="heist-diamond" data-diamond aria-label="الماس فصل">${ICON.loot}<small dir="rtl"></small></button></div>
       <div class="heist-top">
         <span class="heist-alarm" aria-hidden="true">${'<i></i>'.repeat(ALARM_TURNS)}</span>
         <span class="heist-loot" aria-hidden="true">${ICON.loot}</span>
@@ -171,6 +172,9 @@ function start(el, L, debug) {
   let online = false, wallet = null, members = [], inbox = [], raid = null, viewing = null;
   const member = () => (typeof level === 'string' && level.startsWith('u:') ? members.find(m => m.id === level.slice(2)) || null : null);
   const shielded = m => !!m?.shield_until && Date.parse(m.shield_until) > Date.now();
+  // Phase 5: what the member's diet habits give (from the server), the gadgets they own and their slots, the season and its diamond.
+  let habit = null, owned = ALL.slice(), slots = KIT_MAX, season = null, trophies = 0, armedBuy = 0;
+  const budget = () => habit?.budget ?? 100;
   let mineCheck = check(mineVault);
   const saveMine = () => { try { localStorage.setItem('tanara:heist:mine', JSON.stringify(mineVault)); } catch { /* private mode */ } };
   // the editor: the tool in hand, the guard being drawn, and the steps back
@@ -208,14 +212,33 @@ function start(el, L, debug) {
     $('[data-go]').disabled = (level === 'mine' && !mineCheck.ok) || (!!m && (shielded(m) || !wallet || wallet.raidsLeft <= 0 || wallet.coins < wallet.fee));
     if (wallet) {
       $('.heist-wallet b').textContent = fa(wallet.coins);
-      $('.heist-left').innerHTML = Array.from({ length: wallet.perDay }, (_, k) => `<i class="${k < wallet.raidsLeft ? 'on' : ''}"></i>`).join('');
+      // a dot for each raid on members today: lit while left, dim once used, hollow while still to earn (a full-log day, some activity)
+      const earned = habit ? habit.raids : wallet.perDay;
+      $('.heist-left').innerHTML = Array.from({ length: wallet.perDay }, (_, k) => `<i class="${k < wallet.raidsLeft ? 'on' : k < earned ? '' : 'todo'}"></i>`).join('');
+      $('.heist-trophies').innerHTML = trophies ? `${ICON.loot}<b>${fa(trophies)}</b>` : '';
+      if (season) {
+        const left = Math.max(0, Math.round((Date.parse(season.ends) - Date.parse(season.today)) / 864e5) + 1), d = $('[data-diamond]');
+        d.style.setProperty('--p', Math.min(1, wallet.coins / season.diamond).toFixed(3));
+        d.classList.toggle('ready', wallet.coins >= season.diamond);
+        d.classList.toggle('armed', !!armedBuy);
+        d.querySelector('small').textContent = `${fa(left)} روز`;
+      }
       for (const b of el.querySelectorAll('.heist-levels [data-level]')) b.classList.toggle('pays', /^\d$/.test(b.dataset.level) && !wallet.practicePaid.includes(+b.dataset.level));
     }
     const mineBtn = $('[data-level="mine"]');
     mineBtn.classList.toggle('news', inbox.length > 0);
     $('[data-inbox]').hidden = !(level === 'mine' && inbox.length);
     $('.heist-badge').textContent = inbox.length ? fa(inbox.length) : '';
-    for (const b of el.querySelectorAll('[data-kit]')) b.classList.toggle('on', kit.includes(b.dataset.kit));
+    // gadgets not earned yet are locked; the next one shows how far the run of full-log days has come
+    const next = ['decoy', 'lockpick', 'goggles'].find(g => !owned.includes(g));
+    for (const b of el.querySelectorAll('[data-kit]')) {
+      const n = b.dataset.kit, mine = owned.includes(n);
+      b.classList.toggle('on', kit.includes(n));
+      b.classList.toggle('locked', !mine);
+      b.classList.toggle('next', !mine && n === next && !!habit);
+      if (n === next && habit) b.style.setProperty('--p', ((7 - habit.toNext) / 7).toFixed(3));
+    }
+    $('.heist-kit').classList.toggle('three', slots > 2);
   }
   bus.on('state', hud);
   // the scene acts the turn out; the raid waits for it
@@ -253,10 +276,11 @@ function start(el, L, debug) {
     const g = n => !n ? '<i class="heist-slot"></i>' : TAPPED.has(n)
       ? `<button class="heist-btn" data-g="${n}" aria-label="${NAMES[n]}">${ICON[n]}</button>`
       : `<span class="heist-btn heist-passive" data-p="${n}" role="img" aria-label="${NAMES[n]}">${ICON[n]}</span>`;
-    $('.heist-tools').innerHTML = `${g(kit[0])}<button class="heist-btn" data-wait aria-label="صبر">${ICON.wait}</button>${g(kit[1])}`;
+    $('.heist-tools').innerHTML = `${g(kit[0])}<button class="heist-btn" data-wait aria-label="صبر">${ICON.wait}</button>${g(kit[1])}${kit[2] ? g(kit[2]) : ''}`;
   }
   function toggleKit(n) {
-    kit = kit.includes(n) ? kit.filter(x => x !== n) : [...kit, n].slice(-KIT_MAX);
+    if (!owned.includes(n)) { toast('با ۷ روز پشت‌سرهم ثبت کامل باز می‌شود'); return; }
+    kit = kit.includes(n) ? kit.filter(x => x !== n) : [...kit, n].slice(-slots);
     try { localStorage.setItem('tanara:heist:kit', kit.join(',')); } catch { /* private mode */ }
     hud();
   }
@@ -407,15 +431,28 @@ function start(el, L, debug) {
     if (live !== L) return;
     online = true;
     wallet = { coins: s.me.coins, raidsLeft: s.raidsLeft, perDay: s.rules.raidsPerDay, fee: s.rules.fee, practicePaid: s.practicePaid };
+    habit = s.diet || null;
+    if (s.kit) { owned = s.kit.gadgets; slots = s.kit.slots; kit = kit.filter(g => owned.includes(g)).slice(0, slots); }
+    season = s.season || null;
+    trophies = s.me.trophies || 0;
+    mineCheck = check(mineVault, budget());
+    if (habit?.paidToday) toast(`${fa(habit.paidToday * 100)} سکه برای ثبت کامل`);
+    // the last season's winner, once
+    try {
+      if (s.lastWinner && season && localStorage.getItem('tanara:heist:told') !== String(season.id)) {
+        toast(s.lastWinner.me ? 'الماس فصل قبل مال تو شد' : `${s.lastWinner.name} الماس فصل قبل را برد`);
+        localStorage.setItem('tanara:heist:told', String(season.id));
+      }
+    } catch { /* private mode */ }
     members = s.targets || [];
     inbox = s.inbox || [];
     // My vault: a draft on this phone that the rules accept and the server doesn't have yet goes up; a draft still being worked on
     // stays here (others raid the last accepted one); with no draft, the server's is mine.
     const same = JSON.stringify(s.me.vault) === JSON.stringify(mineVault);
     if (drafted && !same && mineCheck.ok) saveOnline();
-    else if (!drafted && !same) { mineVault = s.me.vault; mineCheck = check(mineVault); saveMine(); drafted = true; if (level === 'mine' && mode === 'menu') build(); }
+    else if (!drafted && !same) { mineVault = s.me.vault; mineCheck = check(mineVault, budget()); saveMine(); drafted = true; if (level === 'mine' && mode === 'menu') build(); }
     if (typeof level === 'string' && level.startsWith('u:') && !member()) { level = 1; if (mode === 'menu') build(); }
-    $('.heist-targets').innerHTML = members.map(m => `<button data-level="u:${m.id}" class="${shielded(m) ? 'shielded' : ''}">${shielded(m) ? ICON.shield : ''}<span>${esc(m.name)}</span></button>`).join('');
+    $('.heist-targets').innerHTML = members.map(m => `<button data-level="u:${m.id}" class="${shielded(m) ? 'shielded' : ''}">${shielded(m) ? ICON.shield : ''}<span>${esc(m.name)}</span>${m.trophies ? `<i class="heist-cup">${ICON.loot}${fa(m.trophies)}</i>` : ''}</button>`).join('');
     hud();
   }
   const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -454,10 +491,27 @@ function start(el, L, debug) {
     if (inbox.length) watchInbox(); else build();
   }
 
+  // The season's diamond: its price until there are coins enough; then two taps buy it (the first only arms it).
+  async function diamond() {
+    if (!season || !wallet || mode !== 'menu') return;
+    if (wallet.coins < season.diamond) { toast(`الماس فصل: ${fa(season.diamond)} سکه`); return; }
+    if (!armedBuy || Date.now() - armedBuy > 4000) { armedBuy = Date.now(); hud(); toast('یک بار دیگر بزن تا الماس را بخری'); setTimeout(() => { armedBuy = 0; hud(); }, 4000); return; }
+    armedBuy = 0;
+    try {
+      await net.call('buy', { season: season.id });
+      toast('الماس مال توست؛ برنده‌ی این فصل شدی');
+      buzz([40, 30, 40, 30, 220]);
+      try { localStorage.setItem('tanara:heist:told', String(season.id + 1)); } catch { /* private mode */ }
+    } catch (e) {
+      toast(e.code === 'over' ? 'این فصل تمام شده' : e.code === 'coins' ? 'سکه‌ی کافی نداری' : 'اینترنت را بررسی کن.');
+    }
+    refreshOnline();
+  }
+
   // ----- the editor -----
   const editPads = () => padFor('.heist-why', '.heist-palette');
   function editorView() {
-    mineCheck = check(vault);
+    mineCheck = check(vault, budget());
     const c = mineCheck;
     $('.heist-cost b').textContent = fa(c.cost);
     $('.heist-cost i').textContent = fa(c.budget);
@@ -634,6 +688,7 @@ function start(el, L, debug) {
     if (b.dataset.wait !== undefined) { armed = null; act('W'); return; }
     if (b.dataset.g) { if (mode === 'play') { armed = armed === b.dataset.g ? null : b.dataset.g; refresh(); } return; }
     if (b.dataset.inbox !== undefined) { watchInbox(); return; }
+    if (b.dataset.diamond !== undefined) { diamond(); return; }
     if (b.dataset.again !== undefined) { if (mode === 'result') begin(true); return; }
     if (b.dataset.replay !== undefined) { if (mode === 'result') { if (viewing) { const r = viewing; inbox.unshift(r); watchInbox(); } else replay(); } return; }
     if (b.dataset.next !== undefined) { if (mode === 'result') { if (viewing) leaveViewing(); else { seed++; build(); } } }
@@ -652,6 +707,7 @@ function start(el, L, debug) {
     bus, audio, get kit() { return kit; }, setKit(k) { kit = k; hud(); }, get state() { return state; }, get vault() { return vault; }, get moves() { return moves; }, get mode() { return mode; }, get scene() { return scene; },
     act, begin, replay, solve: (alarm = false) => solve(vault, kit, { alarm })?.moves,
     load(l, s) { level = l; seed = s; return build(); },
+    refreshOnline, get habit() { return habit; }, get owned() { return owned; },
     get mine() { return mineVault; }, get editor() { return { tool, sel, check: mineCheck, undo: undo.length }; }, openEditor, closeEditor, watch,
     useTool(t) { tool = t; if (t !== 'guard') sel = -1; editorView(); }, editAt, stepBack, rebuilt: () => rebuilding,
   };
