@@ -63,12 +63,21 @@ export function openShopping() {
     const sugg = body.querySelector('[data-sugg]');
     body.querySelector('[data-close]').onclick = () => sheet.close();
 
-    const row = i => `
+    let editing = null; // id of the row being edited in place
+    let picked = null;  // { id, name } of the bank food chosen from the hints, until the name changes
+    const row = i => i.id === editing ? `
+      <form class="shop-row shop-edit" data-id="${esc(i.id)}" novalidate>
+        <input name="name" value="${esc(i.name)}" enterkeyhint="done" autocomplete="off" aria-label="نام">
+        <input name="amount" class="shop-amt" value="${esc(i.amount || '')}" enterkeyhint="done" autocomplete="off" placeholder="مقدار" aria-label="مقدار">
+        <button class="icon-btn sm" aria-label="ذخیره">${icon.check}</button>
+        <button type="button" class="icon-btn sm" data-cancel aria-label="انصراف">${icon.close}</button>
+      </form>` : `
       <div class="shop-row${i.done ? ' done' : ''}" data-id="${esc(i.id)}">
         <button class="shop-main" data-tick aria-pressed="${!!i.done}">
           <span class="tick">${i.done ? icon.check : ''}</span>
           <span class="shop-name">${esc(i.name)}<small>${i.amount ? `${esc(i.amount)} · ` : ''}<span class="shop-who">برای ${esc(i.who || 'من')}</span></small></span>
         </button>
+        ${i.me ? `<button class="icon-btn sm" data-edit aria-label="ویرایش ${esc(i.name)}">${icon.edit}</button>` : ''}
         ${i.me || i.done ? `<button class="icon-btn sm" data-rm aria-label="حذف ${esc(i.name)} از لیست">${icon.close}</button>` : ''}
       </div>`;
 
@@ -92,18 +101,37 @@ export function openShopping() {
     const add = (name, amount, food_id) => {
       if (!String(name).trim()) return F.name.focus();
       if (!addToShopping([{ name, amount, food_id }])) toast('در لیست هست');
-      F.name.value = ''; F.amount.value = '';
+      F.name.value = ''; F.amount.value = ''; picked = null;
       hints(); paint();
       F.name.focus(); // the next item can be typed straight away
     };
 
-    F.name.addEventListener('input', hints);
-    form.onsubmit = e => { e.preventDefault(); add(F.name.value, F.amount.value); };
+    F.name.addEventListener('input', () => {
+      if (picked && norm(F.name.value) !== norm(picked.name)) picked = null;
+      hints();
+    });
+    form.onsubmit = e => { e.preventDefault(); add(F.name.value, F.amount.value, picked?.id); };
     // the + must not take focus from the field, or the keyboard would close between items
     body.querySelector('.shop-plus').addEventListener('mousedown', e => e.preventDefault());
     sugg.onclick = e => {
       const b = e.target.closest('[data-food]');
-      if (b) add(b.textContent, F.amount.value, b.dataset.food);
+      if (!b) return;
+      // a hint only fills the name: the amount is typed next, then + adds it
+      picked = { id: b.dataset.food, name: b.textContent };
+      F.name.value = b.textContent;
+      sugg.hidden = true;
+      F.amount.focus();
+    };
+    list.onsubmit = e => {
+      e.preventDefault();
+      const f = e.target, name = f.elements.name.value.trim();
+      if (!name) return f.elements.name.focus();
+      const i = shopping().find(x => x.id === f.dataset.id);
+      const amount = f.elements.amount.value.trim();
+      if (i && (name !== i.name || amount !== (i.amount || ''))) {
+        shop.change(i.id, name === i.name ? { amount } : { name, amount, food_id: null });
+      }
+      editing = null; paint();
     };
     list.onclick = e => {
       if (e.target.closest('[data-clear]')) {
@@ -112,7 +140,12 @@ export function openShopping() {
       }
       const i = shopping().find(x => x.id === e.target.closest('[data-id]')?.dataset.id);
       if (!i) return;
-      if (e.target.closest('[data-rm]')) shop.remove(i.id);
+      if (e.target.closest('[data-cancel]')) editing = null;
+      else if (i.id === editing) return; // typing in the edit fields
+      else if (e.target.closest('[data-edit]')) {
+        editing = i.id; paint();
+        return list.querySelector('.shop-edit [name=amount]').focus();
+      } else if (e.target.closest('[data-rm]')) shop.remove(i.id);
       else if (e.target.closest('[data-tick]')) shop.change(i.id, { done: !i.done });
       paint();
     };
@@ -126,7 +159,7 @@ export function openShopping() {
     };
     paint();
     // what the others added or bought since this device last looked
-    const off = shop.onChange(() => { if (body.isConnected) paint(); else off(); });
+    const off = shop.onChange(() => { if (!body.isConnected) off(); else if (!editing) paint(); });
     shop.refresh();
   }, { tall: true });
 }
