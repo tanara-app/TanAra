@@ -78,11 +78,10 @@ exist side by side. When a new decision replaces an old one, change or mark the 
   its tile in «بیشتر»). The user asked for this on 2026-11-12. Remove the word when it is released to all.
 - On 2026-11-12 a «تازه‌ها» page (the app's changes, with an unread count and a one-time sheet) was built
   and removed the same day: the user didn't like it. Don't bring it back unless they ask.
-- **The game («باغ») is the exception to asking first** (the user, 2026-11-15: «کنترل و مسئولیت بخش بازی به عهده خودت باشه… دیگه از من
-  مشورت نخواه برای بخش بازی»). Whichever Claude works on the garden designs and builds it on its own judgment: rules, look, what comes
-  next. Don't ask the user to choose or approve game decisions; build, check it yourself at phone size, write what you decided and why in
-  `GARDEN.md`, commit and push, and tell them briefly what is new. The fixed limits in `GARDEN.md` («قیدها») still hold, it stays beta
-  until the user says otherwise, and this freedom is for the game only, not the rest of the app.
+- **The game («سرقت بزرگ», from 2026-11-17) follows [briefs/heist.md](briefs/heist.md)**: within a phase, decide game details on your
+  own judgment, but keep every stop the brief sets (tell the user the model and cost before any Meshy job, ask before making sound, and
+  stop for the user's approval on the phone after each phase). Write decisions in `DESIGN-heist.md` / `briefs/heist.md` / `GARDEN.md`.
+  It stays beta until the user says otherwise.
 - Build only what the user agreed to. When a reply could mean more than one of the options you offered,
   ask which ones before building (on 2026-11-08 a shared «team goal» was built that the user hadn't asked for).
 
@@ -97,9 +96,8 @@ exist side by side. When a new decision replaces an old one, change or mark the 
 - `art/STYLE.md`: how the app's own pictures (the «بیشتر» icons) are made.
 - `REDESIGN.md`: the rebuild of «امروز» and «رژیم» into one part, step by step: what the user decided so far. Read it before
   touching the today screen, «سهم وعده» or «رژیم».
-- `GARDEN.md`: «باغ», the game inside the app (a living 3D Persian garden, all built in code with three.js), why it
-  replaced the old «سرزمین» city-builder (removed on 2026-11-15 at the user's request), how to work on it, and the plan.
-  Read it before any work on the game.
+- `GARDEN.md`: the game inside the app: the user's decisions on the new game «سرقت بزرگ» (which will replace «باغ»), why the old
+  «سرزمین» was removed, and how to work on the game. The build brief is [briefs/heist.md](briefs/heist.md). Read both before any work on the game.
 - `IDEAS.md`: ideas for daily "hooks" that bring members back, with the ones the user picked. When one gets built,
   mark it there.
 - `VOICE.md` / `ELEVENLABS.md`: the mascot Heimerdinger's lines and the brief for recording them
