@@ -31,7 +31,8 @@ export function weekRow({ entries = [], activity = [], notes = [], profile: p },
     plan_done: 0,
     plan_of: 0,
   };
-  if (p?.mode === 'plan' && !edCare(p)) {
+  // the rebuilt «امروز» (2026-11-17) has no «رژیم» to tick, so no plan part
+  if (false && p?.mode === 'plan' && !edCare(p)) {
     const a = adherence(notes, entries, ws, end);
     row.plan_done = a.done;
     row.plan_of = a.of;

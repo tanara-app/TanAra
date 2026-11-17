@@ -19,8 +19,8 @@ import { portionsFor } from '../domain/plan.js';
 import { fitMeal, usualAmounts } from '../domain/portion.js';
 import { packs, savePack, askPackName } from './packs.js';
 
-// the rebuilt «امروز» (beta `eat`, REDESIGN.md) has five meals: two snacks
-const fiveOn = () => (store.profile()?.beta || []).includes('eat');
+// the rebuilt «امروز» (REDESIGN.md; on for everyone from 2026-11-17) has five meals: two snacks
+const fiveOn = () => !(store.profile()?.beta || []).includes('one');
 const five = meal => fiveOn() || meal === 'snack1' || meal === 'snack2';
 export const mealSeg = meal => `<div class="seg meal-seg${five(meal) ? ' five' : ''}" data-meal>
   ${Object.entries(five(meal) ? MEALS5 : MEALS).map(([k, l]) => `<button type="button" data-v="${k}" class="${k === meal ? 'on' : ''}">${l}</button>`).join('')}

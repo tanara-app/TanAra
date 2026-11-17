@@ -103,9 +103,9 @@ export function renderToday(root) {
   const beta = (p.beta || []).includes('portion');
   // «یکی» (beta, accounts with `one`): one meal screen in place of the three modes (meal.js)
   const one = (p.beta || []).includes('one');
-  // the rebuild of «امروز» (REDESIGN.md, beta `eat`, on for nobody yet): no mode tabs; each meal card
-  // shows its share of the day and a line for it, and a dot by a food their illness keeps out
-  const eat = !one && (p.beta || []).includes('eat');
+  // the rebuilt «امروز» (REDESIGN.md; was beta `eat`, on for everyone from 2026-11-17): no mode tabs;
+  // each meal card shows its share of the day and a line for it, and a dot by a food their illness keeps out
+  const eat = !one;
   const portionMode = !one && !eat && beta && p.mode === 'portion';
   const planMode = !one && !eat && p.mode === 'plan';
   // '' when no plan covers this day: the ordinary meal list is shown instead

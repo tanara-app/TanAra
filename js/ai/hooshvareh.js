@@ -167,7 +167,8 @@ function context() {
     energy: energyContext(s, p, t),
     reviews: s.reviews.map(({ week_start, good, hard, next_goal }) => ({ week_start, good, hard, next_goal })),
     motivations: s.motivations.map(({ kind, title, note, day, image_path }) => ({ kind, title, note, day, image_path: image_path ? 1 : null })),
-    mode: p?.mode === 'plan' ? 'plan' : 'count',
+    // the rebuilt «امروز» (2026-11-17) has no «رژیم» mode: everyone counts
+    mode: 'count',
     plan: planContext(s, t),
     pattern: patternContext(s, t),
     magazine: magazineContext(s),

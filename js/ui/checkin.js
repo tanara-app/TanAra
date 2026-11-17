@@ -44,7 +44,8 @@ export function signsNow() {
     phase: phaseOn(p, t), light: lightOn(p, sortedWeights(s.weights), t),
     kcalOn: d => effectiveTargets(p, d)?.kcal,
     marks: logMarks(s.ai_notes),
-    adherence: p.mode === 'plan' ? (from, to) => adherence(s.ai_notes, s.entries, from, to) : null,
+    // the rebuilt «امروز» (2026-11-17) has no «رژیم» to tick, so no plan adherence
+    adherence: null,
   }, t);
 }
 
