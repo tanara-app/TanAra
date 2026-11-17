@@ -13,6 +13,7 @@ import { renderChat } from './ui/chat.js';
 import { renderMagazine } from './ui/magazine.js';
 import { renderTools } from './ui/tools.js';
 import { renderGarden } from './ui/garden.js';
+import { renderHeist } from './ui/heist.js';
 import { configureAI, sparkle } from './ai/hooshvareh.js';
 import { disable as disableReminders } from './ui/reminders.js';
 import { applyTheme } from './ui/theme.js';
@@ -34,7 +35,8 @@ const ROUTES = {
   profile: { label: 'نمایه', icon: icon.user, render: renderProfile },
   // not in the bottom bar: opened from «بیشتر» (and the magazine card on «امروز»)
   mag: { label: 'مجله', render: renderMagazine, under: 'tools' },
-  garden: { label: 'باغ', render: renderGarden, under: 'tools' }, // beta: the garden (GARDEN.md)
+  garden: { label: 'باغ', render: renderGarden, under: 'tools' }, // the old garden: its tile is gone, the page stays until the heist is approved (GARDEN.md)
+  heist: { label: 'سرقت بزرگ', render: renderHeist, under: 'tools' }, // beta: the game (briefs/heist.md)
 
 };
 

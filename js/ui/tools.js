@@ -17,6 +17,8 @@ import { shareAdmin, checkShare, openFoodShare } from './foodShare.js';
 import { openRewards } from './rewards.js';
 
 
+// the game's tile: a safe's round door at night, with a red beam across it
+const HEIST_ICON = `<svg viewBox="0 0 64 64" aria-hidden="true"><rect x="6" y="6" width="52" height="52" rx="12" fill="#16224a"/><circle cx="32" cy="33" r="16" fill="#2b3f7a" stroke="#ffc94a" stroke-width="3"/><circle cx="32" cy="33" r="5" fill="#ffc94a"/><path d="M32 21v6M32 39v6M20 33h6M38 33h6" stroke="#ffc94a" stroke-width="3" stroke-linecap="round"/><path d="M6 17h52" stroke="#ff2e4d" stroke-width="2.5"/><circle cx="50" cy="50" r="3" fill="#3de0ff"/></svg>`;
 // the garden's tile: a pomegranate tree on a patch of grass
 const GARDEN_ICON = `<svg viewBox="0 0 64 64" aria-hidden="true"><ellipse cx="32" cy="52" rx="20" ry="6" fill="#7cbf5a"/><path d="M30 52V36h4v16z" fill="#8a5a33"/><circle cx="32" cy="27" r="15" fill="#4f9a3e"/><circle cx="24" cy="22" r="8" fill="#5fb04a"/><circle cx="39" cy="21" r="8" fill="#5fb04a"/><circle cx="26" cy="31" r="2.6" fill="#d8443a"/><circle cx="37" cy="29" r="2.6" fill="#d8443a"/><circle cx="32" cy="20" r="2.4" fill="#d8443a"/></svg>`;
 
@@ -30,7 +32,8 @@ const TOOLS = {
   // what a member earns by keeping a habit (for everyone since 2026-11-15)
   rewards: { label: 'جوایز', open: () => openRewards() },
   // beta, only for accounts with `game` in profile.beta (set from the database; the key is older than the garden)
-  garden: { label: 'باغ', beta: true, svg: GARDEN_ICON, only: () => (store.profile()?.beta || []).includes('game'), open: () => { location.hash = '#/garden'; } },
+  // «سرقت بزرگ» took the garden's tile on 2026-11-17 (the garden's page is still at #/garden, with no tile)
+  heist: { label: 'سرقت بزرگ', beta: true, svg: HEIST_ICON, only: () => (store.profile()?.beta || []).includes('game'), open: () => { location.hash = '#/heist'; } },
 };
 
 // The member's order: what they arranged, then any tool added since, in its usual place.

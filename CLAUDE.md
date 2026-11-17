@@ -61,6 +61,11 @@ exist side by side. When a new decision replaces an old one, change or mark the 
   `meshy-3d-generation`, `meshy-3d-printing`, `meshy-openclaw`. It belongs to the claude.ai account, not this folder
   (on `m.b.a` it is cached under `~/Library/Application Support/Claude/local-agent-mode-sessions/…/rpm/plugin_01LLaHeMvnzBdyHYEGGSUNZi/`).
   If `ClaudeAccount` uses another claude.ai account, it does not have these skills.
+- Trying the game (or any animated page) by yourself: when the Browser pane is hidden, the page gets no animation frames and CSS
+  transitions stand still, so screenshots show a half-loaded screen. Use the Playwright MCP browser (`mcp__plugin_parallax-threejs_playwright-mcp__*`,
+  viewport 375×812) instead; it writes into `.playwright-mcp/` in this folder, so delete that folder when done. In `?local` mode the app
+  starts at the questionnaire: to skip it, set `localStorage['tanara:local:state']` to `{"profile":{"user_id":"local","data":{"onboarded":true,"beta":["game"]}}}`
+  and reload (a hash-only navigation does not reload the page). The game: `http://127.0.0.1:5173/?local&debug#/heist`, console hook `window.__heist`.
 - Tests: `node tests/run.js` (or open `tests/index.html` in the browser).
 - The user speaks Persian; answer in Persian.
 - ElevenLabs (the mascot's voice): always the newest model, and ask the user before generating anything
