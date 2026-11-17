@@ -9,6 +9,7 @@ const DIR = 'assets/heist/audio/';
 const SOUNDS = {
   step: ['step.mp3', 4.5], land: ['land.mp3', 3], safe: ['safe.mp3', 0.7], coins: ['coins.mp3', 0.8], alarm: ['alarm.mp3', 0.3],
   caught: ['caught.mp3', 0.8], emp: ['emp.mp3', 0.7], smoke: ['smoke.mp3', 0.35], pick: ['pick.mp3', 1.2], music: ['music.m4a', 0.26],
+  decoy: ['decoy.mp3', 1.3], scan: ['scan.mp3', 0.35], lockpick: ['lockpick.m4a', 1.5],
 };
 const KEY = 'tanara:heist:sound';
 
@@ -57,7 +58,8 @@ export function createAudio(bus) {
     const quick = t.speed > 1 ? 0.7 : 1;
     for (const e of t.events) {
       if (e.e === 'move') play('step', { rate: vary() * (t.next.alarm ? 1.25 : 1), gain: quick });
-      else if (e.e === 'pick' || e.e === 'open') play('pick', { rate: e.e === 'open' ? 1.15 : vary(), gain: quick });
+      // with the lockpick every door opens at the first touch; its own sound comes with the scene's 'lockpick' effect
+      else if (e.e === 'pick' || (e.e === 'open' && !t.kit?.includes('lockpick'))) play('pick', { rate: e.e === 'open' ? 1.15 : vary(), gain: quick });
     }
     if (t.events.some(e => e.e === 'guard' && e.to !== e.from)) play('step', { rate: 0.72, gain: 0.35, delay: 0.22 / t.speed });
   });
@@ -66,6 +68,9 @@ export function createAudio(bus) {
     else if (name === 'safe') { play('safe'); play('coins', { delay: 0.3 }); }
     else if (name === 'emp') play('emp');
     else if (name === 'smoke') play('smoke');
+    else if (name === 'decoy') play('decoy');
+    else if (name === 'lockpick') play('lockpick');
+    else if (name === 'scan') play('scan');
     else if (name === 'alarm') { if (!alarm) alarm = play('alarm', { loop: true }); if (music) music.g.gain.setTargetAtTime(SOUNDS.music[1] * 0.35, ctx.currentTime, 0.1); }
     else if (name === 'calm' || name === 'caught' || name === 'escape' || name === 'fled') {
       stop(alarm); alarm = null;

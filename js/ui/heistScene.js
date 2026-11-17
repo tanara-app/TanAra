@@ -387,6 +387,33 @@ export async function createScene(stage, vault, opts = {}) {
   thief.play('idle');
   guards.forEach(g => g.play('idle'));
 
+  // A sign over a guard's head: «؟» while the bait pulls him, a red «!» while he chases the thief.
+  function badgeTex(glyph, fg, bg) {
+    return canvasTex(128, (g, s) => {
+      g.fillStyle = bg; g.beginPath(); g.arc(s / 2, s / 2, s * 0.4, 0, 7); g.fill();
+      g.lineWidth = 7; g.strokeStyle = fg; g.stroke();
+      g.fillStyle = fg; g.font = `800 ${Math.round(s * 0.52)}px Vazirmatn, system-ui, sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.fillText(glyph, s / 2, s / 2 + s * 0.03);
+    });
+  }
+  const askTex = badgeTex('؟', '#e8eeff', '#1b2752'), alertTex = badgeTex('!', '#ffffff', '#ff2e4d');
+  for (const g of guards) {
+    g.badge = new T.Sprite(new T.SpriteMaterial({ map: askTex, transparent: true, depthTest: false, toneMapped: false }));
+    g.badge.position.y = 1.82;
+    g.badge.scale.setScalar(0.001);
+    g.badge.renderOrder = 6;
+    g.badge.kind = '';
+    g.root.add(g.badge);
+  }
+  const modeBadge = m => (m === 1 ? '؟' : m === 3 ? '!' : '');
+  function setBadge(g, kind) {
+    if (!g?.badge || g.badge.kind === kind) return;
+    g.badge.kind = kind;
+    const b = g.badge, s0 = b.scale.x;
+    if (kind) { b.material.map = kind === '!' ? alertTex : askTex; tween(0.3, k => b.scale.setScalar(0.001 + 0.66 * (k < 0.65 ? (k / 0.65) * 1.2 : 1.2 - 0.2 * (k - 0.65) / 0.35)), k => k); }
+    else tween(0.2, k => b.scale.setScalar(Math.max(0.001, s0 * (1 - k))));
+  }
+
   // ---------- effects ----------
   const rope = new T.Mesh(new T.CylinderGeometry(0.012, 0.012, 1, 6), std(0xc9d3f5, { roughness: 0.6 }));
   rope.visible = false;
@@ -426,6 +453,58 @@ export async function createScene(stage, vault, opts = {}) {
       }
     }
   }
+  // The decoy: a small puck that blinks and sends out rings while a guard is on his way to it.
+  const puckGeo = new T.CylinderGeometry(0.17, 0.21, 0.12, 24), puckLampGeo = new T.SphereGeometry(0.065, 12, 10), puckRimGeo = new T.TorusGeometry(0.18, 0.022, 8, 28);
+  const puckMat = std(0x2b3f7a, { roughness: 0.35, metalness: 0.6 }), puckLamp = glow(COLORS.cyan, 2.8), puckDead = glow(0x39456f, 1);
+  const decoys = [];
+  function makePuck(at) {
+    const g = new T.Group();
+    const body = new T.Mesh(puckGeo, puckMat);
+    body.castShadow = true;
+    body.position.y = 0.06;
+    const lamp = new T.Mesh(puckLampGeo, puckLamp);
+    lamp.position.y = 0.14;
+    const rim = new T.Mesh(puckRimGeo, puckLamp);
+    rim.rotation.x = Math.PI / 2;
+    rim.position.y = 0.11;
+    g.add(rim);
+    const waves = [0, 1, 2].map(() => { const w = flat(ringTex, COLORS.cyan, 1, 0, 1.8); w.position.y = 0.02; g.add(w); return w; });
+    g.add(body, lamp);
+    board.add(g);
+    const p = { g, lamp, waves, at, t0: clock, k: 1, dying: false, landed: false };
+    decoys.push(p);
+    return p;
+  }
+  // Sparks: the lockpick at a lock, the pulse round the thief.
+  const SPARKS = 30;
+  const sparkMesh = new T.InstancedMesh(new T.BoxGeometry(0.022, 0.022, 0.11), glow(COLORS.cyan, 3.2), SPARKS);
+  const spark = Array.from({ length: SPARKS }, () => ({ p: new T.Vector3(), v: new T.Vector3(), life: 0 }));
+  sparkMesh.frustumCulled = false;
+  board.add(sparkMesh);
+  function burstSparks(at, power = 1) {
+    for (const s of spark) {
+      s.life = 0.3 + Math.random() * 0.35;
+      s.p.copy(at);
+      s.v.set((Math.random() - 0.5) * 3.4 * power, (0.5 + Math.random() * 2.2) * power, (Math.random() - 0.5) * 3.4 * power);
+    }
+  }
+  // The goggles: a curtain of light sweeps the floor from south to north and shows every plate for what it is.
+  const scanTex = canvasTex(64, (g, s) => {
+    const r = g.createLinearGradient(0, 0, 0, s);
+    r.addColorStop(0, 'rgba(255,255,255,1)'); r.addColorStop(0.07, 'rgba(255,255,255,.5)'); r.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = r; g.fillRect(0, 0, s, s);
+  });
+  const curtainTex = canvasTex(64, (g, s) => {
+    const r = g.createLinearGradient(0, 0, 0, s);
+    r.addColorStop(0, 'rgba(255,255,255,0)'); r.addColorStop(0.8, 'rgba(255,255,255,.45)'); r.addColorStop(1, 'rgba(255,255,255,1)');
+    g.fillStyle = r; g.fillRect(0, 0, s, s);
+  });
+  const scanMat = tex => new T.MeshBasicMaterial({ map: tex, color: new T.Color(COLORS.cyan).multiplyScalar(1.5), transparent: true, opacity: 0, depthWrite: false, blending: T.AdditiveBlending, toneMapped: false, side: T.DoubleSide });
+  const scanFloor = new T.Mesh(new T.PlaneGeometry(W + 0.2, 1.8), scanMat(scanTex));
+  scanFloor.rotation.x = -Math.PI / 2;
+  const scanWall = new T.Mesh(new T.PlaneGeometry(W + 0.2, 0.9), scanMat(curtainTex));
+  for (const m of [scanFloor, scanWall]) { m.visible = false; m.renderOrder = 3; board.add(m); }
+
   function burstCoins(from, dir) {
     for (const c of coin) {
       c.life = 1.1 + Math.random() * 0.5;
@@ -534,19 +613,24 @@ export async function createScene(stage, vault, opts = {}) {
     doors.forEach((d, j) => { d.open = state.doors[j] === 9; d.g.position.y = d.open ? -(WALL_H + 0.02) : -0.02; d.lamp.material = d.lamp2.material = d.open ? openLamp : shutLamp; });
     if (safeDoor) { safeDoor.rotation.y = state.loot ? -2.1 : 0; safe.userData.inside.material.color.set(COLORS.gold).multiplyScalar(state.loot ? 2.6 : 0); safeLight.intensity = state.loot ? 3.5 : 1.2; }
     const seen = new Map(revealed(vault, state, gadgets).map(r => [r.at, r.real]));
-    for (const p of plates) {
-      const kind = !seen.has(p.at) ? 'cue' : seen.get(p.at) ? 'real' : 'fake';
-      if (kind === p.shown) continue;
-      p.shown = kind;
-      p.m.material.map = kind === 'real' ? plateTex : cueTex;
-      p.m.material.color.set(kind === 'real' ? COLORS.red : 0xa9b6e0).multiplyScalar(kind === 'real' ? 1.8 : 1);
-      p.m.material.opacity = kind === 'real' ? 0.95 : kind === 'fake' ? 0.12 : 0.3;
-    }
+    for (const p of plates) stylePlate(p, !seen.has(p.at) ? 'cue' : seen.get(p.at) ? 'real' : 'fake');
+    // the decoy stays while a guard is on his way to it, then goes dark
+    const baits = new Set();
+    guards.forEach((g, j) => { setBadge(g, state.status === 'play' ? modeBadge(state.g[j * 6 + 3]) : g.badge.kind); if (state.g[j * 6 + 3] === 1) baits.add(state.g[j * 6 + 5]); });
+    for (const p of decoys) if (!p.dying && (p.landed || state.t === 0) && !baits.has(p.at)) { p.dying = true; p.lamp.material = puckDead; }
     setSmoke(state.smoke);
     setAlarm(state.alarm > 0 && state.status === 'play');
     setOverlay(state, hints);
   }
   const shutLamp = glow(0x8c9ac8, 1.3), openLamp = glow(COLORS.cyan, 2.2);
+  function stylePlate(p, kind, pop = false) {
+    if (kind === p.shown) return;
+    p.shown = kind;
+    p.m.material.map = kind === 'real' ? plateTex : cueTex;
+    p.m.material.color.set(kind === 'real' ? COLORS.red : kind === 'fake' ? COLORS.cyan : 0xa9b6e0).multiplyScalar(kind === 'real' ? 1.8 : 1);
+    p.m.material.opacity = kind === 'real' ? 0.95 : kind === 'fake' ? 0.2 : 0.3;
+    if (pop) tween(0.4, k => p.m.scale.setScalar(1 + 0.4 * Math.sin(Math.PI * k)));
+  }
   function setAlarm(on) {
     if (on === alarm) return;
     alarm = on;
@@ -573,7 +657,7 @@ export async function createScene(stage, vault, opts = {}) {
   const turnTo = (a, dir, dur = 0.14) => { const r0 = a.root.rotation.y, d = Math.atan2(Math.sin(ROT[dir] - r0), Math.cos(ROT[dir] - r0)); a.dir = dir; return tween(dur, k => { a.root.rotation.y = r0 + d * k; }); };
   const dirTo = (from, to) => { const dx = to % W - from % W, dy = (to / W | 0) - (from / W | 0); return Math.abs(dx) >= Math.abs(dy) ? (dx > 0 ? 1 : 3) : (dy > 0 ? 2 : 0); };
 
-  async function act(e, prev, next, d, speed) {
+  async function act(e, prev, next, d, speed, gadgets = []) {
     if (e.e === 'move') {
       const slow = speed <= 1 && laserCells.has(e.to);
       if (slow) { scale = 0.3; camTo(pos(e.to), 0.62, 0.12); opts.onFx?.('slow'); }
@@ -586,7 +670,19 @@ export async function createScene(stage, vault, opts = {}) {
       const door = doors[doorCells.indexOf(e.at)];
       await turnTo(thief, dirTo(prev.p, e.at), 0.1);
       if (e.e === 'pick') await tween(d, k => { door.g.position.x = pos(e.at).x + Math.sin(k * 25) * 0.025 * (1 - k); });
-      else { door.lamp.material = door.lamp2.material = openLamp; await tween(Math.max(d, 0.4 / speed), k => { door.g.position.y = -0.02 - (WALL_H) * k; }, easeInOut); door.open = true; }
+      else {
+        if (gadgets.includes('lockpick') && prev.doors[doorCells.indexOf(e.at)] === 0) {
+          // the lockpick: one quick twist, sparks at the lock, and the door drops
+          opts.onFx?.('lockpick');
+          const lock = pos(e.at, 0.38).lerp(pos(prev.p, 0.38), 0.42);
+          burstSparks(lock);
+          await tween(0.16 / speed, k => { door.g.rotation.z = Math.sin(k * Math.PI * 3) * 0.04 * (1 - k); });
+          door.g.rotation.z = 0;
+        }
+        door.lamp.material = door.lamp2.material = openLamp;
+        await tween(Math.max(d, 0.4 / speed), k => { door.g.position.y = -0.02 - (WALL_H) * k; }, easeInOut);
+        door.open = true;
+      }
     } else if (e.e === 'loot') {
       await turnTo(thief, dirTo(prev.p, e.at), 0.12);
       const f = 1 / Math.max(1, speed);
@@ -604,15 +700,31 @@ export async function createScene(stage, vault, opts = {}) {
       await camTo(null, 1, 0.4 * f);
     } else if (e.e === 'emp') {
       opts.onFx?.('emp');
+      burstSparks(pos(e.at, 0.55), 0.8);
       ring.position.copy(pos(e.at, 0.06));
       await tween(0.45 / speed, k => { ring.scale.setScalar(0.2 + 2.6 * k); ring.material.opacity = 1 - k; thiefLight.intensity = 1.6 + 8 * (1 - k); }, easeOut);
       thiefLight.intensity = 1.6;
+    } else if (e.e === 'bait') {
+      // the thief tosses the decoy in an arc; it lands, blinks and calls the nearest guard
+      await turnTo(thief, dirTo(prev.p, e.at), 0.1);
+      const p = makePuck(e.at), from = thief.root.position.clone().setY(0.95), to = pos(e.at), f = 1 / Math.max(1, speed);
+      p.g.position.copy(from);
+      await tween(0.45 * f, k => { p.g.position.lerpVectors(from, to, k); p.g.position.y = from.y * (1 - k) + Math.sin(Math.PI * k) * 1.2; p.g.rotation.x = k * 7; }, k => k);
+      p.g.position.copy(to);
+      p.g.rotation.x = 0;
+      p.landed = true;
+      p.t0 = clock;
+      opts.onFx?.('decoy');
+      shake = Math.max(shake, 0.06);
+      if (e.guard >= 0) setBadge(guards[e.guard], '؟');
+      await wait(0.15 * f);
     } else if (e.e === 'smoke') {
       opts.onFx?.('smoke');
       setSmoke(next.smoke);
       await wait(0.3 / speed);
     } else if (e.e === 'guard') {
       const g = guards[e.i];
+      setBadge(g, modeBadge(e.mode));
       if (e.to !== e.from) await walk(g, e.to, e.dir, d, e.mode === 3 ? 'run' : 'walk', 0.03);
       else await turnTo(g, e.dir, d * 0.6);
       if (e.mode !== 3) g.play(vaultGuardMoves[e.i] ? 'walk' : 'idle');
@@ -632,6 +744,7 @@ export async function createScene(stage, vault, opts = {}) {
     const f = 1 / Math.max(1, speed);
     if (e.e === 'alarm') {
       setAlarm(true);
+      guards.forEach(g => setBadge(g, '!'));
       shake = 0.5;
       thief.play('run');
       await wait(0.45 * f);
@@ -662,8 +775,8 @@ export async function createScene(stage, vault, opts = {}) {
     for (const e of events) (['guard', 'cam', 'laser', 'emp_end', 'smoke_end'].includes(e.e) ? b : ['alarm', 'caught', 'escape', 'fled', 'timeout'].includes(e.e) ? end : a).push(e);
     const d = 0.24 / speed;
     setOverlay(null);
-    await Promise.all(a.map(e => act(e, prev, next, d, speed)));
-    if (b.length) await Promise.all(b.map(e => act(e, prev, next, d * 0.85, speed)));
+    await Promise.all(a.map(e => act(e, prev, next, d, speed, gadgets)));
+    if (b.length) await Promise.all(b.map(e => act(e, prev, next, d * 0.85, speed, gadgets)));
     if (disposed) return;
     const out = next.status === 'escaped' || next.status === 'escaped_alarm' || next.status === 'fled';
     if (!end.some(e => e.e === 'caught' || e.e === 'timeout') && !out) sync(next, gadgets);
@@ -672,13 +785,30 @@ export async function createScene(stage, vault, opts = {}) {
   }
 
   // The thief comes down a rope from the ceiling onto the entry.
+  async function scan(state, gadgets, dur) {
+    const seen = new Map(revealed(vault, state, gadgets).map(r => [r.at, r.real]));
+    const z0 = H / 2 + 0.25, z1 = -H / 2 - 0.25, done = new Set();
+    scanFloor.visible = scanWall.visible = true;
+    opts.onFx?.('scan');
+    await tween(dur, k => {
+      const edge = z0 + (z1 - z0) * k, a = Math.min(1, k * 8, (1 - k) * 8);
+      scanFloor.position.set(0, 0.03, edge + 0.9);
+      scanWall.position.set(0, 0.45, edge);
+      scanFloor.material.opacity = 0.75 * a;
+      scanWall.material.opacity = 0.85 * a;
+      for (const p of plates) if (!done.has(p) && pos(p.at).z >= edge) { done.add(p); stylePlate(p, seen.get(p.at) ? 'real' : 'fake', true); }
+    }, k => k);
+    scanFloor.visible = scanWall.visible = false;
+  }
+
   async function intro(state, gadgets, fast) {
-    sync(state, gadgets);
+    const goggles = gadgets.includes('goggles'), bare = gadgets.filter(g => g !== 'goggles');
+    sync(state, bare);
     setOverlay(null);
     const at = pos(state.p), top = 7.5;
     thief.dir = 0;
     thief.root.rotation.y = ROT[0];
-    if (fast) { sync(state, gadgets); return; }
+    if (fast) { if (goggles) await scan(state, gadgets, 0.6); sync(state, gadgets); return; }
     rope.visible = true;
     thief.play('rope');
     view.target.copy(base.target).lerp(at, 0.75);
@@ -696,6 +826,7 @@ export async function createScene(stage, vault, opts = {}) {
     await tween(0.35, k => { rope.scale.y = Math.max(0.01, (top - 1) * (1 - k)); rope.position.y = top - rope.scale.y / 2; });
     rope.visible = false;
     await wait(0.15);
+    if (goggles) await scan(state, gadgets, 1.1);
     sync(state, gadgets);
   }
 
@@ -715,6 +846,7 @@ export async function createScene(stage, vault, opts = {}) {
   }
 
   // ---------- the loop ----------
+  const ZAXIS = new T.Vector3(0, 0, 1), v3 = new T.Vector3();
   let raf = 0, last = performance.now(), fps = 60, frames = 0, since = 0, warm = 0, drawn = { calls: 0, triangles: 0 };
   const o = new T.Object3D();
   function frame(now) {
@@ -754,6 +886,34 @@ export async function createScene(stage, vault, opts = {}) {
       coins.setMatrixAt(k, o.matrix);
     }
     coins.instanceMatrix.needsUpdate = true;
+    for (let k = 0; k < SPARKS; k++) {
+      const s = spark[k];
+      if (s.life > 0) {
+        s.life -= dt;
+        s.v.y -= 7 * dt;
+        s.p.addScaledVector(s.v, dt);
+        o.position.copy(s.p);
+        o.quaternion.setFromUnitVectors(ZAXIS, v3.copy(s.v).normalize());
+        o.scale.setScalar(Math.max(0, Math.min(1, s.life * 5)));
+      } else o.scale.setScalar(0);
+      o.updateMatrix();
+      sparkMesh.setMatrixAt(k, o.matrix);
+    }
+    sparkMesh.instanceMatrix.needsUpdate = true;
+    for (let k = decoys.length - 1; k >= 0; k--) {
+      const p = decoys[k];
+      if (p.dying) {
+        p.k -= real * 2.2;
+        if (p.k <= 0) { board.remove(p.g); p.waves.forEach(w => w.material.dispose()); decoys.splice(k, 1); continue; }
+        p.g.scale.setScalar(p.k);
+      }
+      p.lamp.visible = p.dying || !p.landed || Math.sin(clock * 14) > -0.3;
+      p.waves.forEach((w, n) => {
+        const ph = ((clock - p.t0) * 0.85 + n / 3) % 1;
+        w.scale.setScalar(0.6 + 5.4 * ph);
+        w.material.opacity = p.landed && !p.dying ? (1 - ph) * 0.6 : 0;
+      });
+    }
     for (let k = puffs.length - 1; k >= 0; k--) {
       const p = puffs[k];
       p.k += ((p.gone ? 0 : 1) - p.k) * Math.min(1, real * 5);
@@ -784,6 +944,17 @@ export async function createScene(stage, vault, opts = {}) {
 
   return {
     setQuiet(q) { quiet = q; setOverlay(shown); },
+    // The space kept free above and below the board (the menu and the result need more than a raid); the camera glides to the new fit.
+    // (No glide when the intro is about to move the camera itself: two moves at once fight.)
+    setPads(top, bottom, glide = true) {
+      if (opts.padTop === top && opts.padBottom === bottom) return;
+      opts.padTop = top; opts.padBottom = bottom;
+      const t0 = view.target.clone(), d0 = view.dist;
+      resize();
+      if (!glide) return;
+      view.target.copy(t0); view.dist = d0;
+      camTo(null, 1, 0.45);
+    },
     sync, playTurn, intro, pick, cellRect, setHints: hints => setOverlay(shown, hints), setTier, resize,
     get tier() { return tier; }, get fps() { return Math.round(fps); },
     three: { T, scene, camera, renderer },
@@ -797,8 +968,9 @@ export async function createScene(stage, vault, opts = {}) {
       const drop = m => { if (!m || seen.has(m)) return; seen.add(m); for (const v of Object.values(m)) if (v?.isTexture) v.dispose(); m.dispose(); };
       scene.traverse(obj => { obj.geometry?.dispose(); [].concat(obj.material || []).forEach(drop); });
       for (const f of [thiefFile, guardFile]) f?.scene.traverse(obj => { obj.geometry?.dispose(); [].concat(obj.material || []).forEach(drop); });
-      [litDot, dimDot, deadDot, litLens, deadLens, shutLamp, openLamp].forEach(drop);
-      [ringTex, arrowTex, cueTex, plateTex, puffTex].forEach(t => t.dispose());
+      [litDot, dimDot, deadDot, litLens, deadLens, shutLamp, openLamp, puckMat, puckLamp, puckDead].forEach(drop);
+      [puckGeo, puckLampGeo, puckRimGeo].forEach(g => g.dispose());
+      [ringTex, arrowTex, cueTex, plateTex, puffTex, askTex, alertTex, scanTex, curtainTex].forEach(t => t.dispose());
       bloom.dispose?.(); composer.dispose?.(); renderer.dispose();
       renderer.domElement.remove();
     },

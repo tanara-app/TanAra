@@ -4,6 +4,7 @@ Made with ElevenLabs (the ElevenCreative MCP tools, account of `m.b.a`) on 2026-
 short piece of music. Played by `js/ui/heistAudio.js`. Files are in `assets/heist/audio/`.
 
 Cost: 17 credits for each sound effect (10 made, one of them a second try) and 900 for the music: **1070 credits**.
+Phase 2b (2026-11-17, the user said yes to three more): 3 × 17 = **51 credits**. All told: **1121**.
 
 | File | What | Model | Prompt |
 |---|---|---|---|
@@ -16,6 +17,9 @@ Cost: 17 credits for each sound effect (10 made, one of them a second try) and 9
 | emp.mp3 | the pulse | eleven_text_to_sound_v2 | Electromagnetic pulse burst: sharp electric zap followed by electronics powering down with a falling hum, short |
 | smoke.mp3 | the smoke (second try; the first was almost silent) | eleven_text_to_sound_v2 | Loud burst of pressurized gas hissing out of a canister, strong white-noise whoosh that fades, close-mic |
 | pick.mp3 | working a lock | eleven_text_to_sound_v2 | Lockpick working a door lock: small metallic scrapes and a final satisfying click, close-mic, short |
+| decoy.mp3 | the decoy landing (phase 2b) | eleven_text_to_sound_v2 | Small electronic gadget landing on a hard floor with a light plastic clack, then three quick high-pitched chirping beeps |
+| scan.mp3 | the goggles' sweep (phase 2b) | eleven_text_to_sound_v2 | Futuristic visor scanner sweep, smooth rising electronic shimmer with a soft digital ping at the end, clean, short |
+| lockpick.m4a | a door opened with the lockpick (phase 2b). The tool made 12 s of scattered clicks; the loudest snap and click (10.36 s to 10.96 s) was cut out with Python and `afconvert` to AAC | eleven_text_to_sound_v2 | Lock picked open in one fast move: quick metallic tension snap and a crisp loud lock click, close-mic, very short |
 | music.m4a | the music, 40 s, looped (AAC 96 kbps, converted with `afconvert` from the 192 kbps MP3) | eleven_music_v2_5 | Instrumental sneaky heist theme, 40 seconds, loopable: pizzicato upright bass, soft brushed drums, muted vibraphone, light synth pulse, minor key, 96 bpm, tense but playful, quiet and sparse, no vocals |
 
 Notes:
