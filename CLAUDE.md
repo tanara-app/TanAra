@@ -98,6 +98,8 @@ exist side by side. When a new decision replaces an old one, change or mark the 
   touching the today screen, «سهم وعده» or «رژیم».
 - `GARDEN.md`: the game inside the app: the user's decisions on the new game «سرقت بزرگ» (which will replace «باغ»), why the old
   «سرزمین» was removed, and how to work on the game. The build brief is [briefs/heist.md](briefs/heist.md). Read both before any work on the game.
+- `DESIGN-heist.md`: the heist game's final rules and numbers, the art bible and the asset ledger; `js/domain/heist.js` (simulator,
+  solver, validator, generator) implements the rules and `tests/heist.test.js` holds them.
 - `IDEAS.md`: ideas for daily "hooks" that bring members back, with the ones the user picked. When one gets built,
   mark it there.
 - `VOICE.md` / `ELEVENLABS.md`: the mascot Heimerdinger's lines and the brief for recording them
