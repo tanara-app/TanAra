@@ -10,7 +10,7 @@ const run = (from, n) => Array.from({ length: n }, (_, i) => full(addDays(from, 
 suite('rewards', () => {
   test('the longest run of full days, and the one going on now', () => {
     const e = [...run('2026-01-01', 10), ...run('2026-02-20', 9)]; // up to 2026-02-28 = yesterday
-    eq(fullRuns(e, [], DAY), { best: 10, now: 9 });
+    eq(fullRuns(e, [], DAY), { best: 10, now: 9, total: 19 });
   });
 
   test('today counts once it is full; until then the run ends yesterday', () => {
@@ -34,8 +34,19 @@ suite('rewards', () => {
     ok(progress({ earned: { parniyan: '2026-01-01' } }, DAY)[0].earned);
   });
 
+  test('«شب‌پر»: full days in all, in a row or not', () => {
+    const of = rewardOf('shab').goal.of;
+    const at = e => progress({ entries: e }, DAY).find(x => x.reward.key === 'shab');
+    // runs of 5 with a gap between, all before today
+    const gappy = n => Array.from({ length: n }, (_, i) => run(addDays('2025-01-01', i * 7), 5)).flat();
+    eq([at(gappy(7)).earned, at(gappy(7)).now], [false, 35]);
+    eq([at(gappy(8)).earned, at(gappy(8)).now], [true, of]);
+    eq(at(gappy(8)).now <= of, true);
+  });
+
   test('only earned finishes can be worn', () => {
     eq(earnedFinishes({}).length, 0);
     eq(earnedFinishes({ parniyan: '2026-01-01' }).map(r => r.key), ['parniyan']);
+    eq(earnedFinishes({ shab: '2026-01-01', parniyan: '2026-01-01' }).map(r => r.key), ['parniyan', 'shab']);
   });
 });

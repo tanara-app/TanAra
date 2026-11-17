@@ -12,6 +12,7 @@ import { progress, goalText } from '../domain/rewards.js';
 import { getFinish, setFinish } from './theme.js';
 
 const LOCK = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="10.5" width="14" height="10" rx="2.5"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/></svg>';
+const MOON = '<svg viewBox="0 0 48 48" aria-hidden="true"><mask id="sb-moon-cut"><rect width="48" height="48" fill="#fff"/><circle cx="32" cy="17" r="15" fill="#000"/></mask><circle cx="24" cy="24" r="18" fill="currentColor" mask="url(#sb-moon-cut)"/></svg>';
 const STAR = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l1.8 6.2L20 10l-6.2 1.8L12 18l-1.8-6.2L4 10l6.2-1.8z" fill="currentColor"/></svg>';
 
 // A finish worn on a device whose member has not earned it (another account signed in) comes off.
@@ -38,6 +39,13 @@ const SHOWCASE = {
       <div class="pn-card pn-sum"><div class="pn-ring"><b>${fa(740)}</b></div><div class="pn-lines"><i></i><i></i><i></i></div></div>
       <div class="pn-card"><div class="pn-meal"><b>ناهار</b><span>${fa(410)} از ${fa(600)}</span></div><div class="pn-bar"><i></i></div></div>
       <div class="pn-btn">ثبت غذا</div>
+    </div>`,
+  shab: () => `
+    <i class="sb-moon">${MOON}</i><i class="sb-shoot"></i><i class="sb-tw t1"></i><i class="sb-tw t2"></i><i class="sb-tw t3"></i>
+    <div class="sb-phone">
+      <div class="sb-card sb-sum"><div class="sb-ring"><b>${fa(740)}</b></div><div class="sb-lines"><i></i><i></i><i></i></div></div>
+      <div class="sb-card"><div class="sb-meal"><b>شام</b><span>${fa(520)} از ${fa(600)}</span></div><div class="sb-bar"><i></i></div></div>
+      <div class="sb-btn">ثبت غذا</div>
     </div>`,
 };
 

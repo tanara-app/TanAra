@@ -8,7 +8,7 @@
 
   Kinds: 'finish' — a look laid over any colour theme (css/app.css [data-finish]), worn from «ظاهر».
   Goals: 'fullRun' — `of` full days in a row (stats.js fullDay: what they said about the day, else two
-  meals or more).
+  meals or more); 'fullDays' — `of` full days in all, in a row or not.
 */
 import { addDays } from '../lib/dates.js';
 import { baseMeal } from './meals.js';
@@ -16,18 +16,22 @@ import { logMarks, fullDay } from './stats.js';
 
 export const REWARDS = [
   { key: 'parniyan', kind: 'finish', name: 'پرنیان', about: 'پوسته‌ی ظاهر اپ', goal: { type: 'fullRun', of: 21 } },
+  // 40 days: a «چله»
+  { key: 'shab', kind: 'finish', name: 'شب‌پر', about: 'پوسته‌ی ظاهر اپ', goal: { type: 'fullDays', of: 40 } },
 ];
 export const rewardOf = key => REWARDS.find(r => r.key === key) || null;
 
 // the goal in words, under the reward's name
 export function goalText(r, fa = String) {
   if (r.goal.type === 'fullRun') return `${fa(r.goal.of)} روز پشت‌سرهم ثبت کامل`;
+  if (r.goal.type === 'fullDays') return `${fa(r.goal.of)} روز ثبت کامل`;
   return '';
 }
 
 /*
-  { best, now }: the longest run of full days so far (up to `day`), and the run going on now —
-  ending today when today is already full, else ending yesterday (today is not over yet).
+  { best, now, total }: the longest run of full days so far (up to `day`), the run going on now —
+  ending today when today is already full, else ending yesterday (today is not over yet) — and all
+  the full days so far.
 */
 export function fullRuns(entries, notes, day) {
   const meals = new Map();
@@ -46,7 +50,7 @@ export function fullRuns(entries, notes, day) {
   }
   let now = 0;
   for (let x = full.has(day) ? day : addDays(day, -1); full.has(x); x = addDays(x, -1)) now++;
-  return { best, now };
+  return { best, now, total: full.size };
 }
 
 /*
@@ -58,8 +62,9 @@ export function progress({ entries = [], notes = [], earned = {} }, day) {
   const runs = fullRuns(entries, notes, day);
   return REWARDS.map(r => {
     const of = r.goal.of;
-    const now = r.goal.type === 'fullRun' ? runs.now : 0;
-    const met = r.goal.type === 'fullRun' ? runs.best >= of : false;
+    const [now, met] = r.goal.type === 'fullRun' ? [runs.now, runs.best >= of]
+      : r.goal.type === 'fullDays' ? [runs.total, runs.total >= of]
+      : [0, false];
     return { reward: r, earned: !!earned[r.key] || met, now: Math.min(now, of), of };
   });
 }
