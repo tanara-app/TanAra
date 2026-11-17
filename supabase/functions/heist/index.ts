@@ -61,9 +61,11 @@ async function settle(raid: any, status: string, turns: number, moves: string[] 
       .eq("thief", raid.thief).eq("practice", raid.practice).gt("loot", 0).gte("started_at", tehranDayStart());
     paid = (count || 0) > 0;
   }
+  // `paid` is only a first guess: heist_settle checks it again under lock (two finishes at once can't both be paid)
   const p = payout(status, { ownerCoins, fee: raid.fee, practice: raid.practice || 0, paid });
   const rows = must(await admin.rpc("heist_settle", {
     p_raid: raid.id, p_status: status, p_turns: turns, p_moves: moves, p_loot: p.loot, p_thief: p.thief, p_owner: p.owner, p_shield: p.shield,
+    p_since: tehranDayStart(),
   })) as { o_loot: number; o_coins: number }[];
   return { loot: rows[0]?.o_loot ?? 0, coins: rows[0]?.o_coins ?? 0, fee: raid.fee, owner: p.owner };
 }
@@ -134,17 +136,17 @@ async function start(uid: string, body: any) {
     vault = generate(seed, level);
   } else {
     owner = String(body.target || "");
-    if (!owner || owner === uid) throw new Refused("target");
-    const t = must(await admin.from("heist_players").select("vault,shield_until").eq("user_id", owner).maybeSingle()) as any;
-    if (!t) throw new Refused("target", 404);
-    if (t.shield_until && Date.parse(t.shield_until) > Date.now()) throw new Refused("shield", 409);
-    if (await raidsToday(uid) <= 0) throw new Refused("limit", 409);
-    vault = t.vault;
+    if (!/^[0-9a-f-]{36}$/.test(owner) || owner === uid) throw new Refused("target");
+    vault = null;   // the owner's vault as it is now, read under lock by heist_begin
     fee = FEE;
   }
-  const id = must(await admin.rpc("heist_begin", { p_thief: uid, p_owner: owner, p_practice: practice, p_vault: vault, p_gadgets: gadgets, p_fee: fee }));
-  if (id === null) throw new Refused("coins", 409);
-  return { raid: id, vault, fee };
+  // The coins, the shield and the daily limit are all checked inside heist_begin, under lock with the fee taken.
+  const rows = must(await admin.rpc("heist_begin", {
+    p_thief: uid, p_owner: owner, p_practice: practice, p_vault: vault, p_gadgets: gadgets, p_fee: fee, p_since: tehranDayStart(), p_per_day: RAIDS_PER_DAY,
+  })) as { o_id: number; o_vault: unknown }[];
+  const id = Number(rows[0]?.o_id);
+  if (!(id > 0)) throw new Refused(({ "-1": "coins", "-2": "shield", "-3": "limit", "-4": "target" } as Record<string, string>)[String(id)] || "server", id === -4 ? 404 : 409);
+  return { raid: id, vault: rows[0].o_vault, fee };
 }
 
 async function finish(uid: string, body: any) {

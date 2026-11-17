@@ -60,6 +60,12 @@ async function vapidHeader(endpoint: string, k: Keys) {
   return `vapid t=${unsigned}.${b64u(sig)}, k=${k.publicKey}`;
 }
 
+// Only the browsers' own push services are ever called (an endpoint is written by the member's own device, so it is not trusted).
+const PUSH_HOSTS = [/^fcm\.googleapis\.com$/, /^android\.googleapis\.com$/, /^updates\.push\.services\.mozilla\.com$/, /^web\.push\.apple\.com$/, /^[a-z0-9-]+\.notify\.windows\.com$/];
+function pushService(endpoint: string) {
+  try { const u = new URL(endpoint); return u.protocol === "https:" && !u.port && PUSH_HOSTS.some(h => h.test(u.hostname)); } catch { return false; }
+}
+
 // Sends a note to every device of a user. Returns how many push services took it. A subscription the service no longer knows is deleted.
 export async function notify(admin: SupabaseClient, userId: string, note: Note) {
   const k = await keys(admin);
@@ -69,8 +75,7 @@ export async function notify(admin: SupabaseClient, userId: string, note: Note) 
   for (const sub of (subs || []) as Sub[]) {
     let status = 0;
     try {
-      const u = new URL(sub.endpoint);
-      if (u.protocol !== "https:" || /^(localhost|127\.|10\.|192\.168\.|169\.254\.|\[)/.test(u.hostname)) continue;
+      if (!pushService(sub.endpoint)) continue;
       const res = await fetch(sub.endpoint, {
         method: "POST",
         headers: { "Content-Encoding": "aes128gcm", "Content-Type": "application/octet-stream", TTL: "7200", Urgency: "normal", Authorization: await vapidHeader(sub.endpoint, k) },
