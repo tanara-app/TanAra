@@ -11,12 +11,13 @@
 
   Controls: tap a cell next to the thief to move there, hold a finger down (or the hourglass) to wait, tap a gadget
   and then a lit cell to use it. Arrow keys and space work too. `?debug` shows the frame rate, the quality step and
-  the narrowest cell; `window.__heist` gives the state to the console.
+  the narrowest cell; `window.__heist` gives the state to the console. The sound is in ui/heistAudio.js.
 */
 import { icon } from './dom.js';
 import { fa } from '../lib/fa.js';
 import { generate, initial, play, solve, MAX_TURNS, ALARM_TURNS, LEVELS, W, H, EMP_RADIUS, SMOKE_RANGE } from '../domain/heist.js';
 import { createScene } from './heistScene.js';
+import { createAudio } from './heistAudio.js';
 
 const GADGETS = ['emp', 'smoke'];
 const DIRS = ['U', 'R', 'D', 'L'], DX = [0, 1, 0, -1], DY = [-1, 0, 1, 0];
@@ -31,6 +32,7 @@ const ICON = {
   again: svg('<path d="M4 12a8 8 0 1 0 2.6-5.9"/><path d="M4 4v5h5"/>'),
   replay: svg('<path d="M11 6l-7 6 7 6z" fill="currentColor"/><path d="M20 6l-7 6 7 6z" fill="currentColor"/>'),
   next: svg('<path d="M19 12H5"/><path d="M11 6l-6 6 6 6"/>'),
+  sound: svg('<path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5z"/><path class="wave" d="M15.5 9a4.2 4.2 0 0 1 0 6M18 6.5a8 8 0 0 1 0 11"/><path class="mute" d="M16 9.5l5 5M21 9.5l-5 5"/>'),
   loot: svg('<path d="M6 4h12l3.5 5L12 21 2.5 9z"/><path d="M2.5 9h19M9 4l-2 5 5 12 5-12-2-5"/>'),
 };
 
@@ -54,6 +56,7 @@ export function renderHeist(root) {
       <div class="heist-stage"></div>
       <div class="heist-glow" aria-hidden="true"></div>
       <button class="heist-btn heist-back" data-back aria-label="برگشت">${icon.chevR}</button>
+      <button class="heist-btn heist-sound" data-sound aria-label="صدا">${ICON.sound}</button>
       <div class="heist-top">
         <span class="heist-alarm" aria-hidden="true">${'<i></i>'.repeat(ALARM_TURNS)}</span>
         <span class="heist-loot" aria-hidden="true">${ICON.loot}</span>
@@ -123,6 +126,10 @@ function start(el, L, debug) {
   bus.on('state', hud);
   // the scene acts the turn out; the raid waits for it
   bus.on('turn', t => scene?.playTurn(t.prev, t.next, t.events, GADGETS, t.speed));
+  // the sound (nothing plays before the first tap)
+  const audio = createAudio(bus);
+  el.classList.toggle('muted', !audio.on);
+  el.addEventListener('pointerdown', () => audio.unlock(), { passive: true });
   // the phone's buzz
   const buzz = p => { try { navigator.vibrate?.(p); } catch { /* not allowed */ } };
   bus.on('fx', name => {
@@ -275,6 +282,7 @@ function start(el, L, debug) {
     const b = e.target.closest('button');
     if (!b) return;
     if (b.dataset.back !== undefined) { location.replace('#/tools'); return; }
+    if (b.dataset.sound !== undefined) { el.classList.toggle('muted', !audio.toggle()); return; }
     if (b.dataset.level) { if (mode === 'menu' && +b.dataset.level !== level) { level = +b.dataset.level; seed = 1; try { localStorage.setItem('tanara:heist:level', level); } catch { /* private mode */ } build(); } return; }
     if (b.dataset.go !== undefined) { if (mode === 'menu') begin(false); return; }
     if (b.dataset.wait !== undefined) { armed = null; act('W'); return; }
@@ -294,7 +302,7 @@ function start(el, L, debug) {
     box.textContent = `fps ${s.fps}  quality ${s.tier}  cell ${Math.round(narrow)}px\ncalls ${info.calls}  tris ${info.triangles}  geo ${info.geometries}  tex ${info.textures}\nL${level} seed ${seed}  turn ${state?.t}  ${mode}`;
   }
   window.__heist = {
-    bus, get state() { return state; }, get vault() { return vault; }, get moves() { return moves; }, get mode() { return mode; }, get scene() { return scene; },
+    bus, audio, get state() { return state; }, get vault() { return vault; }, get moves() { return moves; }, get mode() { return mode; }, get scene() { return scene; },
     act, begin, replay, solve: (alarm = false) => solve(vault, GADGETS, { alarm })?.moves,
     load(l, s) { level = l; seed = s; return build(); },
   };
@@ -305,6 +313,7 @@ function start(el, L, debug) {
     window.removeEventListener('keydown', onKey);
     scene?.dispose();
     scene = null;
+    audio.dispose();
   };
   build();
 }
