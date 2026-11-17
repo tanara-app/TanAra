@@ -152,8 +152,13 @@ function slot(gadgets, used, name) {
   return -1;
 }
 function target(c, mv) {
-  const k = mv.indexOf(','), x = +mv.slice(1, k), y = +mv.slice(k + 1);
-  return k < 0 || !(x >= 0 && y >= 0 && x < c.w && y < c.h) ? -1 : y * c.w + x;
+  const m = /^[SB](\d{1,2}),(\d{1,2})$/.exec(mv);
+  return !m || +m[1] >= c.w || +m[2] >= c.h ? -1 : +m[2] * c.w + +m[1];
+}
+// What a thief may carry: known gadgets, one of each, three at most (a raid's record comes from a phone, so it is checked).
+export const MAX_GADGETS = 3;
+function loadout(gadgets, max = MAX_GADGETS) {
+  return Array.isArray(gadgets) && gadgets.length <= max && gadgets.every((g, i) => GADGETS.includes(g) && gadgets.indexOf(g) === i);
 }
 
 // The state after the thief's move `mv`, or null if the move isn't allowed. Events of the turn are pushed to `ev`.
@@ -295,6 +300,7 @@ function fade(list, name, ev) {
 
 // For the screen: one move of a raid in play. Returns { state, events } or null if the move isn't allowed.
 export function play(vault, state, move, gadgets = []) {
+  if (!loadout(gadgets)) return null;
   const events = [], next = step(compile(vault), state, move, gadgets, events);
   return next && { state: next, events };
 }
@@ -334,6 +340,7 @@ export function revealed(vault, state, gadgets = []) {
 export function simulate(vault, moves, gadgets = []) {
   const c = compile(vault), events = [];
   let s = initial(vault), alarm = false;
+  if (!loadout(gadgets) || !Array.isArray(moves)) return { result: 'invalid', at: -1, turns: 0, alarm, loot: false, events, state: s };
   for (let i = 0; i < moves.length && s.status === 'play'; i++) {
     const ev = [], n = step(c, s, moves[i], gadgets, ev);
     if (!n) return { result: 'invalid', at: i, turns: s.t, alarm, loot: !!s.loot, events, state: s };
@@ -395,7 +402,7 @@ function movesFor(c, s, gadgets) {
 export function solve(vault, gadgets = [], opts = {}) {
   const c = compile(vault), max = Math.min(opts.maxTurns ?? MAX_TURNS, MAX_TURNS);
   const blind = !gadgets.includes('goggles'), exact = !!opts.exact;
-  if (c.entry < 0) return null;
+  if (c.entry < 0 || !loadout(gadgets, GADGETS.length)) return null;
   const start = initial(vault), k0 = keyOf(c, start, exact);
   const seen = new Map([[k0, { from: null, mv: '', depth: 0, count: 1 }]]);
   let frontier = [[start, k0]], win = null, routes = 0;

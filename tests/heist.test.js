@@ -40,6 +40,9 @@ suite('heist: one raid', () => {
     eq(simulate(plain, [...'UUUUUUUU']).result, 'fled');
     eq(simulate(plain, ['U', 'W']).result, 'unfinished');
     eq(simulate(plain, ['E']).result, 'invalid', 'a gadget he did not bring');
+    for (const bag of [['emp', 'emp'], ['emp', 'smoke', 'decoy', 'goggles'], ['bomb'], 'emp']) eq(simulate(plain, ['U'], bag).at, -1, 'a bag the game does not allow');
+    for (const mv of ['S3,7.0', 'S3.0,7', 'S 3,7', 'S3,7,1', 'S-0,7', 'S3,70', 'B03,7x', 'UU', '']) eq(simulate(NEEDS.smoke, [mv], ['smoke', 'decoy']).result, 'invalid', mv);
+    eq(simulate(NEEDS.smoke, ['S3,7'], ['smoke']).result, 'unfinished');
   });
 
   test('the same vault and moves always give the same raid', () => {
