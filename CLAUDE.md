@@ -48,7 +48,8 @@ exist side by side. When a new decision replaces an old one, change or mark the 
   comes up, the server is probably already running under the other account; just navigate to
   `127.0.0.1:5173`. On 2026-11-08 `127.0.0.1:5173` itself answered 404 for every page (another
   folder's server); then use `tanara-5180` (`http://127.0.0.1:5180`). On 2026-11-12 `127.0.0.1:5180` served an
-  old copy of the app (another server); then use `tanara-5190`. Check with a fetch that the page has your change.
+  old copy of the app (another server); then use `tanara-5190`. Check with a fetch that the page has your change. On 2026-11-17 the Browser pane's `127.0.0.1:5190` served a stale copy
+  while `curl` from the shell saw the new file; `preview_start` with `tanara-static` (opened at `localhost:5173`) showed the current files.
 - Edge Functions deploy from this folder with the Supabase CLI (logged in on `m.b.a` on 2026-11-09):
   `npx supabase functions deploy <name> --project-ref whmzjvmeyxdoqjtkukix --yes` (`hooshvareh` is too big to send
   through the Supabase MCP tool). Since 2026-11-17 deploy on your own after pushing checked work, without asking the user
