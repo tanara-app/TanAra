@@ -112,6 +112,8 @@ exist side by side. When a new decision replaces an old one, change or mark the 
   «سرزمین» was removed, and how to work on the game. The build brief is [briefs/heist.md](briefs/heist.md). Read both before any work on the game.
 - `DESIGN-heist.md`: the heist game's final rules and numbers, the art bible and the asset ledger; `js/domain/heist.js` (simulator,
   solver, validator, generator) implements the rules and `tests/heist.test.js` holds them.
+- `LABS.md`: the lab-results tool («آزمایش خون» in «بیشتر», from 2026-11-17): PDF upload, the original kept for download,
+  trends per test, condition suggestions. The user's decisions and where the work stands.
 - `IDEAS.md`: ideas for daily "hooks" that bring members back, with the ones the user picked. When one gets built,
   mark it there.
 - `VOICE.md` / `ELEVENLABS.md`: the mascot Heimerdinger's lines and the brief for recording them
