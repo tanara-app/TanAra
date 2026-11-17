@@ -12,13 +12,15 @@ import { sheet, icon } from './dom.js';
 // Claude Sonnet 5.5, US dollars per million tokens (cache write: the 5-minute rate), and per web search.
 // Change these when the model or its prices change.
 const PRICE = { input: 2, cache_read: 0.2, cache_write: 2.5, output: 10, search: 0.01 };
+// modes that run on another model: «خواندن آزمایش» reads a lab PDF twice with Claude Opus 5.5
+const MODE_PRICE = { lab: { input: 4, cache_read: 0.2, cache_write: 5, output: 20, search: 0 } };
 const MODES = {
   chat: 'گفت‌وگو', magazine: 'مجله', plan: 'چیدن رژیم', plan_option: 'گزینه‌ی دیگر رژیم', plan_swap: 'جایگزین در رژیم', food_tags: 'برچسب سلامت غذاها', tip: 'نکته‌ی امروز',
-  review: 'تحلیل هفته', progress: 'تحلیل روند', maintain: 'مرور ماهانه‌ی نگهداری', checkin: 'برگشت به مسیر', occasion: 'برنامه‌ی مناسبت', estimate: 'تخمین غذا', photo: 'عکس غذا', label: 'برچسب بسته', recipe: 'رسپی', shop: 'لیست خرید', quote: 'جمله‌ی انگیزشی', title: 'اسم گفت‌وگو',
+  review: 'تحلیل هفته', progress: 'تحلیل روند', maintain: 'مرور ماهانه‌ی نگهداری', checkin: 'برگشت به مسیر', occasion: 'برنامه‌ی مناسبت', estimate: 'تخمین غذا', photo: 'عکس غذا', label: 'برچسب بسته', recipe: 'رسپی', shop: 'لیست خرید', quote: 'جمله‌ی انگیزشی', title: 'اسم گفت‌وگو', lab: 'خواندن آزمایش',
 };
 const DAYS = 30;
 
-const cost = r => (r.input * PRICE.input + r.cache_read * PRICE.cache_read + r.cache_write * PRICE.cache_write + r.output * PRICE.output) / 1e6 + r.searches * PRICE.search;
+const cost = r => { const P = MODE_PRICE[r.mode] || PRICE; return (r.input * P.input + r.cache_read * P.cache_read + r.cache_write * P.cache_write + r.output * P.output) / 1e6 + r.searches * P.search; };
 const usd = x => `${fa(x < 0.995 ? Math.round(x * 100) / 100 : Math.round(x * 10) / 10, 2)} دلار`;
 
 export function openUsage() {

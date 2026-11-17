@@ -106,6 +106,22 @@ export function createSupabaseRemote(sb) {
       return data.map(d => ({ path: d.path, url: d.error ? null : d.signedUrl }));
     },
 
+    // «آزمایش خون»: a lab sheet's original PDF (private `labs` bucket, under <user id>/, 20261117_labs.sql)
+    async uploadLab(name, blob) {
+      const { data: { session } } = await sb.auth.getSession();
+      if (!session) return { error: { message: 'no session' } };
+      const path = `${session.user.id}/${name}`;
+      const { error } = await sb.storage.from('labs').upload(path, blob, { contentType: 'application/pdf' });
+      return error ? { error } : { path };
+    },
+    removeLab(path) {
+      return sb.storage.from('labs').remove([path]);
+    },
+    async labUrl(path, download) {
+      const { data, error } = await sb.storage.from('labs').createSignedUrl(path, 600, download ? { download } : undefined);
+      if (error) throw error;
+      return data.signedUrl;
+    },
 
     // This browser's push subscription: { endpoint, p256dh, auth }.
     savePush(sub) {

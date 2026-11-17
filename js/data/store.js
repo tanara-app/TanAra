@@ -458,6 +458,37 @@ export function deleteNote(key) {
   commit({ op: 'delete', table: 'ai_notes', key });
 }
 
+/*
+  «آزمایش خون» (LABS.md): each lab sheet is a note `lab:<id>`; its original PDF goes straight to the
+  remote's private `labs` storage (it needs a connection anyway: Hooshvareh just read it). Without
+  a remote the PDF stays inline as a data URL.
+*/
+export async function uploadLabPdf(id, blob) {
+  if (!remote) {
+    return new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(r.result);
+      r.onerror = () => reject(new Error('فایل خوانده نشد.'));
+      r.readAsDataURL(blob);
+    });
+  }
+  if (navigator.onLine === false) throw new Error('برای ذخیره‌ی برگه به اینترنت وصل شو.');
+  const { path, error } = await remote.uploadLab(`${id}.pdf`, blob);
+  if (error) throw new Error('فایل آپلود نشد. دوباره امتحان کن.');
+  return path;
+}
+export function deleteLabSheet(key) {
+  const file = note(key)?.data?.file;
+  deleteNote(key);
+  if (file && remote && !file.startsWith('data:')) remote.removeLab(file).catch(() => {});
+}
+// A link that downloads the sheet's PDF under `name` (signed for 10 minutes).
+export async function labFileUrl(path, name) {
+  if (!path) return null;
+  if (path.startsWith('data:') || !remote) return path;
+  return remote.labUrl(path, name);
+}
+
 /* ---------------- export / import ---------------- */
 export function exportData() {
   const strip = r => { const { user_id, ...rest } = r; return rest; };

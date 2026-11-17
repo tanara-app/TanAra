@@ -19,6 +19,7 @@ import { today, parse, addDays, diffDays } from '../lib/dates.js';
 import { perUnit } from '../domain/recipe.js';
 import { tagsOf, TAGS_KEY } from '../domain/health.js';
 import { toBuy } from '../domain/shopping.js';
+import { forAI, sheetsOf } from '../domain/labs.js';
 import * as shop from '../data/shop.js';
 
 const URL_ = `${SUPABASE_URL}/functions/v1/hooshvareh`;
@@ -180,11 +181,13 @@ function context() {
     // «برگشت به مسیر»: what they said when the diet slipped, what was planned, how it went
     checkins: s.ai_notes.filter(n => n.kind === 'checkin' && n.data).sort((a, b) => (a.key < b.key ? -1 : 1)).slice(-5)
       .map(({ key, data: d }) => ({ day: key.slice(8), signs: d.signs, mood: d.mood, causes: d.causes, said: d.said, cause: d.cause, steps: d.steps, goal: d.goal, outcome: d.outcome || null })),
-    notes: s.ai_notes.filter(n => !['thread', 'plan', 'pick', 'mag', 'recipe', 'shop', 'checkin', 'tags', 'logday'].includes(n.kind)).map(({ key, text, created_at }) => ({ key, text, created_at })),
+    // «آزمایش خون»: the newest value of every test, with the one before it
+    labs: forAI(sheetsOf(s.ai_notes), p?.sex),
+    notes: s.ai_notes.filter(n => !['thread', 'plan', 'pick', 'mag', 'recipe', 'shop', 'checkin', 'tags', 'logday', 'lab'].includes(n.kind)).map(({ key, text, created_at }) => ({ key, text, created_at })),
   };
 }
 
-async function post(body) {
+async function post(body, ctx = null) {
   if (!getToken) throw new Error('هوشواره فقط وقتی وارد حساب شده‌ای کار می‌کند.');
   if (navigator.onLine === false) throw new Error('برای هوشواره به اینترنت وصل شو.');
   const token = await getToken();
@@ -194,7 +197,7 @@ async function post(body) {
     res = await fetch(URL_, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, apikey: SUPABASE_KEY },
-      body: JSON.stringify({ ...body, ctx: context() }),
+      body: JSON.stringify({ ...body, ctx: ctx || context() }),
     });
   } catch { throw new Error('به هوشواره وصل نشد. اینترنت را بررسی کن.'); }
   if (!res.ok) {
@@ -206,7 +209,8 @@ async function post(body) {
 
 // One-shot modes: tip, quote, review, progress, maintain, checkin, occasion, estimate, photo, label, recipe, shop, title, plan, plan_option, plan_swap, magazine. Resolves to the result object.
 export async function ask(mode, input = {}) {
-  const res = await post({ mode, input });
+  // «آزمایش خون»: a lab PDF is read on its own; none of the member's data goes with it
+  const res = await post({ mode, input }, mode === 'lab' ? { today: today() } : null);
   const j = await res.json();
   if (!j.result) throw new Error(j.error || 'هوشواره جواب نداد.');
   return j.result;

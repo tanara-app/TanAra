@@ -23,6 +23,7 @@ import './quality.test.js';
 import './nutrients.test.js';
 import './chatText.test.js';
 import './rewards.test.js';
+import './labs.test.js';
 import './garden.test.js';
 import './heist.test.js';
 

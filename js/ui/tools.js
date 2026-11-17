@@ -15,6 +15,7 @@ import { toBuy } from '../domain/shopping.js';
 import { openFoodBank, openRecipes } from './foodBank.js';
 import { shareAdmin, checkShare, openFoodShare } from './foodShare.js';
 import { openRewards } from './rewards.js';
+import { openLabs, LAB_ICON } from './labs.js';
 
 
 // the game's tile: a safe's round door at night, with a red beam across it
@@ -33,6 +34,8 @@ const TOOLS = {
   rewards: { label: 'جوایز', open: () => openRewards() },
   // beta, only for accounts with `game` in profile.beta (set from the database; the key is older than the garden)
   // «سرقت بزرگ» took the garden's tile on 2026-11-17 (the garden's page is still at #/garden, with no tile)
+  // «آزمایش خون» (LABS.md): beta, only for accounts with `labs` in profile.beta
+  labs: { label: 'آزمایش خون', beta: true, svg: LAB_ICON, only: () => (store.profile()?.beta || []).includes('labs'), open: () => openLabs() },
   heist: { label: 'سرقت بزرگ', beta: true, svg: HEIST_ICON, only: () => (store.profile()?.beta || []).includes('game'), open: () => { location.hash = '#/heist'; } },
 };
 

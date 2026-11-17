@@ -21,6 +21,8 @@
     food_tags    health tags (purine, sugary, fatty…) of the foods they added or wrote as recipes
     magazine  one magazine article, researched with real web search limited to trusted
               health sources; every source link shown comes from the search results
+    lab       a lab-results PDF («آزمایش خون»), read twice in parallel by Claude Opus 5.5 so the app can
+              compare the reads and check the numbers (js/domain/labs.js); no member data is sent
 
   The app sends its whole local state (it's the source of truth, including writes not yet
   synced), so the model always sees exactly what the user sees. The API key lives only in
@@ -42,7 +44,7 @@ const MODEL = "claude-sonnet-5-5";
 // Server-side fallback: if a safety classifier declines, the API retries on the model
 // Anthropic recommends for that category instead of failing the request.
 const BETAS = ["server-side-fallback-2026-07-01"];
-const MAX_BODY = 8_000_000; // room for a few chat photos on top of the data
+const MAX_BODY = 9_000_000; // room for a few chat photos on top of the data, or a lab PDF (sent without the data)
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -181,6 +183,7 @@ type Ctx = {
   mode?: string; plan?: any; magazine?: any[]; focus?: string; recipes?: any[];
   shopping?: { name: string; amount?: string; for?: string }[];
   checkins?: any[];
+  labs?: any[];
 };
 
 // snack1 / snack2: the morning and afternoon snacks of the rebuilt «امروز» (js/domain/meals.js); «snack» is either
@@ -333,6 +336,8 @@ function sections(c: Ctx) {
     },
     reviews: () => `# Weekly reviews they wrote (weeks start Saturday)\n${[...(c.reviews || [])].sort((a, b) => (a.week_start < b.week_start ? -1 : 1)).map(r => `week of ${r.week_start}: good: ${r.good || "-"} / hard: ${r.hard || "-"} / next goal: ${r.next_goal || "-"}`).join("\n") || "none"}`,
     motivations: () => `# Motivations they saved\n${(c.motivations || []).map(m => `${kinds[m.kind] || m.kind}${m.day ? ` (${m.day})` : ""}: ${m.title || "(no title)"}${m.note ? ` — ${m.note}` : ""}${m.image_path ? " [has photo]" : ""}`).join("\n") || "none"}`,
+    // «آزمایش خون»: the newest value of each test from the lab sheets they saved (the app checked them)
+    labs: () => (c.labs || []).length ? `# Their blood and urine tests, newest value of each (test | value unit | date | healthy range | low/high | the value before and its date). The healthy range is the clinical guideline's for sugar, lipids, uric acid, vitamin D and eGFR, else the lab's.\n${c.labs!.slice(0, 60).map(l => `${l.test} | ${l.value} ${l.unit || ""} | ${l.day} | ${l.range || "-"} | ${l.status || "-"}${l.before != null ? ` | before: ${l.before} (${l.before_day})` : ""}`).join("\n")}\nUse these when they matter (food for high triglycerides or low vitamin D, the trend since last time), without diagnosing: a doctor reads the full sheet. Numbers out of range that are not about food (blood count, thyroid): suggest showing them to their doctor.` : "",
     checkins: () => (c.checkins || []).length ? `# «برگشت به مسیر» check-ins: when the diet slipped, what they told you, what you made of it and planned, and how it went (latest last)\n${c.checkins!.map(k => `${k.day}: noticed ${signText(k.signs)}; mood ${k.mood ? `${k.mood}/5` : "-"}; they named: ${(k.causes || []).join("، ") || "-"}${k.said ? `; they wrote: «${String(k.said).slice(0, 600)}»` : ""}\n  your reading: ${String(k.cause || "-").slice(0, 600)}\n  plan: ${(k.steps || []).join(" / ")}${k.goal ? `; week goal: ${k.goal}` : ""}\n  outcome a week later: ${({ good: "went well", some: "partly", no: "did not work" } as Record<string, string>)[k.outcome] || "not asked yet"}`).join("\n")}` : "",
     notes: () => `# What you (Hooshvareh) already told them outside the chat, latest last\n${[...(c.notes || [])].sort((a, b) => (a.created_at < b.created_at ? -1 : 1)).slice(-20).map(n => `${n.key}: ${n.text}`).join("\n") || "none"}`,
     magazine: () => {
@@ -763,7 +768,7 @@ const ONE_SHOT: Record<string, OneShot> = {
   plan: {
     effort: "medium",
     max_tokens: 20000,
-    data: (S) => [S.now(), S.profile(), S.targets(), S.phase(), S.energy(), S.mode(), S.foods(), S.plan(), S.pattern(), S.adherence(), S.weights(), S.totals(), S.recent(), S.reviews(), S.checkins()],
+    data: (S) => [S.now(), S.profile(), S.labs(), S.targets(), S.phase(), S.energy(), S.mode(), S.foods(), S.plan(), S.pattern(), S.adherence(), S.weights(), S.totals(), S.recent(), S.reviews(), S.checkins()],
     schema: {
       type: "object",
       properties: {
@@ -1145,6 +1150,149 @@ function refusalText() {
   return "متأسفم، نمی‌توانم به این یکی جواب بدهم. می‌توانی سؤالت را جور دیگری بپرسی؟";
 }
 
+/* ---------------- lab sheets («آزمایش خون», LABS.md) ---------------- */
+
+/*
+  A lab-results PDF, read twice at the same time by the most capable model, with two different
+  ways of working through the sheet. The app compares the two reads and checks the numbers against
+  each other (js/domain/labs.js), so the member only looks at what is doubtful. Nothing about the
+  member is sent: the app sends only today's date with the PDF. The PDF itself is not kept here.
+*/
+const LAB_MODEL = "claude-opus-5-5";
+const MAX_PDF = 7_000_000; // base64 characters: a PDF of about 5 MB
+// The tests the app knows. Keys match TESTS in js/domain/labs.js (a test in tests/labs.test.js checks).
+const LAB_TESTS = {
+  fbs: "fasting blood glucose / sugar (FBS, Glucose F, Blood Sugar (F))",
+  rbs: "random or non-fasting blood glucose (RBS)",
+  pp2: "glucose 2 hours after a meal or a glucose load (2hPP, GTT 2 h)",
+  hba1c: "glycated haemoglobin (HbA1c, A1C)",
+  chol: "total cholesterol",
+  tg: "triglycerides",
+  hdl: "HDL cholesterol",
+  ldl: "LDL cholesterol",
+  vldl: "VLDL cholesterol",
+  alt: "ALT / SGPT / alanine transaminase",
+  ast: "AST / SGOT / aspartate transaminase",
+  alp: "alkaline phosphatase (ALP)",
+  ggt: "gamma-GT (GGT)",
+  bili: "total bilirubin (not direct or indirect)",
+  cr: "serum creatinine",
+  urea: "blood urea (urea itself, not BUN)",
+  bun: "BUN (blood urea nitrogen)",
+  uric: "uric acid in blood",
+  egfr: "eGFR",
+  vitd: "25-OH vitamin D",
+  b12: "vitamin B12",
+  ferritin: "ferritin",
+  iron: "serum iron",
+  ca: "total calcium (not ionised)",
+  na: "sodium",
+  k: "potassium",
+  cl: "chloride",
+  mg: "magnesium",
+  phos: "phosphorus / phosphate",
+  tsh: "TSH",
+  ft4: "free T4 (FT4)",
+  t4: "total T4 / thyroxine",
+  t3: "total T3 (not free T3)",
+  hgb: "haemoglobin (Hb, HGB) in the blood count",
+  wbc: "total white blood cells (WBC)",
+  plt: "platelets (PLT)",
+  rbc: "red blood cells (RBC)",
+  hct: "haematocrit (HCT, PCV)",
+  mcv: "MCV",
+  mch: "MCH",
+  mchc: "MCHC",
+  rdw: "RDW-CV",
+  mpv: "MPV",
+  neut: "neutrophils, percent",
+  lymph: "lymphocytes, percent",
+  mono: "monocytes, percent",
+  eos: "eosinophils, percent",
+  baso: "basophils, percent",
+  esr: "ESR (sedimentation rate)",
+  crp: "CRP (C-reactive protein, quantitative)",
+  u_glucose: "glucose / sugar in a URINE test (GUE, urinalysis)",
+  u_protein: "protein / albumin in a URINE test",
+  u_ketone: "ketones in a URINE test",
+};
+const LAB_SCHEMA = {
+  type: "object",
+  properties: {
+    found: { type: "boolean", description: "false if this is not a laboratory result sheet" },
+    lab: str("the laboratory or hospital name as printed, empty if none"),
+    date: str("the date of this sheet's results (sample taken or reported, not the date it was printed when another is shown), as YYYY-MM-DD in the Gregorian calendar; empty if none"),
+    prev_date: str("the date of the previous-result column, if the sheet has one, as YYYY-MM-DD; empty otherwise"),
+    person: {
+      type: "object",
+      properties: {
+        name: str("the patient's name as printed, empty if none"),
+        age: { type: "number", description: "age in years as printed, 0 if not printed" },
+        sex: { type: "string", enum: ["male", "female", ""] },
+      },
+      required: ["name", "age", "sex"], additionalProperties: false,
+    },
+    rows: {
+      type: "array",
+      description: "every test with a result on the sheet, in the order printed",
+      items: {
+        type: "object",
+        properties: {
+          key: { type: "string", enum: [...Object.keys(LAB_TESTS), "other"], description: "the test it is, or other" },
+          name: str("the test's name exactly as printed, without any code number"),
+          value: str("this sheet's result exactly as printed: the number with its decimal point and any < or >, or the word or signs (Negative, Absent, Trace, ++)"),
+          unit: str("the unit as printed in the row, empty if none"),
+          range: str("the normal or reference range as printed for this row, empty if none"),
+          prev: str("the previous result for this test, if the sheet has a previous-result column, exactly as printed; empty otherwise"),
+        },
+        required: ["key", "name", "value", "unit", "range", "prev"], additionalProperties: false,
+      },
+    },
+  },
+  required: ["found", "lab", "date", "prev_date", "person", "rows"], additionalProperties: false,
+};
+const LAB_SYSTEM = `You copy medical laboratory result sheets into data for تن‌آرا, a Persian health app. Members rely on these numbers without checking them one by one, so an exact copy matters more than anything else.
+
+Rules for every row:
+- Copy each result character by character as printed. Never round, compute, correct or convert a number or a unit, and keep every decimal point. Write Persian or Arabic digits as Western digits.
+- The value is this sheet's result. It is never the reference range, never the previous result, and never a code or catalogue number that some sheets print next to the name (like "RESULT / 2841" or "S. Cholesterol / 1172": 2841 and 1172 are codes, not results).
+- Read across the row: the unit, range and previous result you write must be on the same printed row as the value.
+- Map each test to the closest key in this list, and use "other" for any test not in it (IgE, ASO, rheumatoid factor, urine microscopy and so on). A glucose in a urine test is u_glucose, never fbs; blood urea and BUN are different tests.
+${Object.entries(LAB_TESTS).map(([k, d]) => `  ${k}: ${d}`).join("\n")}
+- Include every row that has a result, also those with the key "other". Leave out headings and rows with no result.
+- If the sheet has no previous-result column, prev is empty for every row.
+Dates: give them in the Gregorian calendar as YYYY-MM-DD; convert a Jalali (۱۴۰۵/۰۸/۲۳) or Hijri date. Labs in Iran and Iraq usually print the year first.`;
+const LAB_PROMPTS = [
+  "Copy every result on this lab sheet, page by page and row by row.",
+  "Work through this lab sheet column by column first: on every page, find each table's header row and decide which column holds this sheet's result, which the unit, which the reference range and which an earlier (previous) result, if any. Then copy every result row using those columns.",
+];
+
+async function runLab(input: any, use: Use) {
+  const pdf = input?.pdf;
+  if (typeof pdf !== "string" || !pdf.startsWith("JVBER") || pdf.length > MAX_PDF || !/^[A-Za-z0-9+/]+=*$/.test(pdf)) {
+    return json({ error: "فایل PDF درست نرسید یا خیلی بزرگ است." }, 400);
+  }
+  const read = async (prompt: string) => {
+    const res: any = await anthropic.beta.messages.create({
+      model: LAB_MODEL,
+      max_tokens: 16000,
+      betas: BETAS,
+      fallbacks: "default",
+      system: LAB_SYSTEM,
+      output_config: { effort: "medium", format: { type: "json_schema", schema: LAB_SCHEMA } },
+      messages: [{ role: "user", content: [{ type: "document", source: { type: "base64", media_type: "application/pdf", data: pdf } }, { type: "text", text: prompt }] }],
+    } as any);
+    use.add("lab", res);
+    if (res.stop_reason !== "end_turn") throw new Error(`lab read stopped: ${res.stop_reason}`);
+    return JSON.parse(res.content.filter((b: any) => b.type === "text").map((b: any) => b.text).join(""));
+  };
+  const out = await Promise.allSettled(LAB_PROMPTS.map(read));
+  out.forEach(o => { if (o.status === "rejected") console.error("lab read failed", o.reason); });
+  const reads = out.map(o => (o.status === "fulfilled" ? o.value : null));
+  if (!reads.some(Boolean)) return json({ error: "برگه خوانده نشد؛ دوباره امتحان کن." }, 502);
+  return json({ result: { reads } });
+}
+
 async function runOneShot(mode: string, ctx: Ctx, input: any, use: Use) {
   const m = ONE_SHOT[mode];
   const image = m.image && input?.image != null;
@@ -1297,7 +1445,7 @@ function runChat(ctx: Ctx, history: any[], images: unknown, use: Use) {
   const S = sections(ctx);
 
   // Cached prefix: tools, prompt, and everything that doesn't change while they chat.
-  const system = systemBlocks(block([S.profile(), S.targets(), S.phase(), S.energy(), S.mode(), S.foods(), S.recipes(), S.magazine(), S.motivations(), S.reviews(), S.checkins(), S.notes(), S.plan(), S.pattern(), S.weights(), S.totals(S.yesterday), S.entries(S.detailFrom, S.yesterday)]));
+  const system = systemBlocks(block([S.profile(), S.labs(), S.targets(), S.phase(), S.energy(), S.mode(), S.foods(), S.recipes(), S.magazine(), S.motivations(), S.reviews(), S.checkins(), S.notes(), S.plan(), S.pattern(), S.weights(), S.totals(S.yesterday), S.entries(S.detailFrom, S.yesterday)]));
   // What changes by the minute goes after the conversation, so it never breaks the cache:
   // the next message finds everything up to this one already cached.
   const live = `<live_data>\n${block([S.now(), S.today(), S.standing(), S.activity(), S.occasions(), S.adherence(), S.shopping(), S.focus()])}\n</live_data>`;
@@ -1419,6 +1567,7 @@ Deno.serve(async (req) => {
   try {
     if (body.mode === "chat") return runChat(ctx, body.messages, body.images ?? body.image, use); // saves its usage when the stream ends
     const res = body.mode === "magazine" ? await runMagazine(ctx, body.input, use)
+      : body.mode === "lab" ? await runLab(body.input, use)
       : ONE_SHOT[body.mode] ? await runOneShot(body.mode, ctx, body.input, use)
       : json({ error: "unknown mode" }, 400);
     await use.save();
