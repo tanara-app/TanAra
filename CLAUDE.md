@@ -57,6 +57,10 @@ exist side by side. When a new decision replaces an old one, change or mark the 
   (verify_jwt true for `hooshvareh`), as on 2026-11-11 (version 45), 2026-11-12 (version 47) and 2026-11-13 (version 48). On 2026-11-15
   `m.b.a` deployed version 49 with the CLI (commit 8ee2b03, the «ثبت کامل» / «ثبت ناقص» marks). The same day `ClaudeAccount` deployed
   version 50 with the MCP tool (commit 3371b05, carbohydrate and sodium of own foods, the «پیشرفت» pace; 8ee2b03 is in it).
+- On 2026-11-17 the user installed the official Meshy plugin (claude.ai directory, by Meshy) with three skills:
+  `meshy-3d-generation`, `meshy-3d-printing`, `meshy-openclaw`. It belongs to the claude.ai account, not this folder
+  (on `m.b.a` it is cached under `~/Library/Application Support/Claude/local-agent-mode-sessions/…/rpm/plugin_01LLaHeMvnzBdyHYEGGSUNZi/`).
+  If `ClaudeAccount` uses another claude.ai account, it does not have these skills.
 - Tests: `node tests/run.js` (or open `tests/index.html` in the browser).
 - The user speaks Persian; answer in Persian.
 - ElevenLabs (the mascot's voice): always the newest model, and ask the user before generating anything
