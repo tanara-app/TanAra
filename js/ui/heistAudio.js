@@ -18,9 +18,17 @@ export function createAudio(bus) {
   const buffers = {};
   try { on = localStorage.getItem(KEY) !== 'off'; } catch { /* private mode */ }
 
-  async function load(name) {
-    const res = await fetch(DIR + SOUNDS[name][0]);
-    buffers[name] = await ctx.decodeAudioData(await res.arrayBuffer());
+  // a file that fails is asked for once more a moment later (a busy server drops some of thirteen requests at once)
+  async function load(name, tries = 2) {
+    try {
+      const res = await fetch(DIR + SOUNDS[name][0]);
+      if (!res.ok) throw new Error(res.status);
+      buffers[name] = await ctx.decodeAudioData(await res.arrayBuffer());
+    } catch (e) {
+      if (tries <= 1 || closed) throw e;
+      await new Promise(r => setTimeout(r, 900));
+      return load(name, tries - 1);
+    }
   }
   // Called from a tap: make the context and fetch the files (once).
   function unlock() {

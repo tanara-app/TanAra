@@ -36,13 +36,16 @@ export async function createScene(stage, vault, opts = {}) {
   const pos = (i, y = 0) => new T.Vector3(i % W - (W - 1) / 2, y, (i / W | 0) - (H - 1) / 2);
 
   // ---------- renderer, camera, light ----------
-  const renderer = new T.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+  // A scene for another vault (the editor rebuilds on every tap) takes the renderer and the loaded figures over from the last one:
+  // `release()` hands them on, `opts.keep` takes them.
+  const keep = opts.keep || {};
+  const renderer = keep.renderer || new T.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
   renderer.toneMapping = T.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.15;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = T.PCFSoftShadowMap;
   renderer.info.autoReset = false;
-  stage.appendChild(renderer.domElement);
+  if (renderer.domElement.parentNode !== stage) stage.appendChild(renderer.domElement);
 
   const scene = new T.Scene();
   scene.background = new T.Color(COLORS.bg);
@@ -323,11 +326,39 @@ export async function createScene(stage, vault, opts = {}) {
   overlay.renderOrder = 2;
   board.add(overlay);
 
+  // The guards' rounds as glowing red strips on the floor, for the vault's owner in the editor.
+  const routes = new T.Group();
+  routes.visible = false;
+  board.add(routes);
+  {
+    const strip = new T.MeshBasicMaterial({ color: new T.Color(COLORS.red).multiplyScalar(1.3), transparent: true, opacity: 0.55, depthWrite: false, toneMapped: false });
+    const dotGeo = new T.CircleGeometry(0.09, 16);
+    dotGeo.rotateX(-Math.PI / 2);
+    for (const d of vault.defenses || []) {
+      if (d.t !== 'guard') continue;
+      const done = new Set(), cells = d.path.map(([x, y]) => y * W + x);
+      for (const c of new Set(cells)) { const m = new T.Mesh(dotGeo, strip); m.position.copy(pos(c, 0.03)); routes.add(m); }
+      for (let k = 0; k < cells.length && cells.length > 1; k++) {
+        const a = cells[k], b = cells[(k + 1) % cells.length], key = Math.min(a, b) + ',' + Math.max(a, b);
+        if (a === b || done.has(key)) continue;
+        done.add(key);
+        const m = new T.Mesh(new T.PlaneGeometry(0.07, 1), strip);
+        m.rotation.x = -Math.PI / 2;
+        m.rotation.z = (b - a === 1 || a - b === 1) ? Math.PI / 2 : 0;
+        m.position.copy(pos(a, 0.03).add(pos(b, 0.03)).multiplyScalar(0.5));
+        routes.add(m);
+      }
+    }
+  }
+
   // ---------- the figures ----------
   opts.onProgress?.(0.45);
   const loader = new GLTFLoader();
   const load = url => new Promise(res => loader.load(url, res, undefined, () => res(null)));
-  const [thiefFile, guardFile] = await Promise.all([load('assets/heist/thief.glb'), load('assets/heist/guard.glb')]);
+  const [thiefFile, guardFile] = keep.files || await Promise.all([load('assets/heist/thief.glb'), load('assets/heist/guard.glb')]);
+  // what belongs to the figures' files (shared by every scene that takes them over), so `release()` leaves it alone
+  const shared = new Set();
+  for (const f of [thiefFile, guardFile]) f?.scene.traverse(o => { if (o.geometry) shared.add(o.geometry); [].concat(o.material || []).forEach(m => { shared.add(m); for (const v of Object.values(m)) if (v?.isTexture) shared.add(v); }); });
   opts.onProgress?.(0.9);
 
   // If a model is missing the game still works: a simple figure in the same colours stands in.
@@ -579,15 +610,17 @@ export async function createScene(stage, vault, opts = {}) {
 
   // ---------- showing a state ----------
   let shown = null;
-  let quiet = true;   // no danger or hints on the floor until a raid is on
+  // true: nothing on the floor (menu, result); false: a raid's danger and hints; 'edit': what the defences see at the start, under the
+  // editor's cyan marks (no next-turn frames)
+  let quiet = true;
   function setOverlay(state, hints) {
     aCur.array.fill(0); aNext.array.fill(0); aHint.array.fill(0);
-    if (state && state.status === 'play' && !quiet) {
-      const now = threats(vault, state), next = nextThreats(vault, state);
-      for (const i of [...now.seen, ...now.cam]) aCur.array[i] = 1;
-      for (const i of [...next.seen, ...next.near, ...next.cam, ...next.laser]) aNext.array[i] = 1;
+    if (state && state.status === 'play' && quiet !== true) {
+      const now = threats(vault, state);
+      for (const i of [...now.seen, ...now.cam]) aCur.array[i] = quiet === 'edit' ? 0.6 : 1;
+      if (!quiet) { const next = nextThreats(vault, state); for (const i of [...next.seen, ...next.near, ...next.cam, ...next.laser]) aNext.array[i] = 1; }
     }
-    if (!quiet) for (const [i, kind] of hints || []) aHint.array[i] = kind;
+    if (quiet !== true) for (const [i, kind] of hints || []) { aHint.array[i] = kind; if (quiet === 'edit') aCur.array[i] = 0; }
     aCur.needsUpdate = aNext.needsUpdate = aHint.needsUpdate = true;
   }
   function setLaser(l, on, dead) {
@@ -834,10 +867,11 @@ export async function createScene(stage, vault, opts = {}) {
     const r = renderer.domElement.getBoundingClientRect();
     const ray = new T.Raycaster();
     ray.setFromCamera(new T.Vector2(((clientX - r.left) / r.width) * 2 - 1, -((clientY - r.top) / r.height) * 2 + 1), camera);
-    const hit = ray.ray.intersectPlane(new T.Plane(new T.Vector3(0, 1, 0), 0), new T.Vector3());
-    if (!hit) return -1;
-    const x = Math.round(hit.x + (W - 1) / 2), y = Math.round(hit.z + (H - 1) / 2);
-    return x < 0 || y < 0 || x >= W || y >= H ? -1 : y * W + x;
+    const cell = h => { if (!h) return -1; const x = Math.round(h.x + (W - 1) / 2), y = Math.round(h.z + (H - 1) / 2); return x < 0 || y < 0 || x >= W || y >= H ? -1 : y * W + x; };
+    // the top of a wall first (a tap there means the wall, not the floor behind it), then the floor
+    const top = cell(ray.ray.intersectPlane(new T.Plane(new T.Vector3(0, 1, 0), -(WALL_H - 0.09)), new T.Vector3()));
+    if (top >= 0 && tiles[top] === '#') return top;
+    return cell(ray.ray.intersectPlane(new T.Plane(new T.Vector3(0, 1, 0), 0), new T.Vector3()));
   }
   // Where a cell is on the screen, and how wide it is there (for ?debug: every cell should be 44 points or more).
   function cellRect(i) {
@@ -936,7 +970,7 @@ export async function createScene(stage, vault, opts = {}) {
       opts.onStats?.({ fps: Math.round(fps), tier });
     }
   }
-  resize();
+  if (keep.tier) setTier(keep.tier); else resize();
   const onResize = () => resize();
   window.addEventListener('resize', onResize);
   raf = requestAnimationFrame(frame);
@@ -959,6 +993,24 @@ export async function createScene(stage, vault, opts = {}) {
     get tier() { return tier; }, get fps() { return Math.round(fps); },
     three: { T, scene, camera, renderer },
     info: () => ({ ...renderer.info.memory, ...drawn }),
+    showRoutes(on) { routes.visible = on; },
+    // Everything but the renderer and the figures' files, which the next scene takes over (opts.keep).
+    release() {
+      disposed = true;
+      cancelAnimationFrame(raf);
+      window.removeEventListener('resize', onResize);
+      for (const t of tweens.splice(0)) t.res();
+      const seen = new Set(shared);
+      const drop = m => { if (!m || seen.has(m)) return; seen.add(m); for (const v of Object.values(m)) if (v?.isTexture && !shared.has(v)) v.dispose(); m.dispose(); };
+      scene.traverse(obj => { if (obj.geometry && !shared.has(obj.geometry)) obj.geometry.dispose(); [].concat(obj.material || []).forEach(drop); });
+      [litDot, dimDot, deadDot, litLens, deadLens, shutLamp, openLamp, puckMat, puckLamp, puckDead].forEach(drop);
+      [puckGeo, puckLampGeo, puckRimGeo].forEach(g => g.dispose());
+      [ringTex, arrowTex, cueTex, plateTex, puffTex, askTex, alertTex, scanTex, curtainTex].forEach(t => t.dispose());
+      // the moon's shadow map and each figure's bone texture belong to this scene, not to the files
+      scene.traverse(obj => { if (obj.isLight) obj.shadow?.dispose(); if (obj.isSkinnedMesh) obj.skeleton?.dispose(); });
+      bloom.dispose?.(); composer.dispose?.();
+      return { renderer, files: [thiefFile, guardFile], tier };
+    },
     dispose() {
       disposed = true;
       cancelAnimationFrame(raf);

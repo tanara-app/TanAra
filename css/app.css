@@ -1695,3 +1695,43 @@ body.heist-mode .nav { display: none; }
 .heist-stage { transition: opacity .5s; }
 .heist-debug { position: absolute; top: calc(env(safe-area-inset-top) + 60px); left: 8px; margin: 0; padding: 4px 7px; border-radius: 6px; background: rgba(0,0,0,.55); color: #9fe8a0; font: 10px/1.35 ui-monospace, monospace; pointer-events: none; }
 @media (prefers-reduced-motion: reduce) { .heist.alarm .heist-glow { animation: none; box-shadow: inset 0 0 90px 14px rgba(255,46,77,.4); } }
+/* «سرقت بزرگ», the vault editor (phase 3) and «my vault» on the menu */
+.heist-levels button { display: grid; place-items: center; }
+.heist-levels button svg { width: 22px; height: 22px; }
+.heist-go-row { display: flex; align-items: center; gap: 22px; direction: ltr; }
+.heist-go-row [data-edit] { display: none; color: var(--cy); border-color: rgba(61,224,255,.55); }
+.heist.mine .heist-go-row [data-edit] { display: grid; }
+.heist.mine .heist-result [data-next] { visibility: hidden; }
+.heist-go:disabled { opacity: .3; box-shadow: none; }
+.heist-edit { position: absolute; inset: 0; opacity: 0; pointer-events: none; transition: opacity .3s; }
+.heist[data-state="edit"] .heist-edit { opacity: 1; }
+.heist[data-state="edit"] .heist-edit button { pointer-events: auto; }
+.heist[data-state="edit"] .heist-top, .heist[data-state="edit"] .heist-tools { opacity: 0; pointer-events: none; }
+.heist-edit-top { position: absolute; top: calc(env(safe-area-inset-top) + 12px); left: 14px; height: 42px; display: flex; align-items: center; gap: 12px; direction: ltr; }
+.heist-edit-top [data-watch] { width: 42px; height: 42px; color: var(--cy); }
+.heist-edit-top [data-watch] svg { width: 22px; height: 22px; }
+.heist-grade { display: flex; align-items: flex-end; gap: 3px; height: 20px; }
+.heist-grade i { width: 5px; border-radius: 2px; background: rgba(140,154,200,.25); }
+.heist-grade i:nth-child(1) { height: 6px; } .heist-grade i:nth-child(2) { height: 9.5px; } .heist-grade i:nth-child(3) { height: 13px; }
+.heist-grade i:nth-child(4) { height: 16.5px; } .heist-grade i:nth-child(5) { height: 20px; }
+.heist-grade i.on { background: var(--gd); box-shadow: 0 0 7px rgba(255,201,74,.7); }
+.heist-cost { display: flex; align-items: baseline; gap: 4px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.heist-cost b { font-size: 1.25rem; }
+.heist-cost i { font-style: normal; font-size: .8rem; color: #8c9ac8; }
+.heist-cost i::before { content: '/'; margin-inline-end: 3px; opacity: .6; }
+.heist-cost.over b { color: var(--rd); text-shadow: 0 0 10px rgba(255,46,77,.6); }
+.heist-verdict { display: grid; place-items: center; width: 26px; height: 26px; }
+.heist-verdict svg { width: 24px; height: 24px; }
+.heist-verdict.ok { color: var(--cy); filter: drop-shadow(0 0 6px rgba(61,224,255,.7)); }
+.heist-verdict.bad { color: var(--rd); filter: drop-shadow(0 0 6px rgba(255,46,77,.6)); }
+.heist-why { position: absolute; top: calc(env(safe-area-inset-top) + 60px); left: 16px; right: 16px; margin: 0; min-height: 1.4em; font-size: .85rem; line-height: 1.4; text-align: center; color: #ff8b9d; }
+.heist-palette { position: absolute; left: 0; right: 0; bottom: calc(env(safe-area-inset-bottom) + 18px); display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.heist-palette div { display: flex; gap: 8px; direction: ltr; }
+.heist-palette button { display: grid; place-items: center; width: 48px; height: 48px; padding: 0; border-radius: 14px; border: 1.5px solid rgba(140,154,200,.3);
+  background: rgba(14,23,54,.8); color: #8c9ac8; transition: color .15s, border-color .15s, box-shadow .15s, transform .12s, opacity .2s; }
+.heist-palette button svg { width: 24px; height: 24px; }
+.heist-palette button:active { transform: scale(.92); }
+.heist-palette button.on { border-color: var(--cy); color: var(--cy); background: rgba(61,224,255,.12); box-shadow: 0 0 14px rgba(61,224,255,.45); }
+.heist-palette button:disabled, .heist-edit-top button:disabled { opacity: .3; }
+.heist .no { animation: heist-nudge .28s ease; }
+@keyframes heist-nudge { 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
