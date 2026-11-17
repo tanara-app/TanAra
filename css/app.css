@@ -1735,3 +1735,33 @@ body.heist-mode .nav { display: none; }
 .heist-palette button:disabled, .heist-edit-top button:disabled { opacity: .3; }
 .heist .no { animation: heist-nudge .28s ease; }
 @keyframes heist-nudge { 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
+/* «سرقت بزرگ» online (phase 4): coins and raids left, the members to raid, raids on my vault, the coins a raid made */
+.heist-wallet { position: absolute; top: calc(env(safe-area-inset-top) + 12px); left: 16px; height: 42px; display: none; align-items: center; gap: 6px; direction: ltr; z-index: 2; pointer-events: none; }
+.heist.online[data-state="menu"] .heist-wallet, .heist.online[data-state="result"] .heist-wallet { display: flex; }
+.heist.online[data-state="result"] .heist-top { opacity: 0; }
+.heist-wallet b { font-size: 1.15rem; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--gd); }
+.heist-left { display: flex; gap: 3px; margin-inline-start: 6px; }
+.heist-left i { width: 7px; height: 7px; border-radius: 50%; background: rgba(140,154,200,.25); }
+.heist-left i.on { background: var(--cy); box-shadow: 0 0 6px var(--cy); }
+.heist-targets { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.heist-targets:empty { display: none; }
+.heist-targets button { display: inline-flex; align-items: center; gap: 5px; height: 38px; padding: 0 16px; border-radius: 19px; border: 1.5px solid rgba(140,154,200,.35);
+  background: rgba(14,23,54,.75); color: #e8eeff; font-weight: 700; font-size: .95rem; }
+.heist-targets button svg { width: 16px; height: 16px; }
+.heist-targets button.on { border-color: var(--rd); color: #fff; box-shadow: 0 0 14px rgba(255,46,77,.45); }
+.heist-targets button.shielded { color: #8c9ac8; }
+.heist-levels button { position: relative; }
+.heist-levels button.pays::after, .heist-levels button.news::after { content: ''; position: absolute; top: 5px; right: 5px; width: 7px; height: 7px; border-radius: 50%; }
+.heist-levels button.pays::after { background: var(--gd); box-shadow: 0 0 6px rgba(255,201,74,.8); }
+.heist-levels button.news::after { background: var(--rd); box-shadow: 0 0 6px rgba(255,46,77,.8); }
+.heist-go-row [data-inbox] { position: relative; color: var(--cy); border-color: rgba(61,224,255,.55); }
+.heist-go-row [data-inbox][hidden] { display: none; }
+.heist-badge { position: absolute; top: -4px; right: -4px; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 10px; display: grid; place-items: center;
+  background: var(--rd); color: #fff; font-size: .72rem; font-weight: 800; }
+.heist-gain { display: inline-flex; align-items: center; gap: 4px; margin-inline-start: 14px; vertical-align: middle; }
+.heist-gain:empty { display: none; }
+.heist-gain.up b { color: var(--gd); }
+.heist-gain.down b { color: var(--rd); }
+.heist.member .heist-result [data-next] { visibility: hidden; }
+.heist.viewing .heist-result [data-next] { visibility: visible; }
+.heist.viewing .heist-result [data-again] { display: none; }

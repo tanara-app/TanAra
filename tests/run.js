@@ -27,6 +27,7 @@ import './labs.test.js';
 import './garden.test.js';
 import './heist.test.js';
 import './heistEdit.test.js';
+import './heistRules.test.js';
 
 const results = await run();
 const failed = results.filter(r => !r.ok);

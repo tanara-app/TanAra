@@ -13,12 +13,13 @@
   and then a lit cell to use it. Arrow keys and space work too. `?debug` shows the frame rate, the quality step and
   the narrowest cell; `window.__heist` gives the state to the console. The sound is in ui/heistAudio.js.
 */
-import { icon } from './dom.js';
+import { icon, toast } from './dom.js';
 import { fa } from '../lib/fa.js';
 import { generate, initial, play, solve, MAX_TURNS, ALARM_TURNS, LEVELS, W, H, EMP_RADIUS, SMOKE_RANGE, BAIT_RANGE } from '../domain/heist.js';
 import { createScene } from './heistScene.js';
 import { createAudio } from './heistAudio.js';
 import { edit as editVault, targets, check, lineOf } from '../domain/heistEdit.js';
+import * as net from '../data/heistNet.js';
 
 // The five gadgets in their order on the menu. A raid takes two (DESIGN-heist.md); the lockpick and the goggles just work while carried,
 // the others are used with a tap and then (smoke, decoy) a tap on a cell.
@@ -36,6 +37,10 @@ const WHY = { unsolvable: 'راه بی‌آژیر ندارد', budget: 'از ب�
   plate: 'روی هر خانه یک صفحه', mark: 'روی هر خانه یک نشانه', defense: 'گاوصندوق خراب است', shape: 'گاوصندوق خراب است' };
 const DIRS = ['U', 'R', 'D', 'L'], DX = [0, 1, 0, -1], DY = [-1, 0, 1, 0];
 const TITLES = { escaped: 'فرار بی‌صدا', escaped_alarm: 'فرار با آژیر', caught: 'گیر افتادی', timeout: 'وقت تمام شد', fled: 'دست خالی' };
+// a raid on my vault, as I watch it later: what the thief did
+const DID = { escaped: 'دستبرد زد', escaped_alarm: 'با آژیر فرار کرد', caught: 'گیر افتاد', timeout: 'گیر افتاد', fled: 'دست خالی رفت' };
+// why the server would not let a raid begin
+const REFUSED = { shield: 'این گاوصندوق سپر دارد', limit: 'دستبردهای امروز تمام شد', coins: 'سکه‌ی کافی نداری' };
 
 const svg = (d, extra = '') => `<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"${extra}>${d}</svg>`;
 const ICON = {
@@ -68,6 +73,8 @@ const ICON = {
   eye: svg('<path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>'),
   ok: svg('<path d="M5 12.5l4.5 4.5L19 7.5"/>'),
   bad: svg('<circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5M12 16.3v.4"/>'),
+  coin: '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="#ffc94a"/><circle cx="12" cy="12" r="6.2" fill="none" stroke="#b8861f" stroke-width="1.6"/><path d="M12 8.6v6.8" stroke="#b8861f" stroke-width="1.8" stroke-linecap="round"/></svg>',
+  shield: svg('<path d="M12 3l7 3v5.5c0 4.5-3 8-7 9.5-4-1.5-7-5-7-9.5V6z"/>'),
 };
 
 function makeBus() {
@@ -91,6 +98,7 @@ export function renderHeist(root) {
       <div class="heist-glow" aria-hidden="true"></div>
       <button class="heist-btn heist-back" data-back aria-label="برگشت">${icon.chevR}</button>
       <button class="heist-btn heist-sound" data-sound aria-label="صدا">${ICON.sound}</button>
+      <div class="heist-wallet" aria-hidden="true">${ICON.coin}<b></b><span class="heist-left"></span></div>
       <div class="heist-top">
         <span class="heist-alarm" aria-hidden="true">${'<i></i>'.repeat(ALARM_TURNS)}</span>
         <span class="heist-loot" aria-hidden="true">${ICON.loot}</span>
@@ -99,9 +107,11 @@ export function renderHeist(root) {
       <div class="heist-tools"></div>
       <div class="heist-menu">
         <h1>سرقت بزرگ</h1>
+        <div class="heist-targets" role="group" aria-label="اعضا"></div>
         <div class="heist-levels" role="group" aria-label="سطح">${Array.from({ length: LEVELS }, (_, i) => `<button data-level="${i + 1}">${fa(i + 1)}</button>`).join('')}<button data-level="mine" aria-label="گاوصندوق من">${ICON.mine}</button></div>
         <div class="heist-kit" role="group" aria-label="ابزار">${ALL.map(n => `<button data-kit="${n}" aria-label="${NAMES[n]}">${ICON[n]}</button>`).join('')}</div>
         <div class="heist-go-row">
+          <button class="heist-btn" data-inbox aria-label="دستبردهای تازه">${ICON.eye}<b class="heist-badge"></b></button>
           <button class="heist-btn" data-edit aria-label="چیدن گاوصندوق">${ICON.edit}</button>
           <button class="heist-btn heist-go" data-go aria-label="شروع">${ICON.go}</button>
         </div>
@@ -121,7 +131,7 @@ export function renderHeist(root) {
       </div>
       <div class="heist-result">
         <h2></h2>
-        <p></p>
+        <p><span class="heist-turns"></span><span class="heist-gain"></span></p>
         <div>
           <button class="heist-btn" data-replay aria-label="بازپخش">${ICON.replay}</button>
           <button class="heist-btn heist-go" data-again aria-label="دوباره">${ICON.again}</button>
@@ -153,9 +163,14 @@ function start(el, L, debug) {
   let level = 1, seed = 1, vault = null, scene = null, state = null, moves = [], mode = 'loading', armed = null, building = 0;
   try { const l = localStorage.getItem('tanara:heist:level'); level = l === 'mine' ? 'mine' : Math.max(1, Math.min(LEVELS, +l || 1)); } catch { /* private mode */ }
   // The member's own vault: on this phone for now (phase 4 puts it on the server). A first one comes from the generator to start from.
-  let mineVault = null;
-  try { const v = JSON.parse(localStorage.getItem('tanara:heist:mine') || 'null'); if (v && !check(v).errors.includes('shape')) mineVault = v; } catch { /* none yet */ }
+  let mineVault = null, drafted = false;
+  try { const v = JSON.parse(localStorage.getItem('tanara:heist:mine') || 'null'); if (v && !check(v).errors.includes('shape')) { mineVault = v; drafted = true; } } catch { /* none yet */ }
   mineVault ||= generate(11, 2);
+  // Online (phase 4): my coins and raids left, the other members' vaults, the raids on my vault I haven't watched, the raid under way
+  // on the server, and the one from my inbox being watched.
+  let online = false, wallet = null, members = [], inbox = [], raid = null, viewing = null;
+  const member = () => (typeof level === 'string' && level.startsWith('u:') ? members.find(m => m.id === level.slice(2)) || null : null);
+  const shielded = m => !!m?.shield_until && Date.parse(m.shield_until) > Date.now();
   let mineCheck = check(mineVault);
   const saveMine = () => { try { localStorage.setItem('tanara:heist:mine', JSON.stringify(mineVault)); } catch { /* private mode */ } };
   // the editor: the tool in hand, the guard being drawn, and the steps back
@@ -186,7 +201,20 @@ function start(el, L, debug) {
     if (pick) pick.classList.toggle('ready', !!state && state.status === 'play' && doorCells.some((c, j) => state.doors[j] !== 9 && Math.abs(c % W - state.p % W) + Math.abs((c / W | 0) - (state.p / W | 0)) === 1));
     for (const b of el.querySelectorAll('[data-level]')) b.classList.toggle('on', b.dataset.level === String(level));
     el.classList.toggle('mine', level === 'mine');
-    $('[data-go]').disabled = level === 'mine' && !mineCheck.ok;
+    el.classList.toggle('member', !!member());
+    el.classList.toggle('online', online);
+    const m = member();
+    $('.heist-menu h1').textContent = level === 'mine' ? 'گاوصندوق من' : m ? m.name : 'سرقت بزرگ';
+    $('[data-go]').disabled = (level === 'mine' && !mineCheck.ok) || (!!m && (shielded(m) || !wallet || wallet.raidsLeft <= 0 || wallet.coins < wallet.fee));
+    if (wallet) {
+      $('.heist-wallet b').textContent = fa(wallet.coins);
+      $('.heist-left').innerHTML = Array.from({ length: wallet.perDay }, (_, k) => `<i class="${k < wallet.raidsLeft ? 'on' : ''}"></i>`).join('');
+      for (const b of el.querySelectorAll('.heist-levels [data-level]')) b.classList.toggle('pays', /^\d$/.test(b.dataset.level) && !wallet.practicePaid.includes(+b.dataset.level));
+    }
+    const mineBtn = $('[data-level="mine"]');
+    mineBtn.classList.toggle('news', inbox.length > 0);
+    $('[data-inbox]').hidden = !(level === 'mine' && inbox.length);
+    $('.heist-badge').textContent = inbox.length ? fa(inbox.length) : '';
     for (const b of el.querySelectorAll('[data-kit]')) b.classList.toggle('on', kit.includes(b.dataset.kit));
   }
   bus.on('state', hud);
@@ -206,10 +234,19 @@ function start(el, L, debug) {
   });
   bus.on('result', r => {
     const win = r.status === 'escaped' || r.status === 'escaped_alarm';
-    el.classList.toggle('won', win);
-    $('.heist-result h2').textContent = TITLES[r.status] || '';
-    $('.heist-result p').innerHTML = `<b>${fa(r.turns)}</b> نوبت`;
+    // a raid on my vault I am watching: told from my side (the thief caught is my win)
+    el.classList.toggle('won', viewing ? !win && r.status !== 'fled' : win);
+    el.classList.toggle('viewing', !!viewing);
+    $('.heist-result h2').textContent = viewing ? `${viewing.thief_name} ${DID[r.status] || ''}` : TITLES[r.status] || '';
+    $('.heist-turns').innerHTML = `<b>${fa(r.turns)}</b> نوبت`;
+    gain(viewing ? (win ? -viewing.loot : r.status === 'fled' ? 0 : viewing.fee) : null);
   });
+  // the coins a raid made or cost, under the result (filled in when the server answers)
+  function gain(n) {
+    const g = $('.heist-gain');
+    g.className = `heist-gain${n > 0 ? ' up' : n < 0 ? ' down' : ''}`;
+    g.innerHTML = n ? `${ICON.coin}<b dir="ltr">${n > 0 ? '+' : '−'}${fa(Math.abs(n))}</b>` : '';
+  }
 
   // The tools bar: the first gadget, wait, the second. A gadget used with a tap is a button; one that just works is a lit badge.
   function tools() {
@@ -231,13 +268,13 @@ function start(el, L, debug) {
     Math.max(pads.play[1], el.clientHeight - $(row).getBoundingClientRect().top + 12)];
 
   // ----- a vault and its scene -----
-  async function build() {
+  async function build(given = null) {
     const mine = ++building;
     setMode('loading');
     $('.heist-load i').style.width = '8%';
     const keep = scene?.release();
     scene = null;
-    vault = level === 'mine' ? mineVault : generate(seed, level);
+    vault = given || (level === 'mine' ? mineVault : member() ? member().vault : generate(seed, level));
     doorCells.length = 0;
     [...vault.tiles.join('')].forEach((t, i) => { if (t === 'D') doorCells.push(i); });
     state = initial(vault);
@@ -295,6 +332,7 @@ function start(el, L, debug) {
     for (const e of r.events) bus.emit('event', e);
     if (state.status !== 'play') {
       if (watching) return true;
+      if (raid && !viewing) finishRaid();
       await bus.emit('result', { status: state.status, turns: state.t, alarm: state.alarm > 0 });
       setMode('result');
       scene?.setPads(...padFor('.heist-result h2', '.heist-result p'));
@@ -305,8 +343,34 @@ function start(el, L, debug) {
     return true;
   }
 
+  // The raid is over: the server replays it and moves the coins; the result screen shows what it made.
+  function finishRaid() {
+    const id = raid, sent = moves.slice();
+    raid = null;
+    return net.call('finish', { raid: id, moves: sent }).then(r => {
+      if (wallet) wallet.coins = r.coins;
+      gain(r.loot > 0 ? r.loot : r.fee && (r.status === 'caught' || r.status === 'timeout') ? -r.fee : 0);
+      if (typeof level === 'number' && r.loot > 0 && wallet && !wallet.practicePaid.includes(level)) wallet.practicePaid.push(level);
+      hud();
+    }).catch(() => {});
+  }
   async function begin(fast) {
     if (!scene) return;
+    // A raid on a member or a practice vault begins on the server (the fee, the daily limit, the shield); raiding my own vault is a test.
+    raid = null;
+    if (online && level !== 'mine') {
+      const m = member();
+      try {
+        const r = await net.call('start', m ? { target: m.id, gadgets: kit } : { practice: { level, seed }, gadgets: kit });
+        raid = r.raid;
+        if (live !== L) { finishRaid(); return; }   // the page was left while the server answered: the raid ends at once
+        if (m && wallet) { wallet.coins -= r.fee; wallet.raidsLeft = Math.max(0, wallet.raidsLeft - 1); }
+      } catch (e) {
+        toast(REFUSED[e.code] || 'اینترنت را بررسی کن.');
+        refreshOnline();
+        return;
+      }
+    }
     state = initial(vault);
     moves = [];
     armed = null;
@@ -333,6 +397,61 @@ function start(el, L, debug) {
     setMode('replay');
     for (const mv of list) { if (live !== L || !(await act(mv, 1.6))) break; }
     moves = list;
+  }
+
+  // ----- online (phase 4) -----
+  async function refreshOnline() {
+    if (!(await net.online())) return;
+    let s;
+    try { s = await net.call('state', drafted && mineCheck.ok ? { vault: mineVault } : {}); } catch { return; }
+    if (live !== L) return;
+    online = true;
+    wallet = { coins: s.me.coins, raidsLeft: s.raidsLeft, perDay: s.rules.raidsPerDay, fee: s.rules.fee, practicePaid: s.practicePaid };
+    members = s.targets || [];
+    inbox = s.inbox || [];
+    // My vault: a draft on this phone that the rules accept and the server doesn't have yet goes up; a draft still being worked on
+    // stays here (others raid the last accepted one); with no draft, the server's is mine.
+    const same = JSON.stringify(s.me.vault) === JSON.stringify(mineVault);
+    if (drafted && !same && mineCheck.ok) saveOnline();
+    else if (!drafted && !same) { mineVault = s.me.vault; mineCheck = check(mineVault); saveMine(); drafted = true; if (level === 'mine' && mode === 'menu') build(); }
+    if (typeof level === 'string' && level.startsWith('u:') && !member()) { level = 1; if (mode === 'menu') build(); }
+    $('.heist-targets').innerHTML = members.map(m => `<button data-level="u:${m.id}" class="${shielded(m) ? 'shielded' : ''}">${shielded(m) ? ICON.shield : ''}<span>${esc(m.name)}</span></button>`).join('');
+    hud();
+  }
+  const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  let saveTimer = 0;
+  function saveOnline(delay = 0) {
+    clearTimeout(saveTimer);
+    if (!online || !mineCheck.ok) return;
+    const v = mineVault;
+    saveTimer = setTimeout(() => net.call('save', { vault: v }).catch(() => {}), delay);
+  }
+  // The oldest raid on my vault I haven't watched, played out on the vault as it was then.
+  async function watchInbox() {
+    const r = inbox[0];
+    if (!r || mode !== 'menu') return;
+    viewing = r;
+    await build(r.vault);
+    if (!scene || viewing !== r) return;
+    state = initial(vault);
+    setMode('busy');
+    await scene.intro(state, r.gadgets || [], true);
+    scene.setQuiet(false);
+    setMode('replay');
+    moves = [];
+    for (const mv of r.moves || []) { if (live !== L || !(await act(mv, 1.4, r.gadgets || []))) break; }
+    if (state.status === 'play') {   // a raid left open (the thief's app was closed): no moves to show
+      await bus.emit('result', { status: r.status, turns: r.turns || 0 });
+      setMode('result');
+      scene.setPads(...padFor('.heist-result h2', '.heist-result p'));
+    }
+    net.call('seen', { ids: [r.id] }).catch(() => {});
+    inbox = inbox.filter(x => x !== r);
+  }
+  function leaveViewing() {
+    viewing = null;
+    el.classList.remove('viewing');
+    if (inbox.length) watchInbox(); else build();
   }
 
   // ----- the editor -----
@@ -418,8 +537,10 @@ function start(el, L, debug) {
     if (undo.length > 60) undo.shift();
     vault = mineVault = r.vault;
     sel = r.sel;
+    drafted = true;
     saveMine();
     editorView();
+    saveOnline(1200);
     rebuild();
   }
   function stepBack() {
@@ -429,6 +550,7 @@ function start(el, L, debug) {
     sel = u.sel;
     saveMine();
     editorView();
+    saveOnline(1200);
     rebuild();
   }
   // The shortest raid a careful thief with no gadget makes on this vault, played out, then back to the editor.
@@ -503,7 +625,7 @@ function start(el, L, debug) {
     if (b.dataset.edit !== undefined) { openEditor(); return; }
     if (b.dataset.sound !== undefined) { el.classList.toggle('muted', !audio.toggle()); return; }
     if (b.dataset.level) {
-      const l = b.dataset.level === 'mine' ? 'mine' : +b.dataset.level;
+      const l = b.dataset.level === 'mine' || b.dataset.level.startsWith('u:') ? b.dataset.level : +b.dataset.level;
       if (mode === 'menu' && l !== level) { level = l; seed = 1; try { localStorage.setItem('tanara:heist:level', level); } catch { /* private mode */ } build(); }
       return;
     }
@@ -511,9 +633,10 @@ function start(el, L, debug) {
     if (b.dataset.kit) { if (mode === 'menu') toggleKit(b.dataset.kit); return; }
     if (b.dataset.wait !== undefined) { armed = null; act('W'); return; }
     if (b.dataset.g) { if (mode === 'play') { armed = armed === b.dataset.g ? null : b.dataset.g; refresh(); } return; }
+    if (b.dataset.inbox !== undefined) { watchInbox(); return; }
     if (b.dataset.again !== undefined) { if (mode === 'result') begin(true); return; }
-    if (b.dataset.replay !== undefined) { if (mode === 'result') replay(); return; }
-    if (b.dataset.next !== undefined) { if (mode === 'result') { seed++; build(); } }
+    if (b.dataset.replay !== undefined) { if (mode === 'result') { if (viewing) { const r = viewing; inbox.unshift(r); watchInbox(); } else replay(); } return; }
+    if (b.dataset.next !== undefined) { if (mode === 'result') { if (viewing) leaveViewing(); else { seed++; build(); } } }
   });
 
   // ----- ?debug -----
@@ -534,6 +657,9 @@ function start(el, L, debug) {
   };
 
   L.dispose = () => {
+    if (raid) finishRaid();   // leaving mid-raid: it ends where it stopped (a timeout)
+    clearTimeout(saveTimer);
+    if (online && drafted && mineCheck.ok) net.call('save', { vault: mineVault }).catch(() => {});
     building++;
     clearTimeout(holdTimer);
     window.removeEventListener('keydown', onKey);
@@ -542,4 +668,5 @@ function start(el, L, debug) {
     audio.dispose();
   };
   build();
+  refreshOnline();
 }
