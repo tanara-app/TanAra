@@ -34,8 +34,8 @@ const TOOLS = {
   rewards: { label: 'جوایز', open: () => openRewards() },
   // beta, only for accounts with `game` in profile.beta (set from the database; the key is older than the garden)
   // «سرقت بزرگ» took the garden's tile on 2026-11-17 (the garden's page is still at #/garden, with no tile)
-  // «آزمایش خون» (LABS.md): beta, only for accounts with `labs` in profile.beta
-  labs: { label: 'آزمایش خون', beta: true, svg: LAB_ICON, only: () => (store.profile()?.beta || []).includes('labs'), open: () => openLabs() },
+  // «آزمایش خون» (LABS.md): for everyone since 2026-11-17 (the `labs` beta flag is unused)
+  labs: { label: 'آزمایش خون', svg: LAB_ICON, open: () => openLabs() },
   heist: { label: 'سرقت بزرگ', beta: true, svg: HEIST_ICON, only: () => (store.profile()?.beta || []).includes('game'), open: () => { location.hash = '#/heist'; } },
 };
 

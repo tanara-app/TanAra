@@ -1,5 +1,5 @@
 /*
-  «آزمایش خون» (a tile in «بیشتر», beta `labs`; LABS.md): the member adds a lab sheet as a PDF,
+  «آزمایش خون» (a tile in «بیشتر», for everyone since 2026-11-17; LABS.md): the member adds a lab sheet as a PDF,
   Hooshvareh reads it twice and js/domain/labs.js checks the numbers, so the confirm sheet shows
   only what is doubtful (both reads, the reason) and folds the rest under one line. The tests are
   tiles by group, each with its newest value and the change since the time before; a tile opens
