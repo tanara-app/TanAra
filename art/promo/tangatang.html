@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>تنگاتنگ: سه طرح پوستر</title>
+<!-- Mockups only (2026-11-18): three ways to show the game «تنگاتنگ» in «جوایز». Not used by the app. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;700;800;900&display=swap" rel="stylesheet">
+<style>
+  :root { --bg: #0f1315; --surface: #171d20; --surface-2: #1f272b; --text: #e9eef0; --muted: #95a3a9; --line: #2a3438; }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: #070809; color: var(--text); font-family: Vazirmatn, Tahoma, sans-serif; padding: 24px 0 60px; }
+  .opt { width: 375px; margin: 0 auto 40px; }
+  .opt > h1 { font-size: 15px; font-weight: 700; color: var(--muted); margin: 0 16px 10px; }
+  .sheet { background: var(--surface); border-radius: 22px; overflow: hidden; padding: 6px 16px 22px; }
+  .grip { height: 18px; position: relative; } .grip::before { content: ''; position: absolute; top: 7px; left: 50%; width: 40px; height: 4px; margin-left: -20px; border-radius: 4px; background: var(--line); }
+  .head { display: grid; grid-template-columns: 44px 1fr 44px; align-items: center; min-height: 40px; margin-bottom: 10px; }
+  .head b { grid-column: 2; text-align: center; font-size: 17px; }
+  .head i { grid-column: 3; width: 22px; height: 22px; justify-self: center; opacity: .8; }
+
+  /* the poster: full bleed inside the sheet */
+  .poster { position: relative; margin: 0 -16px; height: 470px; overflow: hidden; }
+  .poster svg.art { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  .lock { position: absolute; top: 14px; left: 14px; z-index: 3; height: 32px; padding: 0 12px 0 10px; border-radius: 999px; display: inline-flex; align-items: center; gap: 6px;
+    font-size: 12px; font-weight: 700; color: #fff; background: rgba(255,255,255,.12); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,.18); }
+  .lock svg { width: 14px; height: 14px; }
+  .titles { position: absolute; left: 0; right: 0; z-index: 2; padding: 0 24px; text-align: center; }
+  .kicker { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 800; letter-spacing: 0; padding: 5px 12px; border-radius: 999px; }
+  .title { font-weight: 900; line-height: 1.05; }
+  .tag { font-size: 15px; font-weight: 500; line-height: 1.8; margin-top: 6px; }
+
+  /* below the poster: the same in all three */
+  .info { display: flex; flex-direction: column; gap: 14px; margin-top: 18px; }
+  .unlock { border-radius: 20px; padding: 16px; background: var(--surface-2); }
+  .unlock .row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+  .unlock .goal { font-size: 15px; font-weight: 800; }
+  .unlock .left { font-size: 13px; color: var(--muted); white-space: nowrap; } .unlock .left b { color: #7ff0b0; font-size: 15px; }
+  .days { display: grid; grid-template-columns: repeat(10, 1fr); gap: 5px; margin-top: 12px; }
+  .days i { height: 10px; border-radius: 6px; background: rgba(255,255,255,.08); }
+  .days i.on { background: linear-gradient(90deg, #57e39a, #b6f36a); box-shadow: 0 0 10px rgba(110, 240, 150, .45); }
+  .feats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .feat { border-radius: 16px; padding: 12px 6px 10px; background: var(--surface-2); text-align: center; font-size: 12.5px; font-weight: 700; color: #cfd8dc; }
+  .feat svg { width: 24px; height: 24px; display: block; margin: 0 auto 6px; }
+  .play { height: 54px; border-radius: 18px; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 17px; font-weight: 900; color: #1a0b2e; }
+  .credit { text-align: center; color: #6c7a80; font-size: 11px; }
+
+  /* ---------- 1: سفر به خانه (cinematic space) ---------- */
+  .o1 .titles { bottom: 26px; }
+  .o1 .kicker { position: absolute; top: 14px; right: 14px; z-index: 3; }
+  .o1 .kicker { color: #ffe9a8; background: rgba(255, 214, 102, .14); border: 1px solid rgba(255, 214, 102, .35); }
+  .o1 .title { font-size: 66px; margin-top: 10px; background: linear-gradient(180deg, #fff 30%, #ffd9f0 70%, #ffb3d9); -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 4px 0 rgba(84, 32, 140, .9)) drop-shadow(0 0 22px rgba(255, 120, 210, .55)); }
+  .o1 .tag { color: #e6dcff; text-shadow: 0 2px 10px rgba(10, 4, 40, .8); }
+  .o1 .play { background: linear-gradient(90deg, #ffd166, #ff7ac8); box-shadow: 0 10px 30px rgba(255, 122, 200, .35); }
+
+  /* ---------- 2: جای خالی (the perfect fit) ---------- */
+  .o2 .titles { top: 30px; }
+  .o2 .kicker { color: #fff; background: rgba(255,255,255,.18); border: 1px solid rgba(255,255,255,.35); }
+  .o2 .title { font-size: 58px; margin-top: 10px; color: #fff; text-shadow: 0 4px 0 #b4386d, 0 14px 30px rgba(120, 20, 80, .45); }
+  .o2 .tag { color: #fff4ea; font-weight: 700; }
+  .o2 .play { background: linear-gradient(90deg, #ffb35c, #ff5c8a); color: #fff; box-shadow: 0 10px 30px rgba(255, 92, 138, .4); }
+
+  /* ---------- 3: ۱۳٬۳۱۲ (the mission) ---------- */
+  .o3 .titles { top: 28px; }
+  .o3 .kicker { color: #9ff7ff; background: rgba(80, 230, 255, .12); border: 1px solid rgba(80, 230, 255, .35); }
+  .o3 .num { font-size: 92px; font-weight: 900; line-height: 1; margin-top: 8px; letter-spacing: -2px; background: linear-gradient(180deg, #ffffff, #9ff7ff 55%, #47b8ff); -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 6px 0 #123a6b) drop-shadow(0 0 30px rgba(80, 220, 255, .5)); }
+  .o3 .tag { color: #d6f6ff; font-size: 17px; font-weight: 800; margin-top: 2px; }
+  .o3 .bottom { position: absolute; bottom: 24px; left: 0; right: 0; text-align: center; z-index: 2; }
+  .o3 .bottom .title { font-size: 44px; color: #fff; text-shadow: 0 4px 0 #0e2f57, 0 0 26px rgba(80, 220, 255, .5); }
+  .o3 .play { background: linear-gradient(90deg, #5ef2ff, #8b7bff); box-shadow: 0 10px 30px rgba(94, 242, 255, .3); }
+
+  /* motion */
+  .drift { animation: drift 6s ease-in-out infinite alternate; transform-box: fill-box; transform-origin: center; }
+  .drift.b { animation-duration: 7.5s; animation-delay: -2s; } .drift.c { animation-duration: 5.2s; animation-delay: -4s; } .drift.d { animation-duration: 8s; animation-delay: -1s; }
+  @keyframes drift { from { transform: translate(0, -7px) rotate(-6deg); } to { transform: translate(0, 7px) rotate(6deg); } }
+  .tw { animation: tw 3s ease-in-out infinite; } .tw.b { animation-delay: 1s; } .tw.c { animation-delay: 2s; }
+  @keyframes tw { 50% { opacity: .15; } }
+  .flame { animation: flame .14s steps(2) infinite alternate; transform-box: fill-box; transform-origin: 50% 0; }
+  @keyframes flame { from { transform: scale(.92, .86); } to { transform: scale(1.06, 1.12); } }
+  .hover { animation: hover 3s ease-in-out infinite alternate; }
+  @keyframes hover { from { transform: translate(0, -4px); } to { transform: translate(0, 5px); } }
+  .pull { animation: pull 3.6s cubic-bezier(.5, 0, .3, 1) infinite; transform-box: fill-box; transform-origin: center; }
+  @keyframes pull { 0% { transform: translate(-40px, 70px) rotate(-30deg) scale(1); opacity: 0; } 15% { opacity: 1; } 70% { transform: translate(52px, -30px) rotate(10deg) scale(.55); opacity: 1; } 85%, 100% { transform: translate(64px, -40px) rotate(14deg) scale(.2); opacity: 0; } }
+  .beam { animation: beam 3.6s ease-in-out infinite; } @keyframes beam { 0%, 100% { opacity: .25; } 50% { opacity: .7; } }
+  .rays { animation: spin 40s linear infinite; transform-origin: 187px 250px; } @keyframes spin { to { transform: rotate(360deg); } }
+  .snap { animation: snap 4.2s cubic-bezier(.45, 0, .2, 1) infinite; transform-box: fill-box; transform-origin: center; }
+  @keyframes snap {
+    0% { transform: translate(0, -96px) rotate(-90deg); opacity: 0; }
+    12% { opacity: 1; }
+    45% { transform: translate(0, -18px) rotate(0deg); }
+    55% { transform: translate(0, 0) rotate(0deg); }
+    90% { transform: translate(0, 0) rotate(0deg); opacity: 1; }
+    100% { transform: translate(0, 0); opacity: 0; }
+  }
+  .flash { animation: flash 4.2s ease-out infinite; } @keyframes flash { 0%, 54% { opacity: 0; } 58% { opacity: 1; } 80%, 100% { opacity: 0; } }
+  .burst { animation: burst 4.2s ease-out infinite; transform-box: fill-box; transform-origin: center; }
+  @keyframes burst { 0%, 54% { transform: scale(.2); opacity: 0; } 58% { opacity: 1; } 85%, 100% { transform: scale(1.5); opacity: 0; } }
+  .hole { animation: hole 4.2s ease-in-out infinite; } @keyframes hole { 0%, 50% { opacity: 1; } 56%, 100% { opacity: 0; } }
+  .peek { animation: peek 2.8s ease-in-out infinite alternate; } @keyframes peek { from { transform: translateY(0); } to { transform: translateY(-6px); } }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; } }
+</style>
+</head>
+<body>
+
+<section class="opt o1"><h1>۱. سفر به خانه</h1><div class="sheet" data-o="1"></div></section>
+<section class="opt o2"><h1>۲. جای خالی</h1><div class="sheet" data-o="2"></div></section>
+<section class="opt o3"><h1>۳. ماموریت ۱۳٬۳۱۲</h1><div class="sheet" data-o="3"></div></section>
+
+<script>
+/* ---------- the blocky creatures: glossy candy cubes with a face ---------- */
+const SHAPES = {
+  L: [[0,0],[0,1],[0,2],[1,2]], J: [[1,0],[1,1],[1,2],[0,2]], T: [[0,0],[1,0],[2,0],[1,1]],
+  S: [[1,0],[2,0],[0,1],[1,1]], Z: [[0,0],[1,0],[1,1],[2,1]], O: [[0,0],[1,0],[0,1],[1,1]], I: [[0,0],[1,0],[2,0],[3,0]],
+  // option 2's board (a 5×4 tiling found by search): the last piece Jh drops into the top right
+  Jh: [[0,0],[1,0],[2,0],[2,1]], Lb: [[2,0],[0,1],[1,1],[2,1]], Sv: [[0,0],[0,1],[1,1],[1,2]],
+};
+const C = {
+  sun: ['#FFF09A', '#FFC23D', '#E8890C'], pink: ['#FFC2E2', '#FF5FAE', '#D62F84'], sky: ['#B6F4FF', '#41C8FF', '#2577F0'],
+  lime: ['#DDFFA8', '#7FE35A', '#2FAE4E'], grape: ['#E3D2FF', '#A47BFF', '#6A3FE0'], peach: ['#FFD8C2', '#FF8A5C', '#E2543A'],
+};
+let uid = 0;
+// face: 'happy' | 'wow' | 'wink'
+function creature(shape, col, s, faceCell = 0, face = 'happy', look = 0) {
+  const id = 'g' + (uid++), cells = SHAPES[shape], [hi, mid, lo] = C[col], gap = s * .07, r = s * .3;
+  let out = `<defs><linearGradient id="${id}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${hi}"/><stop offset=".45" stop-color="${mid}"/><stop offset="1" stop-color="${lo}"/></linearGradient></defs><g filter="url(#ds)">`;
+  for (const [x, y] of cells) {
+    const px = x * s + gap / 2, py = y * s + gap / 2, w = s - gap;
+    out += `<rect x="${px}" y="${py}" width="${w}" height="${w}" rx="${r}" fill="url(#${id})"/>
+      <rect x="${px + w * .16}" y="${py + w * .1}" width="${w * .68}" height="${w * .24}" rx="${w * .12}" fill="#fff" opacity=".55"/>
+      <rect x="${px + w * .12}" y="${py + w * .78}" width="${w * .76}" height="${w * .1}" rx="${w * .05}" fill="${lo}" opacity=".55"/>`;
+  }
+  out += '</g>';
+  const [fx, fy] = cells[faceCell], cx = fx * s + s / 2, cy = fy * s + s / 2 + s * .04, ex = s * .17, er = s * .15, pr = s * .085;
+  const eye = (x, wink) => wink
+    ? `<path d="M${x - er} ${cy} q${er} ${-er * .9} ${er * 2} 0" fill="none" stroke="#2a1640" stroke-width="${s * .06}" stroke-linecap="round"/>`
+    : `<circle cx="${x}" cy="${cy}" r="${er}" fill="#fff"/><circle cx="${x + look * er * .35}" cy="${cy + er * .12}" r="${pr}" fill="#2a1640"/><circle cx="${x + look * er * .35 - pr * .4}" cy="${cy - pr * .3}" r="${pr * .38}" fill="#fff"/>`;
+  out += eye(cx - ex, false) + eye(cx + ex, face === 'wink');
+  out += `<ellipse cx="${cx - s * .3}" cy="${cy + s * .2}" rx="${s * .08}" ry="${s * .05}" fill="#ff4f8b" opacity=".45"/><ellipse cx="${cx + s * .3}" cy="${cy + s * .2}" rx="${s * .08}" ry="${s * .05}" fill="#ff4f8b" opacity=".45"/>`;
+  out += face === 'wow'
+    ? `<ellipse cx="${cx}" cy="${cy + s * .24}" rx="${s * .06}" ry="${s * .075}" fill="#2a1640"/>`
+    : `<path d="M${cx - s * .08} ${cy + s * .2} q${s * .08} ${s * .08} ${s * .16} 0" fill="none" stroke="#2a1640" stroke-width="${s * .05}" stroke-linecap="round"/>`;
+  return out;
+}
+const put = (x, y, rot, html, cls = '') => `<g transform="translate(${x} ${y}) rotate(${rot})"><g class="${cls}">${html}</g></g>`;
+
+// a seeded starfield
+function stars(n, w, h, seed, tint = '#fff') {
+  let a = seed, out = '';
+  const rnd = () => (a = (a * 9301 + 49297) % 233280) / 233280;
+  for (let i = 0; i < n; i++) {
+    const r = rnd() < .1 ? 1.6 : rnd() * .9 + .3;
+    out += `<circle cx="${(rnd() * w).toFixed(1)}" cy="${(rnd() * h).toFixed(1)}" r="${r.toFixed(2)}" fill="${tint}" opacity="${(.35 + rnd() * .6).toFixed(2)}" class="${i % 7 === 0 ? 'tw' + (i % 3 ? ' b' : '') : ''}"/>`;
+  }
+  return out;
+}
+const sparkle = (x, y, s, fill = '#fff', cls = 'tw') => `<path class="${cls}" transform="translate(${x} ${y}) scale(${s})" d="M0-10C1-3 3-1 10 0C3 1 1 3 0 10C-1 3-3 1-10 0C-3-1-1-3 0-10Z" fill="${fill}"/>`;
+
+const DEFS = `<defs>
+  <filter id="ds" x="-30%" y="-30%" width="160%" height="170%"><feDropShadow dx="0" dy="5" stdDeviation="5" flood-color="#14062e" flood-opacity=".45"/></filter>
+  <filter id="blur8"><feGaussianBlur stdDeviation="8"/></filter><filter id="blur20" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="24"/></filter>
+  <filter id="blur3"><feGaussianBlur stdDeviation="2.5"/></filter>
+  <filter id="grain"><feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="2" stitchTiles="stitch"/><feColorMatrix values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 .07 0"/></filter>
+</defs>`;
+
+/* ---------- 1: سفر به خانه — a rocket full of them, flying home through a nebula ---------- */
+function rocket() {
+  const win = [['sun', 0], ['pink', 1], ['sky', 0], ['lime', 1], ['grape', 0], ['peach', 1], ['sky', 1], ['sun', 0], ['pink', 0]]
+    .map(([c, f], i) => { const x = -22 + (i % 3) * 15, y = -27 + Math.floor(i / 3) * 15; return `<rect x="${x}" y="${y}" width="13.5" height="13.5" rx="4" fill="${C[c][1]}"/>${f ? `<circle cx="${x + 4.5}" cy="${y + 7}" r="1.6" fill="#2a1640"/><circle cx="${x + 9}" cy="${y + 7}" r="1.6" fill="#2a1640"/>` : ''}`; }).join('');
+  return `<defs>
+      <linearGradient id="body" x1="0" x2="1"><stop offset="0" stop-color="#9aa0e6"/><stop offset=".35" stop-color="#ffffff"/><stop offset=".7" stop-color="#e3e5ff"/><stop offset="1" stop-color="#7b80cf"/></linearGradient>
+      <linearGradient id="nose" x1="0" x2="1"><stop offset="0" stop-color="#d6337f"/><stop offset=".4" stop-color="#ff7ac0"/><stop offset="1" stop-color="#b8226a"/></linearGradient>
+      <radialGradient id="glass" cx=".35" cy=".3"><stop offset="0" stop-color="#3b2f9e"/><stop offset="1" stop-color="#120c3a"/></radialGradient>
+      <linearGradient id="ring" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#8a8fd6"/></linearGradient>
+      <linearGradient id="trail" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffd166" stop-opacity=".9"/><stop offset=".4" stop-color="#ff7ac8" stop-opacity=".5"/><stop offset="1" stop-color="#8d5bff" stop-opacity="0"/></linearGradient>
+      <clipPath id="winclip"><circle r="27"/></clipPath>
+    </defs>
+    <path d="M-30 96 L30 96 L70 330 L-70 330 Z" fill="url(#trail)" filter="url(#blur8)" opacity=".85"/>
+    <g transform="translate(0 92)"><g class="flame">
+      <path d="M-26 0 Q0 170 26 0Z" fill="#ff8a3d" filter="url(#blur3)" opacity=".9"/><path d="M-17 0 Q0 110 17 0Z" fill="#ffd34d"/><path d="M-8 0 Q0 62 8 0Z" fill="#fff"/></g></g>
+    <path d="M-42 26 L-82 92 Q-86 100 -76 100 L-40 84Z" fill="url(#nose)"/><path d="M42 26 L82 92 Q86 100 76 100 L40 84Z" fill="url(#nose)"/>
+    <rect x="-26" y="80" width="52" height="16" rx="5" fill="#5b5fa8"/>
+    <path d="M0 -118 C40 -88 48 -26 46 40 L46 76 Q46 86 36 86 L-36 86 Q-46 86 -46 76 L-46 40 C-48 -26 -40 -88 0 -118Z" fill="url(#body)"/>
+    <path d="M0 -118 C30 -95 40 -70 43 -54 L-43 -54 C-40 -70 -30 -95 0 -118Z" fill="url(#nose)"/>
+    <rect x="-46" y="58" width="92" height="9" fill="#ff7ac0" opacity=".9"/>
+    <g transform="translate(0 0)"><circle r="33" fill="url(#ring)"/><circle r="27" fill="url(#glass)"/>
+      <g clip-path="url(#winclip)">${win}<path d="M-30 -8 A30 30 0 0 1 8 -30 L14 -24 A24 24 0 0 0 -24 -2Z" fill="#fff" opacity=".28"/></g></g>
+    <path d="M-30 -40 C-34 0 -34 40 -32 76" stroke="#fff" stroke-width="5" stroke-linecap="round" opacity=".55" fill="none"/>`;
+}
+function poster1() {
+  return `<svg class="art" viewBox="0 0 375 470" preserveAspectRatio="xMidYMid slice">${DEFS}
+    <defs><radialGradient id="sp1" cx=".5" cy=".35" r=".8"><stop offset="0" stop-color="#2d1a78"/><stop offset=".6" stop-color="#140c45"/><stop offset="1" stop-color="#07061c"/></radialGradient>
+      <radialGradient id="pl1" cx=".35" cy=".2" r=".9"><stop offset="0" stop-color="#7c5cff"/><stop offset=".45" stop-color="#3a1f9a"/><stop offset="1" stop-color="#120a3a"/></radialGradient>
+      <linearGradient id="fade1" x1="0" y1="0" x2="0" y2="1"><stop offset=".45" stop-color="#07061c" stop-opacity="0"/><stop offset="1" stop-color="#07061c" stop-opacity=".9"/></linearGradient></defs>
+    <rect width="375" height="470" fill="url(#sp1)"/>
+    <ellipse cx="40" cy="90" rx="150" ry="90" fill="#ff3fa4" opacity=".42" filter="url(#blur20)"/>
+    <ellipse cx="350" cy="140" rx="130" ry="90" fill="#22c8ff" opacity=".35" filter="url(#blur20)"/>
+    <ellipse cx="190" cy="260" rx="170" ry="110" fill="#8d5bff" opacity=".45" filter="url(#blur20)"/>
+    ${stars(120, 375, 470, 7)}
+    ${sparkle(318, 58, 1.1)}${sparkle(56, 210, .7, '#ffe9a8', 'tw b')}${sparkle(300, 300, .6, '#c9f6ff', 'tw c')}
+    <g transform="translate(330 70)"><ellipse rx="34" ry="9" fill="none" stroke="#ffd9a8" stroke-width="3" opacity=".6" transform="rotate(-18)"/><circle r="18" fill="#ffb36b"/><circle cx="-5" cy="-5" r="6" fill="#fff" opacity=".25"/></g>
+    <circle cx="150" cy="700" r="330" fill="url(#pl1)"/>
+    <circle cx="150" cy="700" r="332" fill="none" stroke="#7ef0ff" stroke-width="3" opacity=".7" filter="url(#blur3)"/>
+    <g transform="translate(210 205) rotate(16)"><g class="hover">${rocket()}</g></g>
+    <path class="beam" d="M180 228 L40 330 L105 352 Z" fill="#fff6c2" opacity=".35" filter="url(#blur8)"/>
+    ${put(64, 300, 0, creature('T', 'sun', 22, 1, 'wow', 1), 'pull')}
+    ${put(22, 128, -14, creature('L', 'pink', 24, 3, 'happy', 1), 'drift')}
+    ${put(300, 225, 12, creature('O', 'lime', 24, 0, 'wink', -1), 'drift b')}
+    ${put(270, 320, -8, creature('S', 'sky', 20, 2, 'happy', -1), 'drift c')}
+    ${put(110, 60, 18, creature('I', 'grape', 13, 1, 'happy'), 'drift d')}
+    <rect width="375" height="470" fill="url(#fade1)"/>
+    <rect width="375" height="470" filter="url(#grain)"/>
+  </svg>`;
+}
+
+/* ---------- 2: جای خالی — the last piece snaps into the only hole left ---------- */
+function poster2() {
+  const s = 40, ox = 187 - 2.5 * s, oy = 206;
+  // a 5×4 plate: O O J J J / O O L S J / L L L S S / I I I I S — four in, the J is the hole
+  const placed = [
+    ['O', 'sky', 0, 0, 2, 'happy'], ['Lb', 'pink', 0, 1, 1, 'wink'], ['Sv', 'grape', 3, 1, 1, 'wow'], ['I', 'lime', 0, 3, 1, 'happy'],
+  ];
+  let wells = '';
+  for (let y = 0; y < 4; y++) for (let x = 0; x < 5; x++) wells += `<rect x="${ox + x * s + 2}" y="${oy + y * s + 2}" width="${s - 4}" height="${s - 4}" rx="9" fill="#5b1d52" opacity=".28"/>`;
+  const hole = [[2, 0], [3, 0], [4, 0], [4, 1]]; // where the falling piece goes
+  const holeD = hole.map(([x, y]) => `<rect x="${ox + x * s + 3}" y="${oy + y * s + 3}" width="${s - 6}" height="${s - 6}" rx="9"/>`).join('');
+  return `<svg class="art" viewBox="0 0 375 470" preserveAspectRatio="xMidYMid slice">${DEFS}
+    <defs><linearGradient id="bg2" x1="0" y1="0" x2=".4" y2="1"><stop offset="0" stop-color="#ffb35c"/><stop offset=".45" stop-color="#ff5c8a"/><stop offset="1" stop-color="#6b3cf0"/></linearGradient>
+      <radialGradient id="glow2" cx=".5" cy=".55" r=".5"><stop offset="0" stop-color="#fff" stop-opacity=".55"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+      <linearGradient id="plate" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".38"/><stop offset="1" stop-color="#fff" stop-opacity=".12"/></linearGradient></defs>
+    <rect width="375" height="470" fill="url(#bg2)"/>
+    <g class="rays" opacity=".14">${Array.from({ length: 12 }, (_, i) => `<path d="M187 250 L${187 + 600 * Math.cos(i * Math.PI / 6)} ${250 + 600 * Math.sin(i * Math.PI / 6)} L${187 + 600 * Math.cos(i * Math.PI / 6 + .18)} ${250 + 600 * Math.sin(i * Math.PI / 6 + .18)}Z" fill="#fff"/>`).join('')}</g>
+    <circle cx="60" cy="380" r="40" fill="#fff" opacity=".12" filter="url(#blur8)"/><circle cx="330" cy="120" r="56" fill="#ffe08a" opacity=".22" filter="url(#blur8)"/><circle cx="320" cy="420" r="26" fill="#fff" opacity=".14" filter="url(#blur3)"/>
+    <ellipse cx="187" cy="270" rx="170" ry="120" fill="url(#glow2)"/>
+    <rect x="${ox - 14}" y="${oy - 14}" width="${5 * s + 28}" height="${4 * s + 28}" rx="30" fill="url(#plate)" stroke="#fff" stroke-opacity=".55" stroke-width="1.5"/>
+    <rect x="${ox - 14}" y="${oy + 4 * s + 4}" width="${5 * s + 28}" height="14" rx="7" fill="#4a1450" opacity=".25" filter="url(#blur3)"/>
+    ${wells}
+    ${placed.map(([sh, col, x, y, f, face]) => `<g transform="translate(${ox + x * s} ${oy + y * s})">${creature(sh, col, s, f, face)}</g>`).join('')}
+    <g class="hole" fill="none" stroke="#fff" stroke-width="2.5" stroke-dasharray="6 5" opacity=".9">${holeD}</g>
+    <g class="flash">${hole.map(([x, y]) => `<rect x="${ox + x * s - 4}" y="${oy + y * s - 4}" width="${s + 8}" height="${s + 8}" rx="14" fill="#fff6c2" opacity=".55" filter="url(#blur8)"/>`).join('')}</g>
+    <g transform="translate(${ox + 2 * s} ${oy})"><g class="snap">${creature('Jh', 'sun', s, 1, 'wow')}</g></g>
+    <g class="burst" transform="translate(${ox + 3.5 * s} ${oy + .7 * s})">${[0, 1, 2, 3, 4, 5, 6, 7].map(i => sparkle(42 * Math.cos(i * Math.PI / 4), 42 * Math.sin(i * Math.PI / 4), i % 2 ? .55 : .9, i % 2 ? '#fff' : '#fff2a8', '')).join('')}</g>
+    ${sparkle(40, 170, .8)}${sparkle(340, 330, .7, '#fff2a8', 'tw b')}${sparkle(300, 60, .5, '#fff', 'tw c')}
+    <rect width="375" height="470" filter="url(#grain)"/>
+  </svg>`;
+}
+
+/* ---------- 3: ماموریت ۱۳٬۳۱۲ — the big number, with them all over it ---------- */
+function poster3() {
+  return `<svg class="art" viewBox="0 0 375 470" preserveAspectRatio="xMidYMid slice">${DEFS}
+    <defs><radialGradient id="bg3" cx=".5" cy=".3" r=".9"><stop offset="0" stop-color="#1a4b8f"/><stop offset=".55" stop-color="#0e2152"/><stop offset="1" stop-color="#060b22"/></radialGradient>
+      <radialGradient id="spot" cx=".5" cy="0" r="1"><stop offset="0" stop-color="#9ff7ff" stop-opacity=".35"/><stop offset="1" stop-color="#9ff7ff" stop-opacity="0"/></radialGradient></defs>
+    <rect width="375" height="470" fill="url(#bg3)"/>
+    <path d="M120 0 L255 0 L360 470 L15 470Z" fill="url(#spot)" opacity=".7"/>
+    ${stars(90, 375, 470, 31, '#cfe9ff')}
+    <ellipse cx="187" cy="470" rx="240" ry="70" fill="#47b8ff" opacity=".25" filter="url(#blur20)"/>
+    <g transform="translate(0 0)">
+      ${put(26, 196, -16, creature('L', 'pink', 26, 3, 'happy', 1), 'drift')}
+      ${put(118, 222, 6, creature('O', 'sun', 26, 1, 'wink'), 'drift b')}
+      ${put(196, 214, -6, creature('T', 'lime', 25, 1, 'wow'), 'drift c')}
+      ${put(290, 196, 14, creature('J', 'sky', 24, 3, 'happy', -1), 'drift d')}
+      ${put(66, 300, 10, creature('S', 'grape', 24, 2, 'happy', 1), 'drift b')}
+      ${put(218, 306, -10, creature('Z', 'peach', 24, 0, 'wow', -1), 'drift')}
+      ${put(150, 360, 0, creature('I', 'sky', 18, 2, 'happy'), 'drift c')}
+      ${put(16, 380, -20, creature('O', 'lime', 16, 2, 'wink'), 'drift d')}
+      ${put(318, 330, 22, creature('T', 'sun', 16, 1, 'happy', -1), 'drift')}
+    </g>
+    ${sparkle(330, 120, .9)}${sparkle(48, 150, .6, '#9ff7ff', 'tw b')}
+    <rect width="375" height="470" filter="url(#grain)"/>
+  </svg>`;
+}
+
+/* ---------- the page around each poster ---------- */
+const LOCK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="10.5" width="14" height="10" rx="2.5"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/></svg>';
+const CLOSE = '<svg viewBox="0 0 24 24" fill="none" stroke="#e9eef0" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+const FEATS = [
+  ['۵ حالت بازی', '<svg viewBox="0 0 24 24" fill="none" stroke="#ffd166" stroke-width="2" stroke-linejoin="round"><rect x="3" y="3" width="8" height="8" rx="2.5"/><rect x="13" y="3" width="8" height="8" rx="2.5"/><rect x="3" y="13" width="8" height="8" rx="2.5"/><rect x="13" y="13" width="8" height="8" rx="2.5" fill="#ffd166"/></svg>'],
+  ['بی‌پایان', '<svg viewBox="0 0 24 24" fill="none" stroke="#ff7ac8" stroke-width="2.2" stroke-linecap="round"><path d="M7 8.5c-2 0-3.5 1.6-3.5 3.5S5 15.5 7 15.5c3.5 0 6.5-7 10-7 2 0 3.5 1.6 3.5 3.5S19 15.5 17 15.5c-3.5 0-6.5-7-10-7z"/></svg>'],
+  ['بدون عجله', '<svg viewBox="0 0 24 24" fill="none" stroke="#7ff0d0" stroke-width="2.2" stroke-linecap="round"><path d="M20 14.5A8 8 0 1 1 9.5 4 6.5 6.5 0 0 0 20 14.5z"/></svg>'],
+];
+const STAR = '<svg viewBox="-10 -10 20 20" width="12" height="12"><path d="M0-10C1-3 3-1 10 0C3 1 1 3 0 10C-1 3-3 1-10 0C-3-1-1-3 0-10Z" fill="currentColor"/></svg>';
+const PLAY = '<svg viewBox="0 0 24 24" width="20" height="20"><path d="M8 5.5v13l10.5-6.5z" fill="currentColor"/></svg>';
+const fa = n => String(n).replace(/\d/g, d => '۰۱۲۳۴۵۶۷۸۹'[d]);
+
+function page(o) {
+  const poster = { 1: poster1, 2: poster2, 3: poster3 }[o]();
+  const titles = {
+    1: `<span class="kicker">${STAR}جایزه‌ی تازه</span><div class="titles"><div class="title">تنگاتنگ</div><p class="tag">بلوکی‌ها توی کهکشان گم شده‌اند.<br>جایشان بده، ببرشان خانه.</p></div>`,
+    2: `<div class="titles"><span class="kicker">پازل تازه</span><div class="title">تنگاتنگ</div><p class="tag">آخری هم جا می‌شود؟</p></div>`,
+    3: `<div class="titles"><span class="kicker">ماموریت نجات</span><div class="num">۱۳٬۳۱۲</div><p class="tag">بلوکی گم شده‌اند</p></div><div class="bottom"><div class="title">تنگاتنگ</div></div>`,
+  }[o];
+  const done = 3, of = 10;
+  return `<div class="grip"></div><div class="head"><b></b><i>${CLOSE}</i></div>
+    <div class="poster">${poster}<span class="lock">${LOCK}<span>قفل</span></span>${titles}</div>
+    <div class="info">
+      <div class="unlock"><div class="row"><span class="goal">۱۰ روز ۵ سهم سبزی و میوه</span><span class="left"><b>${fa(of - done)}</b> روز مانده</span></div>
+        <div class="days">${Array.from({ length: of }, (_, i) => `<i class="${i < done ? 'on' : ''}"></i>`).join('')}</div></div>
+      <div class="feats">${FEATS.map(([t, ic]) => `<div class="feat">${ic}${t}</div>`).join('')}</div>
+      <p class="credit">Mattia Fortunati · js13kGames 2021</p>
+    </div>`;
+}
+document.querySelectorAll('.sheet').forEach(el => { el.innerHTML = page(+el.dataset.o); });
+</script>
+</body>
+</html>

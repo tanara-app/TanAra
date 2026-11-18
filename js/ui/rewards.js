@@ -12,6 +12,7 @@ import { fa } from '../lib/fa.js';
 import { today } from '../lib/dates.js';
 import { progress, goalText, rewardOf } from '../domain/rewards.js';
 import { getFinish, setFinish } from './theme.js';
+import { ttArt } from './ttArt.js';
 
 const LOCK = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="10.5" width="14" height="10" rx="2.5"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/></svg>';
 const MOON = '<svg viewBox="0 0 48 48" aria-hidden="true"><mask id="sb-moon-cut"><rect width="48" height="48" fill="#fff"/><circle cx="32" cy="17" r="15" fill="#000"/></mask><circle cx="24" cy="24" r="18" fill="currentColor" mask="url(#sb-moon-cut)"/></svg>';
@@ -59,43 +60,8 @@ const SHOWCASE = {
     </div>`,
 };
 
-/*
-  «تنگاتنگ»: its creatures in the game's own look (dark outline #5D4E51, pastel fills, two eyes), one
-  dropping into the rocket over and over while the others float. Drawn here, no pictures.
-*/
-const INK = '#5D4E51';
-const BLOCKY = {
-  L: 'M0 0h16v32h16v16H0z', T: 'M0 0h48v16H32v16H16V16H0z', S: 'M16 0h32v16H32v16H0V16h16z', O: 'M0 0h32v32H0z',
-};
-const blocky = (shape, fill, ex, ey) => `<path d="${BLOCKY[shape]}" fill="${fill}" stroke="${INK}" stroke-width="4.5" stroke-linejoin="round"/>
-  <circle cx="${ex}" cy="${ey}" r="2.8" fill="${INK}"/><circle cx="${ex + 7}" cy="${ey}" r="2.8" fill="${INK}"/>
-  <circle cx="${ex - .8}" cy="${ey - 1}" r="1" fill="#fff"/><circle cx="${ex + 6.2}" cy="${ey - 1}" r="1" fill="#fff"/>`;
-const ttScene = () => `<svg class="tt-scene" viewBox="0 0 360 250" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
-  <rect width="360" height="250" fill="#94DEC3"/>
-  <circle cx="180" cy="470" r="300" fill="#FED1E6"/>
-  <ellipse cx="180" cy="300" rx="230" ry="90" fill="none" stroke="#000" stroke-opacity=".04" stroke-width="26"/>
-  <circle cx="300" cy="52" r="30" fill="#FDF3BD"/><circle cx="286" cy="42" r="30" fill="#94DEC3"/>
-  <ellipse cx="62" cy="62" rx="26" ry="8" fill="#000" fill-opacity=".05"/><circle cx="62" cy="62" r="14" fill="#FFC886"/><ellipse cx="62" cy="58" rx="14" ry="5" fill="#FFC886"/>
-  <g fill="#fff"><circle class="tt-tw" cx="30" cy="30" r="2.2"/><circle cx="120" cy="22" r="1.6"/><circle class="tt-tw d2" cx="210" cy="40" r="2"/>
-    <circle cx="250" cy="110" r="1.4"/><circle class="tt-tw d3" cx="96" cy="118" r="1.8"/><circle cx="335" cy="140" r="1.6"/><circle cx="24" cy="160" r="1.4"/></g>
-  <g transform="translate(180 120)">
-    <g class="tt-rocket">
-      <path d="M-34 70l-22 26h22zM34 70l22 26H34z" fill="${INK}" stroke="${INK}" stroke-width="6" stroke-linejoin="round"/>
-      <g class="tt-fire"><ellipse cx="0" cy="104" rx="11" ry="24" fill="#FF9E67"/><ellipse cx="0" cy="102" rx="6" ry="15" fill="#FEE66C"/></g>
-      <path d="M-14 88h28l4 10h-36z" fill="${INK}" stroke="${INK}" stroke-width="4" stroke-linejoin="round"/>
-      <path d="M-36 90V-4Q-36-12-30-14L0-44L30-14Q36-12 36-4V90z" fill="#7DC864" stroke="${INK}" stroke-width="6" stroke-linejoin="round"/>
-      <path d="M-33-12L0-42L33-12z" fill="${INK}"/>
-      <g fill="#000" fill-opacity=".1" stroke="${INK}" stroke-width="2">
-        ${[0, 1, 2, 3].map(r => [0, 1, 2].map(c => `<rect x="${-25 + c * 17}" y="${4 + r * 19}" width="15" height="17" rx="3"/>`).join('')).join('')}
-      </g>
-    </g>
-  </g>
-  <g transform="translate(152 4) scale(1.15)"><g class="tt-drop">${blocky('S', '#C2FDFF', 4, 26)}</g></g>
-  <g transform="translate(62 112) scale(1.25)"><g class="tt-bob">${blocky('L', '#FFEA7E', 3, 40)}</g></g>
-  <g transform="translate(250 118) scale(1.2)"><g class="tt-bob d2">${blocky('T', '#FF7E64', 20, 8)}</g></g>
-  <g transform="translate(262 190) scale(1.2)"><g class="tt-bob d3">${blocky('O', '#A09CF1', 9, 12)}</g></g>
-</svg>`;
-SHOWCASE.tangatang = ttScene;
+// «تنگاتنگ»: the poster's picture (ttArt.js), cropped to the card
+SHOWCASE.tangatang = () => ttArt('ttc');
 
 const PLAY = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z" fill="currentColor"/></svg>';
 
@@ -114,33 +80,47 @@ function card({ reward: r, earned, now, of }) {
   </article>`;
 }
 
-// what each game's page says about it, beside the showcase
+/*
+  A game's own page in «جوایز»: a poster (picture, a badge, the name, two lines), then while locked the goal as
+  one cell per day with how many are left, or once earned «بازی کن»; three things about the game; who made it.
+  Design 1 «سفر به خانه» of art/promo/tangatang.html, chosen by the owner on 2026-11-18.
+*/
+const SPARK = '<svg viewBox="-10 -10 20 20" width="12" height="12" aria-hidden="true"><path d="M0-10C1-3 3-1 10 0C3 1 1 3 0 10C-1 3-3 1-10 0C-3-1-1-3 0-10Z" fill="currentColor"/></svg>';
+const FEAT = {
+  modes: '<svg viewBox="0 0 24 24" fill="none" stroke="#ffd166" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="8" height="8" rx="2.5"/><rect x="13" y="3" width="8" height="8" rx="2.5"/><rect x="3" y="13" width="8" height="8" rx="2.5"/><rect x="13" y="13" width="8" height="8" rx="2.5" fill="#ffd166"/></svg>',
+  endless: '<svg viewBox="0 0 24 24" fill="none" stroke="#ff7ac8" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M7 8.5c-2 0-3.5 1.6-3.5 3.5S5 15.5 7 15.5c3.5 0 6.5-7 10-7 2 0 3.5 1.6 3.5 3.5S19 15.5 17 15.5c-3.5 0-6.5-7-10-7z"/></svg>',
+  calm: '<svg viewBox="0 0 24 24" fill="none" stroke="#7ff0d0" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M20 14.5A8 8 0 1 1 9.5 4 6.5 6.5 0 0 0 20 14.5z"/></svg>',
+};
 const PROMO = {
   tangatang: {
-    line: 'بلوکی‌های بامزه توی کهکشان گم شده‌اند. تنگاتنگ توی موشک جایشان بده و برسانشان خانه.',
-    tags: ['پنج حالت', 'بی‌عجله', 'بی‌اینترنت'],
+    art: () => ttArt('ttp'),
+    kicker: 'جایزه‌ی تازه',
+    lines: ['بلوکی‌ها توی کهکشان گم شده‌اند.', 'جایشان بده، ببرشان خانه.'],
+    feats: [['modes', '۵ حالت بازی'], ['endless', 'بی‌پایان'], ['calm', 'بدون عجله']],
     credit: '<bdi>Mattia Fortunati</bdi> · <bdi>js13kGames 2021</bdi>',
   },
 };
 
-// A game's own page in «جوایز»: a big showcase, a line about it, the goal and how far along, or «بازی کن».
 function openPromo(key) {
   const r = rewardOf(key), p = PROMO[key];
   sheet.open(body => {
     const x = listNow().find(y => y.reward.key === key);
     body.innerHTML = `
-      <div class="sheet-head"><span></span><h2>${r.name}</h2><button class="icon-btn" data-close aria-label="بستن">${icon.close}</button></div>
+      <div class="sheet-head"><span></span><h2 class="sr-only">${r.name}</h2><button class="icon-btn" data-close aria-label="بستن">${icon.close}</button></div>
       <div class="promo">
-        <div class="promo-show rw-show rw-${key}">${SHOWCASE[key]()}${x.earned ? '' : `<span class="rw-lock">${LOCK}</span>`}</div>
-        <p class="promo-line">${p.line}</p>
-        <div class="promo-tags">${p.tags.map(t => `<span>${t}</span>`).join('')}</div>
+        <div class="promo-poster">
+          ${p.art()}
+          ${x.earned ? '' : `<span class="promo-lock">${LOCK}<span>قفل</span></span>`}
+          <span class="promo-kicker">${SPARK}${p.kicker}</span>
+          <div class="promo-titles"><div class="promo-title">${r.name}</div><p>${p.lines.join('<br>')}</p></div>
+        </div>
         ${x.earned
-          ? `<button class="btn primary promo-play" data-play>${PLAY}<span>بازی کن</span></button>`
+          ? `<button class="promo-play" data-play>${PLAY}<span>بازی کن</span></button>`
           : `<div class="promo-goal">
-              <p class="rw-goal">${goalText(r, fa)}</p>
-              <div class="rw-bar" role="progressbar" aria-valuemin="0" aria-valuemax="${x.of}" aria-valuenow="${x.now}"><i style="width:${x.now / x.of * 100}%"></i></div>
-              <p class="rw-count"><b>${fa(x.now)}</b> از ${fa(x.of)}</p>
+              <div class="row"><span>${goalText(r, fa)}</span><span class="left"><b>${fa(x.of - x.now)}</b> روز مانده</span></div>
+              <div class="promo-days" role="progressbar" aria-valuemin="0" aria-valuemax="${x.of}" aria-valuenow="${x.now}">${Array.from({ length: x.of }, (_, i) => `<i${i < x.now ? ' class="on"' : ''}></i>`).join('')}</div>
             </div>`}
+        <div class="promo-feats">${p.feats.map(([k, t]) => `<div>${FEAT[k]}<span>${t}</span></div>`).join('')}</div>
         <p class="promo-credit">${p.credit}</p>
       </div>`;
     body.querySelector('[data-close]').onclick = () => sheet.close();

@@ -1585,39 +1585,56 @@ body.kb .toast, body.chat-mode .toast { bottom: calc(var(--nav-h) + var(--safe-b
   box-shadow: inset 0 1px 0 rgba(255,255,255,.4), 0 0 20px color-mix(in srgb, var(--accent) 55%, transparent); }
 @media (prefers-reduced-motion: reduce) { :root[data-finish="shab"] body::after, .sb-shoot, .sb-tw { animation: none; } }
 
-/* «تنگاتنگ» (a game in «جوایز», js/ui/rewards.js): the game's own pastel space, the same in every palette,
-   since it is a picture of the game; one creature drops into the rocket, the others float */
-.rw-show.rw-tangatang { background: #94DEC3; }
+/* «تنگاتنگ» (a game in «جوایز»): the poster's picture (js/ui/ttArt.js) — its own night sky in every palette,
+   since it is a poster; design 1 «سفر به خانه» of art/promo/tangatang.html */
+.rw-show.rw-tangatang { background: #07061c; }
 .rw-tangatang::before { display: none; }
-.tt-scene { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
-.tt-scene g { transform-box: fill-box; }
-.tt-drop { animation: tt-drop 3.4s cubic-bezier(.45, 0, .55, 1) infinite; }
-@keyframes tt-drop {
-  0% { transform: translate(0, -70px); opacity: 0; }
-  12% { opacity: 1; }
-  62% { transform: translate(6px, 92px); opacity: 1; }
-  78%, 100% { transform: translate(6px, 128px); opacity: 0; }
-}
-.tt-bob { animation: tt-bob 3s ease-in-out infinite alternate; }
-.tt-bob.d2 { animation-delay: -1s; } .tt-bob.d3 { animation-delay: -2s; }
-@keyframes tt-bob { from { transform: translateY(-5px) rotate(-3deg); } to { transform: translateY(5px) rotate(3deg); } }
-.tt-rocket { animation: tt-hover 2.4s ease-in-out infinite alternate; }
-@keyframes tt-hover { from { transform: translateY(-2px); } to { transform: translateY(3px); } }
-.tt-fire { transform-origin: 50% 0; animation: tt-fire .18s steps(2) infinite alternate; }
-@keyframes tt-fire { from { transform: scaleY(.85); } to { transform: scaleY(1.15); } }
-.tt-tw { animation: tt-tw 2.6s ease-in-out infinite; } .tt-tw.d2 { animation-delay: .9s; } .tt-tw.d3 { animation-delay: 1.7s; }
-@keyframes tt-tw { 50% { opacity: .25; } }
-@media (prefers-reduced-motion: reduce) { .tt-drop, .tt-bob, .tt-rocket, .tt-fire, .tt-tw { animation: none; } }
+.tt-art { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.tt-art g { transform-box: fill-box; transform-origin: center; }
+.tt-drift { animation: tt-drift 6s ease-in-out infinite alternate; }
+.tt-drift.b { animation-duration: 7.5s; animation-delay: -2s; } .tt-drift.c { animation-duration: 5.2s; animation-delay: -4s; } .tt-drift.d { animation-duration: 8s; animation-delay: -1s; }
+@keyframes tt-drift { from { transform: translate(0, -7px) rotate(-6deg); } to { transform: translate(0, 7px) rotate(6deg); } }
+.tt-tw { animation: tt-tw 3s ease-in-out infinite; } .tt-tw.b { animation-delay: 1s; } .tt-tw.c { animation-delay: 2s; }
+@keyframes tt-tw { 50% { opacity: .15; } }
+.tt-art .tt-flame { transform-origin: 50% 0; animation: tt-flame .14s steps(2) infinite alternate; }
+@keyframes tt-flame { from { transform: scale(.92, .86); } to { transform: scale(1.06, 1.12); } }
+.tt-hover { animation: tt-hover 3s ease-in-out infinite alternate; }
+@keyframes tt-hover { from { transform: translate(0, -4px); } to { transform: translate(0, 5px); } }
+.tt-pull { animation: tt-pull 3.6s cubic-bezier(.5, 0, .3, 1) infinite; }
+@keyframes tt-pull { 0% { transform: translate(-40px, 70px) rotate(-30deg) scale(1); opacity: 0; } 15% { opacity: 1; } 70% { transform: translate(52px, -30px) rotate(10deg) scale(.55); opacity: 1; } 85%, 100% { transform: translate(64px, -40px) rotate(14deg) scale(.2); opacity: 0; } }
+.tt-beam { animation: tt-beam 3.6s ease-in-out infinite; } @keyframes tt-beam { 0%, 100% { opacity: .25; } 50% { opacity: .7; } }
+@media (prefers-reduced-motion: reduce) { .tt-drift, .tt-tw, .tt-art .tt-flame, .tt-hover, .tt-pull, .tt-beam { animation: none; } }
 .rw-card.tap { cursor: pointer; }
 .rw-card.tap:active { transform: scale(.985); }
-/* a game's own page */
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+/* a game's own page: the poster bleeds to the sheet's edges */
 .promo { display: flex; flex-direction: column; gap: 14px; padding-bottom: 6px; }
-.promo-show { height: 300px; border-radius: 24px; }
-.promo-line { text-align: center; font-size: 1rem; line-height: 1.9; }
-.promo-tags { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px; }
-.promo-tags span { padding: 4px 12px; border-radius: 999px; background: var(--surface-2); font-size: .82rem; font-weight: 700; }
-.promo-goal { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border-radius: 18px; background: var(--surface-2); }
-.promo-play { display: flex; align-items: center; justify-content: center; gap: 8px; height: 52px; font-size: 1.05rem; }
-.promo-credit { text-align: center; color: var(--muted); font-size: .72rem; }
+.promo-poster { position: relative; margin: 0 -16px; height: 470px; overflow: hidden; }
+.promo-lock, .promo-kicker { position: absolute; top: 14px; z-index: 2; height: 32px; padding: 0 12px; border-radius: 999px; display: inline-flex; align-items: center; gap: 6px;
+  font-size: .76rem; font-weight: 800; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+.promo-lock { left: 14px; color: #fff; background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.18); }
+.promo-lock svg { width: 14px; height: 14px; }
+.promo-kicker { right: 14px; color: #ffe9a8; background: rgba(255, 214, 102, .14); border: 1px solid rgba(255, 214, 102, .35); }
+.promo-titles { position: absolute; left: 0; right: 0; bottom: 26px; z-index: 1; padding: 0 24px; text-align: center; }
+.promo-title { font-size: 4.1rem; font-weight: 900; line-height: 1.05; color: transparent;
+  background: linear-gradient(180deg, #fff 30%, #ffd9f0 70%, #ffb3d9); -webkit-background-clip: text; background-clip: text;
+  filter: drop-shadow(0 4px 0 rgba(84, 32, 140, .9)) drop-shadow(0 0 22px rgba(255, 120, 210, .55)); }
+.promo-titles p { margin-top: 6px; font-size: .95rem; font-weight: 500; line-height: 1.8; color: #e6dcff; text-shadow: 0 2px 10px rgba(10, 4, 40, .8); }
+.promo-goal { padding: 16px; border-radius: 20px; background: var(--surface-2); }
+.promo-goal .row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; font-size: .95rem; font-weight: 800; }
+.promo-goal .left { font-size: .82rem; font-weight: 500; color: var(--muted); white-space: nowrap; }
+.promo-goal .left b { font-size: .95rem; color: var(--accent); }
+.promo-days { display: grid; grid-template-columns: repeat(10, 1fr); gap: 5px; margin-top: 12px; }
+.promo-days i { height: 10px; border-radius: 6px; background: color-mix(in srgb, var(--text) 9%, transparent); }
+.promo-days i.on { background: linear-gradient(90deg, #57e39a, #b6f36a); box-shadow: 0 0 10px rgba(110, 240, 150, .45); }
+.promo-play { height: 56px; border: 0; border-radius: 18px; display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer;
+  font: inherit; font-size: 1.08rem; font-weight: 900; color: #1a0b2e; background: linear-gradient(90deg, #ffd166, #ff7ac8); box-shadow: 0 10px 30px rgba(255, 122, 200, .35); }
+.promo-play svg { width: 20px; height: 20px; }
+.promo-play:active { transform: scale(.98); }
+.promo-feats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.promo-feats div { padding: 12px 6px 10px; border-radius: 16px; background: var(--surface-2); text-align: center; font-size: .8rem; font-weight: 700; }
+.promo-feats svg { width: 24px; height: 24px; display: block; margin: 0 auto 6px; }
+:root[data-theme="light"] .promo-feats svg { filter: brightness(.78) saturate(1.3); }
+.promo-credit { text-align: center; color: var(--muted); font-size: .7rem; opacity: .8; }
 /* the game itself, under the sheet's head */
 .game-frame { display: block; width: 100%; height: calc(92dvh - 96px - var(--safe-b)); border: 0; border-radius: 18px; background: #FFEA7E; }
