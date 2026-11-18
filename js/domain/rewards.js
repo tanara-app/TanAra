@@ -2,9 +2,13 @@
   «جوایز»: things a member earns by keeping a habit. Pure functions.
 
   Each reward is one entry of REWARDS: what it is (`kind`, `name`, and `about`, the few words shown
-  under its name), and the goal that earns it (`goal`). Adding a reward = one more entry here (and,
-  for a new kind of goal, one more case in `progress`); the «جوایز» page lists them all the same way.
-  Earned once, a reward stays earned (profile.data.rewards: { key: day earned }).
+  under its name), the goal that earns it (`goal`), and `since`, the day it was added. Adding a reward =
+  one more entry here (and, for a new kind of goal, one more case in `progress`); the «جوایز» page lists
+  them all the same way. Earned once, a reward stays earned (profile.data.rewards: { key: day earned }).
+
+  Only days from `since` on count towards a goal, never the days before the reward existed (the owner's
+  rule, 2026-11-19): a new reward is something to start on, not something already won. So every new
+  reward gets `since` = the day it ships; one released late at night starts the next day.
 
   Kinds: 'finish' — a look laid over any colour theme (css/app.css [data-finish]), worn from «ظاهر»;
   'game' — a game (games/<key>/), a tile in «بیشتر» once earned.
@@ -18,11 +22,11 @@ import { logMarks, fullDay } from './stats.js';
 import { vegByDay, VEG_FRUIT_GOAL } from './quality.js';
 
 export const REWARDS = [
-  { key: 'parniyan', kind: 'finish', name: 'پرنیان', about: 'پوسته‌ی ظاهر اپ', goal: { type: 'fullRun', of: 21 } },
+  { key: 'parniyan', kind: 'finish', name: 'پرنیان', about: 'پوسته‌ی ظاهر اپ', goal: { type: 'fullRun', of: 21 }, since: '2026-11-15' },
   // 40 days: a «چله»
-  { key: 'shab', kind: 'finish', name: 'شب‌پر', about: 'پوسته‌ی ظاهر اپ', goal: { type: 'fullDays', of: 40 } },
-  // PACKABUNCHAS by Mattia Fortunati (MIT), in Persian: games/tangatang/
-  { key: 'tangatang', kind: 'game', name: 'تنگاتنگ', about: 'بازی پازل', goal: { type: 'vegDays', of: 10 } },
+  { key: 'shab', kind: 'finish', name: 'شب‌پر', about: 'پوسته‌ی ظاهر اپ', goal: { type: 'fullDays', of: 40 }, since: '2026-11-17' },
+  // PACKABUNCHAS by Mattia Fortunati (MIT), in Persian: games/tangatang/ (released 2026-11-18 at 23:49)
+  { key: 'tangatang', kind: 'game', name: 'تنگاتنگ', about: 'بازی پازل', goal: { type: 'vegDays', of: 10 }, since: '2026-11-19' },
 ];
 export const rewardOf = key => REWARDS.find(r => r.key === key) || null;
 
@@ -68,11 +72,13 @@ export function fullRuns(entries, notes, day) {
 export const vegDays = (entries, foods, day) =>
   [...vegByDay(entries, foods)].filter(([d, n]) => d <= day && n >= VEG_FRUIT_GOAL).length;
 
-export function progress({ entries = [], notes = [], foods = [], earned = {} }, day) {
-  const runs = fullRuns(entries, notes, day);
-  const veg = REWARDS.some(r => r.goal.type === 'vegDays') ? vegDays(entries, foods, day) : 0;
-  return REWARDS.map(r => {
+export function progress({ entries = [], notes = [], foods = [], earned = {} }, day, rewards = REWARDS) {
+  return rewards.map(r => {
     const of = r.goal.of;
+    // only the days since the reward was added
+    const mine = r.since ? entries.filter(e => e.day >= r.since) : entries;
+    const runs = r.goal.type === 'fullRun' || r.goal.type === 'fullDays' ? fullRuns(mine, notes, day) : null;
+    const veg = r.goal.type === 'vegDays' ? vegDays(mine, foods, day) : 0;
     const [now, met] = r.goal.type === 'fullRun' ? [runs.now, runs.best >= of]
       : r.goal.type === 'fullDays' ? [runs.total, runs.total >= of]
       : r.goal.type === 'vegDays' ? [veg, veg >= of]

@@ -103,6 +103,9 @@ exist side by side. When a new decision replaces an old one, change or mark the 
   that becomes a tile in «بیشتر» once earned. The user's rule: it must not be on Google Play and must be new to members (2048 was
   rejected for that). It is PACKABUNCHAS by Mattia Fortunati (js13kGames 2021, mobile winners, MIT), in Persian, in
   `games/tangatang/` (keep its `LICENSE`). Downloaded games are allowed this way; still don't build a game of our own unasked.
+- **Rewards count only from the day they are added (the user's rule, 2026-11-19):** a reward's goal never counts days from before
+  the reward existed. Every entry of `REWARDS` in `js/domain/rewards.js` has `since` (the day it ships; one released late at night
+  starts the next day), and `progress` only looks at days from `since` on. Give every new reward its `since`.
 - Build only what the user agreed to. When a reply could mean more than one of the options you offered,
   ask which ones before building (on 2026-11-08 a shared «team goal» was built that the user hadn't asked for).
 
