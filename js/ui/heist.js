@@ -20,6 +20,7 @@ import { createScene } from './heistScene.js';
 import { createAudio } from './heistAudio.js';
 import { edit as editVault, targets, check, lineOf } from '../domain/heistEdit.js';
 import * as net from '../data/heistNet.js';
+import { LESSONS, stepOf } from '../domain/heistTutorial.js';
 
 // The five gadgets in their order on the menu. A raid takes two (DESIGN-heist.md); the lockpick and the goggles just work while carried,
 // the others are used with a tap and then (smoke, decoy) a tap on a cell.
@@ -40,6 +41,16 @@ const TITLES = { escaped: 'فرار بی‌صدا', escaped_alarm: 'فرار ب�
 // a raid on my vault, as I watch it later: what the thief did
 const DID = { escaped: 'دستبرد زد', escaped_alarm: 'با آژیر فرار کرد', caught: 'گیر افتاد', timeout: 'گیر افتاد', fled: 'دست خالی رفت' };
 // why the server would not let a raid begin
+// The walk through the menu after the lessons: what each thing is, in a line (shown only for what is on the screen).
+const COACH = [
+  ['.heist-wallet > b', 'سکه: از دستبرد، و هر روز ثبت کامل ۱۰۰ تا'],
+  ['.heist-left', 'دستبردهای امروز؛ ثبت کامل و تحرک بیشترش می‌کنند'],
+  ['[data-diamond]', 'اولین کسی که الماس را بخرد برنده‌ی فصل است'],
+  ['.heist-targets', 'به گاوصندوق اعضا دستبرد بزن و سکه‌شان را ببر'],
+  ['.heist-levels [data-level="1"]', 'تمرین؛ در روز ثبت کامل سکه هم می‌دهد'],
+  ['.heist-kit', 'ابزارها؛ هر ۷ روز پشت‌سرهم ثبت کامل، یکی تازه'],
+  ['[data-level="mine"]', 'گاوصندوق خودت؛ بچینش تا بقیه به آن بزنند'],
+];
 const REFUSED = { shield: 'این گاوصندوق سپر دارد', limit: 'دستبردهای امروز تمام شد', coins: 'سکه‌ی کافی نداری' };
 
 const svg = (d, extra = '') => `<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"${extra}>${d}</svg>`;
@@ -72,6 +83,8 @@ const ICON = {
   undo: svg('<path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>'),
   eye: svg('<path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>'),
   ok: svg('<path d="M5 12.5l4.5 4.5L19 7.5"/>'),
+  help: svg('<circle cx="12" cy="12" r="9"/><path d="M9.6 9.3a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2-2.4 3.6M12 17v.4"/>'),
+  close: svg('<path d="M6 6l12 12M18 6L6 18"/>'),
   bad: svg('<circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5M12 16.3v.4"/>'),
   coin: '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="#ffc94a"/><circle cx="12" cy="12" r="6.2" fill="none" stroke="#b8861f" stroke-width="1.6"/><path d="M12 8.6v6.8" stroke="#b8861f" stroke-width="1.8" stroke-linecap="round"/></svg>',
   shield: svg('<path d="M12 3l7 3v5.5c0 4.5-3 8-7 9.5-4-1.5-7-5-7-9.5V6z"/>'),
@@ -98,6 +111,8 @@ export function renderHeist(root) {
       <div class="heist-glow" aria-hidden="true"></div>
       <button class="heist-btn heist-back" data-back aria-label="برگشت">${icon.chevR}</button>
       <button class="heist-btn heist-sound" data-sound aria-label="صدا">${ICON.sound}</button>
+      <div class="heist-tip" hidden><p></p><button data-skip aria-label="رد کردن آموزش">${ICON.close}</button></div>
+      <div class="heist-coach" hidden><i></i><p></p></div>
       <div class="heist-wallet">${ICON.coin}<b></b><span class="heist-left" aria-hidden="true"></span><span class="heist-trophies" aria-label="فصل‌های برده"></span>
         <button class="heist-diamond" data-diamond aria-label="الماس فصل">${ICON.loot}<small dir="rtl"></small></button></div>
       <div class="heist-top">
@@ -115,6 +130,7 @@ export function renderHeist(root) {
           <button class="heist-btn" data-inbox aria-label="دستبردهای تازه">${ICON.eye}<b class="heist-badge"></b></button>
           <button class="heist-btn" data-edit aria-label="چیدن گاوصندوق">${ICON.edit}</button>
           <button class="heist-btn heist-go" data-go aria-label="شروع">${ICON.go}</button>
+          <button class="heist-btn heist-help" data-help aria-label="آموزش">${ICON.help}</button>
         </div>
       </div>
       <div class="heist-edit">
@@ -209,6 +225,7 @@ function start(el, L, debug) {
     el.classList.toggle('online', online);
     const m = member();
     $('.heist-menu h1').textContent = level === 'mine' ? 'گاوصندوق من' : m ? m.name : 'سرقت بزرگ';
+    el.classList.toggle('learning', lesson >= 0);
     $('[data-go]').disabled = (level === 'mine' && !mineCheck.ok) || (!!m && (shielded(m) || !wallet || wallet.raidsLeft <= 0 || wallet.coins < wallet.fee));
     if (wallet) {
       $('.heist-wallet b').textContent = fa(wallet.coins);
@@ -288,6 +305,7 @@ function start(el, L, debug) {
   // The free space above and below the board: in a raid only the top bar and the tools; on the menu and the result, the title above and
   // everything from their first row of buttons down, so nothing sits on the board.
   const pads = { play: [70 + safeArea('top'), 112 + safeArea('bottom')] };
+  pads.learn = [pads.play[0] + 52, pads.play[1]];   // room for the lesson's line above the board
   const padFor = (title, row) => [Math.max(pads.play[0], $(title).getBoundingClientRect().bottom + 6),
     Math.max(pads.play[1], el.clientHeight - $(row).getBoundingClientRect().top + 12)];
 
@@ -364,6 +382,7 @@ function start(el, L, debug) {
     }
     setMode(was);
     if (was === 'play') refresh();
+    if (lesson >= 0) teach();
     return true;
   }
 
@@ -382,7 +401,7 @@ function start(el, L, debug) {
     if (!scene) return;
     // A raid on a member or a practice vault begins on the server (the fee, the daily limit, the shield); raiding my own vault is a test.
     raid = null;
-    if (online && level !== 'mine') {
+    if (online && (member() || typeof level === 'number')) {
       const m = member();
       try {
         const r = await net.call('start', m ? { target: m.id, gadgets: kit } : { practice: { level, seed }, gadgets: kit });
@@ -399,7 +418,8 @@ function start(el, L, debug) {
     moves = [];
     armed = null;
     tools();
-    scene.setPads(...pads.play, fast);
+    scene.setPads(...(lesson >= 0 ? pads.learn : pads.play), fast);
+    if (lesson >= 0) { step = 0; teach(); }
     setMode('busy');
     el.classList.remove('won');
     bus.emit('state');
@@ -408,6 +428,7 @@ function start(el, L, debug) {
     scene.setQuiet(false);
     setMode('play');
     refresh();
+    if (lesson >= 0) teach();
   }
 
   async function replay() {
@@ -421,6 +442,62 @@ function start(el, L, debug) {
     setMode('replay');
     for (const mv of list) { if (live !== L || !(await act(mv, 1.6))) break; }
     moves = list;
+  }
+
+  // ----- the tutorial (2026-11-18) -----
+  // Four lessons, each a small vault played for real with one line at a time (domain/heistTutorial.js), then a walk through the menu.
+  // It starts by itself the first time the game opens, and again from the «?» on the menu.
+  let lesson = -1, step = 0, before = null, coachAt = -1, coachList = [];
+  let learned = false;
+  try { learned = !!localStorage.getItem('tanara:heist:learned'); } catch { /* private mode */ }
+  async function learn(i = 0) {
+    if (lesson < 0) before = { level, kit };
+    lesson = i;
+    step = 0;
+    level = 'learn';
+    kit = LESSONS[i].kit.slice();
+    $('.heist-tip').hidden = true;
+    await build(LESSONS[i].vault);
+    if (live !== L || lesson !== i || !scene) return;
+    begin(i > 0);
+  }
+  // the line for where the raid stands, and the button it is about lit up
+  function teach() {
+    const Ls = LESSONS[lesson];
+    if (!Ls || !state) return;
+    if (state.status === 'play') step = stepOf(Ls, state, step);
+    const s = Ls.steps[step], tip = $('.heist-tip');
+    tip.hidden = state.status !== 'play';
+    tip.querySelector('p').textContent = s.text;
+    for (const b of el.querySelectorAll('.hint')) b.classList.remove('hint');
+    if (s.ui && state.status === 'play') $(s.ui)?.classList.add('hint');
+  }
+  function leaveLesson(skipped) {
+    lesson = -1;
+    $('.heist-tip').hidden = true;
+    for (const b of el.querySelectorAll('.hint')) b.classList.remove('hint');
+    if (before) { level = before.level; kit = before.kit; before = null; }
+    learned = true;
+    try { localStorage.setItem('tanara:heist:learned', '1'); } catch { /* private mode */ }
+    build().then(() => { if (!skipped && live === L) setTimeout(coach, 500); });
+  }
+  // The menu, one thing at a time: a ring round it and its line. A tap anywhere goes on.
+  function coach() {
+    if (mode !== 'menu') return;
+    coachList = COACH.filter(([sel]) => { const n = $(sel); const r = n?.getBoundingClientRect(); return n && !n.hidden && r && r.width > 0 && getComputedStyle(n).display !== 'none'; });
+    coachAt = -1;
+    nextCoach();
+  }
+  function nextCoach() {
+    const box = $('.heist-coach');
+    coachAt++;
+    if (coachAt >= coachList.length) { box.hidden = true; coachAt = -1; return; }
+    const [sel, text] = coachList[coachAt], r = $(sel).getBoundingClientRect(), h = el.clientHeight, ring = box.querySelector('i'), p = box.querySelector('p');
+    box.hidden = false;
+    Object.assign(ring.style, { left: `${r.left - 6}px`, top: `${r.top - 6}px`, width: `${r.width + 12}px`, height: `${r.height + 12}px` });
+    p.textContent = text;
+    const below = r.bottom + 14 + 70 < h;
+    Object.assign(p.style, below ? { top: `${r.bottom + 14}px`, bottom: '' } : { top: '', bottom: `${h - r.top + 14}px` });
   }
 
   // ----- online (phase 4) -----
@@ -672,7 +749,9 @@ function start(el, L, debug) {
   el.addEventListener('click', e => {
     const b = e.target.closest('button');
     if (!b) return;
-    if (b.dataset.back !== undefined) { if (mode === 'edit') closeEditor(); else location.replace('#/tools'); return; }
+    if (b.dataset.back !== undefined) { if (mode === 'edit') closeEditor(); else if (lesson >= 0) leaveLesson(true); else location.replace('#/tools'); return; }
+    if (b.dataset.skip !== undefined) { leaveLesson(true); return; }
+    if (b.dataset.help !== undefined) { if (mode === 'menu') learn(0); return; }
     if (b.dataset.tool) { if (mode === 'edit') { tool = b.dataset.tool; if (tool !== 'guard') sel = -1; editorView(); } return; }
     if (b.dataset.undo !== undefined) { if (mode === 'edit') stepBack(); return; }
     if (b.dataset.watch !== undefined) { watch(); return; }
@@ -691,7 +770,11 @@ function start(el, L, debug) {
     if (b.dataset.diamond !== undefined) { diamond(); return; }
     if (b.dataset.again !== undefined) { if (mode === 'result') begin(true); return; }
     if (b.dataset.replay !== undefined) { if (mode === 'result') { if (viewing) { const r = viewing; inbox.unshift(r); watchInbox(); } else replay(); } return; }
-    if (b.dataset.next !== undefined) { if (mode === 'result') { if (viewing) leaveViewing(); else { seed++; build(); } } }
+    if (b.dataset.next !== undefined) {
+      if (mode !== 'result') return;
+      if (lesson >= 0) { if (lesson + 1 < LESSONS.length) learn(lesson + 1); else leaveLesson(false); }
+      else if (viewing) leaveViewing(); else { seed++; build(); }
+    }
   });
 
   // ----- ?debug -----
@@ -705,7 +788,7 @@ function start(el, L, debug) {
   }
   window.__heist = {
     bus, audio, get kit() { return kit; }, setKit(k) { kit = k; hud(); }, get state() { return state; }, get vault() { return vault; }, get moves() { return moves; }, get mode() { return mode; }, get scene() { return scene; },
-    act, begin, replay, solve: (alarm = false) => solve(vault, kit, { alarm })?.moves,
+    act, begin, replay, solve: (alarm = false) => solve(vault, kit, { alarm })?.moves, learn, get lesson() { return lesson; }, get step() { return step; }, coach,
     load(l, s) { level = l; seed = s; return build(); },
     refreshOnline, get habit() { return habit; }, get owned() { return owned; },
     get mine() { return mineVault; }, get editor() { return { tool, sel, check: mineCheck, undo: undo.length }; }, openEditor, closeEditor, watch,
@@ -723,6 +806,8 @@ function start(el, L, debug) {
     scene = null;
     audio.dispose();
   };
-  build();
+  // the coach's tap anywhere goes on (and nothing under it is pressed)
+  $('.heist-coach').addEventListener('click', e => { e.stopPropagation(); nextCoach(); });
+  if (learned) build(); else learn(0);
   refreshOnline();
 }
