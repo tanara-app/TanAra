@@ -65,7 +65,8 @@ exist side by side. When a new decision replaces an old one, change or mark the 
   `Bash(npx supabase functions deploy *)`); the user has to add that file themselves. The same day `ClaudeAccount` deployed version 52
   (commit 734e209, the `lab` mode for «آزمایش خون»); that deploy went through. On 2026-11-18 `ClaudeAccount` deployed version 53 with the MCP tool
   (commit 2b2ab89: the removed diet plan and screen-only profile keys no longer go to the assistant). It boots (OPTIONS 200), but no
-  answer could be checked: the Anthropic credit was still empty that day.
+  answer could be checked: the Anthropic credit was still empty that day. On 2026-11-19 `ClaudeAccount` deployed version 54 the same way (commit f8998b5:
+  the tip mode gone, the chat sees today's tip from TIPS.md); it boots (OPTIONS 200).
 - From 2026-11-16 04:22 UTC every `hooshvareh` call failed with 502 (still so on 2026-11-18): the Anthropic API answered «credit balance is too low». Only the
   user can add credit (console.anthropic.com, Plans & Billing). Check the function logs for it when the assistant stops answering.
 - On 2026-11-17 the user installed the official Meshy plugin (claude.ai directory, by Meshy) with three skills:
