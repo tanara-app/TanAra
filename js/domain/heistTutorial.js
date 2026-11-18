@@ -6,6 +6,8 @@
   Each lesson was checked with the solver (tests/heistTutorial.test.js): the guard and the laser lessons can't be walked straight through
   (waiting is the lesson), the last can't be done without the pulse.
 */
+import { nextThreats } from './heist.js';
+
 const V = (tiles, defenses = []) => ({ v: 1, w: 7, h: 9, tiles, defenses });
 
 export const LESSONS = [
@@ -24,8 +26,9 @@ export const LESSONS = [
     vault: V(['###X###', '###.###', '##V.###', '###.###', '#.....#', '###.###', '###.###', '###.###', '###E###'],
       [{ t: 'guard', path: [[4, 4], [5, 4], [4, 4], [3, 4], [2, 4], [1, 4], [2, 4], [3, 4]] }]),
     steps: [
-      { text: 'کف قرمز یعنی نگهبان آن‌جا را می‌بیند', until: { turns: 2 } },
-      { text: 'قاب قرمز یعنی نوبت بعد؛ با ساعت شنی صبر کن', ui: '[data-wait]', until: { above: 4 } },
+      { text: 'قرمز یعنی اگر آن‌جا بروی، نگهبان می‌گیردت', until: { turns: 2 } },
+      { text: 'جلویت قرمز است؛ با ساعت شنی صبر کن', ui: '[data-wait]', until: { clear: true } },
+      { text: 'قرمز رفت؛ حالا برو', until: { above: 4 } },
       { text: 'صندوق، بعد خروجی' },
     ],
   },
@@ -35,7 +38,8 @@ export const LESSONS = [
       [{ t: 'laser', x: 3, y: 5, axis: 'h', mode: 'blink', phase: 2 }]),
     steps: [
       { text: 'لیزر روشن و خاموش می‌شود', until: { turns: 2 } },
-      { text: 'صبر کن تا خاموش شود، بعد رد شو', ui: '[data-wait]', until: { above: 5 } },
+      { text: 'جلویت قرمز است؛ صبر کن تا خاموش شود', ui: '[data-wait]', until: { clear: true } },
+      { text: 'خاموش شد؛ حالا رد شو', until: { above: 5 } },
       { text: 'اگر لیزر یا دوربین ببیندت، آژیر می‌زند', until: { loot: true } },
       { text: 'فرار کن' },
     ],
@@ -61,6 +65,8 @@ export function reached(until, state, vault) {
   if (until.loot) return !!state.loot;
   if (until.above !== undefined) return y < until.above;
   if (until.used !== undefined) return !!(state.used & (1 << until.used));
+  // the cell ahead (up the board) isn't red: safe to step on next turn
+  if (until.clear) { const n = nextThreats(vault, state); return ![...n.seen, ...n.near, ...n.cam, ...n.laser].includes(state.p - W); }
   if (until.nearSafe) {
     const safe = vault.tiles.join('').indexOf('V');
     return Math.abs(safe % W - x) + Math.abs((safe / W | 0) - y) === 1;

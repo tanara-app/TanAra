@@ -312,7 +312,7 @@ export async function createScene(stage, vault, opts = {}) {
         float stripes = 0.5 + 0.5 * sin((vUv.x + vUv.y) * 22.0 - uTime * 2.4);
         float pulse = 0.5 + 0.5 * sin(uTime * 3.0);
         vec3 red = vec3(1.0, 0.1, 0.2), cyan = vec3(0.24, 0.88, 1.0);
-        float aRed = vK.x * (0.07 + 0.11 * stripes) * (1.0 - smoothstep(0.9, 1.0, edge)) + vK.y * (frame * (0.42 + 0.3 * pulse) + 0.03);
+        float aRed = vK.x * (0.12 + 0.12 * stripes) * (1.0 - smoothstep(0.9, 1.0, edge)) + vK.y * (frame * (0.42 + 0.3 * pulse) + 0.03);
         float aCy = step(0.5, vK.z) * (step(1.5, vK.z) * (0.16 + frame * 0.5) + (1.0 - step(1.5, vK.z)) * (corner * (0.65 + 0.35 * pulse) + 0.035));
         float a = max(aRed, aCy);
         if (a < 0.01) discard;
@@ -613,12 +613,15 @@ export async function createScene(stage, vault, opts = {}) {
   // true: nothing on the floor (menu, result); false: a raid's danger and hints; 'edit': what the defences see at the start, under the
   // editor's cyan marks (no next-turn frames)
   let quiet = true;
+  const danger = state => { const n = nextThreats(vault, state); return new Set([...n.seen, ...n.near, ...n.cam, ...n.laser]); };
   function setOverlay(state, hints) {
     aCur.array.fill(0); aNext.array.fill(0); aHint.array.fill(0);
     if (state && state.status === 'play' && quiet !== true) {
-      const now = threats(vault, state);
-      for (const i of [...now.seen, ...now.cam]) aCur.array[i] = quiet === 'edit' ? 0.6 : 1;
-      if (!quiet) { const next = nextThreats(vault, state); for (const i of [...next.seen, ...next.near, ...next.cam, ...next.laser]) aNext.array[i] = 1; }
+      // In a raid only one red: the cells where standing after this move is caught or sets off the alarm (the defences move first,
+      // then they look). What they see right now doesn't matter and only misled (2026-11-18: «this lesson can't be done»).
+      // The editor shows what the defences cover at the start.
+      if (quiet === 'edit') for (const i of [...threats(vault, state).seen, ...threats(vault, state).cam]) aCur.array[i] = 0.6;
+      else for (const i of danger(state)) { aCur.array[i] = 1; aNext.array[i] = 1; }
     }
     if (quiet !== true) for (const [i, kind] of hints || []) { aHint.array[i] = kind; if (quiet === 'edit') aCur.array[i] = 0; }
     aCur.needsUpdate = aNext.needsUpdate = aHint.needsUpdate = true;

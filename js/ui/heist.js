@@ -15,7 +15,7 @@
 */
 import { icon, toast } from './dom.js';
 import { fa } from '../lib/fa.js';
-import { generate, initial, play, solve, MAX_TURNS, ALARM_TURNS, LEVELS, W, H, EMP_RADIUS, SMOKE_RANGE, BAIT_RANGE } from '../domain/heist.js';
+import { generate, initial, play, solve, nextThreats, MAX_TURNS, ALARM_TURNS, LEVELS, W, H, EMP_RADIUS, SMOKE_RANGE, BAIT_RANGE } from '../domain/heist.js';
 import { createScene } from './heistScene.js';
 import { createAudio } from './heistAudio.js';
 import { edit as editVault, targets, check, lineOf } from '../domain/heistEdit.js';
@@ -354,7 +354,14 @@ function start(el, L, debug) {
       for (let j = -r; j <= r; j++) for (let i = -r; i <= r; i++) {
         if (Math.abs(i) + Math.abs(j) <= r && play(vault, state, `${k}${x + i},${y + j}`, kit)) out.push([(y + j) * W + x + i, 2]);
       }
-    } else for (let d = 0; d < 4; d++) if (play(vault, state, DIRS[d], kit)) out.push([(y + DY[d]) * W + x + DX[d], 1]);
+    } else {
+      // only the moves that are safe next turn are lit (red is drawn by the scene)
+      const n = nextThreats(vault, state), red = new Set([...n.seen, ...n.near, ...n.cam, ...n.laser]);
+      for (let d = 0; d < 4; d++) {
+        const to = (y + DY[d]) * W + x + DX[d];
+        if (play(vault, state, DIRS[d], kit) && !red.has(to)) out.push([to, 1]);
+      }
+    }
     return out;
   }
   const refresh = () => { bus.emit('state'); scene?.setHints(hints()); };
