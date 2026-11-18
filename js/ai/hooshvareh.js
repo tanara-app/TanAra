@@ -5,12 +5,11 @@
   keep token use low. When the app gains a new kind of data, add it to context() and to
   sections() in the function (and only to the modes that need it), and update HOOSHVAREH.md.
 */
-import { eatingPattern, optionUse } from '../domain/pattern.js';
+import { eatingPattern } from '../domain/pattern.js';
 import * as store from '../data/store.js';
 import { SEED_FOODS } from '../data/seedFoods.js';
 import { SUPABASE_URL, SUPABASE_KEY } from '../config.js';
 import { effectiveTargets, computeTargets, phaseOn, maintenanceKcal, rampKcal, correcting } from '../domain/targets.js';
-import { SLOTS, planOn, planEnd, previousPlan, adherence, optionText, picksOn, offOn, slotExtras, dayRooms, carriesOver, fastOn, fastPlan } from '../domain/plan.js';
 import { measuredTdee } from '../domain/energy.js';
 import { lossStart, zone, maintainWeeks, lightOn } from '../domain/phase.js';
 import { sortedWeights, rate4w, measureDue, activityWeek, weekStart, ACTIVITY_GOAL, logMarks } from '../domain/stats.js';
@@ -31,40 +30,23 @@ export const aiOnline = () => !!getToken && navigator.onLine !== false;
 // The signed-in person's access token, for the app's other Edge Function (reminders).
 export const authToken = async () => (getToken ? getToken() : null);
 
-// The diet plan as Hooshvareh sees it: every option in plain words, plus how closely each
-// recent day followed it.
-function planContext(s, t) {
-  const plan = planOn(s.ai_notes, t);
-  if (!plan) return null;
-  const brief = pl => ({
-    start: pl.start, end: planEnd(pl), kcal: pl.kcal,
-    slots: Object.keys(SLOTS).map(k => ({ slot: SLOTS[k].label, pick: pl.slots[k].pick, options: pl.slots[k].options.map(o => `${o.title ? `${o.title}: ` : ''}${optionText(o)} (${o.kcal} kcal, ${o.protein} g protein)`) })),
-    free: (pl.free || []).map(f => f.name),
-  });
-  const prev = previousPlan(s.ai_notes, plan);
-  const from = addDays(t, -27);
-  const picks = picksOn(s.ai_notes, s.entries, t);
-  const fast = fastOn(s.ai_notes, t);
-  const et = effectiveTargets(s.profile?.data, t);
-  const shaped = fast ? fastPlan(plan, new Map(s.foods.map(f => [f.id, f])), { protein: et.protein, proteinMax: !!et.proteinMax }) : plan;
-  const rooms = dayRooms(shaped, picks, slotExtras(s.entries, picks, offOn(s.ai_notes, t), t, { fast }), s.entries, { carry: carriesOver(s.profile?.data, t) });
-  return {
-    ...brief(plan), note: plan.note,
-    previous: prev ? { start: prev.start, kcal: prev.kcal, adherence: (({ done, of }) => ({ done, of }))(adherence(s.ai_notes, s.entries, prev.start, addDays(plan.start, -1))) } : null,
-    days: adherence(s.ai_notes, s.entries, from, t).days,
-    // in Ramadan, on a day they fast: سحری from the lunch options, افطار from breakfast, شام from dinner
-    fastingToday: fast,
-    // today's occasions that off-plan food changed: what is left, and what was taken off for earlier ones
-    rooms: Object.keys(SLOTS).filter(k => rooms[k].extras || rooms[k].owed).map(k => ({ slot: shaped.labels?.[k] || SLOTS[k].label, left: rooms[k].left, owed: rooms[k].owed, back: !!rooms[k].back, locked: rooms[k].locked })),
-  };
-}
+// The diet plan («رژیم») is not sent: since the rebuilt «امروز» (2026-11-17) nobody sees a plan,
+// and an old plan with no ticks made the assistant talk about a plan they can't open (and paid
+// for a few thousand tokens with every message). Removed from the AI on 2026-11-18.
 
-// How they really eat (domain/pattern.js), and which options of the plan they pick.
+// Profile keys that only remember the app's own screens, not the person: they cost tokens with
+// every request and say nothing about them («game» is the removed game's save, about 4,000
+// characters). Everything else in the profile (the questionnaire, conditions, medications,
+// planPrefs, reminders, targets) still goes.
+const SCREEN_ONLY = ['game', 'toolsOrder', 'newsSeen', 'newsShown', 'beta', 'mode', 'planKcal', 'onboarded', 'kidneyAsked', 'glucoseMedsAsked'];
+const profileForAI = p => (p ? Object.fromEntries(Object.entries(p).filter(([k]) => !SCREEN_ONLY.includes(k))) : p);
+
+// How they really eat (domain/pattern.js).
 function patternContext(s, t) {
   const m = eatingPattern(s.entries, s.ai_notes, t);
   if (!m.ready) return null;
   const { days, eaten, shares, usual } = m;
-  return { days, eaten, shares, usual, use: optionUse(s.ai_notes, s.entries, t) };
+  return { days, eaten, shares, usual };
 }
 
 // The magazine as Hooshvareh sees it: every article by title. The full text of the latest few
@@ -142,7 +124,7 @@ function context() {
     today: t,
     todayFa: new Intl.DateTimeFormat('fa-IR-u-ca-persian', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(parse(t)),
     now: `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`,
-    profile: p,
+    profile: profileForAI(p),
     targets: p ? effectiveTargets(p) : null,
     // own: added by the person, not one of the app's starter foods; the diet plan favours these
     // tags: what the food is for their medical conditions (js/domain/health.js), when known
@@ -170,7 +152,6 @@ function context() {
     motivations: s.motivations.map(({ kind, title, note, day, image_path }) => ({ kind, title, note, day, image_path: image_path ? 1 : null })),
     // the rebuilt «امروز» (2026-11-17) has no «رژیم» mode: everyone counts
     mode: 'count',
-    plan: planContext(s, t),
     pattern: patternContext(s, t),
     magazine: magazineContext(s),
     focus: focusKey,

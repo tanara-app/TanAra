@@ -11,7 +11,7 @@ import { sheet, icon } from './dom.js';
 
 // Claude Sonnet 5.5, US dollars per million tokens (cache write: the 5-minute rate), and per web search.
 // Change these when the model or its prices change.
-const PRICE = { input: 2, cache_read: 0.2, cache_write: 2.5, output: 10, search: 0.01 };
+const PRICE = { input: 2, cache_read: 0.1, cache_write: 2.5, output: 10, search: 0.01 };
 // modes that run on another model: «خواندن آزمایش» reads a lab PDF twice with Claude Opus 5.5
 const MODE_PRICE = { lab: { input: 4, cache_read: 0.2, cache_write: 5, output: 20, search: 0 } };
 const MODES = {
