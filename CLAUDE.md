@@ -98,6 +98,10 @@ exist side by side. When a new decision replaces an old one, change or mark the 
   docs, the `heist` tables, functions and Edge Function, and `game` in `profile.beta`), after being unhappy with its tutorial
   («دیگه خسته شدم کلا بخش بازی رو حذف کن»). Don't build a game again unless the user asks. «سرزمین خانواده» in «پیشرفت» is not the
   game and stays.
+- **The game «تنگاتنگ» (2026-11-18, the user asked for it):** a ready-made game downloaded from the internet as a reward in «جوایز»
+  that becomes a tile in «بیشتر» once earned. The user's rule: it must not be on Google Play and must be new to members (2048 was
+  rejected for that). It is PACKABUNCHAS by Mattia Fortunati (js13kGames 2021, mobile winners, MIT), in Persian, in
+  `games/tangatang/` (keep its `LICENSE`). Downloaded games are allowed this way; still don't build a game of our own unasked.
 - Build only what the user agreed to. When a reply could mean more than one of the options you offered,
   ask which ones before building (on 2026-11-08 a shared «team goal» was built that the user hadn't asked for).
 
@@ -112,6 +116,9 @@ exist side by side. When a new decision replaces an old one, change or mark the 
 - `art/STYLE.md`: how the app's own pictures (the «بیشتر» icons) are made.
 - `REDESIGN.md`: the rebuild of «امروز» and «رژیم» into one part, step by step: what the user decided so far. Read it before
   touching the today screen, «سهم وعده» or «رژیم».
+- `TIPS.md`: the fixed list of daily tips («نکته‌ی امروز»), about 365, written once by Claude from established science only
+  (the user decided on 2026-11-18 to replace the tips Hooshvareh writes every day). Each tip has tags saying who sees it. Code
+  to show it is not written yet: the user asked for the content first, with no code in the meantime.
 - `LABS.md`: the lab-results tool («آزمایش خون» in «بیشتر», from 2026-11-17): PDF upload, the original kept for download,
   trends per test, condition suggestions. The user's decisions and where the work stands.
 - `IDEAS.md`: ideas for daily "hooks" that bring members back, with the ones the user picked. When one gets built,
