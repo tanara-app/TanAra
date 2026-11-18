@@ -5,7 +5,8 @@
   the same on every device of that member. «تمام» (or a tap outside the tiles) ends arranging.
 
   Tiles: the family shopping list, the food bank, its recipes, the magazine (its own page,
-  #/mag), and for the app owner «غذاهای تازه‌ی خانواده».
+  #/mag), and for the app owner «غذاهای تازه‌ی خانواده». A game earned in «جوایز» (kind 'game') is a
+  tile too, only for whoever earned it.
 */
 import * as store from '../data/store.js';
 import { fa } from '../lib/fa.js';
@@ -14,9 +15,11 @@ import { openShopping, shopping } from './shopping.js';
 import { toBuy } from '../domain/shopping.js';
 import { openFoodBank, openRecipes } from './foodBank.js';
 import { shareAdmin, checkShare, openFoodShare } from './foodShare.js';
-import { openRewards } from './rewards.js';
+import { openRewards, hasReward, openGame } from './rewards.js';
 import { openLabs, LAB_ICON } from './labs.js';
 
+// two of the game's creatures, in its own colours and outline
+const TT_ICON = '<svg viewBox="0 0 64 64" aria-hidden="true"><g stroke="#5D4E51" stroke-width="3.6" stroke-linejoin="round"><path d="M11 9h13v28h13v14H11z" fill="#FFEA7E"/><path d="M39 21h14v14H39z" fill="#FF7E64"/></g><g fill="#5D4E51"><circle cx="16.5" cy="44" r="2.4"/><circle cx="23.5" cy="44" r="2.4"/><circle cx="43" cy="28" r="2.2"/><circle cx="49" cy="28" r="2.2"/></g><g fill="#fff"><circle cx="15.8" cy="43.1" r=".9"/><circle cx="22.8" cy="43.1" r=".9"/><circle cx="42.4" cy="27.2" r=".8"/><circle cx="48.4" cy="27.2" r=".8"/></g></svg>';
 const again = () => { const v = document.querySelector('#view .tools'); if (v) renderTools(v.parentElement); };
 const TOOLS = {
   shop: { label: 'لیست خرید', badge: () => toBuy(shopping()).length, open: () => openShopping() },
@@ -28,6 +31,8 @@ const TOOLS = {
   rewards: { label: 'جوایز', open: () => openRewards() },
   // «آزمایش خون» (LABS.md): for everyone since 2026-11-17 (the `labs` beta flag is unused)
   labs: { label: 'آزمایش خون', svg: LAB_ICON, open: () => openLabs() },
+  // «تنگاتنگ»: a game earned in «جوایز» (10 days of 5 servings of vegetables and fruit)
+  tangatang: { label: 'تنگاتنگ', svg: TT_ICON, only: () => hasReward('tangatang'), open: () => openGame('tangatang') },
 };
 
 // The member's order: what they arranged, then any tool added since, in its usual place.

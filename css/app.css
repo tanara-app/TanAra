@@ -1584,3 +1584,40 @@ body.kb .toast, body.chat-mode .toast { bottom: calc(var(--nav-h) + var(--safe-b
   color: color-mix(in srgb, var(--accent) 25%, #000); background: linear-gradient(170deg, color-mix(in srgb, var(--accent) 70%, #fff), var(--accent));
   box-shadow: inset 0 1px 0 rgba(255,255,255,.4), 0 0 20px color-mix(in srgb, var(--accent) 55%, transparent); }
 @media (prefers-reduced-motion: reduce) { :root[data-finish="shab"] body::after, .sb-shoot, .sb-tw { animation: none; } }
+
+/* «تنگاتنگ» (a game in «جوایز», js/ui/rewards.js): the game's own pastel space, the same in every palette,
+   since it is a picture of the game; one creature drops into the rocket, the others float */
+.rw-show.rw-tangatang { background: #94DEC3; }
+.rw-tangatang::before { display: none; }
+.tt-scene { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.tt-scene g { transform-box: fill-box; }
+.tt-drop { animation: tt-drop 3.4s cubic-bezier(.45, 0, .55, 1) infinite; }
+@keyframes tt-drop {
+  0% { transform: translate(0, -70px); opacity: 0; }
+  12% { opacity: 1; }
+  62% { transform: translate(6px, 92px); opacity: 1; }
+  78%, 100% { transform: translate(6px, 128px); opacity: 0; }
+}
+.tt-bob { animation: tt-bob 3s ease-in-out infinite alternate; }
+.tt-bob.d2 { animation-delay: -1s; } .tt-bob.d3 { animation-delay: -2s; }
+@keyframes tt-bob { from { transform: translateY(-5px) rotate(-3deg); } to { transform: translateY(5px) rotate(3deg); } }
+.tt-rocket { animation: tt-hover 2.4s ease-in-out infinite alternate; }
+@keyframes tt-hover { from { transform: translateY(-2px); } to { transform: translateY(3px); } }
+.tt-fire { transform-origin: 50% 0; animation: tt-fire .18s steps(2) infinite alternate; }
+@keyframes tt-fire { from { transform: scaleY(.85); } to { transform: scaleY(1.15); } }
+.tt-tw { animation: tt-tw 2.6s ease-in-out infinite; } .tt-tw.d2 { animation-delay: .9s; } .tt-tw.d3 { animation-delay: 1.7s; }
+@keyframes tt-tw { 50% { opacity: .25; } }
+@media (prefers-reduced-motion: reduce) { .tt-drop, .tt-bob, .tt-rocket, .tt-fire, .tt-tw { animation: none; } }
+.rw-card.tap { cursor: pointer; }
+.rw-card.tap:active { transform: scale(.985); }
+/* a game's own page */
+.promo { display: flex; flex-direction: column; gap: 14px; padding-bottom: 6px; }
+.promo-show { height: 300px; border-radius: 24px; }
+.promo-line { text-align: center; font-size: 1rem; line-height: 1.9; }
+.promo-tags { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px; }
+.promo-tags span { padding: 4px 12px; border-radius: 999px; background: var(--surface-2); font-size: .82rem; font-weight: 700; }
+.promo-goal { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border-radius: 18px; background: var(--surface-2); }
+.promo-play { display: flex; align-items: center; justify-content: center; gap: 8px; height: 52px; font-size: 1.05rem; }
+.promo-credit { text-align: center; color: var(--muted); font-size: .72rem; }
+/* the game itself, under the sheet's head */
+.game-frame { display: block; width: 100%; height: calc(92dvh - 96px - var(--safe-b)); border: 0; border-radius: 18px; background: #FFEA7E; }

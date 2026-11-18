@@ -1,5 +1,5 @@
 import { suite, test, eq } from './harness.js';
-import { dayQuality, hasVeg } from '../js/domain/quality.js';
+import { dayQuality, hasVeg, vegByDay } from '../js/domain/quality.js';
 import { SEED_TAGS } from '../js/domain/health.js';
 
 const foods = [
@@ -13,6 +13,14 @@ const tagsOf = f => SEED_TAGS[f.name] || [];
 const day = '2026-11-13';
 
 suite('quality', () => {
+  test('servings of vegetables and fruit per day, the same rule as the day\'s count', () => {
+    const e = [
+      { day, is_veg: true, qty: 2 }, { day, food_id: 'apple', qty: 1 }, { day, food_id: 'date', qty: 3 },
+      { day: '2026-11-12', is_veg: true, unit: 'گرم', qty: 160 },
+    ];
+    eq([...vegByDay(e, foods)], [[day, 3], ['2026-11-12', 2]]);
+    eq(vegByDay(e, foods).get(day), dayQuality(e, foods, day, 2000).veg);
+  });
   test('vegetables and fruit count in servings, dates do not', () => {
     const es = [
       { day, food_id: 'salad', is_veg: true, qty: 1, unit: 'کاسه' },

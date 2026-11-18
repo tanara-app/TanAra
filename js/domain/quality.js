@@ -14,6 +14,19 @@ import { vegServings } from './stats.js';
 export const VEG_FRUIT_GOAL = 5;
 export const SWEET_SHARE = 0.1;
 
+// whether an entry counts as vegetables or fruit (its food from the bank, when it has one)
+const vegFruit = (e, f) => e.is_veg || f?.category === 'fruit';
+
+// Servings of vegetables and fruit on each day with any: Map(day → servings), same rule as dayQuality.
+export function vegByDay(entries, foods) {
+  const byId = new Map((foods || []).map(f => [f.id, f]));
+  const out = new Map();
+  for (const e of entries || []) {
+    if (vegFruit(e, e.food_id ? byId.get(e.food_id) : null)) out.set(e.day, (out.get(e.day) || 0) + vegServings(e));
+  }
+  return out;
+}
+
 // `tagsOf(food)`: its health tags (foodTags in ai/foodTags.js), or null when not known.
 export function dayQuality(entries, foods, day, kcalTarget, tagsOf = () => null) {
   const byId = new Map(foods.map(f => [f.id, f]));
@@ -21,7 +34,7 @@ export function dayQuality(entries, foods, day, kcalTarget, tagsOf = () => null)
   for (const e of entries) {
     if (e.day !== day) continue;
     const f = e.food_id ? byId.get(e.food_id) : null;
-    if (e.is_veg || f?.category === 'fruit') veg += vegServings(e);
+    if (vegFruit(e, f)) veg += vegServings(e);
     const tags = (f && tagsOf(f)) || [];
     if (tags.includes('sugary') || tags.includes('sweetDrink')) sweet += Number(e.kcal) || 0;
   }

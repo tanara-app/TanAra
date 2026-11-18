@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>تنگاتنگ</title>
+<!-- PACKABUNCHAS by Mattia Fortunati (MIT, see LICENSE), in Persian for TanAra: see the note at the top of game.js -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@700;900&display=block" rel="stylesheet">
+<style>
+  html, body { margin: 0; height: 100%; background: #FFEA7E; overscroll-behavior: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+  .c { position: fixed; inset: 0; display: flex; justify-content: center; align-items: center; background: #FFEA7E; touch-action: none; }
+  .c canvas { object-fit: contain; max-height: 100%; max-width: 100%; touch-action: none; }
+</style>
+</head>
+<body>
+<div class="c"><canvas id="v" width="1080" height="1920"></canvas></div>
+<script>
+  // the canvas draws its words in Vazirmatn: start once the font is in (or after a second without it)
+  (function () {
+    var go = function () { if (go.done) return; go.done = true; var s = document.createElement('script'); s.src = 'game.js'; document.body.appendChild(s); };
+    if (document.fonts && document.fonts.load) {
+      Promise.all([document.fonts.load('900 100px Vazirmatn', 'تنگ'), document.fonts.load('700 50px Vazirmatn', 'تنگ')]).then(go, go);
+      setTimeout(go, 1500);
+    } else go();
+  })();
+</script>
+</body>
+</html>

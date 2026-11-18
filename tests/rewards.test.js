@@ -44,6 +44,23 @@ suite('rewards', () => {
     eq(at(gappy(8)).now <= of, true);
   });
 
+  test('«تنگاتنگ»: days with 5 servings of vegetables and fruit, in a row or not', () => {
+    const of = rewardOf('tangatang').goal.of;
+    const foods = [{ id: 'apple', category: 'fruit' }, { id: 'rice', category: 'grain' }];
+    // 3 servings of salad (is_veg) and 2 apples (a fruit of the bank) = 5; rice never counts
+    const good = d => [{ day: d, is_veg: true, qty: 3 }, { day: d, food_id: 'apple', qty: 2 }, { day: d, food_id: 'rice', qty: 4 }];
+    const thin = d => [{ day: d, is_veg: true, qty: 2 }, { day: d, food_id: 'apple', qty: 2 }];
+    const at = e => progress({ entries: e, foods }, DAY).find(x => x.reward.key === 'tangatang');
+    const days = n => Array.from({ length: n }, (_, i) => good(addDays('2026-01-01', i * 3))).flat();
+    eq([at(days(of - 1)).earned, at(days(of - 1)).now], [false, of - 1]);
+    eq([at(days(of)).earned, at(days(of + 2)).now], [true, of]);
+    eq(at(thin(DAY)).now, 0);
+    // 240 g of a vegetable logged by weight = 3 servings
+    eq(at([{ day: DAY, is_veg: true, unit: 'گرم', qty: 240 }, { day: DAY, food_id: 'apple', qty: 2 }]).now, 1);
+    // a day after `day` does not count yet
+    eq(at(good(addDays(DAY, 1))).now, 0);
+  });
+
   test('only earned finishes can be worn', () => {
     eq(earnedFinishes({}).length, 0);
     eq(earnedFinishes({ parniyan: '2026-01-01' }).map(r => r.key), ['parniyan']);
