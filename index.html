@@ -19,32 +19,6 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/app.css">
-  <!-- three.js for the game (js/ui/heistScene.js): a pinned version, fetched only when the game opens. `integrity` lists every
-       file the game loads from it; a browser that knows the field refuses a file whose hash differs. -->
-  <script type="importmap">
-{
-   "imports": {
-    "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js",
-    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
-   },
-   "integrity": {
-    "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js": "sha384-IDC7sAMAIMB/TZ6dgKKPPAKZ2bXXXP8+FBMBC8cU319eBhKITx+PaalhfDkDNH28",
-    "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/loaders/GLTFLoader.js": "sha384-Lq1Wl94so5JCKGDvezrdVMJhdeKQkwb8iwRo59QrPPd61CnrCJZLxYmFlQ8ZuOKR",
-    "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/utils/BufferGeometryUtils.js": "sha384-wOjwauvHlJO7K6APr7FmMGH2nupQa3Ndzas9bJZhsAMOK055efJud8ns4aYmASKv",
-    "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/postprocessing/EffectComposer.js": "sha384-L+Ns9skCAqjab7aG8LH5VLknBCoENW7p37sOj39jnITwlWZFabWc29JwzgYf6ygy",
-    "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/postprocessing/RenderPass.js": "sha384-JBzMcXwTgF2e9tw3AU4+jg+nVDdl7hTHlT0C5qZVa/1DUUe/KIm4L3e2jorIH28/",
-    "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/postprocessing/UnrealBloomPass.js": "sha384-NLbvCtTvm5zjFCKW1mFWUjcnFLVOn258z3hKOAoYCXJ1DtQO54I+x5LPquFbIig+",
-    "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/postprocessing/OutputPass.js": "sha384-pAQ55aG4oXjA92n2goVLMWU14Ik/bNUs29MfxOM6meGyGzTJoFm7WxEU0D0SqsNI",
-    "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/postprocessing/ShaderPass.js": "sha384-zetU6HhR/vTtgSvnS9DE+GQPZhVT/ZOSLa/1+DSM6rkM9hvBgQWr9bCEosZt93ch",
-    "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/postprocessing/MaskPass.js": "sha384-SDM80tiGflO8UDV/QzR/mASjcc/+wF7KfRVFNHJUIPcTctwoPI8GoWVTlccZw7V4",
-    "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/postprocessing/Pass.js": "sha384-gSqIFh8vMmp1veyOysIS3KPVUl/A5JPefYvW4b89OeYeW0bwkrjN7qcC1h0XJK/K",
-    "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/shaders/CopyShader.js": "sha384-kzVlcj2amFaRNIWZ5zE0PmIN+QTNWWvrgKk31S8N/7w0nf7Qq3xqxHRLbD2UPPSl",
-    "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/shaders/LuminosityHighPassShader.js": "sha384-a6qrIDfNt1Ss7Z4VtgMalz9gq8H/Up3lSSf1Agc4HRaDMvNd9eP9k7DckAv5JxQF",
-    "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/shaders/OutputShader.js": "sha384-CdpJL3xlIkjJQAbzgyazSoOx+/oBcwUCsBVSU25SKy8/PEdYEn24U+4mnmx3R4YX",
-    "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/utils/SkeletonUtils.js": "sha384-3fZU4PNurVxnDiEqbpF53fm3l2EaBsiFMngKeMCCNEfE3MrfKgcpCyvRE6O61TGr"
-   }
-  }
-  </script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js" integrity="sha384-GFr3yTh5lJznCbZfpTtXnwboFsxqtTQoeTZCRHhE0579KrRmlCzen5AA8ohaB5ug" crossorigin="anonymous"></script>
 </head>
 <body>

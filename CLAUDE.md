@@ -22,7 +22,7 @@ So at the start of every session:
    if `origin/main` moved.
 6. Commit and push finished, checked work on your own, without asking the user each time (they asked for this
    on 2026-11-13: «انقدر از من نپرس… خودت خودکار انجام بده»). Still check the diff for sensitive data first, and
-   keep big binaries (like the 44 MB Meshy GLB models in `art/models/`) out of git.
+   keep big binaries out of git.
 
 Memory files under `~/.claude/` are per account, so the other Claude can't see yours. Anything the other
 one needs to know goes in this file or in the project docs, not only in your own memory.
@@ -66,20 +66,16 @@ exist side by side. When a new decision replaces an old one, change or mark the 
   (commit 734e209, the `lab` mode for «آزمایش خون»); that deploy went through.
 - From 2026-11-16 04:22 UTC every `hooshvareh` call failed with 502: the Anthropic API answered «credit balance is too low». Only the
   user can add credit (console.anthropic.com, Plans & Billing). Check the function logs for it when the assistant stops answering.
-- The game's function `heist` (from 2026-11-17) imports the app's own files by relative path: `js/domain/heist.js`, `heistEdit.js`, `heistRules.js`,
-  `heistDiet.js`, and through them `family.js`, `stats.js`, `targets.js`, `plan.js`, `meals.js`, `occasions.js`, `js/lib/dates.js`, `js/lib/fa.js`. The CLI
-  (`npx supabase functions deploy heist --project-ref whmzjvmeyxdoqjtkukix --yes`, verify_jwt on) bundles them all. **Redeploy `heist` whenever one of those
-  files changes** (even a change to the «ثبت کامل» rule in stats.js), or the server's rules drift from the app's. Through the MCP tool, upload them too, at
-  the same relative paths.
 - On 2026-11-17 the user installed the official Meshy plugin (claude.ai directory, by Meshy) with three skills:
   `meshy-3d-generation`, `meshy-3d-printing`, `meshy-openclaw`. It belongs to the claude.ai account, not this folder
   (on `m.b.a` it is cached under `~/Library/Application Support/Claude/local-agent-mode-sessions/…/rpm/plugin_01LLaHeMvnzBdyHYEGGSUNZi/`).
   If `ClaudeAccount` uses another claude.ai account, it does not have these skills.
-- Trying the game (or any animated page) by yourself: when the Browser pane is hidden, the page gets no animation frames and CSS
-  transitions stand still, so screenshots show a half-loaded screen. Use the Playwright MCP browser (`mcp__plugin_parallax-threejs_playwright-mcp__*`,
-  viewport 375×812) instead; it writes into `.playwright-mcp/` in this folder, so delete that folder when done. In `?local` mode the app
-  starts at the questionnaire: to skip it, set `localStorage['tanara:local:state']` to `{"profile":{"user_id":"local","data":{"onboarded":true,"beta":["game"]}}}`
-  and reload (a hash-only navigation does not reload the page). The game: `http://127.0.0.1:5173/?local&debug#/heist`, console hook `window.__heist`.
+- Trying an animated page by yourself: when the Browser pane is hidden, the page gets no animation frames and CSS transitions stand
+  still, so screenshots show a half-loaded screen. Use the Playwright MCP browser (`mcp__plugin_parallax-threejs_playwright-mcp__*`,
+  viewport 375×812) instead; it writes into `.playwright-mcp/` in this folder, so delete that folder when done. Keep each Playwright call
+  short: on 2026-11-18 a `browser_run_code_unsafe` with `page.goto`/`page.reload` inside hung for 30 minutes; navigate with `browser_navigate`
+  and check with `browser_evaluate`. In `?local` mode the app starts at the questionnaire: to skip it, set
+  `localStorage['tanara:local:state']` to `{"profile":{"user_id":"local","data":{"onboarded":true}}}` and reload.
 - Tests: `node tests/run.js` (or open `tests/index.html` in the browser).
 - The user speaks Persian; answer in Persian.
 - ElevenLabs (the mascot's voice): always the newest model, and ask the user before generating anything
@@ -93,14 +89,13 @@ exist side by side. When a new decision replaces an old one, change or mark the 
   and an action that can be an icon is an icon (undo instead of «برگشت به پیشنهاد اپ»). Before adding any
   sentence, label or link to the UI, ask whether the screen works without it.
 - Anything that only some members have (a beta in `profile.beta`, not yet released to everyone) carries the word
-  «آزمایشی» next to its name where it is opened (e.g. «سهم وعده آزمایشی» in its tab, «باغ» with «آزمایشی» under
-  its tile in «بیشتر»). The user asked for this on 2026-11-12. Remove the word when it is released to all.
+  «آزمایشی» next to its name where it is opened (e.g. «سهم وعده آزمایشی» in its tab). The user asked for this on 2026-11-12. Remove the word when it is released to all.
 - On 2026-11-12 a «تازه‌ها» page (the app's changes, with an unread count and a one-time sheet) was built
   and removed the same day: the user didn't like it. Don't bring it back unless they ask.
-- **The game («سرقت بزرگ», from 2026-11-17) follows [briefs/heist.md](briefs/heist.md)**: within a phase, decide game details on your
-  own judgment, but keep every stop the brief sets (tell the user the model and cost before any Meshy job, ask before making sound, and
-  stop for the user's approval on the phone after each phase). Write decisions in `DESIGN-heist.md` / `briefs/heist.md` / `GARDEN.md`.
-  It stays beta until the user says otherwise.
+- **On 2026-11-18 the user had the whole game removed** («سرقت بزرگ» and the older «باغ»: code, pictures, sounds, 3D models, tests,
+  docs, the `heist` tables, functions and Edge Function, and `game` in `profile.beta`), after being unhappy with its tutorial
+  («دیگه خسته شدم کلا بخش بازی رو حذف کن»). Don't build a game again unless the user asks. «سرزمین خانواده» in «پیشرفت» is not the
+  game and stays.
 - Build only what the user agreed to. When a reply could mean more than one of the options you offered,
   ask which ones before building (on 2026-11-08 a shared «team goal» was built that the user hadn't asked for).
 
@@ -115,10 +110,6 @@ exist side by side. When a new decision replaces an old one, change or mark the 
 - `art/STYLE.md`: how the app's own pictures (the «بیشتر» icons) are made.
 - `REDESIGN.md`: the rebuild of «امروز» and «رژیم» into one part, step by step: what the user decided so far. Read it before
   touching the today screen, «سهم وعده» or «رژیم».
-- `GARDEN.md`: the game inside the app: the user's decisions on the new game «سرقت بزرگ» (which will replace «باغ»), why the old
-  «سرزمین» was removed, and how to work on the game. The build brief is [briefs/heist.md](briefs/heist.md). Read both before any work on the game.
-- `DESIGN-heist.md`: the heist game's final rules and numbers, the art bible and the asset ledger; `js/domain/heist.js` (simulator,
-  solver, validator, generator) implements the rules and `tests/heist.test.js` holds them.
 - `LABS.md`: the lab-results tool («آزمایش خون» in «بیشتر», from 2026-11-17): PDF upload, the original kept for download,
   trends per test, condition suggestions. The user's decisions and where the work stands.
 - `IDEAS.md`: ideas for daily "hooks" that bring members back, with the ones the user picked. When one gets built,
