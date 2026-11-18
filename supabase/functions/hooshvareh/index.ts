@@ -4,7 +4,6 @@
     chat      streamed reply (NDJSON lines) with tools that *propose* changes; the app
               shows each proposal as a card and only writes it after the user confirms. It can
               propose new records and also corrections (edit / delete) of existing ones.
-    tip       today's short tip for the Today screen
     quote     a motivational sentence for the Motivation section
     review    analysis of one week + a suggested goal for next week
     progress  analysis of the weight trend
@@ -179,7 +178,7 @@ type Ctx = {
   occasions?: { name: string; day: string; inDays: number; days: number }[];
   energy?: any;
   measure?: { weigh: boolean; waist: boolean } | null;
-  mode?: string; plan?: any; magazine?: any[]; focus?: string; recipes?: any[];
+  mode?: string; plan?: any; magazine?: any[]; focus?: string; tip?: { title: string; body: string } | null; recipes?: any[];
   shopping?: { name: string; amount?: string; for?: string }[];
   checkins?: any[];
   labs?: any[];
@@ -343,6 +342,8 @@ function sections(c: Ctx) {
       const mag = [...(c.magazine || [])].sort((a, b) => (a.day < b.day ? -1 : 1));
       return mag.length ? `# Magazine («مجله») articles you researched and wrote for them, latest last (day | category | title — summary of the latest ones). Full text: get_article.\n${mag.map((a, i) => `${a.day} | ${a.category || "-"} | ${a.title}${i >= mag.length - MAG_SUMMARIES && a.summary ? ` — ${a.summary}` : ""}${a.read ? "" : " [not opened yet]"}`).join("\n")}` : "";
     },
+    // «نکته‌ی امروز» on their Today screen: from the app's fixed list (TIPS.md), not written by Hooshvareh
+    tip: () => c.tip?.title ? `# Today's tip on «امروز» (from the app's fixed list of tips, written from established science; the whole family sees the same one today). If they ask about it, answer from it.\n${c.tip.title}\n${c.tip.body}` : "",
     // the article they opened «درباره‌ی این مقاله از هوشواره بپرس» on
     focus: () => {
       const a = c.focus && (c.magazine || []).find(x => x.key === c.focus && x.body);
@@ -705,48 +706,6 @@ type OneShot = {
   effort: string; max_tokens?: number; schema: any; prompt: (i: any, c: Ctx) => string; image?: boolean | "optional";
   system?: string; shared?: (S: Sections) => string[]; data?: (S: Sections, i: any) => string[];
 };
-// «نکته‌ی امروز»: one topic a day, in turn (see ONE_SHOT.tip).
-const TIP_TOPICS = [
-  "water: drinking water before meals and fullness; thirst mistaken for hunger",
-  "protein: why it is the most filling macronutrient and protects muscle while losing",
-  "fibre and vegetables: volume, slower digestion, fullness",
-  "energy density: eating a larger volume of food for fewer calories",
-  "liquid calories: sweet drinks, juice and why the body barely compensates for them",
-  "sleep and appetite: ghrelin, leptin and cravings after a short night",
-  "eating speed: how long fullness signals take and what slowing down does",
-  "daily movement (NEAT): steps and everyday activity versus formal exercise",
-  "strength training while losing weight: keeping muscle and metabolism",
-  "water weight: why the scale jumps day to day (salt, carbohydrate, glycogen) and why weekly averages matter",
-  "plateaus and metabolic adaptation: what really happens and what to do",
-  "ultra-processed foods: what the controlled trial showed about how much people eat",
-  "breakfast and meal timing: what the evidence does and doesn't show",
-  "cooking oil and hidden calories in Iranian cooking (stews, rice, frying)",
-  "bread and rice: refined versus whole grains, portion and fullness",
-  "fruit versus fruit juice and dried fruit",
-  "nuts: healthy but energy-dense; how much is a portion",
-  "dairy and yoghurt in a weight-loss diet",
-  "self-monitoring: what logging food and weighing do for weight loss, by the evidence",
-  "stress, cortisol and emotional eating: the mechanism and what helps",
-  "the slow pace: why 0.5–1 kg a week keeps the weight off better than crash diets",
-  "salt, bloating and blood pressure",
-  "sugar cravings: how they work, and how they fade when sugar is cut back gradually",
-  "the waist: why waist size says more about health than weight alone",
-];
-const TIP_TOPICS_CARE = [
-  "water and hydration: how it helps energy, digestion and concentration",
-  "protein at meals: steady energy and keeping muscle strong",
-  "fibre, vegetables and fruit: digestion, gut health and feeling well",
-  "regular meals: why skipping meals backfires on energy and mood",
-  "sleep and appetite: how a short night changes hunger signals",
-  "movement for mood: what research shows about walking and wellbeing",
-  "whole grains versus refined: steady blood sugar and energy",
-  "calcium, dairy and bone health",
-  "iron and tiredness: foods that help and what helps absorb them",
-  "healthy fats: nuts, olive oil and fish",
-  "stress and eating: how stress affects appetite and gentle ways to wind down",
-  "water weight: why the body's weight naturally swings from day to day",
-];
-
 const ONE_SHOT: Record<string, OneShot> = {
   plan: {
     effort: "medium",
@@ -840,29 +799,6 @@ Also give, for ONE of the food's unit as given (its unit, grams, kcal and protei
 Return every food by its n.
 
 ${JSON.stringify((Array.isArray(i.foods) ? i.foods : []).slice(0, 40).map((f: any) => ({ n: Number(f.n), name: String(f.name || "").slice(0, 80), unit: String(f.unit || "").slice(0, 30), grams: Number(f.grams) || null, kcal: Number(f.kcal) || 0, protein: Number(f.protein) || 0, ...(Array.isArray(f.ingredients) ? { ingredients: f.ingredients.slice(0, 30).map((x: any) => String(x).slice(0, 60)) } : {}) })))}`,
-  },
-  tip: {
-    effort: "low",
-    max_tokens: 3000,
-    data: (S) => [S.now(), S.profile(), S.phase(), S.mode(), S.notes()],
-    schema: { type: "object", properties: { text: str("Persian, simple Markdown") }, required: ["text"], additionalProperties: false },
-    // A topic a day from a fixed rotation, so the tips stay on diet science and don't repeat.
-    // With a (possible) eating-disorder history the rotation is about nourishment, not restriction.
-    prompt: (i, c) => {
-      const care = ["yes", "unsure"].includes((c.profile as any)?.edHistory);
-      const list = care ? TIP_TOPICS_CARE : TIP_TOPICS;
-      // «یک نکته‌ی دیگر» asks again with shift 1, 2, …: the next topics in the rotation
-      const n = Math.floor(Date.parse(c.today + "T12:00:00Z") / 86400000) + (Math.floor(Number(i.shift)) || 0);
-      const topic = list[((n % list.length) + list.length) % list.length];
-      return `Write today's tip for the Today screen: one useful, scientifically grounded fact about nutrition and dieting, explained so they learn something. Today's topic: ${topic}.
-
-Shape (Persian, about 60–90 words, simple Markdown, no greeting):
-- First line: a short bold title of 3–6 words that states the fact (e.g. «**آب قبل از غذا، سیرتر سر سفره**»).
-- Then 2–3 sentences: what research has found, with one concrete number or finding where it is solid (e.g. how much, how long, by how much), and WHY it works (the body mechanism, in plain words).
-- Last sentence: exactly how to use it today, practical and specific to Iranian food and habits.
-Only what is well supported by systematic reviews or solid trials; if the effect is modest, say so honestly instead of overselling. No fads, no supplements or pills, nothing below their safe minimum, nothing against a medical condition in their profile.${care ? " They may have a history of disordered eating: frame everything as nourishing the body and feeling well; nothing about cutting, restricting, calorie numbers, weighing or compensating." : ""}${c.phase?.phase === "maintain" ? " They are in maintenance: where the topic allows, frame it as keeping the weight off." : ""}
-This is NOT an analysis of their data: don't mention their numbers, logs or progress. Don't repeat a fact from your earlier tips (in the data, keys tip:…); take a different angle on the topic if needed.`;
-    },
   },
   quote: {
     effort: "low",
@@ -1431,7 +1367,7 @@ function runChat(ctx: Ctx, history: any[], images: unknown, use: Use) {
   const system = systemBlocks(block([S.profile(), S.labs(), S.targets(), S.phase(), S.energy(), S.mode(), S.foods(), S.recipes(), S.magazine(), S.motivations(), S.reviews(), S.checkins(), S.notes(), S.plan(), S.pattern(), S.weights(), S.totals(S.yesterday), S.entries(S.detailFrom, S.yesterday)]));
   // What changes by the minute goes after the conversation, so it never breaks the cache:
   // the next message finds everything up to this one already cached.
-  const live = `<live_data>\n${block([S.now(), S.today(), S.standing(), S.activity(), S.occasions(), S.adherence(), S.shopping(), S.focus()])}\n</live_data>`;
+  const live = `<live_data>\n${block([S.now(), S.today(), S.standing(), S.activity(), S.occasions(), S.adherence(), S.shopping(), S.tip(), S.focus()])}\n</live_data>`;
   // Photos ride only on the message they were sent with; later turns see the «[عکس غذا]» mark.
   const list = Array.isArray(images) ? images : images != null ? [images] : [];
   const photo = list.filter(okImage).slice(0, MAX_CHAT_PHOTOS).map(v => imageBlock(v as string));

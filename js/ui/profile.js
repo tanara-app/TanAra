@@ -1,5 +1,5 @@
 // Profile, as tiles: the two daily targets (a tap opens recalculating and setting them by hand), the
-// phase, then two square tiles for the person's own details and their motivations. App settings (reminders, appearance, the mascot, support,
+// phase, then two square tiles for the person's own details and their motivations. App settings (reminders, appearance, today's tip, the mascot, support,
 // data, account) live apart in «تنظیمات», a tall sheet opened by the gear in the header.
 import * as store from '../data/store.js';
 import { effectiveTargets, clampKcal, floorFor, hasMedicalFlag, ACTIVITY, CONDITIONS, correcting, rampKcal } from '../domain/targets.js';
@@ -18,6 +18,7 @@ import { THEMES, PALETTES, getTheme, setTheme, getPalette, setPalette, shownMode
 import { earnedFinishes } from '../domain/rewards.js';
 import { MODES, buddyMode, setBuddyMode } from './mascot.js';
 import { openFeedback, feedbackLine } from './feedback.js';
+import { tipOn, setTipOn } from './tip.js';
 
 let session = { email: null, signOut: null, local: true };
 export const setSession = s => { session = s; };
@@ -46,6 +47,7 @@ const ICON = {
   voice: svg('<path d="M4 5h16v11H9l-5 4z"/><path d="M9 10.5h6"/>'),
   usage: svg('<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>'),
   bell: svg('<path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M10 21h4"/>'),
+  tip: svg('<path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.6 10.8c.7.5 1.1 1.3 1.1 2.1V16h5v-.1c0-.8.4-1.6 1.1-2.1A6 6 0 0 0 12 3z"/>'),
   palette: svg('<path d="M12 3.5a8.5 8.5 0 0 0 0 17c1.3 0 1.8-.9 1.4-1.9-.5-1.2.3-2.3 1.6-2.3h1.8a3.7 3.7 0 0 0 3.7-3.7c0-5-3.8-9.1-8.5-9.1z"/><circle cx="8" cy="11" r="1.1" fill="currentColor"/><circle cx="11" cy="7.5" r="1.1" fill="currentColor"/><circle cx="15.5" cy="8.5" r="1.1" fill="currentColor"/>'),
   data: svg('<ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/>'),
   report: svg('<path d="M5 21V4"/><path d="M5 4h12l-2.5 4.5L17 13H5"/>'),
@@ -97,7 +99,8 @@ function openSettings() {
         <div class="sheet-head"><h2>تنظیمات</h2><button class="icon-btn" data-close aria-label="بستن">${icon.close}</button></div>
         ${group('عمومی', `
           ${row('data-reminders', 'bell', 'یادآورها', remindersLine())}
-          ${row('data-look', 'palette', 'ظاهر', appearanceLine())}`)}
+          ${row('data-look', 'palette', 'ظاهر', appearanceLine())}
+          ${row('data-tip', 'tip', 'نکته‌ی روز', tipOn() ? 'روشن' : 'خاموش')}`)}
         ${group('هوشواره', `
           ${row('data-mascot', 'voice', 'جمله‌ها و صدای هوشواره', MODES.find(m => m.value === buddyMode()).label)}
           ${aiAvailable() ? row('data-usage', 'usage', 'مصرف هوشواره', 'هزینه‌ی ۳۰ روز اخیر') : ''}`)}
@@ -110,6 +113,10 @@ function openSettings() {
       body.querySelector('[data-close]').onclick = () => sheet.close();
       bindReminders(body);
       body.querySelector('[data-look]').onclick = openAppearance;
+      body.querySelector('[data-tip]').onclick = async () => {
+        const v = await choose('نکته‌ی روز', [{ value: 'on', label: 'روشن' }, { value: 'off', label: 'خاموش' }], tipOn() ? 'on' : 'off');
+        if (v) setTipOn(v === 'on');
+      };
       body.querySelector('[data-mascot]').onclick = async () => {
         const v = await choose('جمله‌ها و صدای هوشواره', MODES, buddyMode());
         if (v) setBuddyMode(v);

@@ -1,5 +1,5 @@
-// Hooshvareh outside the chat: today's tip, the week analysis, the weight-trend analysis, the
-// monthly maintenance review and a plan for an occasion coming up.
+// Hooshvareh outside the chat: the week analysis, the weight-trend analysis, the monthly maintenance
+// review and a plan for an occasion coming up. (Today's tip is no longer written by Hooshvareh: ui/tip.js.)
 // Each result is saved as an ai_note, so it syncs and the chat knows what was said.
 import * as store from '../data/store.js';
 import { ask, aiAvailable, aiOnline, md, sparkle } from '../ai/hooshvareh.js';
@@ -33,52 +33,6 @@ async function generate(key, kind, mode, input, toNote, refresh, quiet = false) 
 export const head = (title, extra = '') => `<div class="ai-card-h"><span class="ai-mark">${sparkle(16)}</span><b>${title}</b>${extra}</div>`;
 const thinking = text => `<p class="muted small ai-wait"><span class="typing"><i></i><i></i><i></i></span> ${text}</p>`;
 
-/* ---------------- Today: tip of the day ---------------- */
-
-const tipKey = () => `tip:${today()}`;
-const TIP_FOLD = () => store.localKey('tipOpen');
-const tipOpen = () => { try { return localStorage.getItem(TIP_FOLD()) === '1'; } catch { return false; } };
-
-// A tip starts with its bold title line; the explanation under it folds away until tapped.
-function tipParts(text) {
-  const [first, ...rest] = String(text || '').trim().split('\n');
-  const m = first.match(/^\*\*(.+?)\*\*\s*$/);
-  return m && rest.join('').trim() ? { title: m[1], body: rest.join('\n') } : null;
-}
-
-export function tipCard() {
-  if (!aiAvailable()) return '';
-  const n = store.note(tipKey());
-  // checked first: while «یک نکته‌ی دیگر» is being made, the old tip gives way to the wait
-  if (busy.has(tipKey())) return `<section class="card ai-card">${head('نکته‌ی امروز هوشواره')}${thinking(n ? 'دارم یک نکته‌ی تازه آماده می‌کنم…' : 'دارم نکته‌ی امروزت را آماده می‌کنم…')}</section>`;
-  const links = '<div class="row gap"><a class="link small" href="#/ai">بیشتر بپرس</a><button class="link small" data-tip-again>یک نکته‌ی دیگر</button></div>';
-  const parts = n && tipParts(n.text);
-  if (parts) return `<section class="card ai-card fold${tipOpen() ? '' : ' folded'}" data-tip-fold>
-    ${head('نکته‌ی امروز هوشواره')}
-    <button type="button" class="fold-h tip-title" aria-expanded="${tipOpen()}"><b>${md(`**${parts.title}**`).replace(/^<p>|<\/p>$/g, '')}</b>${icon.chevD}</button>
-    <div class="fold-body"><div class="ai-text">${md(parts.body)}</div>${links}</div>
-  </section>`;
-  if (n) return `<section class="card ai-card">${head('نکته‌ی امروز هوشواره')}<div class="ai-text">${md(n.text)}</div>${links}</section>`;
-  return '';
-}
-
-// Generates today's tip once, after the first pull (so another device's tip isn't duplicated).
-export function bindTip(refresh, root = document) {
-  const key = tipKey();
-  root.querySelector('[data-tip-fold] .fold-h')?.addEventListener('click', e => {
-    const open = e.currentTarget.closest('[data-tip-fold]').classList.toggle('folded') === false;
-    e.currentTarget.setAttribute('aria-expanded', open);
-    try { localStorage.setItem(TIP_FOLD(), open ? '1' : '0'); } catch { /* ignore */ }
-  });
-  // another tip today moves on to the next topic, so it is really a different one
-  root.querySelector('[data-tip-again]')?.addEventListener('click', () => {
-    const shift = (store.note(key)?.data?.shift || 0) + 1;
-    generate(key, 'tip', 'tip', { shift }, r => ({ text: r.text, data: { shift } }), refresh);
-  });
-  if (store.note(key) || busy.has(key) || failed.has(key) || !aiOnline() || !store.syncStatus.lastPull) return;
-  generate(key, 'tip', 'tip', {}, r => ({ text: r.text }), refresh, true);
-}
-
 /* ---------------- Weekly review: analysis + suggested goal ---------------- */
 
 // The analysis and its goal, without a card around them (the week card on «امروز» has its own).
@@ -100,7 +54,7 @@ export function reviewCard(ws) {
   return `<section class="card ai-card">${head('تحلیل هوشواره')}${reviewBody(ws)}</section>`;
 }
 
-// Written once by itself for the week card on «امروز» (after the first pull, like the tip).
+// Written once by itself for the week card on «امروز» (after the first pull, so another device's isn't duplicated).
 export function autoReview(ws, refresh) {
   const key = `review:${ws}`;
   if (store.note(key) || busy.has(key) || failed.has(key) || !aiOnline() || !store.syncStatus.lastPull) return;
@@ -173,7 +127,7 @@ export function maintainRow() {
   return `<div class="ask-row">${askRow('data-ai-maintain', 'مرور ماهانه‌ی نگهداری', 'وزن در بازه، وزن‌کشی و تحرک، و یک کار برای ماه بعد')}</div>`;
 }
 
-// Made once a month by itself (after the first pull, like the tip), or on the button.
+// Made once a month by itself (after the first pull, like the week analysis), or on the button.
 export function bindMaintainRow(root, refresh) {
   if (!maintainShown()) return;
   const key = monthKey();

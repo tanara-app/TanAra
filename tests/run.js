@@ -24,6 +24,7 @@ import './nutrients.test.js';
 import './chatText.test.js';
 import './rewards.test.js';
 import './labs.test.js';
+import './tips.test.js';
 
 const results = await run();
 const failed = results.filter(r => !r.ok);

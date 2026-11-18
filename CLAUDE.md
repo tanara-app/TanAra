@@ -117,8 +117,9 @@ exist side by side. When a new decision replaces an old one, change or mark the 
 - `REDESIGN.md`: the rebuild of «امروز» and «رژیم» into one part, step by step: what the user decided so far. Read it before
   touching the today screen, «سهم وعده» or «رژیم».
 - `TIPS.md`: the fixed list of daily tips («نکته‌ی امروز»), about 365, written once by Claude from established science only
-  (the user decided on 2026-11-18 to replace the tips Hooshvareh writes every day). Each tip has tags saying who sees it. Code
-  to show it is not written yet: the user asked for the content first, with no code in the meantime.
+  (the user decided on 2026-11-18 to replace the tips Hooshvareh writes every day). Each tip has tags saying who sees it. In the
+  app since 2026-11-19: `js/ui/tip.js`, picked in `js/domain/tips.js`; after editing TIPS.md run `node tools/tips.mjs`, which
+  rewrites `js/data/tips.js`.
 - `LABS.md`: the lab-results tool («آزمایش خون» in «بیشتر», from 2026-11-17): PDF upload, the original kept for download,
   trends per test, condition suggestions. The user's decisions and where the work stands.
 - `IDEAS.md`: ideas for daily "hooks" that bring members back, with the ones the user picked. When one gets built,

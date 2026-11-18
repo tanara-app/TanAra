@@ -17,7 +17,8 @@ import { icon } from './dom.js';
 import { openLogSheet, openEntrySheet } from './logFood.js';
 import { dismissed, dismiss } from './notices.js';
 import { motivationCard, bindMotivation } from './motivation.js';
-import { tipCard, bindTip, occasionCard, bindOccasion } from './aiCards.js';
+import { occasionCard, bindOccasion } from './aiCards.js';
+import { tipCard, bindTip } from './tip.js';
 import { magCard, bindMag } from './magazine.js';
 import { planHtml, bindPlan, setFast } from './plan.js';
 import { fastOn } from '../domain/plan.js';
@@ -363,7 +364,7 @@ export function renderToday(root) {
     dismiss(n.dataset.notice, n.dataset.mark);
     n.remove();
   });
-  // last: generating the tip or today's magazine article redraws this screen
+  // last: today's magazine article or an AI card being written redraws this screen
   const redrawAi = () => { if (onToday() && day === today()) renderToday(root); };
-  if (isToday) { bindTip(redrawAi, root); bindMag(root, redrawAi); bindOccasion(root, redrawAi); bindWeekCard(root, redrawAi); }
+  if (isToday) { bindTip(root); bindMag(root, redrawAi); bindOccasion(root, redrawAi); bindWeekCard(root, redrawAi); }
 }

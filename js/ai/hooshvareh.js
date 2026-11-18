@@ -20,6 +20,8 @@ import { tagsOf, TAGS_KEY } from '../domain/health.js';
 import { toBuy } from '../domain/shopping.js';
 import { forAI, sheetsOf } from '../domain/labs.js';
 import * as shop from '../data/shop.js';
+import { TIPS } from '../data/tips.js';
+import { tipOfDay } from '../domain/tips.js';
 
 const URL_ = `${SUPABASE_URL}/functions/v1/hooshvareh`;
 const SEED_NAMES = new Set(SEED_FOODS.map(f => f.name));
@@ -38,7 +40,7 @@ export const authToken = async () => (getToken ? getToken() : null);
 // every request and say nothing about them («game» is the removed game's save, about 4,000
 // characters). Everything else in the profile (the questionnaire, conditions, medications,
 // planPrefs, reminders, targets) still goes.
-const SCREEN_ONLY = ['game', 'toolsOrder', 'newsSeen', 'newsShown', 'beta', 'mode', 'planKcal', 'onboarded', 'kidneyAsked', 'glucoseMedsAsked'];
+const SCREEN_ONLY = ['game', 'toolsOrder', 'newsSeen', 'newsShown', 'beta', 'mode', 'planKcal', 'onboarded', 'kidneyAsked', 'glucoseMedsAsked', 'tipOff'];
 const profileForAI = p => (p ? Object.fromEntries(Object.entries(p).filter(([k]) => !SCREEN_ONLY.includes(k))) : p);
 
 // How they really eat (domain/pattern.js).
@@ -165,6 +167,8 @@ function context() {
     // «آزمایش خون»: the newest value of every test, with the one before it
     labs: forAI(sheetsOf(s.ai_notes), p?.sex),
     notes: s.ai_notes.filter(n => !['thread', 'plan', 'pick', 'mag', 'recipe', 'shop', 'checkin', 'tags', 'logday', 'lab'].includes(n.kind)).map(({ key, text, created_at }) => ({ key, text, created_at })),
+    // «نکته‌ی امروز» as it shows on «امروز» (ui/tip.js), unless they turned it off
+    tip: (x => (x ? { title: x.title, body: x.body } : null))(p && !p.tipOff ? tipOfDay(TIPS, p, t) : null),
   };
 }
 
@@ -188,7 +192,7 @@ async function post(body, ctx = null) {
   return res;
 }
 
-// One-shot modes: tip, quote, review, progress, maintain, checkin, occasion, estimate, photo, label, recipe, shop, title, plan, plan_option, plan_swap, magazine. Resolves to the result object.
+// One-shot modes: quote, review, progress, maintain, checkin, occasion, estimate, photo, label, recipe, shop, title, plan, plan_option, plan_swap, magazine. Resolves to the result object.
 export async function ask(mode, input = {}) {
   // «آزمایش خون»: a lab PDF is read on its own; none of the member's data goes with it
   const res = await post({ mode, input }, mode === 'lab' ? { today: today() } : null);
