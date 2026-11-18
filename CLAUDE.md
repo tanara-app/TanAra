@@ -63,8 +63,10 @@ exist side by side. When a new decision replaces an old one, change or mark the 
   On 2026-11-17 `ClaudeAccount` deployed version 51 with the MCP tool (commit 02c67b2, low HDL and SGLT2 drug rules). The auto-mode
   check refused that deploy once and refused writing `.claude/settings.json` (an allow rule for the MCP deploy tool and
   `Bash(npx supabase functions deploy *)`); the user has to add that file themselves. The same day `ClaudeAccount` deployed version 52
-  (commit 734e209, the `lab` mode for «آزمایش خون»); that deploy went through.
-- From 2026-11-16 04:22 UTC every `hooshvareh` call failed with 502: the Anthropic API answered «credit balance is too low». Only the
+  (commit 734e209, the `lab` mode for «آزمایش خون»); that deploy went through. On 2026-11-18 `ClaudeAccount` deployed version 53 with the MCP tool
+  (commit 2b2ab89: the removed diet plan and screen-only profile keys no longer go to the assistant). It boots (OPTIONS 200), but no
+  answer could be checked: the Anthropic credit was still empty that day.
+- From 2026-11-16 04:22 UTC every `hooshvareh` call failed with 502 (still so on 2026-11-18): the Anthropic API answered «credit balance is too low». Only the
   user can add credit (console.anthropic.com, Plans & Billing). Check the function logs for it when the assistant stops answering.
 - On 2026-11-17 the user installed the official Meshy plugin (claude.ai directory, by Meshy) with three skills:
   `meshy-3d-generation`, `meshy-3d-printing`, `meshy-openclaw`. It belongs to the claude.ai account, not this folder
