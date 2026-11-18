@@ -992,6 +992,19 @@ export async function createScene(stage, vault, opts = {}) {
       view.target.copy(t0); view.dist = d0;
       camTo(null, 1, 0.45);
     },
+    // Back to an earlier turn as if nothing had happened since (the tutorial's «one step back»): no animation left over, the thief
+    // standing, the guards on their rounds, the camera home.
+    rest(state, gadgets = []) {
+      for (const t of tweens.splice(0)) t.res();
+      scale = 1; shake = 0;
+      rope.visible = false;
+      thief.root.scale.setScalar(1);
+      thief.model.scale.y = thief.model.scale.x;
+      sync(state, gadgets);
+      thief.play('idle', { fade: 0.25 });
+      guards.forEach((g, j) => g.play(vaultGuardMoves[j] ? 'walk' : 'idle', { fade: 0.25 }));
+      camTo(null, 1, 0.45);
+    },
     sync, playTurn, intro, pick, cellRect, setHints: hints => setOverlay(shown, hints), setTier, resize,
     get tier() { return tier; }, get fps() { return Math.round(fps); },
     three: { T, scene, camera, renderer },

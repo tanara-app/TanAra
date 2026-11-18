@@ -20,7 +20,7 @@ import { createScene } from './heistScene.js';
 import { createAudio } from './heistAudio.js';
 import { edit as editVault, targets, check, lineOf } from '../domain/heistEdit.js';
 import * as net from '../data/heistNet.js';
-import { LESSONS, stepOf } from '../domain/heistTutorial.js';
+import { LESSONS, stepOf, guide, isRed, canFinish, spots, firsts, FIRST, GUIDE, RULES, POWER, FAIL, WELCOME, START, NO_RED, DONE } from '../domain/heistTutorial.js';
 
 // The five gadgets in their order on the menu. A raid takes two (DESIGN-heist.md); the lockpick and the goggles just work while carried,
 // the others are used with a tap and then (smoke, decoy) a tap on a cell.
@@ -88,7 +88,16 @@ const ICON = {
   bad: svg('<circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5M12 16.3v.4"/>'),
   coin: '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="#ffc94a"/><circle cx="12" cy="12" r="6.2" fill="none" stroke="#b8861f" stroke-width="1.6"/><path d="M12 8.6v6.8" stroke="#b8861f" stroke-width="1.8" stroke-linecap="round"/></svg>',
   shield: svg('<path d="M12 3l7 3v5.5c0 4.5-3 8-7 9.5-4-1.5-7-5-7-9.5V6z"/>'),
+  // the tutorial's cards and guide: a red cell as the board draws it, the lit corners, the alarm, the gadgets, activity
+  red: '<svg viewBox="0 0 24 24" width="26" height="26" fill="none" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="3" fill="currentColor" fill-opacity=".2" stroke="currentColor" stroke-width="1.9"/><path d="M7 17L17 7M3.9 13.1l9.2-9.2M10.9 20.1l9.2-9.2" stroke="currentColor" stroke-opacity=".55" stroke-width="1.4"/></svg>',
+  corners: svg('<path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/>'),
+  alarm: svg('<path d="M6.5 18v-5.5a5.5 5.5 0 0 1 11 0V18"/><path d="M4 18h16v3H4z"/><path d="M12 2.5v2M4.2 5.7l1.5 1.5M19.8 5.7l-1.5 1.5"/>'),
+  kit: svg('<rect x="3" y="7.5" width="18" height="12.5" rx="2"/><path d="M9 7.5v-2A1.5 1.5 0 0 1 10.5 4h3A1.5 1.5 0 0 1 15 5.5v2M3 13h18M10.5 13v2h3v-2"/>'),
+  move: svg('<path d="M8.5 3.5c1.7 0 2.6 2 2.4 4.4-.2 2.1-1 3.6-2.6 3.6S5.8 9.9 5.9 7.6C6 5.3 6.9 3.5 8.5 3.5z"/><path d="M6.4 14.2l4.3.4-.3 2.4a2.2 2.2 0 0 1-4.3-.4z"/><path d="M15.5 7.5c-1.7 0-2.6 2-2.4 4.4.2 2.1 1 3.6 2.6 3.6s2.5-1.6 2.4-3.9c-.1-2.3-1-4.1-2.6-4.1z"/><path d="M17.6 18.2l-4.3.4.3 2.4a2.2 2.2 0 0 0 4.3-.4z"/>'),
 };
+ICON.diamond = ICON.loot;
+// The tutorial's pointing hand (its fingertip, at 22.5,3.5 of 48, is what it points with).
+const HAND = '<svg viewBox="0 0 48 48" width="52" height="52" aria-hidden="true"><path d="M19 30V7a3.5 3.5 0 0 1 7 0v11a3.25 3.25 0 0 1 6.5 0v2a3 3 0 0 1 6 0v2.5a2.75 2.75 0 0 1 5.5 0V33c0 7.5-5.5 12.5-12.5 12.5H27c-4.5 0-7.5-2-10-5.5l-6.8-9.4a3.2 3.2 0 0 1 4.9-4.1z" fill="#f4f7ff" stroke="#071022" stroke-width="2.2" stroke-linejoin="round"/><path d="M26 18v6M32.5 20v5M38.5 22.5v4" stroke="#071022" stroke-width="1.8" stroke-linecap="round" fill="none"/></svg>';
 
 function makeBus() {
   const map = new Map();
@@ -111,7 +120,11 @@ export function renderHeist(root) {
       <div class="heist-glow" aria-hidden="true"></div>
       <button class="heist-btn heist-back" data-back aria-label="برگشت">${icon.chevR}</button>
       <button class="heist-btn heist-sound" data-sound aria-label="صدا">${ICON.sound}</button>
-      <div class="heist-tip" hidden><p></p><button data-skip aria-label="رد کردن آموزش">${ICON.close}</button></div>
+      <div class="heist-tip" hidden aria-live="polite"><p></p><button data-tipx aria-label="بستن">${ICON.close}</button></div>
+      <div class="heist-spots" aria-hidden="true"></div>
+      <div class="heist-hand" hidden aria-hidden="true"><div>${HAND}</div></div>
+      <div class="heist-praise" hidden aria-live="polite"><span>${ICON.ok}</span><b></b></div>
+      <div class="heist-card" hidden role="dialog" aria-modal="true"></div>
       <div class="heist-coach" hidden><i></i><p></p></div>
       <div class="heist-wallet">${ICON.coin}<b></b><span class="heist-left" aria-hidden="true"></span><span class="heist-trophies" aria-label="فصل‌های برده"></span>
         <button class="heist-diamond" data-diamond aria-label="الماس فصل">${ICON.loot}<small dir="rtl"></small></button></div>
@@ -119,6 +132,7 @@ export function renderHeist(root) {
         <span class="heist-alarm" aria-hidden="true">${'<i></i>'.repeat(ALARM_TURNS)}</span>
         <span class="heist-loot" aria-hidden="true">${ICON.loot}</span>
         <span class="heist-turn"><b>${fa(0)}</b><i>${fa(MAX_TURNS)}</i></span>
+        <span class="heist-dots">${'<i></i>'.repeat(LESSONS.length)}</span>
       </div>
       <div class="heist-tools"></div>
       <div class="heist-menu">
@@ -213,7 +227,8 @@ function start(el, L, debug) {
     [...el.querySelectorAll('.heist-alarm i')].forEach((p, k) => p.classList.toggle('on', !!state && k < state.alarm));
     for (const b of el.querySelectorAll('[data-g]')) {
       const k = kit.indexOf(b.dataset.g);
-      b.disabled = !state || k < 0 || !!(state.used & (1 << k));
+      // (in a lesson a gadget waits for the line about it, so it isn't spent before it can work)
+      b.disabled = !state || k < 0 || !!(state.used & (1 << k)) || !gadgetOpen(b.dataset.g);
       b.classList.toggle('armed', armed === b.dataset.g);
     }
     // the lockpick lights up next to a locked door
@@ -366,20 +381,27 @@ function start(el, L, debug) {
   }
   const refresh = () => { bus.emit('state'); scene?.setHints(hints()); };
 
-  async function act(mv, speed = 1, gadgets = kit) {
+  // One turn. Lessons go a little slower.
+  async function act(mv, speed = lesson >= 0 ? 0.8 : 1, gadgets = kit) {
     if (mode !== 'play' && mode !== 'replay') return false;
     const r = play(vault, state, mv, gadgets);
     if (!r) { el.classList.remove('no'); void el.offsetWidth; el.classList.add('no'); return false; }
-    const was = mode, prev = state;
+    const was = mode, prev = state, sc = scene;
+    // The guard lesson won't let the thief step on red while there is a safe way: it says why and shows where.
+    if (lesson >= 0 && was === 'play' && LESSONS[lesson].protect && guide(vault, state) && (isRed(state, vault, r.state.p) || r.state.status === 'caught')) { warn(); return false; }
+    hideHand();
+    if (lesson >= 0 && was === 'play') hist.push({ state: prev, moves: moves.length });
     if (was === 'play') moves.push(mv);
     armed = null;
     setMode('busy');
     state = r.state;
     bus.emit('state');
     await bus.emit('turn', { prev, next: state, events: r.events, speed, kit: gadgets });
-    if (live !== L) return false;
+    if (live !== L || scene !== sc) return false;
     for (const e of r.events) bus.emit('event', e);
+    if (lesson >= 0 && was === 'play' && lessonTurn(r.events)) return true;
     if (state.status !== 'play') {
+      hideTip();
       if (watching) return true;
       if (raid && !viewing) finishRaid();
       await bus.emit('result', { status: state.status, turns: state.t, alarm: state.alarm > 0 });
@@ -388,8 +410,13 @@ function start(el, L, debug) {
       return true;
     }
     setMode(was);
-    if (was === 'play') refresh();
-    if (lesson >= 0) teach();
+    if (was === 'play') {
+      refresh();
+      if (lesson >= 0) { teach(); nudge(); }
+      // a real raid: the first alarm ever gets its line at once; a first-time line stays four turns, then the next one
+      else if (r.events.some(e => e.e === 'alarm') && !tipsSeen.has('alarm')) nextTip('alarm');
+      else if (tipLeft && --tipLeft === 0) nextTip();
+    }
     return true;
   }
 
@@ -424,18 +451,21 @@ function start(el, L, debug) {
     state = initial(vault);
     moves = [];
     armed = null;
+    hist = [];
+    hideTip();
     tools();
     scene.setPads(...(lesson >= 0 ? pads.learn : pads.play), fast);
-    if (lesson >= 0) { step = 0; teach(); }
     setMode('busy');
+    if (lesson >= 0) { step = 0; teach(); }
     el.classList.remove('won');
     bus.emit('state');
+    const sc = scene;
     await scene.intro(state, kit, fast);
-    if (live !== L) return;
+    if (live !== L || scene !== sc) return;
     scene.setQuiet(false);
     setMode('play');
     refresh();
-    if (lesson >= 0) teach();
+    if (lesson >= 0) { teach(); nudge(); } else firstTips();
   }
 
   async function replay() {
@@ -451,44 +481,260 @@ function start(el, L, debug) {
     moves = list;
   }
 
-  // ----- the tutorial (2026-11-18) -----
-  // Four lessons, each a small vault played for real with one line at a time (domain/heistTutorial.js), then a walk through the menu.
-  // It starts by itself the first time the game opens, and again from the «?» on the menu.
-  let lesson = -1, step = 0, before = null, coachAt = -1, coachList = [];
-  let learned = false;
-  try { learned = !!localStorage.getItem('tanara:heist:learned'); } catch { /* private mode */ }
-  async function learn(i = 0) {
+  // ----- the tutorial (2026-11-18; DESIGN-heist.md «آموزش») -----
+  // The first open shows a welcome card with a choice, never a jump into a lesson. Five lessons, each a small vault played for real after a
+  // card that says what it teaches; one line at a time, a pointing hand when the player hesitates, and when it goes wrong a card that says
+  // why and offers to go back to just before the mistake. Then the three rules, what the diet gives, and a walk through the menu. «?» on
+  // the menu opens the guide (every sign), which can start the lessons again. Real raids get one line the first time something new shows.
+  const TUTORIAL = 'tanara:heist:tutorial';   // 'done' once finished or skipped
+  let lesson = -1, step = 0, before = null, hist = [], learned = false, later = '';
+  try { learned = localStorage.getItem(TUTORIAL) === 'done'; later = localStorage.getItem('tanara:heist:later') || ''; } catch { /* private mode */ }
+  const today = () => new Date().toDateString();
+  const setLearned = () => { learned = true; try { localStorage.setItem(TUTORIAL, 'done'); } catch { /* private mode */ } };
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  const kicker = i => `درس ${fa(i + 1)} از ${fa(LESSONS.length)}`;
+  const flash = (sel, ms) => { const b = $(sel); b?.classList.add('hint'); setTimeout(() => b?.classList.remove('hint'), ms); };
+  // in a lesson a gadget opens with the line about it
+  const gadgetOpen = g => { if (lesson < 0) return true; const k = LESSONS[lesson].steps.findIndex(s => s.ui === `[data-g="${g}"]`); return k < 0 || k <= step; };
+
+  // A card at the bottom, over the board (which moves up to stay in view). It resolves with the button pressed: its key, 'back' for the
+  // back button, 'replaced' when something else took its place.
+  let cardDone = null, cardSeq = 0;
+  function showCard(o) {
+    const c = $('.heist-card'), seq = ++cardSeq;
+    cardDone?.('replaced');
+    cardDone = null;
+    hideHand(); hideTip();
+    $('.heist-praise').hidden = true;
+    const pips = o.dots >= 0 ? `<span class="heist-pips">${LESSONS.map((_, k) => `<i class="${k < o.dots ? 'done' : k === o.dots ? 'on' : ''}"></i>`).join('')}</span>` : '';
+    c.className = `heist-card${o.tone ? ` ${o.tone}` : ''}`;
+    c.innerHTML = `${o.close ? `<button class="heist-x" data-card="close" aria-label="${o.close}">${ICON.close}</button>` : ''}
+      ${o.kicker ? `<p class="heist-kicker"><span>${o.kicker}</span>${pips}</p>` : ''}
+      <h2>${o.title}</h2>
+      ${o.text ? `<p class="heist-card-text">${o.text}</p>` : ''}
+      ${o.rows?.length ? `<ul>${o.rows.map(([k, t]) => `<li><span class="heist-ic" data-i="${k}">${ICON[k] || ''}</span><span>${t}</span></li>`).join('')}</ul>` : ''}
+      <div class="heist-card-btns">${o.buttons.map(([key, label, ic, main]) => `<button data-card="${key}"${main ? ' class="main"' : ''}>${ic ? ICON[ic] : ''}<span>${label}</span></button>`).join('')}</div>`;
+    c.hidden = false;
+    setMode('card');
+    // (offsetTop: where the card rests, not where its slide-in starts)
+    if (o.lift !== false && scene) scene.setPads(pads.play[0], Math.max(pads.play[1], el.clientHeight - c.offsetTop + 14));
+    if (o.spots) setTimeout(() => { if (seq === cardSeq && !c.hidden) ring(o.spots); }, 560);
+    return new Promise(res => { cardDone = res; });
+  }
+  function closeCard(action) {
+    const c = $('.heist-card'), done = cardDone;
+    cardDone = null;
+    ring(null);
+    if (c.hidden) return;
+    c.hidden = true;
+    done?.(action);
+  }
+  // rings round cells on the board (what a lesson's card is about)
+  function ring(list) {
+    $('.heist-spots').innerHTML = !list || !scene ? '' : list.map(({ cell, kind }) => {
+      const r = scene.cellRect(cell), d = Math.max(46, r.w * 1.3);
+      return `<i class="${kind}" style="left:${r.x.toFixed(1)}px;top:${r.y.toFixed(1)}px;width:${d.toFixed(1)}px;height:${d.toFixed(1)}px"></i>`;
+    }).join('');
+  }
+  function toMenu() {
+    closeCard('replaced');
+    if (!scene) return;
+    setMode('menu');
+    scene.setPads(...padFor('.heist-menu h1', '.heist-levels'));
+    hud();
+  }
+
+  // The line above the board (a lesson's line, a warning, or a real raid's first-time line).
+  function showTip(text, warn = false) {
+    const tip = $('.heist-tip'), p = tip.querySelector('p');
+    tip.classList.toggle('warn', warn);
+    tip.querySelector('[data-tipx]').hidden = lesson >= 0;
+    if (!tip.hidden && p.textContent === text) return;
+    p.textContent = text;
+    tip.hidden = false;
+    tip.classList.remove('pop'); void tip.offsetWidth; tip.classList.add('pop');
+  }
+  function hideTip() { $('.heist-tip').hidden = true; tipLeft = 0; }
+
+  // the lesson's line for where the raid stands, and the button it is about lit up
+  let warned = 0;
+  function teach() {
+    const Ls = LESSONS[lesson];
+    if (!Ls || !state || mode === 'card') return;
+    if (state.status === 'play') step = stepOf(Ls, state, step);
+    const s = Ls.steps[step];
+    if (!warned) showTip(armed && s.armed ? s.armed : s.text);
+    for (const b of el.querySelectorAll('.heist-tools .hint')) b.classList.remove('hint');
+    if (s.ui && !armed) $(s.ui)?.classList.add('hint');
+    [...el.querySelectorAll('.heist-dots i')].forEach((d, k) => { d.className = k < lesson ? 'done' : k === lesson ? 'on' : ''; });
+    hud();
+  }
+  // a tap toward red in the guard lesson: why not, and where instead
+  function warn() {
+    clearTimeout(warned);
+    showTip(NO_RED, true);
+    buzz(40);
+    warned = setTimeout(() => { warned = 0; if (lesson >= 0 && mode === 'play') teach(); }, 1800);
+    nudge(0);
+  }
+
+  // The pointing hand: after a moment of doing nothing (at once in the first lesson), at the next safe tap; for a gadget's line, at its
+  // button and then (armed) at the thief. It comes from the side, so it never covers what is ahead.
+  let handTimer = 0;
+  function hideHand() { clearTimeout(handTimer); $('.heist-hand').hidden = true; }
+  function nudge(delay) {
+    hideHand();
+    if (lesson < 0 || mode !== 'play') return;
+    handTimer = setTimeout(showHand, delay ?? Math.max(700, LESSONS[lesson].hand));
+  }
+  const centre = sel => { const r = $(sel)?.getBoundingClientRect(); return r?.width ? { x: r.left + r.width / 2, y: r.top + r.height / 2 } : null; };
+  function showHand() {
+    if (lesson < 0 || mode !== 'play' || !scene || state.status !== 'play') return;
+    const s = LESSONS[lesson].steps[step], g = s.ui?.match(/data-g="(\w+)"/)?.[1];
+    let at = null, turn = 0;
+    if (g && kit.includes(g) && !(state.used & (1 << kit.indexOf(g)))) {
+      if (armed === g) { at = scene.cellRect(state.p); turn = -90; } else { at = centre(s.ui); turn = 180; }
+    } else {
+      const next = guide(vault, state);
+      if (!next) return;
+      if (next.move === 'W') { at = centre('[data-wait]'); turn = 180; }
+      else { at = scene.cellRect(next.cell); turn = next.move === 'U' || next.move === 'D' ? -90 : at.y + 60 > el.clientHeight - pads.play[1] ? 180 : 0; }
+    }
+    if (!at) return;
+    const h = $('.heist-hand');
+    h.style.translate = `${(at.x - 24.4).toFixed(1)}px ${(at.y - 3.8).toFixed(1)}px`;
+    h.style.rotate = `${turn}deg`;
+    h.hidden = false;
+  }
+
+  // ----- the lessons -----
+  async function learn(i) {
     if (lesson < 0) before = { level, kit };
     lesson = i;
     step = 0;
+    hist = [];
     level = 'learn';
     kit = LESSONS[i].kit.slice();
-    $('.heist-tip').hidden = true;
+    hideTip(); hideHand();
+    closeCard('replaced');
     await build(LESSONS[i].vault);
     if (live !== L || lesson !== i || !scene) return;
-    begin(i > 0);
+    const Ls = LESSONS[i];
+    const a = await showCard({ kicker: kicker(i), dots: i, title: Ls.title, text: Ls.goal, rows: Ls.rows, close: 'رد کردن آموزش',
+      buttons: [['go', START, 'go', true]], spots: spots(Ls) });
+    if (lesson !== i) return;
+    if (a === 'go') begin(i > 0);
+    else if (a === 'close' || a === 'back') leaveLesson(true);
   }
-  // the line for where the raid stands, and the button it is about lit up
-  function teach() {
+  // After a lesson's turn: won, gone wrong (caught, the alarm, out with nothing, the pulse wasted), or on. True when it is over.
+  function lessonTurn(events) {
     const Ls = LESSONS[lesson];
-    if (!Ls || !state) return;
-    if (state.status === 'play') step = stepOf(Ls, state, step);
-    const s = Ls.steps[step], tip = $('.heist-tip');
-    tip.hidden = state.status !== 'play';
-    tip.querySelector('p').textContent = s.text;
-    for (const b of el.querySelectorAll('.hint')) b.classList.remove('hint');
-    if (s.ui && state.status === 'play') $(s.ui)?.classList.add('hint');
+    if (state.status === 'escaped') { passLesson(); return true; }
+    const alarm = events.find(e => e.e === 'alarm'), caught = events.find(e => e.e === 'caught');
+    if (state.status !== 'play' || alarm) { failLesson(caught?.by || alarm?.by || state.status); return true; }
+    if (Ls.kit.length && Ls.kit.every((_, k) => state.used & (1 << k)) && !canFinish(Ls, state)) { failLesson('stuck'); return true; }
+    return false;
   }
-  function leaveLesson(skipped) {
+  async function passLesson() {
+    const i = lesson, p = $('.heist-praise');
+    hideTip(); hideHand();
+    p.querySelector('b').textContent = DONE;
+    p.hidden = false;
+    buzz([30, 50, 30]);
+    await sleep(1100);
+    if (lesson !== i || live !== L) return;
+    if (i + 1 < LESSONS.length) learn(i + 1);
+    else leaveLesson(false);
+  }
+  // Why it went wrong; back to the last moment the lesson could still be won from (one step, mostly), or from the start.
+  async function failLesson(by) {
+    const i = lesson;
+    hideTip(); hideHand();
+    if (state.alarm) { bus.emit('fx', 'calm'); el.classList.remove('alarm'); }
+    let back = -1;
+    for (let k = hist.length - 1; k >= 0 && back < 0; k--) if (canFinish(LESSONS[i], hist[k].state)) back = k;
+    const [title, text] = FAIL[by] || FAIL.seen;
+    const a = await showCard({ kicker: kicker(i), dots: i, title, text, tone: 'fail', close: 'رد کردن آموزش',
+      buttons: back >= 0 ? [['undo', FAIL.back, 'undo', true], ['again', FAIL.restart, 'again']] : [['again', FAIL.restart, 'again', true]] });
+    if (lesson !== i || !scene) return;
+    if (a === 'undo') { const h = hist[back]; hist.length = back; undoTo(h); }
+    else if (a === 'again') { scene.rest(initial(vault), kit); begin(true); }
+    else if (a === 'close' || a === 'back') leaveLesson(true);
+  }
+  function undoTo(h) {
+    state = h.state;
+    moves.length = h.moves;
+    armed = null;
+    scene.rest(state, kit);
+    scene.setPads(...pads.learn);
+    setMode('play');
+    step = stepOf(LESSONS[lesson], state, 0);
+    refresh();
+    teach();
+    nudge(500);
+  }
+  // Out of the lessons: done (the rules, what the diet gives, then the menu's walk-through) or skipped (straight to the menu).
+  async function leaveLesson(skipped) {
     lesson = -1;
-    $('.heist-tip').hidden = true;
+    hist = [];
+    hideTip(); hideHand();
+    closeCard('replaced');
+    $('.heist-praise').hidden = skipped || $('.heist-praise').hidden;
     for (const b of el.querySelectorAll('.hint')) b.classList.remove('hint');
     if (before) { level = before.level; kit = before.kit; before = null; }
-    learned = true;
-    try { localStorage.setItem('tanara:heist:learned', '1'); } catch { /* private mode */ }
-    build().then(() => { if (!skipped && live === L) setTimeout(coach, 500); });
+    setLearned();
+    await build();
+    if (live !== L || lesson >= 0 || !scene) return;
+    if (!skipped) {
+      for (const c of [RULES, POWER]) {
+        const a = await showCard({ title: c.title, rows: c.rows, tone: c === RULES ? 'ready' : 'power', buttons: [['next', c.button, c === POWER ? 'go' : null, true]] });
+        if (a !== 'next') { if (a === 'back') toMenu(); return; }
+      }
+    }
+    toMenu();
+    if (!skipped) setTimeout(coach, 450);
   }
-  // The menu, one thing at a time: a ring round it and its line. A tap anywhere goes on.
+
+  // The first open: what the game is, and a choice. «بعداً» waits till tomorrow, and «?» glows to say where the lessons are.
+  async function welcome() {
+    const a = await showCard({ kicker: WELCOME.length, title: WELCOME.title, text: WELCOME.text, tone: 'welcome',
+      buttons: [['start', WELCOME.start, 'go', true], ['later', WELCOME.later]] });
+    if (a === 'start') learn(0);
+    else if (a === 'later' || a === 'back') {
+      later = today();
+      try { localStorage.setItem('tanara:heist:later', later); } catch { /* private mode */ }
+      toMenu();
+      flash('[data-help]', 4500);
+    }
+  }
+  // «?»: every sign of the game, and the lessons again
+  async function openGuide() {
+    if (mode !== 'menu') return;
+    const a = await showCard({ title: GUIDE.title, rows: GUIDE.rows, tone: 'guide', lift: false, close: 'بستن', buttons: [['replay', GUIDE.replay, 'again']] });
+    if (a === 'replay') learn(0);
+    else if (a === 'close' || a === 'back') toMenu();
+  }
+
+  // Real raids: one line the first time a vault shows something the lessons didn't (a plate, a door, a gadget taken; the alarm when it
+  // first goes off). Each stays four turns or until closed, and is shown once ever.
+  const tipsSeen = new Set();
+  let tipQueue = [], tipLeft = 0;
+  try { for (const k of (localStorage.getItem('tanara:heist:tips') || '').split(',')) if (k) tipsSeen.add(k); } catch { /* private mode */ }
+  function firstTips() {
+    tipQueue = firsts(vault, kit).filter(k => !tipsSeen.has(k));
+    if (tipQueue.length) nextTip();
+  }
+  function nextTip(k = tipQueue.shift()) {
+    if (!k) { hideTip(); if (mode === 'play') scene?.setPads(...pads.play); return; }
+    tipsSeen.add(k);
+    try { localStorage.setItem('tanara:heist:tips', [...tipsSeen].join(',')); } catch { /* private mode */ }
+    showTip(FIRST[k]);
+    tipLeft = 4;
+    scene?.setPads(...pads.learn);
+  }
+
+  // The menu, one thing at a time: a ring round it and its line. A tap anywhere goes on; at the end the start button glows.
+  let coachAt = -1, coachList = [];
   function coach() {
     if (mode !== 'menu') return;
     coachList = COACH.filter(([sel]) => { const n = $(sel); const r = n?.getBoundingClientRect(); return n && !n.hidden && r && r.width > 0 && getComputedStyle(n).display !== 'none'; });
@@ -498,12 +744,12 @@ function start(el, L, debug) {
   function nextCoach() {
     const box = $('.heist-coach');
     coachAt++;
-    if (coachAt >= coachList.length) { box.hidden = true; coachAt = -1; return; }
+    if (coachAt >= coachList.length || mode !== 'menu') { box.hidden = true; coachAt = -1; if (mode === 'menu') flash('[data-go]', 5000); return; }
     const [sel, text] = coachList[coachAt], r = $(sel).getBoundingClientRect(), h = el.clientHeight, ring = box.querySelector('i'), p = box.querySelector('p');
     box.hidden = false;
     Object.assign(ring.style, { left: `${r.left - 6}px`, top: `${r.top - 6}px`, width: `${r.width + 12}px`, height: `${r.height + 12}px` });
-    p.textContent = text;
-    const below = r.bottom + 14 + 70 < h;
+    p.innerHTML = `${text}<small>${fa(coachAt + 1)} از ${fa(coachList.length)}</small>`;
+    const below = r.bottom + 14 + 90 < h;
     Object.assign(p.style, below ? { top: `${r.bottom + 14}px`, bottom: '' } : { top: '', bottom: `${h - r.top + 14}px` });
   }
 
@@ -721,16 +967,19 @@ function start(el, L, debug) {
     if (mode === 'edit') { editAt(cell); return; }
     if (mode !== 'play' || cell < 0) return;
     const x = cell % W, y = cell / W | 0, tx = state.p % W, ty = state.p / W | 0;
-    if (armed === 'emp') { if (Math.max(Math.abs(x - tx), Math.abs(y - ty)) <= EMP_RADIUS) act('E'); else { armed = null; refresh(); } return; }
-    if (AIMED[armed]) { const mv = `${AIMED[armed][0]}${x},${y}`; if (!play(vault, state, mv, kit)) { armed = null; refresh(); } else act(mv); return; }
+    if (armed === 'emp') { if (Math.max(Math.abs(x - tx), Math.abs(y - ty)) <= EMP_RADIUS) act('E'); else disarm(); return; }
+    if (AIMED[armed]) { const mv = `${AIMED[armed][0]}${x},${y}`; if (!play(vault, state, mv, kit)) disarm(); else act(mv); return; }
     const d = DX.findIndex((dx, k) => tx + dx === x && ty + DY[k] === y);
     if (d >= 0) act(DIRS[d]);
   }
+  // a gadget put down again (in a lesson the line and the hand follow)
+  function disarm() { armed = null; refresh(); if (lesson >= 0) { teach(); nudge(); } }
   const stage = $('.heist-stage');
   let down = null, holdTimer = 0;
   stage.addEventListener('pointerdown', e => {
     down = { x: e.clientX, y: e.clientY, held: false };
     clearTimeout(holdTimer);
+    if (lesson >= 0 && mode === 'play') nudge();   // a finger on the board: the hand steps aside, and comes back if nothing happens
     holdTimer = setTimeout(() => { if (down && mode === 'play' && !armed) { down.held = true; act('W'); } }, 480);
   });
   stage.addEventListener('pointermove', e => { if (down && Math.hypot(e.clientX - down.x, e.clientY - down.y) > 14) { clearTimeout(holdTimer); down.moved = true; } });
@@ -756,9 +1005,14 @@ function start(el, L, debug) {
   el.addEventListener('click', e => {
     const b = e.target.closest('button');
     if (!b) return;
-    if (b.dataset.back !== undefined) { if (mode === 'edit') closeEditor(); else if (lesson >= 0) leaveLesson(true); else location.replace('#/tools'); return; }
-    if (b.dataset.skip !== undefined) { leaveLesson(true); return; }
-    if (b.dataset.help !== undefined) { if (mode === 'menu') learn(0); return; }
+    if (b.dataset.card) { closeCard(b.dataset.card); return; }
+    if (b.dataset.back !== undefined) {
+      if (!$('.heist-card').hidden) closeCard('back');
+      else if (mode === 'edit') closeEditor(); else if (lesson >= 0) leaveLesson(true); else location.replace('#/tools');
+      return;
+    }
+    if (b.dataset.tipx !== undefined) { if (lesson < 0) nextTip(); return; }
+    if (b.dataset.help !== undefined) { openGuide(); return; }
     if (b.dataset.tool) { if (mode === 'edit') { tool = b.dataset.tool; if (tool !== 'guard') sel = -1; editorView(); } return; }
     if (b.dataset.undo !== undefined) { if (mode === 'edit') stepBack(); return; }
     if (b.dataset.watch !== undefined) { watch(); return; }
@@ -772,15 +1026,17 @@ function start(el, L, debug) {
     if (b.dataset.go !== undefined) { if (mode === 'menu') begin(false); return; }
     if (b.dataset.kit) { if (mode === 'menu') toggleKit(b.dataset.kit); return; }
     if (b.dataset.wait !== undefined) { armed = null; act('W'); return; }
-    if (b.dataset.g) { if (mode === 'play') { armed = armed === b.dataset.g ? null : b.dataset.g; refresh(); } return; }
+    if (b.dataset.g) {
+      if (mode === 'play') { armed = armed === b.dataset.g ? null : b.dataset.g; refresh(); if (lesson >= 0) { teach(); nudge(armed ? 300 : undefined); } }
+      return;
+    }
     if (b.dataset.inbox !== undefined) { watchInbox(); return; }
     if (b.dataset.diamond !== undefined) { diamond(); return; }
     if (b.dataset.again !== undefined) { if (mode === 'result') begin(true); return; }
     if (b.dataset.replay !== undefined) { if (mode === 'result') { if (viewing) { const r = viewing; inbox.unshift(r); watchInbox(); } else replay(); } return; }
     if (b.dataset.next !== undefined) {
       if (mode !== 'result') return;
-      if (lesson >= 0) { if (lesson + 1 < LESSONS.length) learn(lesson + 1); else leaveLesson(false); }
-      else if (viewing) leaveViewing(); else { seed++; build(); }
+      if (viewing) leaveViewing(); else { seed++; build(); }
     }
   });
 
@@ -796,6 +1052,8 @@ function start(el, L, debug) {
   window.__heist = {
     bus, audio, get kit() { return kit; }, setKit(k) { kit = k; hud(); }, get state() { return state; }, get vault() { return vault; }, get moves() { return moves; }, get mode() { return mode; }, get scene() { return scene; },
     act, begin, replay, solve: (alarm = false) => solve(vault, kit, { alarm })?.moves, learn, get lesson() { return lesson; }, get step() { return step; }, coach,
+    get card() { const c = $('.heist-card'); return c.hidden ? null : c.querySelector('h2')?.textContent; }, press: a => closeCard(a), welcome, openGuide,
+    get hand() { const h = $('.heist-hand'); return h.hidden ? null : { at: h.style.translate, turn: h.style.rotate }; }, get tip() { const t = $('.heist-tip'); return t.hidden ? null : t.textContent; },
     load(l, s) { level = l; seed = s; return build(); },
     refreshOnline, get habit() { return habit; }, get owned() { return owned; },
     get mine() { return mineVault; }, get editor() { return { tool, sel, check: mineCheck, undo: undo.length }; }, openEditor, closeEditor, watch,
@@ -808,6 +1066,8 @@ function start(el, L, debug) {
     if (online && drafted && mineCheck.ok) net.call('save', { vault: mineVault }).catch(() => {});
     building++;
     clearTimeout(holdTimer);
+    hideHand();
+    clearTimeout(warned);
     window.removeEventListener('keydown', onKey);
     scene?.dispose();
     scene = null;
@@ -815,6 +1075,7 @@ function start(el, L, debug) {
   };
   // the coach's tap anywhere goes on (and nothing under it is pressed)
   $('.heist-coach').addEventListener('click', e => { e.stopPropagation(); nextCoach(); });
-  if (learned) build(); else learn(0);
+  // The first open builds the menu and then welcomes (never a jump into a lesson).
+  build().then(() => { if (live === L && mode === 'menu' && !learned && later !== today()) welcome(); });
   refreshOnline();
 }
