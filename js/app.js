@@ -220,4 +220,30 @@ if (params.has('local')) {
 // Service worker: makes the app installable and lets it open without internet.
 if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === '127.0.0.1')) {
   navigator.serviceWorker.register('./sw.js').catch(e => console.warn('SW register failed', e));
+
+  /*
+    The app opens from the phone's copy; the service worker looks for a new version once the app has loaded
+    and whenever they come back to it. A new version is put on (a reload) only when that interrupts nothing:
+    at once if they haven't touched the app yet, else the next time they come back to it, never with a sheet
+    open or something typed and not sent.
+  */
+  const askUpdate = () => navigator.serviceWorker.controller?.postMessage('refresh');
+  let touched = false, updated = false;
+  const touch = () => { touched = true; };
+  addEventListener('pointerdown', touch, { capture: true, once: true });
+  addEventListener('keydown', touch, { capture: true, once: true });
+  const busy = () => document.querySelector('.sheet-wrap, .party')
+    || document.activeElement?.matches?.('input, textarea, select')
+    || [...view.querySelectorAll('input, textarea')].some(x => x.value && x.value !== x.defaultValue);
+  const putOn = () => { if (updated && !busy()) location.reload(); };
+  navigator.serviceWorker.addEventListener('message', e => {
+    if (e.data !== 'updated') return;
+    updated = true;
+    if (!touched) putOn();
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState !== 'visible') return;
+    if (updated) putOn(); else askUpdate();
+  });
+  if (document.readyState === 'complete') askUpdate(); else addEventListener('load', askUpdate);
 }

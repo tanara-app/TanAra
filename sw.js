@@ -1,12 +1,17 @@
 /* App-shell cache for تن‌آرا: makes the app installable and lets it open offline.
-   Own files are network-first, so a new deploy shows up on the next online open; pictures (.webp/.png)
-   come straight from the cache and are refreshed behind it, so icons and the mascot don't wait for the network;
-   they skip the browser's HTTP cache (GitHub Pages sends max-age=600, which would hide a deploy for 10 min);
-   the cache is only the fallback. Pinned CDN files are cache-first.
+   The app's own code and pages (the non-picture files of SHELL) come straight from the phone's copy, so the
+   app opens at once even on a slow or stuck connection (before 2026-11-19 they were network-first with no
+   time limit: 86 requests on every open, and a connection that hung kept the screen blank). New versions
+   come in the background: once the app has loaded it asks for a check ('refresh'); every code file is fetched
+   again, and only when all of them arrived and something changed is the whole set put in the cache at once
+   (never half a version), and the page is told ('updated'; app.js puts it on without interrupting anything).
+   Pictures (.webp/.png) come from the cache and are refreshed behind it one by one. All of them skip the
+   browser's HTTP cache (GitHub Pages sends max-age=600, which would hide a deploy for 10 min).
+   Pinned CDN files are cache-first; other own files (sounds, the game's extras) are network-first.
    Supabase API calls are never touched. Bump CACHE when the shell list changes.
    Every other cache is cleared on activate (including «tanara-vault», from the removed vault).
    Also shows the push reminders sent by the `remind` Edge Function (see ui/reminders.js). */
-const CACHE = 'tanara-shell-v121';
+const CACHE = 'tanara-shell-v122';
 const SHELL = [
   './', './index.html', './manifest.json', './css/app.css',
   './js/app.js', './js/config.js',
@@ -25,6 +30,12 @@ const SHELL = [
 ];
 // fastly.jsdelivr.net: the barcode reader's WebAssembly (pinned version), for phones without a built-in one
 const VENDOR_HOSTS = ['cdn.jsdelivr.net', 'fastly.jsdelivr.net', 'fonts.googleapis.com', 'fonts.gstatic.com'];
+
+// the app's code and pages: everything of SHELL but the pictures, each kept under its address without a query
+const isPicture = u => /\.(webp|png)$/.test(u);
+const CODE = SHELL.filter(u => !isPicture(u)).map(u => new URL(u, self.location).href);
+const CODE_SET = new Set(CODE);
+const refetch = u => fetch(new Request(u, { cache: 'no-cache' }));
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL.map(u => new Request(u, { cache: 'reload' })))));
@@ -51,7 +62,16 @@ self.addEventListener('fetch', e => {
 
   if (url.origin !== self.location.origin) return;
 
-  if (/\.(webp|png)$/.test(url.pathname)) {
+  const key = url.origin + url.pathname;
+  if (CODE_SET.has(key)) {
+    e.respondWith(caches.match(key, { ignoreVary: true }).then(hit => hit || refetch(key).then(res => {
+      if (res.ok) { const copy = res.clone(); caches.open(CACHE).then(c => c.put(key, copy)); }
+      return res;
+    })).catch(() => (req.mode === 'navigate' ? caches.match(new URL('./index.html', self.location).href) : Response.error())));
+    return;
+  }
+
+  if (isPicture(url.pathname)) {
     const fresh = fetch(req, { cache: 'no-cache' }).then(res => {
       if (res.ok) { const copy = res.clone(); caches.open(CACHE).then(c => c.put(req, copy)); }
       return res;
@@ -70,6 +90,40 @@ self.addEventListener('fetch', e => {
   // offline: the cached copy; only a page load falls back to the app shell (a script or
   // stylesheet that isn't cached must fail, not be answered with HTML)
   }).catch(() => caches.match(req, { ignoreSearch: true }).then(hit => hit || (req.mode === 'navigate' ? caches.match('./index.html') : Response.error()))));
+});
+
+/* ---------------- a new version, in the background ---------------- */
+
+const same = (a, b) => {
+  if (a.byteLength !== b.byteLength) return false;
+  const x = new Uint8Array(a), y = new Uint8Array(b);
+  for (let i = 0; i < x.length; i++) if (x[i] !== y[i]) return false;
+  return true;
+};
+
+// Fetches every code file again; true when a new version was put in the cache (all of it or nothing).
+async function update() {
+  const got = await Promise.all(CODE.map(u => refetch(u).then(res => { if (!res.ok) throw new Error(`${res.status} ${u}`); return res; })));
+  const cache = await caches.open(CACHE);
+  let changed = false;
+  for (let i = 0; i < CODE.length && !changed; i++) {
+    const old = await cache.match(CODE[i], { ignoreVary: true });
+    changed = !old || !same(await old.arrayBuffer(), await got[i].clone().arrayBuffer());
+  }
+  if (!changed) return false;
+  await Promise.all(got.map((res, i) => cache.put(CODE[i], res)));
+  return true;
+}
+
+let checking = null, checkedAt = 0;
+self.addEventListener('message', e => {
+  if (e.data !== 'refresh' || checking || Date.now() - checkedAt < 10e3) return; // not twice in a row (load and coming back)
+  checkedAt = Date.now();
+  checking = update()
+    .then(changed => changed && self.clients.matchAll({ type: 'window' }).then(list => list.forEach(c => c.postMessage('updated'))))
+    .catch(() => { checkedAt = 0; }) // offline or a file missing: the version on the phone stays, asked again next time
+    .finally(() => { checking = null; });
+  e.waitUntil(checking);
 });
 
 /* ---------------- reminders ---------------- */

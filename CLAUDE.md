@@ -50,6 +50,12 @@ exist side by side. When a new decision replaces an old one, change or mark the 
   folder's server); then use `tanara-5180` (`http://127.0.0.1:5180`). On 2026-11-12 `127.0.0.1:5180` served an
   old copy of the app (another server); then use `tanara-5190`. Check with a fetch that the page has your change. On 2026-11-17 the Browser pane's `127.0.0.1:5190` served a stale copy
   while `curl` from the shell saw the new file; `preview_start` with `tanara-static` (opened at `localhost:5173`) showed the current files.
+- Since 2026-11-19 the app opens from the service worker's copy (`sw.js`): its code is never fetched while it opens. Once loaded,
+  and whenever the person comes back to it, the worker fetches every code file again and, if anything changed, puts the whole
+  new version in the cache and the page reloads by itself (at once if untouched; otherwise on coming back, never with a sheet open
+  or unsent text). So on `127.0.0.1` (where the worker runs) an edit shows a moment after the reload, by a second reload the app
+  does itself; `localhost` has no worker and always shows the files as they are. A new file in the app still needs adding to
+  `SHELL` and a new `CACHE` name.
 - Edge Functions deploy from this folder with the Supabase CLI (logged in on `m.b.a` on 2026-11-09):
   `npx supabase functions deploy <name> --project-ref whmzjvmeyxdoqjtkukix --yes` (`hooshvareh` is too big to send
   through the Supabase MCP tool). Since 2026-11-17 deploy on your own after pushing checked work, without asking the user
@@ -66,7 +72,8 @@ exist side by side. When a new decision replaces an old one, change or mark the 
   (commit 734e209, the `lab` mode for «آزمایش خون»); that deploy went through. On 2026-11-18 `ClaudeAccount` deployed version 53 with the MCP tool
   (commit 2b2ab89: the removed diet plan and screen-only profile keys no longer go to the assistant). It boots (OPTIONS 200), but no
   answer could be checked: the Anthropic credit was still empty that day. On 2026-11-19 `ClaudeAccount` deployed version 54 the same way (commit f8998b5:
-  the tip mode gone, the chat sees today's tip from TIPS.md); it boots (OPTIONS 200).
+  the tip mode gone, the chat sees today's tip from TIPS.md); it boots (OPTIONS 200). Later that day it deployed version 55 the same way (commit 863b7cb:
+  `lateNight`, the app's day starting at 5 am); it boots (OPTIONS 200).
 - From 2026-11-16 04:22 UTC every `hooshvareh` call failed with 502 (still so on 2026-11-18): the Anthropic API answered «credit balance is too low». Only the
   user can add credit (console.anthropic.com, Plans & Billing). Check the function logs for it when the assistant stops answering.
 - On 2026-11-17 the user installed the official Meshy plugin (claude.ai directory, by Meshy) with three skills:
