@@ -127,6 +127,8 @@ exist side by side. When a new decision replaces an old one, change or mark the 
 - `art/STYLE.md`: how the app's own pictures (the «بیشتر» icons) are made.
 - `REDESIGN.md`: the rebuild of «امروز» and «رژیم» into one part, step by step: what the user decided so far. Read it before
   touching the today screen, «سهم وعده» or «رژیم».
+- `SAHM.md`: the road map to a professional «سهم وعده» algorithm (from 2026-11-20): the current algorithm's weak points,
+  eight phases with exit gates, and the user's decisions on it. Read it before touching `fitMeal` or `mealBudget`.
 - `TIPS.md`: the fixed list of daily tips («نکته‌ی امروز»), about 365, written once by Claude from established science only
   (the user decided on 2026-11-18 to replace the tips Hooshvareh writes every day). Each tip has tags saying who sees it. In the
   app since 2026-11-19: `js/ui/tip.js`, picked in `js/domain/tips.js`; after editing TIPS.md run `node tools/tips.mjs`, which

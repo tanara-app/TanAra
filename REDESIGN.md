@@ -82,6 +82,8 @@
   (`&over` ناهار را بیشتر از سهم می‌کند، `&theme=light`، `&scene=home|search|why|plate|unit|edit|remember|save|freetap|fasttitle|type|typeg|makepack|makebar|gooje|centers|centersall|prot|protadd|veg|top`، `&cond=diabetes,bp` بیماری‌ها (پیش‌فرض diabetes، خالی برای هیچ)؛ `&day=2027-02-20` یک روز دیگر (رمضان) و `&fast` روزه را روشن می‌کند برگه‌ی ناهار را باز می‌کند و
   کاری در آن می‌کند). با Chrome بی‌سر: `--window-size=520,1700` و `--virtual-time-budget=12000`.
 
+- **الگوریتم مقدارها (از ۲۰۲۶-۱۱-۲۰):** نقشه‌ی راه بهتر کردن `fitMeal` و `mealBudget` و تصمیم‌های کاربر درباره‌اش در [SAHM.md](SAHM.md) است.
+
 ## طرح‌ها
 
 تصویرها در `.claude/` (git نادیده می‌گیرد): `طرح-ب.png`، `طرح-امروز.png`، `طرح-چینش-وعده.png`، `طرح-مقدار.png`.
