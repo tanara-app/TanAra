@@ -163,7 +163,7 @@ const SGLT2 = `# If they take an SGLT2 inhibitor (empagliflozin/Jardiance, dapag
 
 type Ctx = {
   logdays?: Record<string, boolean>; // what they said about a day's log: true all of it, false not all
-  today: string; todayFa?: string; now?: string;
+  today: string; todayFa?: string; now?: string; lateNight?: boolean; // after midnight, before the app's day starts (05:00)
   profile?: Record<string, unknown> | null;
   targets?: { kcal: number; protein: number; floor: number; teen?: boolean; hold?: string | null; nursing?: boolean };
   pattern?: { days: number; eaten: Record<string, number>; usual: Record<string, any[]>; use?: { days: number; options: any[] } | null } | null;
@@ -265,7 +265,7 @@ function sections(c: Ctx) {
     toId,
     yesterday: addDays(c.today, -1),
     detailFrom,
-    now: () => `# Now\ntoday: ${c.today}${c.todayFa ? ` (${c.todayFa})` : ""}${c.now ? `, local time ${c.now}` : ""}`,
+    now: () => `# Now\ntoday: ${c.today}${c.todayFa ? ` (${c.todayFa})` : ""}${c.now ? `, local time ${c.now}` : ""}${c.lateNight ? `\nIt is after midnight, but the app's day starts at 05:00: this is still the night of ${c.today}, and what they eat or log now belongs to that day.` : ""}`,
     profile: () => `# Profile (from the onboarding questionnaire)\n${JSON.stringify(c.profile || {})}${c.targets?.teen ? `\n\n${TEEN}` : ""}${c.targets?.hold && HOLDS[c.targets.hold] ? `\n\n${HOLDS[c.targets.hold]}` : ""}${c.targets?.nursing ? `\n\n${NURSING}` : ""}${(c.profile as any)?.glucoseMeds ? `\n\n${GLUCOSE}` : ""}${(c.profile as any)?.glucoseMeds || SGLT2_RE.test(String((c.profile as any)?.medications || "")) ? `\n\n${SGLT2}` : ""}`,
     targets: () => c.targets ? `# Daily targets\ncalories: ${c.targets.kcal} kcal, protein: ${c.targets.protein} g, safety floor (never go below): ${c.targets.floor} kcal` : "",
     mode: () => `# Mode they are using now\n${c.mode === "plan" ? "رژیم (diet plan)" : "شمارش کالری (calorie counting)"}`,

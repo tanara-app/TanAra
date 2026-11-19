@@ -14,7 +14,7 @@ import { measuredTdee } from '../domain/energy.js';
 import { lossStart, zone, maintainWeeks, lightOn } from '../domain/phase.js';
 import { sortedWeights, rate4w, measureDue, activityWeek, weekStart, ACTIVITY_GOAL, logMarks } from '../domain/stats.js';
 import { upcoming } from '../domain/occasions.js';
-import { today, parse, addDays, diffDays } from '../lib/dates.js';
+import { today, parse, addDays, diffDays, lateNight } from '../lib/dates.js';
 import { perUnit } from '../domain/recipe.js';
 import { tagsOf, TAGS_KEY } from '../domain/health.js';
 import { toBuy } from '../domain/shopping.js';
@@ -126,6 +126,8 @@ function context() {
     today: t,
     todayFa: new Intl.DateTimeFormat('fa-IR-u-ca-persian', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(parse(t)),
     now: `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`,
+    // after midnight, before the app's day starts at 5 am: `today` is still the day that is ending
+    ...(lateNight() ? { lateNight: true } : {}),
     profile: profileForAI(p),
     targets: p ? effectiveTargets(p) : null,
     // own: added by the person, not one of the app's starter foods; the diet plan favours these

@@ -3,7 +3,8 @@ import { SUPABASE_URL, SUPABASE_KEY } from './config.js';
 import * as store from './data/store.js';
 import { createSupabaseRemote } from './data/supabaseRemote.js';
 import { $, icon, sheet } from './ui/dom.js';
-import { today } from './lib/dates.js';
+import { today, setFastingDay } from './lib/dates.js';
+import { dayFromMidnight } from './domain/plan.js';
 import { renderOnboarding } from './ui/onboarding.js';
 import { renderToday, setDay } from './ui/today.js';
 import { renderProgress, resetProgress } from './ui/progress.js';
@@ -139,6 +140,8 @@ shop.onChange(requestRender);
 
 async function start(ns, remote) {
   store.init(ns, remote);
+  // «امروز» picked its day before their notes were here (a fasting night starts the day at midnight)
+  lastDay = today(); setDay(lastDay);
   if (remote && !store.profile()) {
     // nothing cached on this device yet — fetch first so we don't show the questionnaire by mistake
     view.innerHTML = '<div class="loading">در حال بارگذاری…</div>';
@@ -155,11 +158,14 @@ async function start(ns, remote) {
   }
 }
 
-// Midnight rollover: if the app stays open past midnight, "today" moves on.
-let lastDay = new Date().toDateString();
+// The app's day starts at 5 am, or at midnight on a fasting day (lib/dates.js).
+setFastingDay(day => dayFromMidnight(store.get().ai_notes, day));
+
+// Day rollover: if the app stays open past the start of a new day, "today" moves on.
+let lastDay = today();
 setInterval(() => {
-  const d = new Date().toDateString();
-  if (d !== lastDay) { lastDay = d; setDay(today()); requestRender(); }
+  const d = today();
+  if (d !== lastDay) { lastDay = d; setDay(d); requestRender(); }
 }, 60000);
 
 /*

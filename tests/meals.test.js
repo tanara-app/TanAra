@@ -2,7 +2,8 @@ import { suite, test, eq } from './harness.js';
 import { baseMeal, mealLabel, meal5, meal5ForNow, MEALS5 } from '../js/domain/meals.js';
 import { mealStanding, MEAL_SHARES5, mealShares5From } from '../js/domain/portion.js';
 import { frequentFoods } from '../js/domain/stats.js';
-import { slotExtras } from '../js/domain/plan.js';
+import { slotExtras, dayFromMidnight } from '../js/domain/plan.js';
+import { dayAt, setFastingDay } from '../js/lib/dates.js';
 
 // a local time on a day, as an ISO string (meal5 reads the hour in local time)
 const at = (day, h) => new Date(`${day}T${String(h).padStart(2, '0')}:30:00`).toISOString();
@@ -27,6 +28,33 @@ suite('meals', () => {
     eq(meal5ForNow('snack', 10), 'snack1');
     eq(meal5ForNow('snack', 17), 'snack2');
     eq(meal5ForNow('dinner', 20), 'dinner');
+  });
+
+  test('after midnight it is still the night before: the day starts at 5 am', () => {
+    const t = (d, h, m = 0) => new Date(2026, 10, d, h, m);
+    eq(dayAt(t(19, 0, 30)), '2026-11-18');
+    eq(dayAt(t(19, 4, 59)), '2026-11-18');
+    eq(dayAt(t(19, 5, 0)), '2026-11-19');
+    eq(dayAt(t(19, 23, 59)), '2026-11-19');
+    eq(dayAt(t(1, 2)), '2026-10-31', 'across a month');
+    // a snack logged then is the evening one, now and when it is placed later
+    eq(meal5ForNow('snack', 3), 'snack2');
+    eq(meal5({ day: '2026-11-09', meal: 'snack', created_at: at('2026-11-10', 3) }), 'snack2');
+  });
+
+  test('on a fasting day the day starts at midnight, so سحری stays with its own day', () => {
+    // 2027-02-10 is in Ramadan (Umm al-Qura), 2026-11-19 is not
+    const notes = [];
+    const night = new Date(2027, 1, 10, 4, 0);
+    setFastingDay(day => dayFromMidnight(notes, day));
+    try {
+      eq(dayAt(night), '2027-02-10', 'not said yet: counted as fasting');
+      notes.push({ key: 'pick:2027-02-09', data: { fast: true } });
+      eq(dayAt(night), '2027-02-10', 'fasting, said the day before');
+      notes.push({ key: 'pick:2027-02-10', data: { fast: false } });
+      eq(dayAt(night), '2027-02-09', 'not fasting: the night belongs to the day before');
+      eq(dayAt(new Date(2026, 10, 19, 4, 0)), '2026-11-18', 'outside Ramadan');
+    } finally { setFastingDay(() => false); }
   });
 
   test('each snack has its own share of the day', () => {

@@ -10,7 +10,24 @@ export function parse(day) {
   const [y, m, d] = day.split('-').map(Number);
   return new Date(y, m - 1, d);
 }
-export const today = () => iso(new Date());
+/*
+  The app's day starts at 5 in the morning, not at midnight (the owner's decision, 2026-11-19): what is
+  eaten or logged late at night belongs to the evening before, not to a day that has barely begun (two
+  members logged their whole day at 1–3 am and it landed on the next day). On a fasting day the day starts
+  at midnight as before, so سحری stays with its own day: app.js tells which days those are (setFastingDay).
+*/
+export const DAY_START_HOUR = 5;
+let fastingDay = () => false;
+export function setFastingDay(fn) { fastingDay = fn; }
+// The app's day at a moment (a Date): before DAY_START_HOUR still the day before, unless it is a fasting day.
+export function dayAt(d) {
+  const cal = iso(d);
+  if (d.getHours() >= DAY_START_HOUR) return cal;
+  return fastingDay(cal) ? cal : addDays(cal, -1);
+}
+export const today = () => dayAt(new Date());
+// After midnight but still the day before (the app's day has not started yet).
+export const lateNight = () => today() !== iso(new Date());
 export function addDays(day, n) {
   const d = parse(day);
   d.setDate(d.getDate() + n);

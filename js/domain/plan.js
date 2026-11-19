@@ -656,11 +656,19 @@ export const slotLabel = (plan, key) => plan?.labels?.[key] || SLOTS[key].label;
   Whether they fast on a day: what they said that day (kept with the day's picks as `fast`), or
   else what they last said on an earlier day of the same Ramadan. Never outside Ramadan.
 */
-export function fastOn(notes, day) {
-  if (!isRamadan(day)) return false;
+export const fastOn = (notes, day) => fastSaid(notes, day) === true;
+// … and what they said, or null when they haven't said yet this Ramadan (or it isn't Ramadan).
+export function fastSaid(notes, day) {
+  if (!isRamadan(day)) return null;
   for (let d = day, n = 0; n < 31 && isRamadan(d); d = addDays(d, -1), n++) {
     const f = notes.find(x => x.key === `pick:${d}`)?.data?.fast;
     if (typeof f === 'boolean') return f;
   }
-  return false;
+  return null;
 }
+/*
+  Whether the app's day starts at midnight instead of 5 am (lib/dates.js): on a day of Ramadan, unless
+  they said they don't fast. Not yet having said counts as fasting, so on the first night of Ramadan
+  سحری goes to its own day, where «امروز روزه‌ام» can be ticked.
+*/
+export const dayFromMidnight = (notes, day) => isRamadan(day) && fastSaid(notes, day) !== false;
