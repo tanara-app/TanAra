@@ -156,6 +156,20 @@ Voice Design اول رد شد («دختر کوچولو» با قانون‌ها�
 | `sfx-gadget` | 1s | A small cute kitchen timer ticking briefly, ending in a bright little bell ding |
 | `sfx-chime` | 1s | Soft warm gentle chime, like a light tap on a small glass bowl, calm and soothing, very quiet |
 
+## دوباره ضبط کردن یک جمله (۲۰۲۶-۱۱-۲۰)
+
+کاربر بعضی تلفظ‌ها را درست نمی‌داند و خودش اِعراب می‌گذارد و دوباره می‌سازد. روند:
+
+1. فلوی «TanAra Pfefferdinger» در الون‌لبز (`XqSPx9L3iUkHb0Xzbs2y`): هر جمله یک جعبه است با **برچسبِ اسم فایلش** (`poke-3`،
+   `first-2`، …؛ ۵۸ جمله و ۴ افکت). صدا (`Pfefferdinger`) و مدل (`eleven_v4`) روی خود جعبه تنظیم است.
+2. کاربر متن جعبه را عوض می‌کند (اِعراب، برچسب حس) و دوباره می‌سازد؛ برداشت تازه کنار قبلی در همان جعبه می‌نشیند.
+3. کاربر فقط اسم فایل‌ها را می‌گوید. Claude جعبه را با `creative_get_flow` (`label_contains`) پیدا می‌کند، تازه‌ترین برداشت را از
+   `creative_get_flow_node` (اولین `generations`) و `creative_get_generations` (`full_res_url`) می‌گیرد، جای فایل در `audio/pfeffer/` می‌گذارد،
+   متن ضبط را در جدول بالا به‌روز می‌کند و commit و push می‌کند. اگر کلمه‌ای (نه فقط اِعراب) عوض شده، متن روی صفحه در
+   `js/ui/buddies.js` هم عوض می‌شود.
+4. راه دیگر: کاربر MP3 را خودش با همان اسم در `audio/pfeffer/` جایگزین می‌کند؛ `git status` نشان می‌دهد کدام‌ها عوض شده‌اند.
+   قبل از commit با `file` چک کن MP3 باشد.
+
 ## وضعیت
 
 ۲۰۲۶-۱۱-۲۰: کاربر تأیید کرد و کار شروع شد. چت بی‌شخصیت شد. تصویرها ساخته شد. صدا انتخاب شد. جمله‌ها بازنویسی شد
