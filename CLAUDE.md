@@ -9,7 +9,9 @@ two macOS accounts on the same Mac:
 - `ClaudeAccount`: the second Claude, which joined on 2026-11-05 to continue the upgrades whenever the
   first one hits its usage limit.
 
-The user never runs both at the same time, but either one may have worked here since your last session.
+The user never runs both at the same time, but either one may have worked here since your last session. (On 2026-11-20 both did
+work here at the same time, committing in turns: so `git add` only your own files, look at `git log` and `git status` again before every
+commit, and before deploying an Edge Function check which commit the live version came from.)
 So at the start of every session:
 
 1. Run `git fetch` and `git log --oneline -10` to see what the other Claude did.
@@ -79,6 +81,8 @@ exist side by side. When a new decision replaces an old one, change or mark the 
   day `m.b.a` deployed `remind` version 6 (commit 3e619e1, BAZGASHT.md phase 1: the pushes of an absence and `push_log`) with
   `npx supabase functions deploy remind --project-ref whmzjvmeyxdoqjtkukix --no-verify-jwt --yes` (without `--no-verify-jwt` the CLI
   turns the JWT check on and the cron call fails), and `hooshvareh` version 57 (commit e8da126: the new «scale» drift sign in words).
+  Later on 2026-11-20 `ClaudeAccount` deployed `hooshvareh` version 58 with the MCP tool (commit bbc4d56: the clinical review's potassium and
+  phosphorus tags and conditions, kidney «not on dialysis», salty white cheese and دوغ; it carries fa6b235 too); it boots (OPTIONS 200).
 - From 2026-11-16 04:22 UTC every `hooshvareh` call failed with 502 (still so on 2026-11-18; on 2026-11-20 `ai_usage` had no row after 2026-11-16, so no call had succeeded since): the Anthropic API answered «credit balance is too low». Only the
   user can add credit (console.anthropic.com, Plans & Billing). Check the function logs for it when the assistant stops answering.
 - On 2026-11-17 the user installed the official Meshy plugin (claude.ai directory, by Meshy) with three skills:
