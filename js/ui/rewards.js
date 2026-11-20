@@ -170,7 +170,8 @@ function openPromo(key) {
     const x = listNow().find(y => y.reward.key === key);
     const art = p.art ? p.art() : `<div class="rw-show rw-${key}">${SHOWCASE[key]?.() || ''}</div>`;
     body.innerHTML = `
-      <div class="sheet-head"><span></span><h2 class="sr-only">${r.name}</h2><button class="icon-btn" data-close aria-label="بستن">${icon.close}</button></div>
+      <h2 class="sr-only">${r.name}</h2>
+      <div class="sheet-head"><span></span><span></span><button class="icon-btn" data-close aria-label="بستن">${icon.close}</button></div>
       <div class="promo">
         <div class="promo-poster${p.art ? '' : ' show'}">
           ${art}

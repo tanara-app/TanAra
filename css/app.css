@@ -1610,12 +1610,13 @@ body.kb .toast, body.chat-mode .toast { bottom: calc(var(--nav-h) + var(--safe-b
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 /* a game's own page: the poster bleeds to the sheet's edges */
 .promo { display: flex; flex-direction: column; gap: 14px; padding-bottom: 6px; }
-.promo-poster { position: relative; margin: 0 -16px; height: 470px; overflow: hidden; }
+.promo-poster { position: relative; margin: 0 -16px; height: 470px; overflow: hidden; contain: paint; isolation: isolate; }
+/* the chips are solid, not blurred behind: a backdrop blur redrawn while the sheet slides up flickered on the phone (2026-11-20) */
 .promo-lock, .promo-kicker { position: absolute; top: 14px; z-index: 2; height: 32px; padding: 0 12px; border-radius: 999px; display: inline-flex; align-items: center; gap: 6px;
-  font-size: .76rem; font-weight: 800; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
-.promo-lock { left: 14px; color: #fff; background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.18); }
+  font-size: .76rem; font-weight: 800; }
+.promo-lock { left: 14px; color: #fff; background: rgba(20, 22, 40, .55); border: 1px solid rgba(255,255,255,.18); }
 .promo-lock svg { width: 14px; height: 14px; }
-.promo-kicker { right: 14px; color: #ffe9a8; background: rgba(255, 214, 102, .14); border: 1px solid rgba(255, 214, 102, .35); }
+.promo-kicker { right: 14px; color: #ffe9a8; background: rgba(60, 46, 14, .6); border: 1px solid rgba(255, 214, 102, .35); }
 .promo-titles { position: absolute; left: 0; right: 0; bottom: 26px; z-index: 1; padding: 0 24px; text-align: center; }
 .promo-title { font-size: 4.1rem; font-weight: 900; line-height: 1.05; color: transparent;
   background: linear-gradient(180deg, #fff 30%, #ffd9f0 70%, #ffb3d9); -webkit-background-clip: text; background-clip: text;
@@ -1641,6 +1642,7 @@ body.kb .toast, body.chat-mode .toast { bottom: calc(var(--nav-h) + var(--safe-b
    (the title block is 133px from the bottom; the owner found a gap between picture and name on the phone) */
 .promo-poster.show { height: 430px; }
 .promo-poster.show .rw-show { position: absolute; inset: 0; height: auto; place-items: end center; padding-bottom: 144px; }
+.promo-poster.show .rw-show::before { display: none; } /* the card's grain (a blend over the whole poster) is too heavy while the sheet slides */
 .promo-poster.show .rw-buddy { width: 250px; height: 250px; }
 .promo-poster.show::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 180px; pointer-events: none;
   background: linear-gradient(transparent, rgba(5, 6, 14, .55)); }
