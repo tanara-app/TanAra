@@ -33,6 +33,7 @@ import { baseMeal } from './meals.js';
 import { logMarks, fullDay, VEG_SERVING_G } from './stats.js';
 import { vegByDay, VEG_FRUIT_GOAL } from './quality.js';
 
+// A new reward also goes in the copy in supabase/functions/remind/index.ts (its notification), then deploy that.
 export const REWARDS = [
   { key: 'parniyan', kind: 'finish', name: 'پرنیان', about: 'پوسته‌ی ظاهر اپ', goal: { type: 'fullRun', of: 21 }, since: '2026-11-15' },
   // 40 days: a «چله»

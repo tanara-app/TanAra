@@ -15,6 +15,9 @@
            a long gap: stopping weighing is how regain usually starts)
     mag    the week's shared magazine article (table magazine), once per device, between 9:00
            and 22:00, to everyone with a subscription
+    reward a reward in «جوایز» they have not seen yet (profile.data.rewardsSeen), once per newest
+           such reward and device, between 9:00 and 22:00, to everyone with a subscription
+           (the owner's request, 2026-11-20); it opens «جوایز» (./#/rewards)
   Times are in the person's own time zone (reminders.tz). The texts are fixed: no AI call.
 
   Deployed with verify_jwt off: the cron call carries no JWT, so each path checks its own
@@ -187,6 +190,26 @@ async function newArticle(): Promise<(Note & { week: string }) | null> {
   return title ? { week, tag: "mag", url: "./#/mag", title: "مقاله‌ی این هفته‌ی مجله", body: title } : null;
 }
 
+// The rewards of «جوایز»: a copy of key, name and `since` of REWARDS in js/domain/rewards.js.
+// Adding a reward there means adding it here too (and deploying this function).
+const REWARDS = [
+  { key: "parniyan", name: "پرنیان", since: "2026-11-15" },
+  { key: "shab", name: "شب‌پر", since: "2026-11-17" },
+  { key: "tangatang", name: "تنگاتنگ", since: "2026-11-19" },
+  { key: "pfeffer", name: "پِفِردینگر", since: "2026-11-20" },
+];
+// Rewards out by `day` that they have not opened yet, newest first; the note names them.
+function newRewards(data: any, day: string): (Note & { mark: string }) | null {
+  const seen: string[] = Array.isArray(data?.rewardsSeen) ? data.rewardsSeen : [];
+  const fresh = REWARDS.filter(r => r.since <= day && !seen.includes(r.key)).sort((a, b) => (a.since < b.since ? 1 : -1));
+  if (!fresh.length) return null;
+  const names = fresh.map(r => r.name);
+  const body = fresh.length === 1
+    ? `جایزه‌ی تازه در «جوایز»: ${names[0]}. انتخابش کن تا روزهایش شمرده شود.`
+    : `${names.slice(0, -1).join("، ")} و ${names[names.length - 1]} در «جوایز» منتظرت هستند. یکی را انتخاب کن تا روزهایش شمرده شود.`;
+  return { mark: fresh[0].key, tag: "reward", url: "./#/rewards", title: "جایزه‌ی تازه", body };
+}
+
 async function runDue(k: Keys) {
   const { data: subs, error } = await admin.from("push_subs").select("*");
   if (error) throw error;
@@ -203,6 +226,9 @@ async function runDue(k: Keys) {
     const notes: Record<string, Note> = {};
     // the week's shared magazine article, once per device, in the day (not at night)
     if (mag && now.min >= 9 * 60 && now.min < 22 * 60) notes.mag = mag;
+    // a reward they have not seen, once per newest one, in the day
+    const reward = now.min >= 9 * 60 && now.min < 22 * 60 ? newRewards(data, now.day) : null;
+    if (reward) notes.reward = reward;
 
     if (r?.log?.on && inWindow(now.min, minutes(r.log.at, 21 * 60)) && !(await lightOn(data, user, now.day))) {
       const { data: rows } = await admin.from("entries").select("meal").eq("user_id", user).eq("day", now.day);
@@ -229,8 +255,8 @@ async function runDue(k: Keys) {
     }
 
     for (const [kind, note] of Object.entries(notes)) {
-      // the magazine is marked with its week, the reminders with the day
-      const mark = kind === "mag" ? mag!.week : now.day;
+      // the magazine is marked with its week, a reward with its key, the reminders with the day
+      const mark = kind === "mag" ? mag!.week : kind === "reward" ? reward!.mark : now.day;
       for (const sub of list) {
         if (sub.sent?.[kind] === mark) continue;
         const status = await push(sub, note, k);

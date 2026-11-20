@@ -15,7 +15,7 @@ import { openShopping, shopping } from './shopping.js';
 import { toBuy } from '../domain/shopping.js';
 import { openFoodBank, openRecipes } from './foodBank.js';
 import { shareAdmin, checkShare, openFoodShare } from './foodShare.js';
-import { openRewards, hasReward, openGame } from './rewards.js';
+import { openRewards, hasReward, openGame, unseenRewards } from './rewards.js';
 import { openLabs, LAB_ICON } from './labs.js';
 
 // two of the game's creatures, in its own colours and outline
@@ -28,7 +28,7 @@ const TOOLS = {
   mag: { label: 'مجله', open: () => { location.hash = '#/mag'; } },
   share: { label: 'غذاهای تازه‌ی خانواده', only: shareAdmin, open: () => openFoodShare(() => checkShare(again, true)) },
   // what a member earns by keeping a habit (for everyone since 2026-11-15)
-  rewards: { label: 'جوایز', open: () => openRewards() },
+  rewards: { label: 'جوایز', badge: () => unseenRewards().length, open: () => openRewards() },
   // «آزمایش خون» (LABS.md): for everyone since 2026-11-17 (the `labs` beta flag is unused)
   labs: { label: 'آزمایش خون', svg: LAB_ICON, open: () => openLabs() },
   // «تنگاتنگ»: a game earned in «جوایز» (10 days of 5 servings of vegetables and fruit)

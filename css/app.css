@@ -1655,6 +1655,14 @@ body.kb .toast, body.chat-mode .toast { bottom: calc(var(--nav-h) + var(--safe-b
   font-size: .72rem; font-weight: 800; color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); }
 .promo-goal > .rw-on { margin: 0 0 10px; }
 .rw-hint { text-align: center; font-size: .88rem; color: var(--muted); }
+/* a reward new to them (2026-11-20): a card on «امروز», and the one being worked on as a pill */
+.rw-new { display: flex; align-items: center; gap: 12px; }
+.rw-new img { width: 52px; height: 52px; object-fit: contain; flex: none; }
+.rw-new .grow { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.rw-new small { color: var(--accent); font-weight: 800; font-size: .75rem; }
+.rw-new b { font-size: .95rem; line-height: 1.6; }
+.rw-pill { gap: 6px; border: 0; font: inherit; cursor: pointer; }
+.rw-pill svg { color: var(--accent); flex: none; }
 /* trying a reward before it is earned (2026-11-20): two minutes of a finish or the game, or a companion's voice */
 .promo-try { height: 52px; border-radius: 18px; display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer;
   font: inherit; font-size: 1rem; font-weight: 800; color: var(--accent);

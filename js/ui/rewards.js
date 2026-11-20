@@ -13,7 +13,7 @@ import * as store from '../data/store.js';
 import { sheet, icon, toast } from './dom.js';
 import { fa } from '../lib/fa.js';
 import { today } from '../lib/dates.js';
-import { progress, goalText, goalRules, rewardOf, pick, activeKey } from '../domain/rewards.js';
+import { progress, goalText, goalRules, rewardOf, pick, activeKey, REWARDS } from '../domain/rewards.js';
 import { getFinish, setFinish } from './theme.js';
 import { ttArt } from './ttArt.js';
 import { tasteLines, sayAloud, hush } from './mascot.js';
@@ -110,6 +110,62 @@ function choose(key) {
   redrawList?.();
 }
 const ON = '<span class="rw-on">در حال انجام</span>';
+
+/*
+  Telling members a reward is new (the owner's request, 2026-11-20): until a member has seen a reward
+  (opened «جوایز», or its page from «امروز»), it is new to them. Then there is a number on the «جوایز»
+  tile (tools.js), a dot on «بیشتر» (app.js), a card on «امروز» (newRewardCard) and, once, a
+  notification (the `remind` function). The keys they have seen: profile.data.rewardsSeen.
+*/
+const released = () => REWARDS.filter(r => r.since <= today());
+export const unseenRewards = () => {
+  const seen = store.profile()?.rewardsSeen || [];
+  return released().filter(r => !seen.includes(r.key));
+};
+export function markSeen(keys = released().map(r => r.key)) {
+  const p = store.profile();
+  if (!p) return;
+  const seen = p.rewardsSeen || [];
+  const add = keys.filter(k => !seen.includes(k));
+  if (add.length) store.saveProfile({ ...p, rewardsSeen: [...seen, ...add] });
+}
+export function openReward(key) { markSeen([key]); openPromo(key); }
+// the reward being worked on, while it is still ahead (null: none picked)
+export const activeReward = () => listNow().find(x => x.active && !x.earned) || null;
+
+const GIFT = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="9" width="17" height="11.5" rx="2"/><path d="M2.5 9h19M12 9v11.5M12 9c-1.5-4-5.5-4.5-5.5-2S10 9 12 9zM12 9c1.5-4 5.5-4.5 5.5-2S14 9 12 9z"/></svg>';
+// «امروز»: a card while a reward is new to them; «ببین» opens it (or «جوایز» when there are several), × lets it go
+export function newRewardCard() {
+  const fresh = unseenRewards();
+  if (!fresh.length) return '';
+  const one = fresh.length === 1 ? fresh[0] : null;
+  const names = fresh.map(r => r.name);
+  const title = one ? one.name : `${names.slice(0, -1).join('، ')} و ${names[names.length - 1]}`;
+  return `<section class="card rw-new" data-rw-new>
+    <img src="${one?.key === 'pfeffer' ? 'img/pfeffer/wave.webp' : 'img/tools/rewards.webp'}" alt="" width="52" height="52">
+    <div class="grow"><small>${one ? 'جایزه‌ی تازه' : 'جوایز تازه'}</small><b>${title}</b></div>
+    <button class="btn sm" data-rw-new-open>ببین</button>
+    <button class="icon-btn" data-rw-new-close aria-label="بستن">${icon.close}</button>
+  </section>`;
+}
+export function bindNewReward(root) {
+  const card = root.querySelector('[data-rw-new]');
+  if (!card) return;
+  card.querySelector('[data-rw-new-open]').onclick = () => {
+    const fresh = unseenRewards();
+    if (fresh.length === 1) openReward(fresh[0].key); else openRewards();
+  };
+  card.querySelector('[data-rw-new-close]').onclick = () => { markSeen(); card.remove(); };
+}
+// «امروز»: the reward being worked on, small, among the pills; a tap opens its page
+export function rewardPill() {
+  const x = activeReward();
+  if (!x) return '';
+  return `<button type="button" class="pill rw-pill" data-rw-pill="${x.reward.key}">${GIFT}<span>${x.reward.name} <b>${fa(x.now)}</b> از ${fa(x.of)}</span></button>`;
+}
+export function bindRewardPill(root) {
+  root.querySelector('[data-rw-pill]')?.addEventListener('click', e => openReward(e.currentTarget.dataset.rwPill));
+}
 
 // each reward's showcase, drawn live in the colours they use now
 const SHOWCASE = {
@@ -288,6 +344,7 @@ export function openGame(key, { trial = false } = {}) {
 }
 
 export function openRewards() {
+  markSeen();
   sheet.open(body => {
     const draw = () => {
       const list = listNow();

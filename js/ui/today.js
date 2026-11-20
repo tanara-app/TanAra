@@ -20,6 +20,7 @@ import { motivationCard, bindMotivation } from './motivation.js';
 import { occasionCard, bindOccasion } from './aiCards.js';
 import { tipCard, bindTip } from './tip.js';
 import { magCard, bindMag } from './magazine.js';
+import { newRewardCard, bindNewReward, rewardPill, bindRewardPill } from './rewards.js';
 import { planHtml, bindPlan, setFast } from './plan.js';
 import { fastOn } from '../domain/plan.js';
 import { isRamadan } from '../domain/occasions.js';
@@ -65,6 +66,8 @@ let moreOpen = false;
 const dayCards = () => [
   ['مرحله', phaseNotes()],
   ['برگشت به مسیر', checkinCard()],
+  // one tap and it is gone, so it may stand above the week's review for that moment
+  ['جایزه‌ی تازه', newRewardCard()],
   ['مرور هفته', weekCard()],
   ['اندازه‌گیری', measureNote()],
   ['مناسبت', occasionCard()],
@@ -256,6 +259,7 @@ export function renderToday(root) {
       ${gapPill}
       ${q ? '' : `<div class="pill">${icon.leaf}<span>سبزی ${isToday ? 'امروز' : ''}: <b>${qtyLabel(Math.round(tot.veg * 2) / 2)}</b> وعده</span></div>`}
       <div class="pill"><span>این هفته <b>${fa(logged)}</b> روز ثبت کرده‌اید${lightOn(p, sortedWeights(s.weights), today()) ? ' · ثبت سبک' : ''}</span></div>
+      ${isToday ? rewardPill() : ''}
       ${t.phase !== 'loss' ? `<div class="pill"><span>مرحله: <b>${phaseLabel(p, day)}</b></span></div>` : ''}
     </div>
 
@@ -363,5 +367,5 @@ export function renderToday(root) {
   });
   // last: today's magazine article or an AI card being written redraws this screen
   const redrawAi = () => { if (onToday() && day === today()) renderToday(root); };
-  if (isToday) { bindTip(root); bindMag(root, redrawAi); bindOccasion(root, redrawAi); bindWeekCard(root, redrawAi); }
+  if (isToday) { bindTip(root); bindMag(root, redrawAi); bindOccasion(root, redrawAi); bindWeekCard(root, redrawAi); bindNewReward(root); bindRewardPill(root); }
 }

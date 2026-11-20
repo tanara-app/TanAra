@@ -40,7 +40,7 @@ export const authToken = async () => (getToken ? getToken() : null);
 // every request and say nothing about them («game» is the removed game's save, about 4,000
 // characters). Everything else in the profile (the questionnaire, conditions, medications,
 // planPrefs, reminders, targets) still goes.
-const SCREEN_ONLY = ['game', 'toolsOrder', 'newsSeen', 'newsShown', 'beta', 'mode', 'planKcal', 'onboarded', 'kidneyAsked', 'glucoseMedsAsked', 'tipOff', 'rewardPlan'];
+const SCREEN_ONLY = ['game', 'toolsOrder', 'newsSeen', 'newsShown', 'beta', 'mode', 'planKcal', 'onboarded', 'kidneyAsked', 'glucoseMedsAsked', 'tipOff', 'rewardPlan', 'rewardsSeen'];
 const profileForAI = p => (p ? Object.fromEntries(Object.entries(p).filter(([k]) => !SCREEN_ONLY.includes(k))) : p);
 
 // How they really eat (domain/pattern.js).

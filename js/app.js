@@ -16,7 +16,7 @@ import { renderTools } from './ui/tools.js';
 import { configureAI, sparkle } from './ai/hooshvareh.js';
 import { disable as disableReminders } from './ui/reminders.js';
 import { applyTheme } from './ui/theme.js';
-import { guardFinish } from './ui/rewards.js';
+import { guardFinish, unseenRewards, openRewards } from './ui/rewards.js';
 import { maybeCelebrate } from './ui/celebrate.js';
 import { startFamily } from './ui/family.js';
 import * as shop from './data/shop.js';
@@ -41,6 +41,9 @@ nav.innerHTML = Object.entries(ROUTES).filter(([, r]) => !r.under).map(([k, r]) 
 
 // «مرور هفته» used to be a tab; old links land on «پیشرفت», where the past weeks open from.
 if (location.hash === '#/review') history.replaceState(history.state, '', '#/progress');
+// The new-reward notification links to «#/rewards»: «بیشتر», with «جوایز» open over it.
+const takeRewardsLink = () => location.hash === '#/rewards' && (history.replaceState(history.state, '', '#/tools'), true);
+let openRewardsNext = takeRewardsLink();
 
 // While history.back() is still on its way to امروز, the hash says the old tab.
 let going = null;
@@ -114,8 +117,11 @@ function render() {
   document.body.classList.toggle('chat-mode', r === 'ai');
   view.classList.toggle('chat-view', r === 'ai');
   nav.querySelectorAll('a').forEach(a => a.classList.toggle('on', a.dataset.route === (ROUTES[r].under || r)));
+  // a reward they have not seen yet: a dot on «بیشتر», where «جوایز» is
+  nav.querySelector('a[data-route="tools"]')?.classList.toggle('news', unseenRewards().length > 0);
   shown = r;
   ROUTES[r].render(view);
+  if (openRewardsNext) { openRewardsNext = false; openRewards(); }
   maybeCelebrate();
 }
 
@@ -134,7 +140,11 @@ view.addEventListener('focusout', e => {
 });
 
 function show() { sheet.closeAll({ history: false }); resetProgress(); render(); window.scrollTo(0, 0); }
-window.addEventListener('hashchange', () => { going = null; if (route() !== shown) show(); });
+window.addEventListener('hashchange', () => {
+  going = null;
+  if (takeRewardsLink()) { openRewardsNext = true; if (route() === shown) render(); }
+  if (route() !== shown) show();
+});
 store.subscribe(requestRender);
 shop.onChange(requestRender);
 

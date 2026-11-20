@@ -119,6 +119,9 @@ exist side by side. When a new decision replaces an old one, change or mark the 
   counts; the others don't fill. They can switch any time; a reward they leave keeps its days and goes on from there when picked
   again (only the days it was the chosen one count). Every reward counts from the day it is chosen, not from before (the progress
   members had made while all rewards counted together was dropped). The choices are `profile.data.rewardPlan`.
+- **A new reward is announced (the user's choice, 2026-11-20):** a number on the «جوایز» tile, a dot on «بیشتر», a card on «امروز»
+  and one push from `remind`, until the member has seen it (`profile.data.rewardsSeen`). So a new reward goes in `REWARDS`
+  *and* in the short copy of it in `supabase/functions/remind/index.ts`, and that function is deployed again.
 - Build only what the user agreed to. When a reply could mean more than one of the options you offered,
   ask which ones before building (on 2026-11-08 a shared «team goal» was built that the user hadn't asked for).
 
