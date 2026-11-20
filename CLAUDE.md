@@ -74,7 +74,8 @@ exist side by side. When a new decision replaces an old one, change or mark the 
   answer could be checked: the Anthropic credit was still empty that day. On 2026-11-19 `ClaudeAccount` deployed version 54 the same way (commit f8998b5:
   the tip mode gone, the chat sees today's tip from TIPS.md); it boots (OPTIONS 200). Later that day it deployed version 55 the same way (commit 863b7cb:
   `lateNight`, the app's day starting at 5 am); it boots (OPTIONS 200). On 2026-11-20 `m.b.a` deployed version 56 with the CLI
-  (commit 6857e0a: the assistant no longer plays Heimerdinger); it boots (OPTIONS 200).
+  (commit 6857e0a: the assistant no longer plays Heimerdinger); it boots (OPTIONS 200). The same day `m.b.a` deployed `remind`
+  version 5 with the CLI (commit 3ff1fad: the new-reward notification); `verify_jwt` stayed off, as the cron call needs.
 - From 2026-11-16 04:22 UTC every `hooshvareh` call failed with 502 (still so on 2026-11-18): the Anthropic API answered «credit balance is too low». Only the
   user can add credit (console.anthropic.com, Plans & Billing). Check the function logs for it when the assistant stops answering.
 - On 2026-11-17 the user installed the official Meshy plugin (claude.ai directory, by Meshy) with three skills:
