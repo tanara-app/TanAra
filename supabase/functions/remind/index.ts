@@ -9,7 +9,10 @@
   What is due comes from the profile (profile.data.reminders, set in «نمایه» ← «تنظیمات» ← «یادآورها»):
     log    at a chosen evening time, if fewer than two meals were logged that day — but not
            in maintenance with light logging on while the weight is in its band (the same
-           rule as js/domain/phase.js → lightOn)
+           rule as js/domain/phase.js → lightOn). The text changes every night. Someone with
+           nothing recorded for 3 days or more gets the pushes of an absence instead
+           (BAZGASHT.md, phase 1): day 3, day 5, a last one, then only the first of a Persian
+           month; and no weigh-in reminder meanwhile
     weigh  at a chosen morning time, if the last weigh-in is `every` days old or more
            (the text also asks for the waist when that is two weeks old, and is warmer after
            a long gap: stopping weighing is how regain usually starts)
@@ -19,6 +22,7 @@
            such reward and device, between 9:00 and 22:00, to everyone with a subscription
            (the owner's request, 2026-11-20); it opens «جوایز» (./#/rewards)
   Times are in the person's own time zone (reminders.tz). The texts are fixed: no AI call.
+  Every push that reached at least one device is a row in push_log (kind, mark, time).
 
   Deployed with verify_jwt off: the cron call carries no JWT, so each path checks its own
   credential. The VAPID key pair is made here on first use and kept in app_secrets (service
@@ -181,6 +185,89 @@ async function latest(table: string, user: string) {
   return data?.[0]?.day as string | undefined;
 }
 
+// A text that changes every day, so the same one never comes two nights running (Duolingo found a
+// repeated reminder loses its pull: Yancey & Settles, KDD 2020).
+const pick = (list: string[], day: string) => list[Math.round(Date.parse(day + "T12:00:00Z") / 86400000) % list.length];
+
+const LOG_NONE = [
+  "امروز هنوز چیزی ثبت نکرده‌ای. همین حالا بنویس چه خوردی؛ دو دقیقه بیشتر وقت نمی‌گیرد.",
+  "پیش از خواب، امروز را ثبت کن؛ تقریبی هم کافی است.",
+  "ثبت تقریبی خیلی بهتر از ثبت نکردن است. امروز چه خوردی؟",
+];
+const LOG_SOME = [
+  "ثبت امروزت هنوز کامل نیست. بقیه‌ی چیزهایی که خوردی را هم اضافه کن؛ یک دقیقه بیشتر وقت نمی‌گیرد.",
+  "یک وعده ثبت شده؛ بقیه‌ی امروز را هم اضافه کن تا عددهای امروز درست باشند.",
+  "چیزی نمانده: فقط بقیه‌ی وعده‌های امروز را اضافه کن.",
+];
+
+/* ---------------- an absence (BAZGASHT.md, phase 1) ---------------- */
+
+// A copy of lapsePush and its constants in js/domain/lapse.js (tested there): change both together.
+const BACK_DAYS = 3, BACK2_DAYS = 5, AWAY_DAYS = 7, FRESH_MAX = 3, FRESH_REST = 3, LAST_REST = 2;
+const LAPSE_KINDS = ["back3", "back5", "last", "fresh"];
+const J_MONTHS = ["فروردین", "اردیبهشت", "خرداد", "تیر", "مرداد", "شهریور", "مهر", "آبان", "آذر", "دی", "بهمن", "اسفند"];
+const JP = new Intl.DateTimeFormat("en-u-ca-persian-nu-latn", { timeZone: "UTC", year: "numeric", month: "numeric", day: "numeric" });
+const jParts = (day: string) => {
+  const p = Object.fromEntries(JP.formatToParts(new Date(day + "T12:00:00Z")).map(x => [x.type, x.value]));
+  return { m: Number(p.month), d: Number(p.day) };
+};
+const freshDay = (day: string) => jParts(day).d === 1;
+const freshSoon = (day: string) => {
+  for (let k = 1; k <= FRESH_REST; k++) if (freshDay(addDays(day, k))) return true;
+  return false;
+};
+function lapsePush(gap: number | null, sent: { kind: string; day: string }[], day: string) {
+  if (gap === null || gap < BACK_DAYS) return null;
+  const has = (k: string) => sent.some(s => s.kind === k);
+  const lastSent = sent.reduce((m, s) => (s.day > m ? s.day : m), "");
+  const since = lastSent ? daysBetween(day, lastSent) : Infinity;
+  if (since < 1) return null;
+  if (freshDay(day) && since >= FRESH_REST && sent.filter(s => s.kind === "fresh").length < FRESH_MAX) return "fresh";
+  if (gap >= AWAY_DAYS) return !has("last") && since >= LAST_REST && !freshSoon(day) ? "last" : null;
+  if (gap >= BACK2_DAYS) return !has("back5") && since >= 2 ? "back5" : null;
+  return sent.length ? null : "back3";
+}
+
+// The last day with anything recorded (food, weight, waist or activity) and how long ago, or null if never.
+async function awayDays(user: string, day: string) {
+  let last = "";
+  for (const table of ["entries", "weights", "waists", "activity"]) {
+    const { data } = await admin.from(table).select("day").eq("user_id", user).lte("day", day).order("day", { ascending: false }).limit(1);
+    const d = data?.[0]?.day as string | undefined;
+    if (d && d > last) last = d;
+  }
+  return last ? { gap: daysBetween(day, last), last } : null;
+}
+// The pushes of this absence already sent: push_log rows after the last active day.
+async function lapseSent(user: string, last: string) {
+  const { data } = await admin.from("push_log").select("kind,mark").eq("user_id", user).in("kind", LAPSE_KINDS).gt("mark", last);
+  return (data || []).map(r => ({ kind: String(r.kind), day: String(r.mark) }));
+}
+/*
+  The texts: no blame, no count of the days missed, one small step from today (self-compassion after a
+  lapse: Adams & Leary 2007; a missed day does not undo a habit: Lally et al. 2010; two logged meals are
+  what counts: Turner-McGrievy et al. 2019). `last` picks a different one in the next absence; with a
+  possible eating-disorder history the scale is never suggested.
+*/
+function lapseNote(kind: string, day: string, last: string, care: boolean): Note {
+  const base = { tag: "log", url: "./#/today", title: "تن‌آرا" };
+  if (kind === "back3") return { ...base, body: pick([
+    "چند روزی است سر نزده‌ای؛ اشکالی ندارد، برای همه پیش می‌آید. برای برگشتن فقط یک وعده‌ی امروز را ثبت کن، همین.",
+    "برگشتن از یک وعده شروع می‌شود، نه از یک روز کامل. امشب فقط یکی را ثبت کن.",
+  ], last) };
+  if (kind === "back5") return { ...base, body: care
+    ? "لازم نیست چیزی را جبران کنی؛ از همین امروز ادامه بده. یک وعده کافی است."
+    : pick([
+      "چند روز جا انداختن، عادت را از بین نمی‌برد؛ برگشتن مهم است. اگر ثبت غذا حالا سخت است، فردا صبح فقط وزن کن.",
+      "لازم نیست چیزی را جبران کنی؛ از همین امروز ادامه بده. یک وعده یا یک وزن‌کشی کافی است.",
+    ], last) };
+  if (kind === "last") return { ...base, body: "انگار این یادآورها این روزها کمکی نمی‌کنند، پس فعلاً هر شب نمی‌فرستم. هر وقت خواستی، تن‌آرا همین‌جاست و از همان‌جا که هستی ادامه می‌دهیم." };
+  const j = jParts(day);
+  return { ...base, body: j.m === 1
+    ? "سال نو مبارک. شروع سال وقت خوبی برای از سر گرفتن است: فقط امروز را ثبت کن و گذشته را کنار بگذار."
+    : `اول ${J_MONTHS[j.m - 1]} است. شروع ماه وقت خوبی برای از سر گرفتن است: فقط امروز را ثبت کن و گذشته را کنار بگذار.` };
+}
+
 // This week's magazine article (table magazine, written by the `magazine` function), once it is
 // ready: everyone gets it, whether or not they turned the other reminders on.
 async function newArticle(): Promise<(Note & { week: string }) | null> {
@@ -230,15 +317,24 @@ async function runDue(k: Keys) {
     const reward = now.min >= 9 * 60 && now.min < 22 * 60 ? newRewards(data, now.day) : null;
     if (reward) notes.reward = reward;
 
-    if (r?.log?.on && inWindow(now.min, minutes(r.log.at, 21 * 60)) && !(await lightOn(data, user, now.day))) {
-      const { data: rows } = await admin.from("entries").select("meal").eq("user_id", user).eq("day", now.day);
-      const meals = new Set((rows || []).map(x => x.meal)).size;
-      if (meals < 2) notes.log = {
-        tag: "log", url: "./#/today", title: "تن‌آرا",
-        body: meals ? "ثبت امروزت هنوز کامل نیست. بقیه‌ی چیزهایی که خوردی را هم اضافه کن؛ یک دقیقه بیشتر وقت نمی‌گیرد." : "امروز هنوز چیزی ثبت نکرده‌ای. همین حالا بنویس چه خوردی؛ دو دقیقه بیشتر وقت نمی‌گیرد.",
-      };
+    const logWindow = inWindow(now.min, minutes(r?.log?.at, 21 * 60)), weighWindow = inWindow(now.min, minutes(r?.weigh?.at, 8 * 60));
+    // the log reminder speaks for an absence too (BAZGASHT.md); light logging turns both off
+    const lapseOn = !!r?.log?.on && (logWindow || (!!r?.weigh?.on && weighWindow)) && !(await lightOn(data, user, now.day));
+    const away = lapseOn ? await awayDays(user, now.day) : null;
+    const isAway = !!away && away.gap >= BACK_DAYS;
+
+    if (lapseOn && logWindow) {
+      if (isAway) {
+        const step = lapsePush(away!.gap, await lapseSent(user, away!.last), now.day);
+        if (step) notes[step] = lapseNote(step, now.day, away!.last, ["yes", "unsure"].includes(data?.edHistory));
+      } else {
+        const { data: rows } = await admin.from("entries").select("meal").eq("user_id", user).eq("day", now.day);
+        const meals = new Set((rows || []).map(x => x.meal)).size;
+        if (meals < 2) notes.log = { tag: "log", url: "./#/today", title: "تن‌آرا", body: pick(meals ? LOG_SOME : LOG_NONE, now.day) };
+      }
     }
-    if (r?.weigh?.on && inWindow(now.min, minutes(r.weigh.at, 8 * 60))) {
+    // while they are away, the evening's push of the absence is the only one (one push a day)
+    if (r?.weigh?.on && weighWindow && !isAway) {
       const every = Math.max(1, Number(r.weigh.every) || 7);
       const lastW = await latest("weights", user);
       if (!lastW || daysBetween(now.day, lastW) >= every) {
@@ -257,15 +353,19 @@ async function runDue(k: Keys) {
     for (const [kind, note] of Object.entries(notes)) {
       // the magazine is marked with its week, a reward with its key, the reminders with the day
       const mark = kind === "mag" ? mag!.week : kind === "reward" ? reward!.mark : now.day;
+      let took = false;
       for (const sub of list) {
         if (sub.sent?.[kind] === mark) continue;
         const status = await push(sub, note, k);
         if (status >= 200 && status < 300) {
           sent++;
+          took = true;
           sub.sent = { ...(sub.sent || {}), [kind]: mark };
           await admin.from("push_subs").update({ sent: sub.sent }).eq("endpoint", sub.endpoint);
         }
       }
+      // one row per person (not per device): the steps of an absence, and later what brought them back
+      if (took) await admin.from("push_log").insert({ user_id: user, kind, mark });
     }
   }
   return { users: byUser.size, sent };
