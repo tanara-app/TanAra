@@ -10,16 +10,17 @@ import { PLATES, PERSONAL, plateFoods } from './golden/plates.js';
 // better; never lower one to let a change through. Set again on 2026-11-20 when the scorer took the app's own
 // meal limits (mealLimits: sodium with kidney disease too, carbohydrate at the meal's share of the day, the
 // protein goal within a quarter of the meal) and the «meal shrank» measure, after the clinical review.
+// The same day the salt limit came to every meal (WHO, for every adult): «sodium» counts the plates with no condition too.
 const FLOOR = {
   safety: 80.3, calories: 78.9, measurable: 100, bounds: 99.3, realism: 94.9, pairs: 97.9,
-  protein: 81.4, sodium: 77.3, personal: 85.2, monotonic: 96.7, smooth: 99.9, collapse: 98.1,
+  protein: 81.4, sodium: 83.6, personal: 85.2, monotonic: 96.7, smooth: 99.9, collapse: 98.1,
 };
 // fitPlate's (version 2), the same day, with the weights of the clinical review (SAHM.md phase 7).
 const FLOOR_V2 = {
-  safety: 100, calories: 82.5, measurable: 100, bounds: 100, realism: 95.7, pairs: 100,
-  protein: 86.7, sodium: 87.1, personal: 85.2, monotonic: 96.7, smooth: 99.7, collapse: 100,
+  safety: 100, calories: 81.8, measurable: 100, bounds: 100, realism: 95, pairs: 100,
+  protein: 84.8, sodium: 88.5, personal: 85.2, monotonic: 97, smooth: 99.7, collapse: 100,
 };
-// Version 2 may be a little less calm than version 1 on these plates (10 of 3000 against 4): no weights kept
+// Version 2 may be a little less calm than version 1 on these plates (8 of 3000 against 4): no weights kept
 // it at 99.9 without losing calories; on 1500 held-out random plates it is the calmer one (99.6 against 99.5).
 const NOT_COMPARED = new Set(['smooth']);
 

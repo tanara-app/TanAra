@@ -48,7 +48,11 @@ export const CONDITIONS = {
   liver: 'کبد چرب یا بیماری کبد',
   gout: 'نقرس یا اسید اوریک بالا',
   stones: 'سنگ کلیه',
-  kidney: 'کم شدن کارکرد کلیه (به تشخیص پزشک)',
+  // not on dialysis: dialysis needs more protein (KDOQI 1.0–1.2 g/kg), never this limit (clinical review 2026-11-20)
+  kidney: 'کم شدن کارکرد کلیه، بدون دیالیز (به تشخیص پزشک)',
+  // only when their doctor limited them (NIDDK: «if your potassium level is high»); offered with `kidney` (onboarding.js)
+  potassium: 'پزشک پتاسیم را محدود کرده',
+  phosphorus: 'پزشک فسفر را محدود کرده',
   gallstone: 'سنگ صفرا',
   reflux: 'سوزش معده یا ریفلاکس',
   constipation: 'یبوست',

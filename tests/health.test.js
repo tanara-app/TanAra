@@ -28,7 +28,7 @@ suite('health', () => {
     const saved = { a: { s: tagSig(liver), t: ['purine'] } };
     eq(tagsOf(liver, saved, SEED), ['purine']);
     eq(tagsOf({ ...liver, kcal: 250 }, saved, SEED), null);
-    eq(tagsOf(f('b', 'نوشابه'), {}, SEED), ['sweetDrink']);
+    eq(tagsOf(f('b', 'نوشابه'), {}, SEED), ['sweetDrink', 'phosphorus']);
     eq(tagsOf(f('c', 'سیب'), {}, SEED), []);
     eq(untagged([liver, f('d', 'کله‌پاچه')], saved, SEED).map(x => x.id), ['d']);
   });

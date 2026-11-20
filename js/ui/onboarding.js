@@ -39,7 +39,7 @@ export const fieldsHtml = {
     <p class="muted small">اگر هر کدام را دارید تیک بزنید.</p>
     <div class="checks" data-name="conditions">
       ${Object.entries(CONDITIONS).map(([k, l]) => `
-        <label class="check"><input type="checkbox" value="${k}" ${d.conditions?.includes(k) ? 'checked' : ''}><span>${l}</span></label>`).join('')}
+        <label class="check"${FOR_KIDNEY.has(k) ? ` data-for-kidney ${d.conditions?.includes('kidney') ? '' : 'hidden'}` : ''}><input type="checkbox" value="${k}" ${d.conditions?.includes(k) ? 'checked' : ''}><span>${l}</span></label>`).join('')}
     </div>
     <label class="check"><input type="checkbox" name="glucoseMeds" ${d.glucoseMeds ? 'checked' : ''}><span>انسولین یا قرص پایین‌آورنده‌ی قند (مثل گلی‌بنکلامید یا گلیکلازید)</span></label>
     <label class="field"><span>داروهایی که مصرف می‌کنید <em>اختیاری</em></span><textarea name="medications" rows="2" placeholder="مثلاً متفورمین، لوزارتان…">${esc(d.medications || '')}</textarea></label>
@@ -74,10 +74,22 @@ export function readFields(root, d) {
   return d;
 }
 
+// Potassium and phosphorus limits are asked only with reduced kidney function (the clinical review, 2026-11-20).
+const FOR_KIDNEY = new Set(['potassium', 'phosphorus']);
+
 // Single-choice buttons (seg / choices) write straight into d.
 export function bindChoices(root, d) {
   root.querySelectorAll('[data-name]').forEach(group => {
-    if (group.dataset.name === 'conditions') return;
+    if (group.dataset.name === 'conditions') {
+      group.addEventListener('change', e => {
+        if (e.target.value !== 'kidney') return;
+        group.querySelectorAll('[data-for-kidney]').forEach(el => {
+          el.hidden = !e.target.checked;
+          if (!e.target.checked) el.querySelector('input').checked = false;
+        });
+      });
+      return;
+    }
     group.addEventListener('click', e => {
       const b = e.target.closest('button[data-v]');
       if (!b) return;

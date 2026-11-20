@@ -7,13 +7,13 @@ import { effectiveTargets, isTeen, proteinFor } from '../domain/targets.js';
 import { phaseNotes, bindPhase, phaseLabel } from './phase.js';
 import { lightOn } from '../domain/phase.js';
 import { MEALS, MEALS5, mealLabel, baseMeal, meal5, entriesOn, totals, daysLoggedInWeek, sortedWeights, logMarks, fullDay, LOGDAY_KEY } from '../domain/stats.js';
-import { underEating, rapidLoss, rapidLimit, slowPace } from '../domain/safety.js';
+import { underEating, rapidLoss, rapidLimit, slowPace, fastRisks, fastAllowed } from '../domain/safety.js';
 import { bmiOf, UNDERWEIGHT_BMI } from '../domain/targets.js';
 import { recalcTargets } from './profile.js';
 import { fa, kcal50, round50, esc, qtyLabel, norm } from '../lib/fa.js';
 import { amountLabel } from './units.js';
 import { today, addDays, relLabel, faDM, weekStart } from '../lib/dates.js';
-import { icon } from './dom.js';
+import { icon, confirmBox } from './dom.js';
 import { openLogSheet, openEntrySheet } from './logFood.js';
 import { dismissed, dismiss } from './notices.js';
 import { motivationCard, bindMotivation } from './motivation.js';
@@ -317,7 +317,16 @@ export function renderToday(root) {
   const room = portionMode ? { smart: true, budgetFor } : null;
   root.querySelector('[data-log]')?.addEventListener('click', () => (one ? openMeal({ day, budgetFor }) : eat ? openEat({ day, budgetFor }) : openLogSheet({ day, room })));
   if (one) bindMealRows(root, day, budgetFor);
-  root.querySelector('[data-fast]')?.addEventListener('click', () => setFast(day, !fast));
+  // with a high-risk condition (IDF-DAR) the fast waits for their doctor's OK, asked once a Ramadan (safety.js)
+  root.querySelector('[data-fast]')?.addEventListener('click', async () => {
+    const pr = store.profile();
+    const risks = fastRisks(pr);
+    if (!fast && risks.length && !fastAllowed(pr, day)) {
+      if (!await confirmBox(`روزه با ${risks.join(' و ')} خطر دارد. فقط اگر پزشکت اجازه داده روشنش کن.`, 'پزشکم اجازه داده', 'انصراف')) return;
+      store.saveProfile({ ...store.profile(), fastOK: day });
+    }
+    setFast(day, !fast);
+  });
   root.querySelector('[data-gap]')?.addEventListener('click', () => {
     store.saveNote({ key: LOGDAY_KEY(day), kind: 'logday', data: { full: !full } });
   });

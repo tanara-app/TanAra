@@ -75,8 +75,9 @@ export function nutrTotals(entries, foodOf, nutr) {
   - proteinMax: with the kidney limit, the meal's part of it;
   - proteinMin: otherwise a main meal's part of the day's protein, 15–40 g (ISSN: 20–40 g a meal),
     and never more than a quarter of the meal's calories (AMDR 10–35%); none under 5 g;
-  - sodiumMax: with high blood pressure, heart or kidney disease or stones, the meal's part of
-    2000 mg (WHO, KDIGO).
+  - sodiumMax: the meal's part of 2000 mg (WHO: for every adult; KDIGO). For everyone since the
+    clinical review of 2026-11-20; only with high blood pressure, heart or kidney disease or stones
+    does the today card show the day's salt (countsSalt). fitPlate keeps it as a soft limit.
 */
 export const PROTEIN_PART = 0.25;
 export function mealLimits({ meal, budget, shares, dayKcal = null, protein, proteinIsLimit = false, conditions = [], main = false }) {
@@ -89,6 +90,6 @@ export function mealLimits({ meal, budget, shares, dayKcal = null, protein, prot
     carbMax: countsCarbs(conditions) ? carbLimit(carbKcal) : null,
     proteinMax: proteinIsLimit && all ? Math.round(protein * part) : null,
     proteinMin: goal != null && goal >= 5 ? goal : null,
-    sodiumMax: countsSalt(conditions) && all ? Math.round(SALT_MAX_G * 1000 / 2.5 * part) : null,
+    sodiumMax: all ? Math.round(SALT_MAX_G * 1000 / 2.5 * part) : null,
   };
 }

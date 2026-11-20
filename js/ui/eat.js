@@ -455,12 +455,30 @@ export function openEat({ day = today(), meal = null, budgetFor, start = null })
         || (fits.has(norm(b.name)) ? 1 : 0) - (fits.has(norm(a.name)) ? 1 : 0)
         || then(a, b)).slice(0, 2);
     }
-    // the plate's suggestions in one row: vegetables (main meals without one), then protein (short of it)
+    /*
+      With the kidney protein limit, a plate that stays under three quarters of its calories because the
+      protein ran out: two foods that give energy with little protein (under 8% of their calories), the
+      ones they eat in this meal first, then the most energy for their protein (the clinical review of
+      2026-11-20: a kidney diet needs its energy, KDIGO). Their conditions' foods are left out (avoidOf).
+    */
+    function lowProteinRow() {
+      const s = store.get();
+      const avoid = avoidOf();
+      const on = new Set(picked.map(f => f.id).filter(Boolean));
+      const lean = f => Number(f.kcal) > 0 && (Number(f.protein) || 0) * 4 / Number(f.kcal) < 0.08;
+      // foods eaten as food: not a drink, a vegetable (too little energy), oil, a spread or a sweet
+      return byMeal(s.foods.filter(f => lean(f) && !on.has(f.id) && !avoid(f.id) && !['drink', 'veg', 'fat', 'treat'].includes(roleOf(f))),
+        (a, b) => (Number(a.protein) || 0) / Number(a.kcal) - (Number(b.protein) || 0) / Number(b.kcal));
+    }
+    // the plate's suggestions in one row: vegetables (main meals without one), then protein (short of it), or
+    // with the kidney limit, low-protein energy (far under the meal's calories)
     function suggestRow(b, r) {
       const veg = b.main && !picked.some(f => f.is_veg) ? vegRow() : [];
       const prot = r.proteinShort ? proteinRow() : [];
+      const kcal = Math.round(b.kcal);
+      const low = b.proteinMax != null && kcal > 0 && r.total < 0.75 * kcal ? lowProteinRow() : [];
       const chip = (f, ic) => `<button type="button" class="eat-chip" data-addp="${f.id}">${ic}<span>${esc(shortName(f.name))}</span></button>`;
-      return veg.length || prot.length ? `<div class="eat-suggest">${veg.map(f => chip(f, icon.leaf)).join('')}${prot.map(f => chip(f, icon.plus)).join('')}</div>` : '';
+      return veg.length || prot.length || low.length ? `<div class="eat-suggest">${veg.map(f => chip(f, icon.leaf)).join('')}${[...prot, ...low].map(f => chip(f, icon.plus)).join('')}</div>` : '';
     }
 
     async function keep() {

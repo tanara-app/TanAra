@@ -1,5 +1,5 @@
 // Fixed safety rules. Pure functions; the UI decides where to show them.
-import { addDays, weekStart } from '../lib/dates.js';
+import { addDays, weekStart, diffDays } from '../lib/dates.js';
 import { baseMeal } from './meals.js';
 import { sortedWeights, weekAvg, totals, fullDay } from './stats.js';
 
@@ -61,3 +61,20 @@ export function underEating(entries, floor, day, marks) {
   }
   return { days };
 }
+
+/*
+  Fasting in Ramadan with what the Diabetes and Ramadan guidelines (IDF-DAR 2021) rate as moderate or
+  high risk: reduced kidney function (eGFR under 30 alone is high risk, 30–45 moderate), pregnancy,
+  and insulin or a sulfonylurea (low blood sugar). The app asks for their doctor's OK before it plans
+  a fast (the clinical review of 2026-11-20); an OK holds for that Ramadan (FAST_OK_DAYS).
+  Returns the reasons, in Persian, or [] when none.
+*/
+export const FAST_OK_DAYS = 40;
+export function fastRisks(p) {
+  const out = [];
+  if ((p?.conditions || []).includes('kidney')) out.push('کم شدن کارکرد کلیه');
+  if (p?.pregnancy === 'pregnant') out.push('بارداری');
+  if (p?.glucoseMeds) out.push('انسولین یا قرص قند');
+  return out;
+}
+export const fastAllowed = (p, day) => !!p?.fastOK && diffDays(day, p.fastOK) >= 0 && diffDays(day, p.fastOK) < FAST_OK_DAYS;

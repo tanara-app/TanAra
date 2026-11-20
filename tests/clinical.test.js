@@ -7,6 +7,8 @@ import { MEAL_SHARES5 } from '../js/domain/portion.js';
 import { proteinFor, refWeight, PROTEIN_PER_KG, KIDNEY_PROTEIN_PER_KG } from '../js/domain/targets.js';
 import { fitPlate, WEIGHTS } from '../js/domain/fit.js';
 import { SEED_TAGS, AVOID } from '../js/domain/health.js';
+import { fastRisks, fastAllowed } from '../js/domain/safety.js';
+import { CONDITIONS } from '../js/domain/targets.js';
 
 const MAIN = new Set(['breakfast', 'lunch', 'dinner']);
 const limitsOn = (dayKcal, protein, conditions, proteinIsLimit = false) => Object.fromEntries(Object.keys(MEAL_SHARES5).map(m =>
@@ -45,14 +47,13 @@ suite('clinical', () => {
     for (const m of MAIN) eq(l[m].proteinMin, null);
   });
 
-  test('salt: the meals\' parts of sodium add up to 2000 mg, 5 g of salt (WHO, KDIGO)', () => {
+  test('salt: the meals\' parts of sodium add up to 2000 mg, 5 g of salt, for everyone (WHO, KDIGO)', () => {
     eq(SALT_MAX_G, 5);
-    for (const c of ['bp', 'heart', 'kidney', 'stones']) {
-      const l = limitsOn(2000, 80, [c]);
+    for (const c of ['bp', 'heart', 'kidney', 'stones', 'diabetes', 'none']) {
+      const l = limitsOn(2000, 80, c === 'none' ? [] : [c]);
       const sum = Object.values(l).reduce((t, x) => t + x.sodiumMax, 0);
       ok(Math.abs(sum - 2000) <= 5, `${c}: ${sum}`);
     }
-    eq(limitsOn(2000, 80, ['diabetes']).lunch.sodiumMax, null);
   });
 
   test('protein: 1.4 g/kg a day while losing (over 1.3 keeps muscle), a main meal 15–40 g (ISSN: 20–40 g), at most a quarter of its calories (inside the AMDR\'s 10–35%)', () => {
@@ -81,5 +82,23 @@ suite('clinical', () => {
     eq(mealLimits({ meal: 'dinner', budget: 60, shares: MEAL_SHARES5, protein: 90, main: true }).proteinMin, null);
     for (const f of ['پنیر سفید', 'دوغ', 'کشک']) ok(SEED_TAGS[f].includes('salty'), f);
     for (const c of ['bp', 'heart', 'kidney', 'stones']) ok(AVOID[c].includes('salty'), c);
+  });
+
+  test('the five choices of the review (2026-11-20): dialysis, potassium and phosphorus, fasting, salt for all', () => {
+    ok(CONDITIONS.kidney.includes('بدون دیالیز'));
+    // potassium and phosphorus: only when their doctor limited them, each keeping its foods out
+    eq(AVOID.potassium, ['potassium']);
+    eq(AVOID.phosphorus, ['phosphorus']);
+    for (const f of ['موز', 'پرتقال', 'خرما', 'عدسی', 'شیر کم‌چرب']) ok(SEED_TAGS[f].includes('potassium'), f);
+    for (const f of ['نوشابه', 'سوسیس', 'پنیر سفید', 'ماست کم‌چرب']) ok(SEED_TAGS[f].includes('phosphorus'), f);
+    ok(!SEED_TAGS['سیب'], 'an apple is low in both');
+    // fasting: kidney, pregnancy and glucose drugs wait for the doctor's OK, which holds for that Ramadan
+    eq(fastRisks({ conditions: ['kidney'], pregnancy: 'pregnant', glucoseMeds: true }), ['کم شدن کارکرد کلیه', 'بارداری', 'انسولین یا قرص قند']);
+    eq(fastRisks({ conditions: ['bp'] }), []);
+    eq(fastAllowed({ fastOK: '2027-02-10' }, '2027-02-20'), true);
+    eq(fastAllowed({ fastOK: '2027-02-10' }, '2028-02-01'), false);
+    eq(fastAllowed({}, '2027-02-20'), false);
+    // salt: every meal has its part, with or without a condition
+    ok(limitsOn(2000, 80, []).lunch.sodiumMax > 0);
   });
 });

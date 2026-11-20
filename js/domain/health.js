@@ -16,8 +16,13 @@ export const TAGS = {
   sugary: 'قند افزوده‌ی زیاد',
   // fried in oil, fatty or processed red meat, butter, cream, کله‌پاچه, cheesy fast food
   fatty: 'سرخ‌کردنی یا چربی حیوانی زیاد',
-  // processed and very salty: pickles, sausage, chips and puffs, کشک, instant soups, salty fast food
+  // processed and very salty: pickles, sausage, chips and puffs, کشک, دوغ, white cheese, instant soups, salty fast food
   salty: 'نمک زیاد',
+  // 200 mg of potassium or more in a serving (NKF): banana, orange and its juice, dates and dried fruit,
+  // pomegranate, melon, tomato, potato, spinach, legumes, milk and yoghurt, nuts
+  potassium: 'پتاسیم بالا',
+  // dark cola (phosphoric acid), processed meat, dairy, nuts, chocolate, cheesy fast food (NKF)
+  phosphorus: 'فسفر بالا',
 };
 export const TAG_KEYS = Object.keys(TAGS);
 // The same, as said of one food: «جگر پورین زیادی دارد».
@@ -27,6 +32,8 @@ export const TAG_SAYS = {
   sugary: 'قند افزوده‌ی زیادی دارد',
   fatty: 'سرخ‌کردنی است یا چربی حیوانی زیادی دارد',
   salty: 'نمک زیادی دارد',
+  potassium: 'پتاسیم زیادی دارد',
+  phosphorus: 'فسفر زیادی دارد',
 };
 
 /*
@@ -39,7 +46,9 @@ export const TAG_SAYS = {
   - fatty liver (MASLD): sugar, sweet drinks, saturated fat (EASL 2024);
   - heart disease / narrowed arteries: saturated fat, fried and salty food (AHA 2021);
   - high blood pressure, kidney stones and reduced kidney function: salt (DASH, AUA 2014, KDIGO);
-  - gallstones and reflux: fried and fatty meals, which bring on attacks and heartburn.
+  - gallstones and reflux: fried and fatty meals, which bring on attacks and heartburn;
+  - potassium or phosphorus limited by their doctor (with reduced kidney function, from a blood test;
+    NIDDK, NKF): foods high in it (the clinical review of 2026-11-20).
   MS, constipation and eczema keep no food out: no diet is proven for MS, and cutting foods for
   eczema without a confirmed allergy is advised against (AAD 2023).
 */
@@ -55,6 +64,8 @@ export const AVOID = {
   stones: ['salty'],
   gallstone: ['fatty'],
   reflux: ['fatty'],
+  potassium: ['potassium'],
+  phosphorus: ['phosphorus'],
 };
 
 // The tags their conditions keep out, each with the conditions that ask for it.
@@ -66,6 +77,8 @@ export function avoidedTags(conditions = []) {
 
 // The starter foods' tags, by their exact seed name.
 export const SEED_TAGS = {
+  // salty: the clinical review of 2026-11-20 added white cheese (about 2.5 g of salt in 100 g) and دوغ (about 1.25 g a
+  // glass), «high» by the UK front-of-pack limits; potassium and phosphorus were added the same day (NKF, NIDDK, USDA)
   'ته‌دیگ': ['fatty'],
   'کوکو سبزی': ['fatty'],
   'کتلت': ['fatty'],
@@ -73,35 +86,59 @@ export const SEED_TAGS = {
   'مرغ سوخاری': ['fatty'],
   'ماهی سرخ‌شده': ['fatty'],
   'همبرگر خانگی': ['fatty'],
-  'سوسیس': ['fatty', 'salty'],
+  'سوسیس': ['fatty', 'salty', 'phosphorus'],
   'خامه صبحانه': ['fatty'],
   'کره': ['fatty'],
   'عسل': ['sugary'],
   'مربا': ['sugary'],
   'حلیم (با شکر)': ['sugary'],
-  'کشک': ['salty'],
-  // the clinical review of 2026-11-20: white cheese about 2.5 g of salt in 100 g and دوغ about 1.25 g a
-  // glass are «high» by the UK front-of-pack limits (over 1.5 g in 100 g; over 0.9 g a drink)
-  'پنیر سفید': ['salty'],
+  'کشک': ['salty', 'phosphorus'],
+  'پنیر سفید': ['salty', 'phosphorus'],
   'دوغ': ['salty'],
   'چای با یک حبه قند': ['sugary'],
-  'نوشابه': ['sweetDrink'],
+  'نوشابه': ['sweetDrink', 'phosphorus'],
   'آب‌میوه صنعتی': ['sweetDrink'],
-  'آب‌پرتقال طبیعی': ['sweetDrink'],
+  'آب‌پرتقال طبیعی': ['sweetDrink', 'potassium'],
   'قهوه فوری سه‌در‌یک': ['sweetDrink'],
   'ماءالشعیر': ['sweetDrink'],
   'شیرینی تر (خامه‌ای)': ['sugary', 'fatty'],
   'شیرینی خشک': ['sugary'],
   'بیسکویت ساده': ['sugary'],
-  'شکلات شیری': ['sugary', 'fatty'],
+  'شکلات شیری': ['sugary', 'fatty', 'phosphorus'],
   'چیپس (بسته کوچک)': ['fatty', 'salty'],
   'پفک (بسته کوچک)': ['fatty', 'salty'],
   'کیک یزدی': ['sugary'],
-  'بستنی سنتی': ['sugary'],
+  'بستنی سنتی': ['sugary', 'phosphorus'],
   'زولبیا یا بامیه': ['sugary', 'fatty'],
   'قند': ['sugary'],
-  'پیتزا': ['fatty', 'salty'],
-  'سیب‌زمینی سرخ‌کرده': ['fatty'],
+  'پیتزا': ['fatty', 'salty', 'phosphorus'],
+  'سیب‌زمینی سرخ‌کرده': ['fatty', 'potassium'],
+  'موز': ['potassium'],
+  'پرتقال': ['potassium'],
+  'خرما': ['potassium'],
+  'کشمش': ['potassium'],
+  'انار': ['potassium'],
+  'خربزه یا طالبی (خردشده)': ['potassium'],
+  'گوجه‌فرنگی': ['potassium'],
+  'بورانی اسفناج': ['potassium'],
+  'عدسی': ['potassium'],
+  'خوراک لوبیا': ['potassium'],
+  'دال عدس': ['potassium'],
+  'نخود پخته': ['potassium'],
+  'آش رشته (با کشک و پیاز داغ)': ['potassium'],
+  'آبگوشت با گوشت‌کوبیده': ['potassium'],
+  'قورمه‌سبزی (بدون روغن رو)': ['potassium'],
+  'قیمه (بدون روغن رو)': ['potassium'],
+  'شیر کم‌چرب': ['potassium', 'phosphorus'],
+  'شیر پرچرب': ['potassium', 'phosphorus'],
+  'ماست کم‌چرب': ['potassium', 'phosphorus'],
+  'ماست پرچرب': ['potassium', 'phosphorus'],
+  'ماست چکیده (یونانی)': ['potassium', 'phosphorus'],
+  'ماست‌وخیار': ['potassium', 'phosphorus'],
+  'بادام': ['potassium', 'phosphorus'],
+  'پسته': ['potassium', 'phosphorus'],
+  'تخمه آفتابگردان': ['potassium', 'phosphorus'],
+  'نوشابه رژیمی': ['phosphorus'],
 };
 
 export const TAGS_KEY = 'food_tags';
