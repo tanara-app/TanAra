@@ -144,6 +144,8 @@ exist side by side. When a new decision replaces an old one, change or mark the 
   trends per test, condition suggestions. The user's decisions and where the work stands.
 - `IDEAS.md`: ideas for daily "hooks" that bring members back, with the ones the user picked. When one gets built,
   mark it there.
+- `PFEFFERDINGER.md`: the second mascot «پِفِردینگر», a little chef girl earned as a reward (from 2026-11-20), and the chat losing
+  its character: the user's decisions and where the work stands. Read it before touching `js/ui/mascot.js` or the chat's face.
 - `VOICE.md` / `ELEVENLABS.md`: the mascot Heimerdinger's lines and the brief for recording them
   (files in `audio/mascot/`). If a line changes in `js/ui/mascot.js`, update both.
 
