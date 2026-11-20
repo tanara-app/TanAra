@@ -21,7 +21,7 @@ import { cheer } from './mascot.js';
 import { dismissed, dismiss } from './notices.js';
 import { startChat } from './chat.js';
 import { askRow, askFold } from './aiCards.js';
-import { CAUSES, offlinePlan } from '../domain/comeback.js';
+import { CAUSES, offlinePlan, withCrisis } from '../domain/comeback.js';
 
 const MOODS = ['خیلی بد', 'بد', 'معمولی', 'خوب', 'خیلی خوب'];
 const OUTCOMES = { good: 'خوب پیش رفت', some: 'نصفه‌نیمه', no: 'نشد' };
@@ -176,7 +176,7 @@ export function openCheckin({ follow = null, onDone = () => {} } = {}) {
       }
       if (!r?.steps?.length) r = offlinePlan(answers, { care: edCare(p), follow: !!follow });
       const key = `checkin:${today()}`;
-      const data = { signs: signs || {}, ...answers, cause: r.cause, steps: r.steps, first_step: r.first_step, goal: r.goal, support: r.support || '', ...(r.offline ? { offline: true } : {}), ...(follow ? { after: follow.key } : {}) };
+      const data = { signs: signs || {}, ...answers, cause: r.cause, steps: r.steps, first_step: r.first_step, goal: r.goal, support: withCrisis(r.support, answers.said), ...(r.offline ? { offline: true } : {}), ...(follow ? { after: follow.key } : {}) };
       store.saveNote({ key, kind: 'checkin', text: `${r.cause}\n${r.steps.map(x => `- ${x}`).join('\n')}`, data });
       result(data);
       onDone();

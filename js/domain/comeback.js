@@ -8,6 +8,7 @@
   Steps that are about the scale or weight carry `w`: with a possible eating-disorder history they are
   left out (the app never talks scales or counts to them).
 */
+import { norm } from '../lib/fa.js';
 
 // The form's causes, by group (the check-in sheet lists exactly these).
 export const CAUSES = [
@@ -21,8 +22,18 @@ const MIND = 'اگر این حال بیشتر از دو هفته مانده یا
 const DOCTOR = 'اگر بیماری، درد یا اثر دارو ادامه دارد، با پزشکت مشورت کن.';
 const BINGE = 'اگر پرخوری بی‌اختیار هفته‌ای چند بار پیش می‌آید، با پزشک یا روان‌شناس حرف بزن؛ درمان دارد و تقصیر تو نیست.';
 const CRISIS = 'اگر به آسیب زدن به خودت فکر می‌کنی، همین حالا با صدای مشاور بهزیستی (۱۴۸۰) یا اورژانس اجتماعی (۱۲۳) تماس بگیر. تنها نیستی.';
-// words that may mean harming oneself, in what they wrote (the assistant reads it properly; this is the floor)
-const HARM = /خودکشی|خودمو بکشم|خودم را بکشم|خودم رو بکشم|آسیب.{0,12}(به )?خود|به خود.{0,6}آسیب|نمی.?خوا(م|هم) زنده|زندگی.{0,10}(ارزش|معنی|معنا) ندار|بمیرم/;
+// Words that may mean harming oneself, matched on text folded by norm (Arabic ي/ك, آ, ZWNJ, spaces and
+// diacritics all folded), so the spelling or keyboard does not matter. The assistant reads it properly;
+// this is the floor, applied to its plans too (withCrisis).
+const HARM = /خودکشی|خودموبکشم|خودمرابکشم|خودمروبکشم|کشتنخودم|اسیب.{0,12}خود|بهخود.{0,8}اسیب|نمی.?خوا(م|هم)زنده|زندگی.{0,10}(ارزش|معنی|معنا)ندار|بمیرم/;
+export const crisisSupport = said => (HARM.test(norm(said)) ? CRISIS : '');
+// The help line of a plan (the assistant's or the app's), with the crisis line first when what they wrote asks for it.
+export function withCrisis(support, said) {
+  const c = crisisSupport(said), s = String(support || '');
+  return c && !s.includes(c) ? [c, s].filter(Boolean).join('\n\n') : s;
+}
+// With a possible eating-disorder history no sentence about weight, the scale or calories is said, whatever field it is in.
+const WEIGHTY = /وزن|ترازو|کالری/;
 
 export const GOAL = 'این هفته دست‌کم چهار روز، دو وعده‌ی اصلی را ثبت کن.';
 const GENERIC = [
@@ -119,7 +130,8 @@ export const PLANS = {
 
 const text = s => (typeof s === 'string' ? s : s.t);
 const whyOf = (p, care) => (care && p.whyCare ? p.whyCare : p.why);
-const kept = care => s => !(care && typeof s !== 'string' && s.w);
+const kept = care => s => !(care && ((typeof s !== 'string' && s.w) || WEIGHTY.test(text(s))));
+const say = care => s => !!s && !(care && WEIGHTY.test(s));
 
 /*
   The plan for what they said: { cause, steps (three, or two after a plan that did not work: simpler),
@@ -133,16 +145,16 @@ export function offlinePlan({ mood = null, causes = [], said = '' } = {}, { care
   for (const p of plans) add(p.steps.filter(kept(care)).map(text)[0]);
   for (const p of plans) for (const s of p.steps.filter(kept(care)).map(text)) add(s);
   for (const s of GENERIC) add(s);
-  const why = plans.slice(0, 2).map(p => whyOf(p, care));
+  const why = plans.map(p => whyOf(p, care)).filter(say(care)).slice(0, 2);
   if (mood && mood <= 2) why.unshift('این روزها حالت خوب نیست، و طبیعی است که روالت به هم بخورد.');
   if (!why.length) why.push('دلیل مشخصی انتخاب نشده؛ پس برنامه‌ی این هفته ساده است.');
-  const support = HARM.test(String(said || '')) ? CRISIS
-    : [...new Set([...(mood === 1 ? [MIND] : []), ...plans.map(p => p.support).filter(Boolean)])].slice(0, 2).join('\n\n');
+  const support = crisisSupport(said)
+    || [...new Set([...(mood === 1 ? [MIND] : []), ...plans.map(p => p.support).filter(Boolean)])].slice(0, 2).join('\n\n');
   return {
     cause: why.join(' '),
     steps: steps.slice(0, follow ? 2 : 3),
-    first_step: plans[0]?.first || 'امروز فقط یک وعده را ثبت کن.',
-    goal: plans.find(p => p.goal)?.goal || GOAL,
+    first_step: plans.map(p => p.first).find(say(care)) || 'امروز فقط یک وعده را ثبت کن.',
+    goal: plans.map(p => p.goal).find(say(care)) || GOAL,
     support,
     offline: true,
   };

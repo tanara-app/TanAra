@@ -1,5 +1,5 @@
 import { suite, test, eq, ok } from './harness.js';
-import { CAUSES, PLANS, GOAL, offlinePlan } from '../js/domain/comeback.js';
+import { CAUSES, PLANS, GOAL, offlinePlan, withCrisis, crisisSupport } from '../js/domain/comeback.js';
 
 const all = CAUSES.flatMap(([, list]) => list);
 
@@ -48,11 +48,24 @@ suite('comeback', () => {
     ok(!offlinePlan({ said: 'سرکار خیلی خسته‌ام' }).support.includes('۱۲۳'));
   });
 
-  test('a possible eating-disorder history: no weight and no scale anywhere', () => {
-    for (const c of all) {
-      const r = offlinePlan({ causes: [c] }, { care: true });
+  test('the crisis line whatever the keyboard or spacing', () => {
+    for (const said of ['خودكشي', 'بميرم', 'آسيب به خودم', 'خودم رو  بکشم', 'نمي خوام زنده بمونم']) ok(crisisSupport(said), said);
+    eq(crisisSupport('یه کم آسیب‌پذیر شدم'), '');
+  });
+
+  test("the crisis line goes on the assistant's plan too, once", () => {
+    const c = crisisSupport('خودکشی');
+    eq(withCrisis('با پزشکت مشورت کن.', 'به خودکشی فکر می‌کنم'), `${c}\n\nبا پزشکت مشورت کن.`);
+    eq(withCrisis(c, 'خودکشی'), c);
+    eq(withCrisis('', 'خوبم'), '');
+  });
+
+  test('a possible eating-disorder history: no weight, scale or calories in any field, for any pair of causes', () => {
+    for (const a of all) for (const b of all) {
+      const r = offlinePlan({ mood: 1, causes: a === b ? [a] : [a, b] }, { care: true });
       const said = [r.cause, ...r.steps, r.first_step, r.goal].join(' ');
-      ok(!/وزن|ترازو|کالری/.test(said), c);
+      ok(!/وزن|ترازو|کالری/.test(said), `${a} + ${b}`);
+      ok(r.steps.length === 3, `${a} + ${b}: three steps`);
     }
   });
 });
