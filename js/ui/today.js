@@ -29,7 +29,7 @@ import { weekCard, bindWeekCard } from './review.js';
 import { greetCard, bindGreet } from './mascot.js';
 import { mealBudget, mealSharesFrom, mealShares5From, mealStanding } from '../domain/portion.js';
 import { planAvoid, foodTags, foodNutr } from '../ai/foodTags.js';
-import { nutrTotals, countsCarbs, countsSalt, carbLimit, SALT_MAX_G } from '../domain/nutrients.js';
+import { nutrTotals, countsCarbs, countsSalt, carbLimit, SALT_MAX_G, mealLimits } from '../domain/nutrients.js';
 import { dayQuality, hasVeg } from '../domain/quality.js';
 import { TAG_SAYS } from '../domain/health.js';
 import { packRow, bindPacks } from './packs.js';
@@ -167,21 +167,16 @@ export function renderToday(root) {
     const pat = eatingPattern(st.entries, st.ai_notes, day);
     return (eat ? mealShares5From : mealSharesFrom)(pat.ready ? pat.shares : null);
   };
-  // with reduced kidney function protein is a limit: each meal gets its part of it (fitMeal)
+  // the meal's calories, and its limits and goals for the amounts (mealLimits in nutrients.js: carbohydrate with
+  // diabetes, the kidney protein limit, a main meal's protein, sodium)
   const budgetFor = m => {
     const st = store.get();
     const sh = sharesNow();
-    const all = Object.values(sh).reduce((a, b) => a + b, 0);
+    const kcal = mealBudget(asShown(st.entries), day, m, t.kcal, sh);
     return {
-      kcal: mealBudget(asShown(st.entries), day, m, t.kcal, sh), label: meals[m] || mealLabel(m), meals,
+      kcal, label: meals[m] || mealLabel(m), meals,
       main: MAIN_MEALS.has(m),
-      // diabetes: the meal's part of the day's carbohydrate, the same share of its own calories (nutrients.js)
-      carbMax: countsCarbs(p.conditions) ? carbLimit(Math.max(0, mealBudget(asShown(st.entries), day, m, t.kcal, sh))) : null,
-      proteinMax: t.proteinMax && all ? Math.round(t.protein * (sh[m] || 0) / all) : null,
-      // a main meal's part of the day's protein, 15–40 g (snacks have none; with a kidney limit, the limit rules)
-      proteinMin: !t.proteinMax && all && MAIN_MEALS.has(m) ? Math.min(40, Math.max(15, Math.round(t.protein * (sh[m] || 0) / all))) : null,
-      // high blood pressure, heart, kidney, stones: the meal's part of the day's sodium (5 g of salt, 2000 mg; fitPlate)
-      sodiumMax: countsSalt(p.conditions) && all ? Math.round(SALT_MAX_G * 1000 / 2.5 * (sh[m] || 0) / all) : null,
+      ...mealLimits({ meal: m, budget: kcal, shares: sh, protein: t.protein, proteinIsLimit: !!t.proteinMax, conditions: p.conditions || [], main: MAIN_MEALS.has(m) }),
     };
   };
   // the quality of the day beside its calories (quality.js): in the summary card of the rebuilt «امروز»

@@ -61,3 +61,26 @@ export function nutrTotals(entries, foodOf, nutr) {
   }
   return { carbs: Math.round(carbs), sodium: Math.round(sodium), salt: Math.round(saltOf(sodium) * 10) / 10, unknown };
 }
+
+/*
+  A meal's limits and goals for the amounts (fitPlate; SAHM.md phase 7 checks them against the
+  guidelines in tests/clinical.test.js). `shares`: each meal's part of the day; `budget`: the meal's
+  calories now; `protein`: the day's protein, a goal or, with reduced kidney function
+  (`proteinIsLimit`), a limit; `main`: a main meal (breakfast, lunch, dinner; سحری, افطار, شام).
+  - carbMax: with diabetes or prediabetes, the meal's carbohydrate is the same share of its own
+    calories as the day's (carbLimit);
+  - proteinMax: with the kidney limit, the meal's part of it;
+  - proteinMin: otherwise a main meal's part of the day's protein, 15–40 g (ISSN: 20–40 g a meal);
+  - sodiumMax: with high blood pressure, heart or kidney disease or stones, the meal's part of
+    2000 mg (WHO, KDIGO).
+*/
+export function mealLimits({ meal, budget, shares, protein, proteinIsLimit = false, conditions = [], main = false }) {
+  const all = Object.values(shares).reduce((a, b) => a + b, 0);
+  const part = all ? (shares[meal] || 0) / all : 0;
+  return {
+    carbMax: countsCarbs(conditions) ? carbLimit(Math.max(0, budget)) : null,
+    proteinMax: proteinIsLimit && all ? Math.round(protein * part) : null,
+    proteinMin: !proteinIsLimit && all && main ? Math.min(40, Math.max(15, Math.round(protein * part))) : null,
+    sodiumMax: countsSalt(conditions) && all ? Math.round(SALT_MAX_G * 1000 / 2.5 * part) : null,
+  };
+}
