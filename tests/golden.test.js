@@ -1,7 +1,8 @@
-// The golden set and scorecard of «سهم وعده» (SAHM.md, phase 2): the judge is checked, and fitMeal may
-// never score below its baseline of 2026-11-20 on any measure.
+// The golden set and scorecard of «سهم وعده» (SAHM.md, phases 2 and 3): the judge is checked, and neither
+// version may score below its own scorecard of 2026-11-20 on any measure; version 2 never below version 1.
 import { suite, test, eq, ok } from './harness.js';
 import { fitMeal, foodBounds } from '../js/domain/portion.js';
+import { fitPlate } from '../js/domain/fit.js';
 import { scorecard, exists, food } from './golden/score.js';
 import { PLATES, PERSONAL, plateFoods } from './golden/plates.js';
 
@@ -10,6 +11,11 @@ import { PLATES, PERSONAL, plateFoods } from './golden/plates.js';
 const FLOOR = {
   safety: 81.5, calories: 78.7, measurable: 100, bounds: 99.4, realism: 94.9, pairs: 97.9,
   protein: 79.1, sodium: 93.2, personal: 85.2, monotonic: 96.1, smooth: 99.8,
+};
+// fitPlate's (version 2) on the same day, after its weights were set (SAHM.md phase 3).
+const FLOOR_V2 = {
+  safety: 100, calories: 79.2, measurable: 100, bounds: 100, realism: 95.6, pairs: 100,
+  protein: 81.6, sodium: 93.2, personal: 85.2, monotonic: 96.9, smooth: 99.8,
 };
 
 suite('golden', () => {
@@ -43,8 +49,13 @@ suite('golden', () => {
     eq(exists(items, { naMax: 299 }), false);                  // the least is 300 mg
   });
 
-  test('fitMeal never scores below its baseline (2026-11-20)', () => {
-    const s = scorecard(fitMeal);
-    for (const [k, floor] of Object.entries(FLOOR)) ok(s[k].pct >= floor, `${k}: ${s[k].pct}% < ${floor}%\n      ${s[k].fails.slice(0, 3).join('\n      ')}`);
+  const atLeast = (s, floors) => { for (const [k, floor] of Object.entries(floors)) ok(s[k].pct >= floor, `${k}: ${s[k].pct}% < ${floor}%\n      ${s[k].fails.slice(0, 3).join('\n      ')}`); };
+
+  test('fitMeal never scores below its baseline (2026-11-20)', () => atLeast(scorecard(fitMeal), FLOOR));
+
+  test('fitPlate never scores below its own scorecard, nor below fitMeal\'s', () => {
+    const s = scorecard(fitPlate);
+    atLeast(s, FLOOR_V2);
+    atLeast(s, FLOOR);
   });
 });

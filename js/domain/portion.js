@@ -81,10 +81,10 @@ const TOL = 15; // calories
   little: two spoons of ارده stay about two spoons in a big breakfast. Vegetables and drinks keep
   their usual helping beside a meal (a meal of vegetables only still scales them).
 */
-const STRETCH = { main: 1, starch: 1, protein: 0.8, dairy: 0.6, fruit: 0.5, rich: 0.45, fat: 0.35, treat: 0.35, veg: 0, drink: 0 };
+export const STRETCH = { main: 1, starch: 1, protein: 0.8, dairy: 0.6, fruit: 0.5, rich: 0.45, fat: 0.35, treat: 0.35, veg: 0, drink: 0 };
 // …and when the meal is smaller than its usual plate, everything shrinks nearly together: less bread
 // is eaten with less ارده, so a spread does not stay put while the bread goes.
-const SHRINK = { main: 1, starch: 1, protein: 0.9, dairy: 0.9, fruit: 0.8, rich: 1, fat: 1, treat: 1, veg: 0, drink: 0 };
+export const SHRINK = { main: 1, starch: 1, protein: 0.9, dairy: 0.9, fruit: 0.8, rich: 1, fat: 1, treat: 1, veg: 0, drink: 0 };
 // How far from its usual helping a food may go, as a part of it (inside the absolute limits too).
 const RANGE = { main: [0.34, 3], starch: [0.25, 3], protein: [0.4, 2.5], dairy: [0.4, 2], fruit: [0.5, 2], rich: [0.5, 2], fat: [0.5, 2], treat: [0.5, 2], veg: [0.5, 3], drink: [1, 1] };
 // A usual helping in grams for a food weighed in grams (no unit to go by).

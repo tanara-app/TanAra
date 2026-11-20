@@ -1,5 +1,6 @@
 import { suite, test, eq, ok } from './harness.js';
 import { roleOf, fitMeal, mealBudget, mealStanding, usualCombos, mealPacks, packKey, MEAL_SHARES, usualAmounts, usualHelping, fitMark, FIT_VERSION } from '../js/domain/portion.js';
+import { fitPlate } from '../js/domain/fit.js';
 import { SEED_FOODS } from '../js/data/seedFoods.js';
 
 const seed = name => {
@@ -11,23 +12,12 @@ const BREAD = seed('نان سنگک'), CHEESE = seed('پنیر سفید'), MELON
 const kcalOf = (foods, r) => r.items.reduce((t, it, i) => t + it.qty * foods[i].kcal, 0);
 const grams = (f, it) => it.qty * f.grams;
 
-suite('portion', () => {
-  test('roles of starter foods', () => {
-    const roles = Object.fromEntries(['نان سنگک', 'پنیر سفید', 'هندوانه (خردشده)', 'تخم‌مرغ آب‌پز', 'کره', 'مربا', 'گردو (مغز کامل)',
-      'قیمه (بدون روغن رو)', 'برنج سفید (کته یا چلو)', 'لوبیاپلو', 'سس مایونز', 'سالاد شیرازی (بدون روغن)', 'شیر کم‌چرب', 'روغن خورش / غذا', 'دوغ', 'جوجه‌کباب']
-      .map(n => [n, roleOf(seed(n))]));
-    eq(roles, {
-      'نان سنگک': 'starch', 'پنیر سفید': 'rich', 'هندوانه (خردشده)': 'fruit', 'تخم‌مرغ آب‌پز': 'protein', 'کره': 'fat', 'مربا': 'fat',
-      'گردو (مغز کامل)': 'fat', 'قیمه (بدون روغن رو)': 'main', 'برنج سفید (کته یا چلو)': 'starch', 'لوبیاپلو': 'main', 'سس مایونز': 'fat',
-      'سالاد شیرازی (بدون روغن)': 'veg', 'شیر کم‌چرب': 'dairy', 'روغن خورش / غذا': 'fat', 'دوغ': 'drink', 'جوجه‌کباب': 'protein',
-    });
-  });
+// A user's own food, as it is in a real bank: date syrup by the spoon.
+const SHIRE = { id: 'shire', name: 'شیره خرما', category: 'sweet', unit: 'قاشق غذاخوری', grams: 20, kcal: 58, protein: 0.2 };
+const gramsOfItem = (f, it) => it.qty * Number(f.grams);
 
-  test('a user food by weight gets a role from its numbers', () => {
-    eq(roleOf({ name: 'پنیر کم چرب', category: 'other', unit: 'گرم', grams: 1, kcal: 2.6, protein: 0.2 }), 'rich');
-    eq(roleOf({ name: 'پرو ماست', category: 'other', unit: 'گرم', grams: 1, kcal: 0.6, protein: 0.1 }), 'dairy');
-  });
-
+// The amounts' behaviour the user agreed to, held by each version: fitMeal (v1) and fitPlate (v2, SAHM.md phase 3).
+function fitBehaviour(fitMeal) {
   test('bread, cheese and watermelon: less cheese than watermelon, about the budget', () => {
     const foods = [BREAD, CHEESE, MELON];
     const r = fitMeal(foods, 450);
@@ -86,15 +76,6 @@ suite('portion', () => {
     eq(r.items[0].atMax, true);
   });
 
-  test('meal budget: what is left of the day, shared by the meals not eaten yet', () => {
-    const day = '2026-11-09';
-    eq(mealBudget([], day, 'breakfast', 2000), 500);
-    const lunch = [{ day, meal: 'breakfast', kcal: 500 }, { day, meal: 'lunch', kcal: 900 }];
-    // 600 left for dinner and snack: dinner 0.25 / 0.45 of it
-    eq(mealBudget(lunch, day, 'dinner', 2000), Math.round(600 * MEAL_SHARES.dinner / 0.45));
-    eq(mealBudget([{ day, meal: 'lunch', kcal: 2500 }], day, 'dinner', 2000), 0);
-  });
-
   test('a protein limit (reduced kidney function) takes protein steps off and gives the calories to the rest', () => {
     const foods = [seed('برنج سفید (کته یا چلو)'), seed('جوجه‌کباب'), seed('سالاد شیرازی (بدون روغن)')];
     const free = fitMeal(foods, 600);
@@ -105,10 +86,6 @@ suite('portion', () => {
     // never below the least helping of the protein food, even when that is past the limit
     eq(fitMeal(foods, 600, {}, { proteinMax: 5 }).items[1].qty, 0.5);
   });
-
-  // A user's own food, as it is in a real bank: date syrup by the spoon.
-  const SHIRE = { id: 'shire', name: 'شیره خرما', category: 'sweet', unit: 'قاشق غذاخوری', grams: 20, kcal: 58, protein: 0.2 };
-  const gramsOfItem = (f, it) => it.qty * Number(f.grams);
 
   test('usual helpings: ارده stays more than شیره at every meal size, in spoons and in grams', () => {
     const foods = [seed('نان سنگک'), seed('ارده'), SHIRE];
@@ -179,6 +156,33 @@ suite('portion', () => {
     eq(r.proteinShort, 0);
     ok(r.protein <= 15.5 || r.items[1].qty <= 1, `${r.protein}`);
   });
+}
+
+suite('portion', () => {
+  test('roles of starter foods', () => {
+    const roles = Object.fromEntries(['نان سنگک', 'پنیر سفید', 'هندوانه (خردشده)', 'تخم‌مرغ آب‌پز', 'کره', 'مربا', 'گردو (مغز کامل)',
+      'قیمه (بدون روغن رو)', 'برنج سفید (کته یا چلو)', 'لوبیاپلو', 'سس مایونز', 'سالاد شیرازی (بدون روغن)', 'شیر کم‌چرب', 'روغن خورش / غذا', 'دوغ', 'جوجه‌کباب']
+      .map(n => [n, roleOf(seed(n))]));
+    eq(roles, {
+      'نان سنگک': 'starch', 'پنیر سفید': 'rich', 'هندوانه (خردشده)': 'fruit', 'تخم‌مرغ آب‌پز': 'protein', 'کره': 'fat', 'مربا': 'fat',
+      'گردو (مغز کامل)': 'fat', 'قیمه (بدون روغن رو)': 'main', 'برنج سفید (کته یا چلو)': 'starch', 'لوبیاپلو': 'main', 'سس مایونز': 'fat',
+      'سالاد شیرازی (بدون روغن)': 'veg', 'شیر کم‌چرب': 'dairy', 'روغن خورش / غذا': 'fat', 'دوغ': 'drink', 'جوجه‌کباب': 'protein',
+    });
+  });
+
+  test('a user food by weight gets a role from its numbers', () => {
+    eq(roleOf({ name: 'پنیر کم چرب', category: 'other', unit: 'گرم', grams: 1, kcal: 2.6, protein: 0.2 }), 'rich');
+    eq(roleOf({ name: 'پرو ماست', category: 'other', unit: 'گرم', grams: 1, kcal: 0.6, protein: 0.1 }), 'dairy');
+  });
+
+  test('meal budget: what is left of the day, shared by the meals not eaten yet', () => {
+    const day = '2026-11-09';
+    eq(mealBudget([], day, 'breakfast', 2000), 500);
+    const lunch = [{ day, meal: 'breakfast', kcal: 500 }, { day, meal: 'lunch', kcal: 900 }];
+    // 600 left for dinner and snack: dinner 0.25 / 0.45 of it
+    eq(mealBudget(lunch, day, 'dinner', 2000), Math.round(600 * MEAL_SHARES.dinner / 0.45));
+    eq(mealBudget([{ day, meal: 'lunch', kcal: 2500 }], day, 'dinner', 2000), 0);
+  });
 
   test('their own usual amount comes first', () => {
     const dates = seed('خرما');
@@ -243,3 +247,6 @@ suite('portion', () => {
     ok(!('proteinMin' in d) && !('proteinMax' in d));
   });
 });
+
+suite('amounts: fitMeal (v1)', () => fitBehaviour(fitMeal));
+suite('amounts: fitPlate (v2)', () => fitBehaviour(fitPlate));

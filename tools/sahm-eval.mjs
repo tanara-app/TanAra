@@ -3,19 +3,20 @@
   The scorecard of «سهم وعده» (SAHM.md, phase 2): every golden plate at five sizes and four
   conditions, plus random plates, judged by phase 0's measures.
 
-    node tools/sahm-eval.mjs                 the scorecard of fitMeal
+    node tools/sahm-eval.mjs                 the scorecard of fitPlate (version 2)
     node tools/sahm-eval.mjs --why calories  and the cases that failed one measure
     node tools/sahm-eval.mjs --json          the numbers as JSON (to compare two versions)
-
-  To score a newer algorithm, import it here in place of fitMeal.
+    node tools/sahm-eval.mjs --v1            fitMeal (version 1) instead of fitPlate (version 2)
 */
 import { fitMeal } from '../js/domain/portion.js';
+import { fitPlate } from '../js/domain/fit.js';
 import { scorecard } from '../tests/golden/score.js';
 
 const args = process.argv.slice(2);
+const fit = args.includes('--v1') ? fitMeal : fitPlate;
 const why = args.includes('--why') ? args[args.indexOf('--why') + 1] : null;
 const t = Date.now();
-const s = scorecard(fitMeal);
+const s = scorecard(fit);
 
 if (args.includes('--json')) {
   console.log(JSON.stringify(Object.fromEntries(Object.entries(s).map(([k, v]) => [k, v.fails ? { n: v.n, ok: v.ok, pct: v.pct } : v])), null, 2));
@@ -33,6 +34,7 @@ if (args.includes('--json')) {
     monotonic: ['۹', 'یکنواخت (+۵۰ کالری)', 'سخت'],
     smooth: ['۱۰', 'آرام (±۱۰ کالری)', 'نرم'],
   };
+  console.log(fit === fitMeal ? 'fitMeal (v1)' : 'fitPlate (v2)');
   console.log('measure                          kind   ok / n        %');
   for (const [k, [no, name, kind]] of Object.entries(NAMES)) {
     const v = s[k];

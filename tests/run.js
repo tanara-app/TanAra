@@ -26,6 +26,7 @@ import './rewards.test.js';
 import './labs.test.js';
 import './tips.test.js';
 import './golden.test.js';
+import './fit.test.js';
 
 const results = await run();
 const failed = results.filter(r => !r.ok);
