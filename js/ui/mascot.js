@@ -111,6 +111,30 @@ async function speak(name) {
   voice = await play(name);
   return voice;
 }
+/*
+  A taste of a companion on its reward page (ui/rewards.js, the owner's request of 2026-11-20): a few
+  of its lines in turn, each with its picture, said aloud whatever the sound setting, since they
+  tapped for it. Not counted towards the six lines a day.
+*/
+export function tasteLines(key) {
+  const b = BUDDIES[key];
+  return [
+    { file: 'greet-morning-1', text: b.greet.morning.lines[0], mood: b.greet.morning.mood },
+    { file: 'poke-1', ...b.pokes[0] },
+    { file: 'entry-2', text: b.lines.entry.lines[1], mood: 'happy' },
+    { file: 'poke-3', ...b.pokes[2] },
+    { file: 'streak-60', text: b.streak[60].replace('{n}', fa(60)), mood: 'excited' },
+    { file: 'poke-6', ...b.pokes[5] },
+  ].map(l => ({ ...l, src: `${b.img}/${l.mood}.webp` }));
+}
+let taste = null;
+export function sayAloud(key, file) {
+  hush();
+  taste = new Audio(`${BUDDIES[key].audio}/${file}.mp3`);
+  taste.play().catch(() => {});
+}
+export function hush() { taste?.pause(); taste = null; }
+
 // The goal weight reached (ui/celebrate.js): the cheer, then the companion's line goal-reached.
 export async function celebrateSound() {
   if (!mascotOn()) return;
