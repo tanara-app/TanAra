@@ -10,12 +10,13 @@
     calories: off the meal's band (15 over, the larger of 20 and 5% under), and lightly off the budget
       inside it, over three times under
     shape: per food, how far it is from its ideal, relatively ((ln(q/t))², a spoon and a bowl alike), and
-      much more past 17% of it: a natural plate a little off the calories beats an odd one on them (half
-      a کفگیر of rice under three of stew)
+      more past 10% of it: a natural plate a little off the calories beats an odd one on them (half a
+      کفگیر of rice under three of stew); but a meal far under its share costs a great deal (calFar,
+      the clinical review of 2026-11-20: meals that shrank to half)
     protein of a main meal short of its share (at most a quarter of the meal's calories, and pressed for
       only while within reach); carbohydrate inside the diabetes slack; sodium past the meal's share
-  The weights were set on the golden plates (SAHM.md phase 3): the version that scores at least
-  fitMeal's on every measure. The plate of least cost is found by branch and bound over every
+  The weights were set on the golden plates (SAHM.md phases 3 and 7) and checked on held-out random
+  plates. The plate of least cost is found by branch and bound over every
   measurable amount of every food: the foods that move the calories most first, each one's amounts from
   its ideal outwards, and a branch is cut when even the best the foods left can do cannot beat the best
   plate found.
@@ -34,15 +35,16 @@ const r2 = x => Math.round(x * 100) / 100;
 export const WEIGHTS = {
   safety: 1e4,      // per gram past a limit
   outside: 0.02,    // per calorie outside the band
+  calFar: 50,       // per (calories short beyond the band ÷ the budget)²: a meal must not shrink far below its share
   inside: 0.002,    // per calorie off the budget inside it (×3 over)
-  protein: 0.05,    // per gram short of the meal's protein, the first 5…
+  protein: 0.1,     // per gram short of the meal's protein, the first 5…
   proteinFar: 0.2,  // …per gram beyond them…
   proteinFarCap: 2, // …for 2 grams: past them the goal is out of reach, and pressing on only makes plates jump
   carb: 0.03,       // per gram past the carbohydrate share, inside the slack
-  sodium: 0.002,    // per milligram past the meal's sodium
+  sodium: 0.0014,   // per milligram past the meal's sodium
   shape: 1,         // per (ln(q/t))²
-  hinge: 5,         // and per (|ln(q/t)| - hingeAt)² beyond hingeAt: far from its place costs much more
-  hingeAt: 0.17,
+  hinge: 2.3,       // and per (|ln(q/t)| - hingeAt)² beyond hingeAt: far from its place costs much more
+  hingeAt: 0.1,
   proteinPart: 0.25, // the meal's protein goal is at most this part of its calories (4 kcal a gram)
 };
 const CANDIDATES = 25;    // amounts tried for a food with many steps (grams), besides its least and most
@@ -113,7 +115,8 @@ export function fitPlate(foods, kcal, locked = {}, { proteinMax = null, proteinM
   const band = underBand(B);
 
   // the cost of the calories, protein, carbohydrate and sodium of a plate (all but its shape)
-  const calCost = d => W.outside * (d > OVER ? d - OVER : d < -band ? -band - d : 0) + W.inside * (d > 0 ? 3 * Math.min(d, OVER) : Math.min(-d, band));
+  const calCost = d => W.outside * (d > OVER ? d - OVER : d < -band ? -band - d : 0) + W.inside * (d > 0 ? 3 * Math.min(d, OVER) : Math.min(-d, band))
+    + (B > 0 && d < -band ? W.calFar * ((-band - d) / B) ** 2 : 0);
   const protCost = sh => W.protein * Math.min(sh, 5) + W.proteinFar * Math.min(pos(sh - 5), W.proteinFarCap);
   const sums = (k, p, c, na) => {
     let cost = W.safety * (pos(p - pCap) + pos(c - cCap)) + calCost(k - B);

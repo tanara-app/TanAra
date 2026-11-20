@@ -1,6 +1,6 @@
 import { suite, test, eq, ok } from './harness.js';
 import { AVOID, SEED_TAGS, TAG_KEYS, avoidedTags, tagSig, tagsOf, untagged, avoidTest, cleanTags } from '../js/domain/health.js';
-import { CONDITIONS, computeTargets, proteinFor } from '../js/domain/targets.js';
+import { CONDITIONS, computeTargets, effectiveTargets, proteinFor } from '../js/domain/targets.js';
 import { SEED_FOODS } from '../js/data/seedFoods.js';
 import { optionAllowed, buildPlan, swapAllowed } from '../js/domain/plan.js';
 
@@ -78,11 +78,15 @@ suite('health', () => {
     eq(swapAllowed({ items: [{ food_id: 'br' }], protein: 5 }, 'breakfast', plan, { avoid }), true);
   });
 
-  test('kidney stones keep the full protein target; only reduced function limits it', () => {
+  test('kidney stones: a protein goal of 1.0 g/kg (EAU), not a limit; only reduced function limits it', () => {
     const base = { sex: 'female', age: 50, heightCm: 160, weightKg: 75, activity: 'light' };
-    eq(computeTargets({ ...base, conditions: ['stones', 'ms'] }).protein, proteinFor({ heightCm: 160 }));
-    ok(computeTargets({ ...base, conditions: ['stones'] }).protein > computeTargets({ ...base, conditions: ['kidney'] }).protein);
+    eq(computeTargets({ ...base, conditions: ['stones', 'ms'] }).protein, Math.round(1.0 * 25 * 1.6 ** 2));
+    ok(computeTargets({ ...base, conditions: ['stones'] }).protein < proteinFor({ heightCm: 160 }));
     eq(computeTargets({ ...base, conditions: ['stones'] }).proteinMax, false);
+    // targets set before the rule get it too, unless set by hand
+    const old = { sex: 'female', heightCm: 160, conditions: ['stones'], targets: { kcal: 1600, protein: 90 } };
+    eq(effectiveTargets(old).protein, 64);
+    eq(effectiveTargets({ ...old, targets: { ...old.targets, manualProtein: 80 } }).protein, 80);
   });
 
   test('model tags are kept only if known', () => {

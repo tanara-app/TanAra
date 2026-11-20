@@ -176,7 +176,7 @@ export function renderToday(root) {
     return {
       kcal, label: meals[m] || mealLabel(m), meals,
       main: MAIN_MEALS.has(m),
-      ...mealLimits({ meal: m, budget: kcal, shares: sh, protein: t.protein, proteinIsLimit: !!t.proteinMax, conditions: p.conditions || [], main: MAIN_MEALS.has(m) }),
+      ...mealLimits({ meal: m, budget: kcal, shares: sh, dayKcal: t.kcal, protein: t.protein, proteinIsLimit: !!t.proteinMax, conditions: p.conditions || [], main: MAIN_MEALS.has(m) }),
     };
   };
   // the quality of the day beside its calories (quality.js): in the summary card of the rebuilt «امروز»

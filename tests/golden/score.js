@@ -15,7 +15,7 @@
 import { SEED_FOODS } from '../../js/data/seedFoods.js';
 import { NUTR } from '../../js/data/nutrients.js';
 import { foodBounds, MEAL_SHARES5 } from '../../js/domain/portion.js';
-import { carbLimit } from '../../js/domain/nutrients.js';
+import { mealLimits } from '../../js/domain/nutrients.js';
 import { PLATES, PERSONAL, plateFoods } from './plates.js';
 
 const SEED = new Map(SEED_FOODS.map(f => [f.name, { ...f, id: f.name }]));
@@ -27,24 +27,20 @@ export function food(name) {
 const carbsOf = f => (NUTR[f.name] || [0, 0])[0];
 const sodiumOf = f => (NUTR[f.name] || [0, 0])[1];
 
-// A reference day: an adult of a 65 kg reference weight (targets.js: 1.4 g/kg protein, 0.8 g/kg with
-// reduced kidney function), 2000 mg of sodium (WHO).
-export const DAY = { protein: 91, kidneyProtein: 52, sodium: 2000 };
+// A reference day: 2000 kcal, an adult of a 65 kg reference weight (targets.js: 1.4 g/kg protein, 0.8 g/kg
+// with reduced kidney function), 2000 mg of sodium (WHO).
+export const DAY = { kcal: 2000, protein: 91, kidneyProtein: 52, sodium: 2000 };
 const MAIN = new Set(['breakfast', 'lunch', 'dinner']);
 export const SIZES = [0.6, 0.8, 1, 1.25, 1.6];
 export const CONDITIONS = ['none', 'diabetes', 'kidney', 'bp'];
 const EPS = 1e-6;
 
-// The options the app gives a meal (today.js budgetFor); sodiumMax and sodiumOf for an algorithm that uses them.
+// The options the app gives a meal: the same mealLimits as today.js budgetFor (since 2026-11-20, phase 7).
 export function optionsFor(meal, cond, budget) {
-  const share = MEAL_SHARES5[meal] || 0.1;
+  const kidney = cond === 'kidney';
   return {
-    proteinMin: cond !== 'kidney' && MAIN.has(meal) ? Math.min(40, Math.max(15, Math.round(DAY.protein * share))) : null,
-    proteinMax: cond === 'kidney' ? Math.round(DAY.kidneyProtein * share) : null,
-    carbMax: cond === 'diabetes' ? carbLimit(budget) : null,
-    carbsOf,
-    sodiumMax: cond === 'bp' ? Math.round(DAY.sodium * share) : null,
-    sodiumOf,
+    ...mealLimits({ meal, budget, shares: MEAL_SHARES5, dayKcal: DAY.kcal, protein: kidney ? DAY.kidneyProtein : DAY.protein, proteinIsLimit: kidney, conditions: cond === 'none' ? [] : [cond], main: MAIN.has(meal) }),
+    carbsOf, sodiumOf,
   };
 }
 
@@ -158,11 +154,11 @@ const mark = (t, ok, why) => { t.n++; if (ok) t.ok++; else if (t.fails.length < 
 export function scorecard(fit, { random = 300 } = {}) {
   const m = {
     safety: tally(), calories: tally(), measurable: tally(), bounds: tally(), realism: tally(), pairs: tally(),
-    protein: tally(), sodium: tally(), personal: tally(), monotonic: tally(), smooth: tally(),
+    protein: tally(), sodium: tally(), personal: tally(), monotonic: tally(), smooth: tally(), collapse: tally(),
   };
   const times = [];
   let errSum = 0, errN = 0;
-  const qtys = (c, budget) => timed(fit, times, c.foods, budget, {}, { ...c.opts, ...(c.cond === 'diabetes' ? { carbMax: carbLimit(budget) } : {}) }).items.map(it => it.qty);
+  const qtys = (c, budget) => timed(fit, times, c.foods, budget, {}, budget === c.budget ? c.opts : optionsFor(c.meal, c.cond, budget)).items.map(it => it.qty);
 
   // steps, bounds, growing with the meal, calm under a few calories: for every case
   const structural = (c, items, qs) => {
@@ -207,6 +203,13 @@ export function scorecard(fit, { random = 300 } = {}) {
       errSum += Math.abs(kcal - c.budget) / c.budget; errN++;
     }
     const above = { ...lim, ...(calOk ? cal : {}) };
+
+    // 12. the meal does not shrink: under 75% of its calories where a plate of 85% or more fitted the limits
+    // (a limit even the least plate passes is kept at the least plate's amount: the user's rule, protein first)
+    const tight = { pMax: o.proteinMax != null ? Math.max(o.proteinMax, leastP) + 0.5 : null, cMax: o.carbMax != null ? Math.max(o.carbMax + carbSlack(o.carbMax), leastC) : null };
+    if (exists(items, { ...tight, lo: 0.85 * c.budget, hi: c.budget + 15 })) {
+      mark(m.collapse, kcal >= 0.75 * c.budget - EPS, `${c.id}: ${Math.round(kcal)} از ${c.budget} کالری (${fmt(c.foods, qs)})`);
+    }
 
     // 5. realism: each food in its sane range, and the pairs in theirs (one condition is enough: 'none')
     if (c.cond === 'none') {

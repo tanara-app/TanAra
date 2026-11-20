@@ -80,6 +80,10 @@ export const SEED_TAGS = {
   'مربا': ['sugary'],
   'حلیم (با شکر)': ['sugary'],
   'کشک': ['salty'],
+  // the clinical review of 2026-11-20: white cheese about 2.5 g of salt in 100 g and دوغ about 1.25 g a
+  // glass are «high» by the UK front-of-pack limits (over 1.5 g in 100 g; over 0.9 g a drink)
+  'پنیر سفید': ['salty'],
+  'دوغ': ['salty'],
   'چای با یک حبه قند': ['sugary'],
   'نوشابه': ['sweetDrink'],
   'آب‌میوه صنعتی': ['sweetDrink'],

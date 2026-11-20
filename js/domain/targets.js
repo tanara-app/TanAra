@@ -110,14 +110,29 @@ export const refWeight = heightCm => 25 * (heightCm / 100) ** 2;
 /*
   Protein a day, per kg of the reference weight: 1.4 keeps muscle while losing. With kidney
   disease a high protein intake loads the kidneys, so the target becomes a limit of 0.8 g/kg
-  (the usual advice for chronic kidney disease without dialysis; their nephrologist may set
-  another figure, which they can enter by hand).
+  (KDIGO 2024 and 2022, for chronic kidney disease without dialysis; their nephrologist may set
+  another figure, which they can enter by hand). The clinical review of 2026-11-20
+  (research/clinical-review.md) added two things:
+  - the kidney limit is never under 0.6 g/kg of their own weight (KIDNEY_FLOOR_PER_KG): on the BMI-25
+    weight a heavy person would otherwise get the supervised low-protein diet of KDOQI (0.55–0.6),
+    and KDIGO advises against low-protein diets during weight loss;
+  - with kidney stones the goal is 1.0 g/kg (EAU: animal protein 0.8–1.0 g/kg a day for stone formers).
 */
 export const PROTEIN_PER_KG = 1.4;
 export const KIDNEY_PROTEIN_PER_KG = 0.8;
+export const KIDNEY_FLOOR_PER_KG = 0.6;
+export const STONES_PROTEIN_PER_KG = 1.0;
 export const kidney = p => (p?.conditions || []).includes('kidney');
-// The day's protein for this height: a target, or with reduced kidney function a limit.
-export const proteinFor = p => Math.round((kidney(p) ? KIDNEY_PROTEIN_PER_KG : PROTEIN_PER_KG) * refWeight(Number(p.heightCm)));
+export const stones = p => (p?.conditions || []).includes('stones');
+// The kidney limit for this height and weight (weight unknown: the reference weight alone).
+export const kidneyLimit = (heightCm, weightKg = 0) =>
+  Math.round(Math.max(KIDNEY_PROTEIN_PER_KG * refWeight(Number(heightCm)), KIDNEY_FLOOR_PER_KG * (Number(weightKg) || 0)));
+// The day's protein for this height (and weight): a target, or with reduced kidney function a limit.
+export const proteinFor = p => {
+  const h = Number(p.heightCm);
+  if (kidney(p)) return kidneyLimit(h, p.weightKg ?? p.targets?.baseWeight);
+  return Math.round((stones(p) ? STONES_PROTEIN_PER_KG : PROTEIN_PER_KG) * refWeight(h));
+};
 
 // measuredTdee: what the body really used, worked out from the log (see energy.js). When
 // given, it replaces the formula's estimate.
@@ -143,7 +158,7 @@ export function computeTargets({ sex, age: age0, heightCm, weightKg, activity, m
     measured,
     kcal: Math.max(floor, raw),
     hitFloor: raw < floor,
-    protein: proteinFor({ conditions, heightCm }),
+    protein: proteinFor({ conditions, heightCm, weightKg }),
     proteinMax: kidney({ conditions }),
     refWeight: Math.round(refWeight(heightCm) * 10) / 10,
     floor,
@@ -209,8 +224,10 @@ export function effectiveTargets(p, day = today()) {
     : rampKcal(p, day) ?? full;
   const manualProtein = Number(t.manualProtein);
   // targets set before kidney disease was entered (or before this rule) still get the limit
-  const limit = kidney(p) && Number(p.heightCm) > 0 ? Math.round(KIDNEY_PROTEIN_PER_KG * refWeight(Number(p.heightCm))) : 0;
-  const protein = manualProtein || (limit ? Math.min(limit, t.protein || limit) : t.protein || 0);
+  const limit = kidney(p) && Number(p.heightCm) > 0 ? kidneyLimit(p.heightCm, t.baseWeight) : 0;
+  // targets set before kidney stones were entered (or before their rule) get the stones goal too
+  const stonesGoal = !limit && stones(p) && Number(p.heightCm) > 0 ? proteinFor({ conditions: ['stones'], heightCm: p.heightCm }) : 0;
+  const protein = manualProtein || (limit ? Math.min(limit, t.protein || limit) : stonesGoal ? Math.min(stonesGoal, t.protein || stonesGoal) : t.protein || 0);
   return { kcal, protein, proteinMax: !manualProtein && !!limit, floor, phase, teen: isTeen(p, day), manual: !!(t.manualKcal || t.manualProtein), hold, nursing };
 }
 

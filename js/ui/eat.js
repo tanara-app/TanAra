@@ -333,7 +333,7 @@ export function openEat({ day = today(), meal = null, budgetFor, start = null })
             </div>
           </div>`;
         }).join('')}</div>
-        <div class="eat-total"><span><b>${fa(Math.round(total))}</b>${budget ? ` از ${fa(budget)}` : ''} کالری · <b class="${r.proteinShort ? 'short' : ''}">${fa(Math.round(protein))}</b>${b.proteinMin ? ` از ${fa(b.proteinMin)}` : ''} گرم پروتئین</span>
+        <div class="eat-total"><span><b>${fa(Math.round(total))}</b>${budget ? ` از ${fa(budget)}` : ''} کالری · <b class="${r.proteinShort || (b.proteinMax != null && protein > b.proteinMax + 0.5) ? 'short' : ''}">${fa(Math.round(protein))}</b>${b.proteinMin ? ` از ${fa(b.proteinMin)}` : b.proteinMax != null ? ` از ${fa(b.proteinMax)}` : ''} گرم پروتئین</span>
           ${editing && locks.size ? `<button type="button" class="icon-btn sm" data-reset aria-label="مقدارهای اپ">${icon.undo}</button>` : ''}</div>
         ${b.carbMax != null ? `<div class="eat-total eat-carb"><span><b class="${r.carbOver ? 'short' : ''}">${fa(Math.round(r.carbs))}</b> از ${fa(b.carbMax)} گرم کربوهیدرات</span></div>` : ''}
         ${suggestRow(b, r)}

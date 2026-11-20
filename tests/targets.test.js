@@ -70,11 +70,13 @@ suite('targets', () => {
     eq(effectiveTargets(p, '2026-11-13').kcal, 2000);
   });
 
-  test('kidney disease: protein becomes a limit of 0.8 g per kg of the reference weight', () => {
+  test('kidney disease: protein becomes a limit of 0.8 g per kg of the reference weight, never under 0.6 g/kg of their own', () => {
     const k = { sex: 'male', age: 50, heightCm: 172, weightKg: 118, activity: 'sedentary' };
     const plain = computeTargets(k);
     const kid = computeTargets({ ...k, conditions: ['kidney'] });
-    eq([plain.protein, plain.proteinMax, kid.protein, kid.proteinMax], [104, false, 59, true]);
+    // 0.8 × 74 kg (BMI 25) = 59 g would be 0.5 g/kg of 118 kg, KDOQI's supervised low-protein diet: 0.6 × 118 = 71 (clinical review 2026-11-20)
+    eq([plain.protein, plain.proteinMax, kid.protein, kid.proteinMax], [104, false, 71, true]);
+    eq(computeTargets({ ...k, weightKg: 70, conditions: ['kidney'] }).protein, 59);
     // targets saved before the condition was entered still get the limit; a hand-set figure wins
     const old = { sex: 'male', heightCm: 172, conditions: ['kidney'], targets: { kcal: 2000, protein: 104 } };
     eq([effectiveTargets(old).protein, effectiveTargets(old).proteinMax], [59, true]);

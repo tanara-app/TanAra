@@ -64,23 +64,31 @@ export function nutrTotals(entries, foodOf, nutr) {
 
 /*
   A meal's limits and goals for the amounts (fitPlate; SAHM.md phase 7 checks them against the
-  guidelines in tests/clinical.test.js). `shares`: each meal's part of the day; `budget`: the meal's
-  calories now; `protein`: the day's protein, a goal or, with reduced kidney function
-  (`proteinIsLimit`), a limit; `main`: a main meal (breakfast, lunch, dinner; سحری, افطار, شام).
-  - carbMax: with diabetes or prediabetes, the meal's carbohydrate is the same share of its own
-    calories as the day's (carbLimit);
+  guidelines in tests/clinical.test.js and research/clinical-review.md). `shares`: each meal's part
+  of the day; `budget`: the meal's calories now; `dayKcal`: the day's target; `protein`: the day's
+  protein, a goal or, with reduced kidney function (`proteinIsLimit`), a limit; `main`: a main meal
+  (breakfast, lunch, dinner; سحری, افطار, شام).
+  - carbMax: with diabetes or prediabetes, 40% of the meal's calories, but never more than the
+    meal's share of the day's carbohydrate: a meal that has more calories because an earlier one was
+    skipped does not get more carbohydrate (ADA: carbohydrate kept steady from meal to meal; the
+    carb-counting ranges for one meal; the independent review of 2026-11-20);
   - proteinMax: with the kidney limit, the meal's part of it;
-  - proteinMin: otherwise a main meal's part of the day's protein, 15–40 g (ISSN: 20–40 g a meal);
+  - proteinMin: otherwise a main meal's part of the day's protein, 15–40 g (ISSN: 20–40 g a meal),
+    and never more than a quarter of the meal's calories (AMDR 10–35%); none under 5 g;
   - sodiumMax: with high blood pressure, heart or kidney disease or stones, the meal's part of
     2000 mg (WHO, KDIGO).
 */
-export function mealLimits({ meal, budget, shares, protein, proteinIsLimit = false, conditions = [], main = false }) {
+export const PROTEIN_PART = 0.25;
+export function mealLimits({ meal, budget, shares, dayKcal = null, protein, proteinIsLimit = false, conditions = [], main = false }) {
   const all = Object.values(shares).reduce((a, b) => a + b, 0);
   const part = all ? (shares[meal] || 0) / all : 0;
+  const kcal = Math.max(0, Number(budget) || 0);
+  const carbKcal = Number(dayKcal) > 0 ? Math.min(kcal, dayKcal * part) : kcal;
+  const goal = !proteinIsLimit && all && main ? Math.min(Math.min(40, Math.max(15, Math.round(protein * part))), Math.floor(PROTEIN_PART * kcal / 4)) : null;
   return {
-    carbMax: countsCarbs(conditions) ? carbLimit(Math.max(0, budget)) : null,
+    carbMax: countsCarbs(conditions) ? carbLimit(carbKcal) : null,
     proteinMax: proteinIsLimit && all ? Math.round(protein * part) : null,
-    proteinMin: !proteinIsLimit && all && main ? Math.min(40, Math.max(15, Math.round(protein * part))) : null,
+    proteinMin: goal != null && goal >= 5 ? goal : null,
     sodiumMax: countsSalt(conditions) && all ? Math.round(SALT_MAX_G * 1000 / 2.5 * part) : null,
   };
 }

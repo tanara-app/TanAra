@@ -33,6 +33,7 @@ if (args.includes('--json')) {
     personal: ['۸', 'شخصی', 'نرم'],
     monotonic: ['۹', 'یکنواخت (+۵۰ کالری)', 'سخت'],
     smooth: ['۱۰', 'آرام (±۱۰ کالری)', 'نرم'],
+    collapse: ['۱۲', 'وعده کوچک نشد (۷۵٪)', 'نرم'],
   };
   console.log(fit === fitMeal ? 'fitMeal (v1)' : 'fitPlate (v2)');
   console.log('measure                          kind   ok / n        %');

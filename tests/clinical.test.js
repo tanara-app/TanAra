@@ -6,6 +6,7 @@ import { mealLimits, carbLimit, SALT_MAX_G, CARB_SHARE } from '../js/domain/nutr
 import { MEAL_SHARES5 } from '../js/domain/portion.js';
 import { proteinFor, refWeight, PROTEIN_PER_KG, KIDNEY_PROTEIN_PER_KG } from '../js/domain/targets.js';
 import { fitPlate, WEIGHTS } from '../js/domain/fit.js';
+import { SEED_TAGS, AVOID } from '../js/domain/health.js';
 
 const MAIN = new Set(['breakfast', 'lunch', 'dinner']);
 const limitsOn = (dayKcal, protein, conditions, proteinIsLimit = false) => Object.fromEntries(Object.keys(MEAL_SHARES5).map(m =>
@@ -67,5 +68,18 @@ suite('clinical', () => {
     const bread = { id: 'b', name: 'نان', category: 'grain', unit: 'کف‌دست', grams: 40, kcal: 110, protein: 4 };
     const r = fitPlate([egg, bread], 200, {}, { proteinMin: 25 });
     ok(r.protein * 4 <= 0.35 * Math.max(200, r.total) + 1e-9, `${r.protein} g in ${r.total} kcal`);
+  });
+
+  test('the independent review (2026-11-20): carbohydrate stays at the meal\'s share of the day, a small meal\'s protein goal within a quarter of it, cheese and دوغ salty', () => {
+    // a lunch with calories carried over from a skipped breakfast does not get more carbohydrate (ADA: steady from meal to meal)
+    const big = mealLimits({ meal: 'lunch', budget: 1000, shares: MEAL_SHARES5, dayKcal: 2000, protein: 90, conditions: ['diabetes'], main: true });
+    eq(big.carbMax, carbLimit(600));
+    // a lunch smaller than its share keeps 40% of its own calories
+    eq(mealLimits({ meal: 'lunch', budget: 400, shares: MEAL_SHARES5, dayKcal: 2000, protein: 90, conditions: ['diabetes'], main: true }).carbMax, carbLimit(400));
+    // 192 kcal: at most 12 g of protein asked (a quarter of it), not the 15–40 of a full meal; under 5 g, none
+    eq(mealLimits({ meal: 'dinner', budget: 192, shares: MEAL_SHARES5, protein: 90, main: true }).proteinMin, 12);
+    eq(mealLimits({ meal: 'dinner', budget: 60, shares: MEAL_SHARES5, protein: 90, main: true }).proteinMin, null);
+    for (const f of ['پنیر سفید', 'دوغ', 'کشک']) ok(SEED_TAGS[f].includes('salty'), f);
+    for (const c of ['bp', 'heart', 'kidney', 'stones']) ok(AVOID[c].includes('salty'), c);
   });
 });
