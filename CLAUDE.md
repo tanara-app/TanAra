@@ -131,7 +131,9 @@ exist side by side. When a new decision replaces an old one, change or mark the 
   eight phases with exit gates, and the user's decisions on it. Read it before touching `fitMeal` or `mealBudget`.
   `node tools/sahm-eval.mjs` scores `fitPlate` (v2, `js/domain/fit.js`; `--v1` for `fitMeal`) on the golden plates
   (`tests/golden/`); `tests/golden.test.js` fails if any
-  measure drops below its floor, so run it after every change to the amounts.
+  measure drops below its floor, so run it after every change to the amounts. **From 2026-12-04 on, if SAHM.md's «اولین عددهای
+  دو هفته» still says «هنوز نه», remind the user first thing** (they asked on 2026-11-20 to be reminded in two weeks; what to run
+  and show is in SAHM.md «وضعیت و کارهای مانده»).
 - `TIPS.md`: the fixed list of daily tips («نکته‌ی امروز»), about 365, written once by Claude from established science only
   (the user decided on 2026-11-18 to replace the tips Hooshvareh writes every day). Each tip has tags saying who sees it. In the
   app since 2026-11-19: `js/ui/tip.js`, picked in `js/domain/tips.js`; after editing TIPS.md run `node tools/tips.mjs`, which
