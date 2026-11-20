@@ -13,7 +13,6 @@ import { today, relLabel, faDMY, weekLabel } from '../lib/dates.js';
 import { toast, confirmBox, sheet, icon } from './dom.js';
 import { pickPhotos, foodPhoto, cameraIcon } from './photo.js';
 import { applySwap, planRules } from './plan.js';
-import { face, thinkingSound } from './mascot.js';
 import { amountLabel, foodMeta } from './units.js';
 import { saveRecipe } from './recipes.js';
 import { recipeFrom, perUnit } from '../domain/recipe.js';
@@ -328,7 +327,7 @@ function bubble(m) {
 function liveHtml() {
   if (!live || !sameThread(live, current)) return '';
   const shown = hideCalls(live.text);
-  const body = shown ? md(shown) : `<p class="typing"><img class="ai-face" src="img/mascot/face-thinking.webp" alt="" width="34" height="34"><i></i><i></i><i></i></p>`;
+  const body = shown ? md(shown) : `<p class="typing"><i></i><i></i><i></i></p>`;
   return `<div class="msg ai" data-live>${body}${actionsHtml(null, live.actions)}${live.error ? `<p class="err">${esc(live.error)}</p>` : ''}</div>`;
 }
 
@@ -351,7 +350,7 @@ function buildShell(root) {
   root.innerHTML = `
     <header class="chat-head">
       <button class="icon-btn" data-threads aria-label="گفت‌وگوهای قبلی">${icon.history}</button>
-      <div class="chat-title"><h1><img class="ai-face" src="${face()}" alt="" width="30" height="30"> هوشواره</h1><small data-title></small></div>
+      <div class="chat-title"><h1>هوشواره</h1><small data-title></small></div>
       <button class="icon-btn" data-new aria-label="گفت‌وگوی تازه">${icon.compose}</button>
     </header>
     <div class="chat" data-scroll></div>
@@ -474,9 +473,7 @@ function paint(forceBottom = false) {
   viewRoot.querySelector('[data-title]').textContent = title;
   box.innerHTML = `
     ${!msgs.length && !liveHtml() ? `<div class="chat-empty">
-      <img class="chat-buddy" src="${face('wave')}" alt="" width="110" height="110">
-      <p><b>سلام! من هایمردینگرم، پروفسورِ کوچولوی آزمایشگاه تن‌آرا و هوشواره‌ی تو.</b> هر چی ثبت کردی جلوی چشممه: غذاها، وزن، مرورهای هفته و انگیزه‌هات. برای من همه‌شون داده‌های هیجان‌انگیزن!</p>
-      <p class="muted small">هر سؤالی داری بپرس، تحلیل بخواه، یا بگو چی خوردی تا برات ثبتش کنم (البته با تأیید خودت).</p>
+      <p>هر سؤالی داری بپرس، تحلیل بخواه، یا بگو چی خوردی تا برات ثبتش کنم (البته با تأیید خودت).</p>
       ${isTeen(store.profile()) ? '<p class="muted small">یادت باشد من یک هوش مصنوعی‌ام، نه پزشک و نه یک آدم واقعی. برای هر چیزی درباره‌ی سلامتت، با پدر و مادرت و پزشک یا مرکز سلامت محله‌تان هم صحبت کن.</p>' : ''}
       <div class="chat-sugg">${SUGGESTIONS.map(s => `<button class="chip-btn" data-sugg>${s}</button>`).join('')}</div>
     </div>` : ''}
@@ -556,7 +553,6 @@ async function send() {
   }));
   history.push({ role: 'user', content: text });
   live = { text: '', actions: [], error: null, thread };
-  thinkingSound();
   store.saveChat({ role: 'user', content: text, thread });
   paint(true);
 

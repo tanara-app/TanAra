@@ -1,5 +1,5 @@
 import { suite, test, eq, ok } from './harness.js';
-import { fullRuns, progress, earnedFinishes, rewardOf, REWARDS } from '../js/domain/rewards.js';
+import { fullRuns, progress, earnedFinishes, rewardOf, REWARDS, recipeDays, goalText } from '../js/domain/rewards.js';
 import { addDays } from '../js/lib/dates.js';
 
 // after every reward's `since`, so the goals below count all their days
@@ -60,6 +60,30 @@ suite('rewards', () => {
     eq(at([{ day: DAY, is_veg: true, unit: 'گرم', qty: 240 }, { day: DAY, food_id: 'apple', qty: 2 }]).now, 1);
     // a day after `day` does not count yet
     eq(at(good(addDays(DAY, 1))).now, 0);
+  });
+
+  test('«پِفِردینگر»: days with something from their own recipes, in a row or not', () => {
+    const r = rewardOf('pfeffer');
+    eq([r.kind, r.goal.type], ['buddy', 'recipeDays']);
+    eq(goalText(r), `${r.goal.of} روز غذا از دستور پخت خودت`);
+    // one recipe in the bank (food 'ash'), one only as a recipe (logged by its name)
+    const notes = [
+      { key: 'recipe:1', kind: 'recipe', data: { name: 'آش رشته', food_id: 'ash', items: [{}] } },
+      { key: 'recipe:2', kind: 'recipe', data: { name: 'کوکو سبزی', food_id: null, items: [{}] } },
+    ];
+    const e = [
+      { day: '2027-02-01', food_id: 'ash' }, { day: '2027-02-01', name: 'کوکو سبزی' }, // the same day twice: one day
+      { day: '2027-02-03', name: ' کوکو سبزی ' },
+      { day: '2027-02-04', food_id: 'rice', name: 'آش رشته' }, // another bank food that happens to share the name: no
+      { day: '2027-02-05', name: 'نان' },
+      { day: '2027-03-02', food_id: 'ash' }, // after `day`: not yet
+    ];
+    eq(recipeDays(e, notes, DAY), 2);
+    const at = n => progress({ entries: Array.from({ length: n }, (_, i) => ({ day: addDays('2027-01-01', i * 2), food_id: 'ash' })), notes }, DAY).find(x => x.reward.key === 'pfeffer');
+    eq([at(r.goal.of - 1).earned, at(r.goal.of - 1).now], [false, r.goal.of - 1]);
+    eq([at(r.goal.of).earned, at(r.goal.of + 4).now], [true, r.goal.of]);
+    // without recipes nothing counts
+    eq(recipeDays(e, [], DAY), 0);
   });
 
   test('only days from the day a reward was added count, never the days before it (2026-11-19)', () => {

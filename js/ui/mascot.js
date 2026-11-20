@@ -1,23 +1,45 @@
 /*
-  Hooshvareh's face: a small, cheerful professor (img/mascot/, one picture per mood) who says a
+  The companion: a small character (Heimerdinger, or Pfefferdinger the little chef once she is
+  earned in «جوایز» and picked in «تنظیمات»; their lines and pictures are in buddies.js) who says a
   short line when something gets done — the first meal of the day, all three meals, a run of
-  days, moving more, a weekly review — and greets them at the top of «امروز».
+  days, moving more, a weekly review — and greets them at the top of «امروز». The chat has no
+  character (the owner's decision, 2026-11-20).
 
-  The lines are written here, not asked of the AI: they cost nothing and work offline. He never
+  The lines are written, not asked of the AI: they cost nothing and work offline. A companion never
   judges amounts or comments on weight going up or down. With a possible eating-disorder history
-  (edCare) he only says kind things about eating and looking after oneself: no streaks, no
-  counting, nothing about the scale.
+  (edCare) only kind things about eating and looking after oneself: no streaks, no counting,
+  nothing about the scale.
 
-  He keeps quiet most of the time: a line at most every 90 seconds (the big moments excepted),
-  six a day; tapping him gets an answer on top of those (poke). One setting in «نمایه» picks, on this device, whether he is off, only writes, or
-  also speaks (his voice is recorded with ElevenLabs, see VOICE.md); it starts on «فقط نوشته».
+  Quiet most of the time: a line at most every 90 seconds (the big moments excepted), six a day;
+  tapping the companion gets an answer on top of those (poke). One setting in «نمایه» picks, on this
+  device, whether it is off, only writes, or also speaks (recorded with ElevenLabs, see VOICE.md and
+  PFEFFERDINGER.md); it starts on «فقط نوشته».
 */
 import * as store from '../data/store.js';
 import { entriesOn, streak, baseMeal } from '../domain/stats.js';
 import { today, diffDays } from '../lib/dates.js';
 import { esc, fa } from '../lib/fa.js';
+import { BUDDIES } from './buddies.js';
 
-export const face = (mood = 'happy') => `img/mascot/${mood}.webp`;
+/*
+  Which companion, on this device: Pfefferdinger only while the signed-in member has earned her
+  (profile.data.rewards), else Heimerdinger — so another account on the same phone gets him back.
+*/
+const WHO = 'tanara:mascot:who';
+export const BUDDY_CHOICES = Object.entries(BUDDIES).map(([value, b]) => ({ value, label: b.name }));
+export const canPick = () => !!store.profile()?.rewards?.pfeffer;
+export function buddyKey() {
+  let k = null;
+  try { k = localStorage.getItem(WHO); } catch { /* private mode */ }
+  return k === 'pfeffer' && canPick() ? 'pfeffer' : 'heimer';
+}
+export function setBuddy(key) {
+  try { key === 'heimer' ? localStorage.removeItem(WHO) : localStorage.setItem(WHO, key); } catch { /* private mode */ }
+}
+const cur = () => BUDDIES[buddyKey()];
+export const buddyName = () => cur().name;
+
+export const face = (mood = 'happy') => `${cur().img}/${mood}.webp`;
 
 const KEY = 'tanara:mascot';
 export function mascotOn() {
@@ -30,65 +52,14 @@ export function setMascot(on) {
 const edCare = () => ['yes', 'unsure'].includes(store.profile()?.edHistory);
 const pick = list => list[Math.floor(Math.random() * list.length)];
 
-// What he says, by moment. {n} is filled in with a number.
-const LINES = {
-  first: { mood: 'excited', lines: [
-    'آه، اولین ثبت امروز! آزمایش روزانه رسماً شروع شد!',
-    'عالی! داده‌ی امروز رسید. علم ازت ممنونه!',
-    'به‌به! روز رو با یه ثبت درست شروع کردی.',
-  ] },
-  entry: { mood: ['wink', 'happy', 'proud'], lines: [
-    'ثبت شد! دقیق و مرتب، مثل یه دانشمند واقعی.',
-    'آفرین! همین ثبت‌های کوچیک نتیجه‌ی بزرگ می‌سازن.',
-    'یه داده‌ی دیگه به آزمایشگاه اضافه شد!',
-    'عالیه! داری عالی پیش میری.',
-    'دقت تو منو به وجد میاره!',
-  ] },
-  meals: { mood: 'proud', lines: [
-    'صبحانه، ناهار، شام: هر سه ثبت شد! یه روز کامل!',
-    'هر سه وعده ثبت شده. این یعنی یه روز علمیِ کامل!',
-  ] },
-  streak: { mood: 'excited', lines: [
-    '{n} روز پشت‌سرهم! این دیگه یه عادت واقعیه!',
-    'فوق‌العاده! {n} روز پیاپی ثبت کردی!',
-    '{n} روز بی‌وقفه! نظریه‌ی من ثابت شد: تو می‌تونی!',
-    '{n} روز! یه سال کامل! نظریه‌ی من ثابت شد: تو می‌تونی!',
-  ] },
-  activity: { mood: 'excited', lines: [
-    'حرکت ثبت شد! بدنت الان داره تشکر می‌کنه.',
-    'آفرین! هر دقیقه حرکت، یه سرمایه‌گذاریه.',
-    'به‌به، تحرک! قلبت عاشق این کاره.',
-  ] },
-  measure: { mood: 'calm', lines: [
-    'ثبت شد! یه نقطه‌ی تازه روی نمودار.',
-    'ممنون! داده‌ی منظم یعنی تحلیل دقیق‌تر.',
-  ] },
-  review: { mood: 'proud', lines: [
-    'مرور هفته ثبت شد! نگاه کردن به عقب، قدم بعدی رو روشن می‌کنه.',
-    'آفرین! یه دانشمند خوب همیشه یادداشت برمی‌داره.',
-  ] },
-  goal: { mood: 'wink', lines: [
-    'هدف این هفته ثبت شد. بزن بریم!',
-    'هدف تازه! من کنارتم.',
-  ] },
-};
-// With edCare: eating is looking after yourself, nothing more.
-const CARE = {
-  first: { mood: 'caring', lines: ['نوش جان! خوبه که به خودت انرژی دادی.', 'روزت رو با مراقبت از خودت شروع کردی.'] },
-  entry: { mood: ['caring', 'calm', 'happy'], lines: ['نوش جان!', 'بدنت از این انرژی ممنونه.', 'خوبه که به خودت رسیدی.'] },
-  activity: { mood: 'happy', lines: ['چه خوب که کمی حرکت کردی.', 'حرکت آروم هم حال آدم رو خوب می‌کنه.'] },
-  review: { mood: 'caring', lines: ['ممنون که به هفته‌ات نگاه کردی.'] },
-  goal: { mood: 'caring', lines: ['هدف تازه ثبت شد. آروم و با مهربونی پیش برو.'] },
-};
 // The moments that may come right after another line.
 const BIG = new Set(['first', 'meals', 'streak', 'review', 'goal']);
-// Each run of days has its own recording, so each has one fixed line (VOICE.md).
-const STREAK_LINE = { 3: 0, 7: 1, 14: 2, 21: 0, 30: 1, 60: 2, 100: 0, 200: 1, 365: 3 };
-const STREAKS = Object.keys(STREAK_LINE).map(Number);
+// The runs of days that get a line; each has its own recording.
+const STREAKS = [3, 7, 14, 21, 30, 60, 100, 200, 365];
 
 /*
-  His voice: one recording per line in audio/mascot/, named <moment>-<n> after the line's place
-  in its list (care-<moment>-<n> for the caring lines, streak-<days>, greet-<part of day>-<n>),
+  The voice: one recording per line in the companion's audio folder, named <moment>-<n> after the
+  line's place in its list (care-<moment>-<n> for the caring lines, streak-<days>, greet-<part of day>-<n>),
   and a short sound effect under it. Off unless switched on in «نمایه». Recordings are fetched
   whole (not streamed), so the service worker keeps a copy and they play offline too.
 */
@@ -104,7 +75,7 @@ export function setSound(on) {
 export const MODES = [
   { value: 'off', label: 'خاموش' },
   { value: 'text', label: 'فقط نوشته' },
-  { value: 'voice', label: 'نوشته و صدای هایمردینگر' },
+  { value: 'voice', label: 'نوشته و صدا' },
 ];
 export const buddyMode = () => (!mascotOn() ? 'off' : soundOn() ? 'voice' : 'text');
 export function setBuddyMode(m) {
@@ -115,13 +86,14 @@ export function setBuddyMode(m) {
 }
 const urls = new Map();
 function load(name) {
-  if (!urls.has(name)) {
-    urls.set(name, fetch(`audio/mascot/${name}.mp3`)
+  const url = `${cur().audio}/${name}.mp3`;
+  if (!urls.has(url)) {
+    urls.set(url, fetch(url)
       .then(r => (r.ok ? r.blob() : Promise.reject(new Error(r.status))))
       .then(b => URL.createObjectURL(b))
-      .catch(e => { urls.delete(name); throw e; }));
+      .catch(e => { urls.delete(url); throw e; }));
   }
-  return urls.get(name);
+  return urls.get(url);
 }
 // Resolves to the playing Audio, or null (sound off, app in the background, not allowed yet).
 async function play(name, volume = 1) {
@@ -139,15 +111,13 @@ async function speak(name) {
   voice = await play(name);
   return voice;
 }
-// The goal weight reached (ui/celebrate.js): the cheer, then his line goal-reached (VOICE.md).
+// The goal weight reached (ui/celebrate.js): the cheer, then the companion's line goal-reached.
 export async function celebrateSound() {
   if (!mascotOn()) return;
   play('sfx-cheer', 0.6);
   await new Promise(r => setTimeout(r, 500));
   speak('goal-reached');
 }
-// The bubbling flasks while Hooshvareh thinks in the chat.
-export function thinkingSound() { if (mascotOn()) play('sfx-bubble', 0.3); }
 
 /* ---------- how often: kept on this device, per day ---------- */
 const LOG = 'tanara:mascot:log';
@@ -176,6 +146,7 @@ function mount() {
 function hide() { clearTimeout(hideTimer); el?.classList.remove('show'); }
 
 async function show(mood, text, sound) {
+  keep();
   const b = mount();
   const img = b.querySelector('img');
   img.src = face(mood);
@@ -198,17 +169,18 @@ async function show(mood, text, sound) {
 }
 
 function say(kind, n) {
-  const care = edCare();
-  const set = (care ? CARE : LINES)[kind];
+  const care = edCare(), b = cur();
+  const set = kind === 'streak' ? (care ? null : { mood: 'excited' }) : (care ? b.care : b.lines)[kind];
   if (!set) return false;
   const log = readLog();
   if (log.n >= 6) return false;
   if (!BIG.has(kind) && Date.now() - log.last < 90000) return false;
   const mood = Array.isArray(set.mood) ? pick(set.mood) : set.mood;
-  const i = kind === 'streak' ? STREAK_LINE[n] : Math.floor(Math.random() * set.lines.length);
+  const i = kind === 'streak' ? 0 : Math.floor(Math.random() * set.lines.length);
+  const text = kind === 'streak' ? b.streak[n] : set.lines[i];
   const sfx = care ? 'sfx-chime' : kind === 'goal' ? 'sfx-gadget' : ['meals', 'streak', 'review'].includes(kind) ? 'sfx-cheer' : 'sfx-pop';
   const file = kind === 'streak' ? `streak-${n}` : `${care ? 'care-' : ''}${kind}-${i + 1}`;
-  show(mood, set.lines[i].replace('{n}', fa(n)), { sfx, voice: file });
+  show(mood, text.replace('{n}', fa(n)), { sfx, voice: file });
   log.n++;
   log.last = Date.now();
   log.said.push(kind === 'streak' ? `streak${n}` : kind);
@@ -248,13 +220,6 @@ function onEntry() {
 }
 
 /* ---------- greeting at the top of «امروز» ---------- */
-const GREET = {
-  morning: { mood: 'wave', lines: ['صبح بخیر! آزمایشگاه امروز آماده‌ست.', 'صبح بخیر! یه روز تازه، یه شروع تازه.', 'سلام صبح‌به‌خیر! امروز چی کشف می‌کنیم؟'] },
-  noon: { mood: 'happy', lines: ['ظهرت بخیر! روز داره خوب پیش میره.', 'سلام! یادت نره به خودت برسی.', 'ظهر بخیر! من اینجام اگه سؤالی داشتی.'] },
-  evening: { mood: 'calm', lines: ['عصرت بخیر! امروز چطور گذشت؟', 'سلام! یه نگاه کوچیک به امروز بندازیم؟', 'عصر بخیر! تا اینجای روز عالی بودی.'] },
-  night: { mood: 'sleepy', lines: ['شب بخیر! خواب خوب هم بخشی از برنامه‌ست.', 'دیروقته! بدنت به استراحت نیاز داره.'] },
-  back: { mood: 'hello', lines: ['خوش برگشتی! دلم برات تنگ شده بود.', 'سلام دوباره! از همین‌جا ادامه می‌دیم، بی‌دغدغه.'] },
-};
 function slot(h) { return h >= 5 && h < 12 ? 'morning' : h >= 12 && h < 17 ? 'noon' : h >= 17 && h < 23 ? 'evening' : 'night'; }
 
 // The same line all through a part of the day, so redraws don't change it.
@@ -265,31 +230,23 @@ export function greetCard() {
   const last = entries.reduce((m, e) => (e.day < t && e.day > m ? e.day : m), '');
   const away = last && diffDays(t, last) >= 3 && !entriesOn(entries, t).length;
   const key = away ? 'back' : slot(new Date().getHours());
-  const g = GREET[key];
+  const b = cur(), g = b.greet[key];
+  keep();
   const seed = [...`${t}${key}`].reduce((a, c) => a + c.charCodeAt(0), 0);
   const i = seed % g.lines.length;
   return `<div class="greet" data-greet data-voice="greet-${key}-${i + 1}" data-once="${t}-${key}">
-    <button type="button" class="greet-face" data-greet-face aria-label="هایمردینگر"><img src="${face(g.mood)}" alt="" width="60" height="60"></button>
+    <button type="button" class="greet-face" data-greet-face aria-label="${b.name}"><img src="${face(g.mood)}" alt="" width="60" height="60"></button>
     <button type="button" class="greet-say" data-greet-say aria-label="گفت‌وگو با هوشواره"><span>${esc(g.lines[i])}</span></button>
   </div>`;
 }
 
 /*
-  Tap him and he answers, and more so the more he is tapped: curious, then fussy, then giving up.
+  Tap the companion for an answer, more so the more it is tapped: curious, then fussy, then giving up.
   The lines take the place of the greeting for a moment and don't count towards the six a day,
   since they asked for them. Nothing here is about food or the body, so they suit everyone. The
-  last one says where the chat is, now that tapping him no longer opens it. Each has a recording
-  poke-<n> (VOICE.md).
+  last one says where the chat is, since tapping the face does not open it. Each has a recording
+  poke-<n> (buddies.js).
 */
-const POKES = [
-  { mood: 'surprised', text: 'اوه! داشتم یه فرمول رو حل می‌کردم.' },
-  { mood: 'happy', text: 'سلام! دنبال من می‌گشتی؟' },
-  { mood: 'wink', text: 'یه راز بهت بگم؟ نصف اختراع‌هام اولش منفجر شدن.' },
-  { mood: 'thinking', text: 'هیس! وسط یه آزمایش حساسم.' },
-  { mood: 'surprised', text: 'این دکمه نیست‌ها! من پروفسورم!' },
-  { mood: 'proud', text: 'نظریه‌ی جدید: تو عاشق دست زدن به پروفسوری!' },
-  { mood: 'calm', text: 'باشه، تو بردی. سؤالی داشتی، روی همین نوشته بزن.' },
-];
 const STAGES = [[0, 1, 2], [3, 4], [5], [6]]; // by how many taps in a row
 const plainSrc = img => img.getAttribute('src').replace('-blink', '');
 let pokes = 0, pokeAt = 0, lastPoke = -1, pokeTimer = 0, pokeId = 0;
@@ -298,6 +255,7 @@ function poke(g) {
   pokes = Date.now() - pokeAt > 6000 ? 0 : pokes + 1;
   pokeAt = Date.now();
   const stage = STAGES[Math.min(Math.floor(pokes / 2), STAGES.length - 1)];
+  const POKES = cur().pokes;
   const i = stage.length > 1 ? pick(stage.filter(n => n !== lastPoke)) : stage[0];
   lastPoke = i;
   const img = g.querySelector('img'), say = g.querySelector('[data-greet-say] span');
@@ -360,29 +318,34 @@ export function bindGreet(root) {
 }
 
 /*
-  He blinks, every few seconds and now and then twice, wherever he is on screen: the same picture
-  with the eyes closed (<mood>-blink.webp) for a moment. Only the moods that have one, and the
-  sleepy one already has its eyes shut.
+  The companion blinks, every few seconds and now and then twice, wherever it is on screen: the same
+  picture with the eyes closed (<mood>-blink.webp, beside the open one) for a moment. Only the moods
+  that have one, and the sleepy one already has its eyes shut.
 */
 const BLINKS = new Set(['wave', 'happy', 'calm', 'hello']);
 const BLINK_MS = 130;
 const still = () => { try { return matchMedia('(prefers-reduced-motion: reduce)').matches; } catch { return false; } };
-const kept = [...BLINKS].map(m => Object.assign(new Image(), { src: face(`${m}-blink`) })); // ready, so no flicker
+// the closed-eye pictures of the companion on screen, loaded ahead so the first blink doesn't flicker
+const kept = new Map();
+function keep() {
+  const b = cur();
+  if (!kept.has(b.img)) kept.set(b.img, [...BLINKS].map(m => Object.assign(new Image(), { src: `${b.img}/${m}-blink.webp` })));
+}
 
 function blinkOnce() {
-  for (const img of document.querySelectorAll('.greet img, .chat-buddy, .buddy.show .buddy-img')) {
+  for (const img of document.querySelectorAll('.greet img, .buddy.show .buddy-img')) {
     const src = img.getAttribute('src') || '';
-    const mood = src.match(/mascot\/([a-z]+)\.webp$/)?.[1];
+    const mood = src.match(/\/([a-z]+)\.webp$/)?.[1];
     if (!BLINKS.has(mood)) continue;
-    const shut = face(`${mood}-blink`);
+    const shut = src.replace(/\.webp$/, '-blink.webp');
     img.src = shut;
-    // unless he got a new face in the meantime
+    // unless it got a new face in the meantime
     setTimeout(() => { if (img.getAttribute('src') === shut) img.src = src; }, BLINK_MS);
   }
 }
 (function blinkLater() {
   setTimeout(() => {
-    if (kept.length && !document.hidden && !still()) {
+    if (kept.size && !document.hidden && !still()) {
       blinkOnce();
       if (Math.random() < 0.15) setTimeout(blinkOnce, BLINK_MS + 140);
     }

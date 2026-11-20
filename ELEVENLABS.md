@@ -84,11 +84,10 @@ Format: `file name | duration | prompt`.
 sfx-pop.mp3 | 0.5s | Cute soft cartoon pop with a tiny magical sparkle, light and playful, for a small character popping onto the screen
 sfx-cheer.mp3 | 1.5s | Short cheerful cartoon victory jingle, tiny toy trumpet and glockenspiel, bright and happy, no voice
 sfx-gadget.mp3 | 1s | Small whimsical steampunk gadget whirring and clicking, ending in a cheerful little ding
-sfx-bubble.mp3 | 1.5s | Soft gentle bubbling of small glass lab beakers, curious and calm, quiet, loopable
 sfx-chime.mp3 | 1s | Soft warm gentle wind chime, calm and soothing, very quiet
 
 ## Step 4: deliver
-- Total: 50 spoken MP3 files + 5 sound-effect MP3 files = 55 files.
+- Total: 50 spoken MP3 files + 4 sound-effect MP3 files = 54 files.
 - File names exactly as listed (lowercase, with the dash and number), e.g. `first-1.mp3`, `streak-30.mp3`, `sfx-pop.mp3`.
 - Put them all in one folder or one ZIP.
 - Before finishing, check that none is missing and that no audio tag was read aloud.

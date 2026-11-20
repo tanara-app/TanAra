@@ -1,5 +1,5 @@
 // Profile, as tiles: the two daily targets (a tap opens recalculating and setting them by hand), the
-// phase, then two square tiles for the person's own details and their motivations. App settings (reminders, appearance, today's tip, the mascot, support,
+// phase, then two square tiles for the person's own details and their motivations. App settings (reminders, appearance, today's tip, the companion, support,
 // data, account) live apart in «تنظیمات», a tall sheet opened by the gear in the header.
 import * as store from '../data/store.js';
 import { effectiveTargets, clampKcal, floorFor, hasMedicalFlag, ACTIVITY, CONDITIONS, correcting, rampKcal } from '../domain/targets.js';
@@ -16,7 +16,7 @@ import { openUsage } from './usage.js';
 import { aiAvailable } from '../ai/hooshvareh.js';
 import { THEMES, PALETTES, getTheme, setTheme, getPalette, setPalette, shownMode, getFinish, setFinish } from './theme.js';
 import { earnedFinishes } from '../domain/rewards.js';
-import { MODES, buddyMode, setBuddyMode } from './mascot.js';
+import { MODES, buddyMode, setBuddyMode, BUDDY_CHOICES, buddyKey, setBuddy, buddyName, canPick } from './mascot.js';
 import { openFeedback, feedbackLine } from './feedback.js';
 import { tipOn, setTipOn } from './tip.js';
 
@@ -52,6 +52,8 @@ const ICON = {
   data: svg('<ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/>'),
   report: svg('<path d="M5 21V4"/><path d="M5 4h12l-2.5 4.5L17 13H5"/>'),
   account: svg('<circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M17 6l3 3M15 8l2 2"/>'),
+  // the companions' kind: a round face with big pointed ears
+  buddy: svg('<circle cx="12" cy="13" r="6"/><path d="M6.6 11 2.5 7.5l5 1M17.4 11l4.1-3.5-5 1"/><circle cx="10" cy="12.5" r=".9" fill="currentColor"/><circle cx="14" cy="12.5" r=".9" fill="currentColor"/><path d="M10.6 15.4c.8.6 2 .6 2.8 0"/>'),
 };
 const COG = '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>';
 const appearanceLine = () => `${PALETTES.find(t => t.value === getPalette()).label} · ${THEMES.find(t => t.value === getTheme()).label}`;
@@ -101,9 +103,10 @@ function openSettings() {
           ${row('data-reminders', 'bell', 'یادآورها', remindersLine())}
           ${row('data-look', 'palette', 'ظاهر', appearanceLine())}
           ${row('data-tip', 'tip', 'نکته‌ی روز', tipOn() ? 'روشن' : 'خاموش')}`)}
-        ${group('هوشواره', `
-          ${row('data-mascot', 'voice', 'جمله‌ها و صدای هوشواره', MODES.find(m => m.value === buddyMode()).label)}
-          ${aiAvailable() ? row('data-usage', 'usage', 'مصرف هوشواره', 'هزینه‌ی ۳۰ روز اخیر') : ''}`)}
+        ${group('همراه', `
+          ${canPick() ? row('data-buddy', 'buddy', 'شخصیت', buddyName()) : ''}
+          ${row('data-mascot', 'voice', 'جمله‌ها و صدا', MODES.find(m => m.value === buddyMode()).label)}`)}
+        ${aiAvailable() ? group('هوشواره', row('data-usage', 'usage', 'مصرف هوشواره', 'هزینه‌ی ۳۰ روز اخیر')) : ''}
         ${group('پشتیبانی', `
           ${row('data-feedback', 'report', 'گزارش خرابی و انتقاد', feedbackLine())}`)}
         ${group('حساب و داده‌ها', `
@@ -118,9 +121,14 @@ function openSettings() {
         if (v) setTipOn(v === 'on');
       };
       body.querySelector('[data-mascot]').onclick = async () => {
-        const v = await choose('جمله‌ها و صدای هوشواره', MODES, buddyMode());
+        const v = await choose('جمله‌ها و صدا', MODES, buddyMode());
         if (v) setBuddyMode(v);
       };
+      // a companion earned in «جوایز» (PFEFFERDINGER.md)
+      body.querySelector('[data-buddy]')?.addEventListener('click', async () => {
+        const v = await choose('شخصیت', BUDDY_CHOICES, buddyKey());
+        if (v) setBuddy(v);
+      });
       body.querySelector('[data-usage]')?.addEventListener('click', openUsage);
       body.querySelector('[data-feedback]').onclick = openFeedback;
       body.querySelector('[data-data]').onclick = openData;

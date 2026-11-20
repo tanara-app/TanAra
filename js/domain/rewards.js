@@ -11,10 +11,13 @@
   reward gets `since` = the day it ships; one released late at night starts the next day.
 
   Kinds: 'finish' — a look laid over any colour theme (css/app.css [data-finish]), worn from «ظاهر»;
-  'game' — a game (games/<key>/), a tile in «بیشتر» once earned.
+  'game' — a game (games/<key>/), a tile in «بیشتر» once earned; 'buddy' — a companion (ui/buddies.js)
+  who can take Heimerdinger's place, picked in «تنظیمات» ← «همراه» once earned.
   Goals: 'fullRun' — `of` full days in a row (stats.js fullDay: what they said about the day, else two
   meals or more); 'fullDays' — `of` full days in all, in a row or not; 'vegDays' — `of` days, in a row
-  or not, with the day's vegetables and fruit at VEG_FRUIT_GOAL servings or more (quality.js).
+  or not, with the day's vegetables and fruit at VEG_FRUIT_GOAL servings or more (quality.js);
+  'recipeDays' — `of` days, in a row or not, with something logged from one of their own recipes
+  («دستور پخت», ui/recipes.js): its bank food, or for a recipe not in the bank its name.
 */
 import { addDays } from '../lib/dates.js';
 import { baseMeal } from './meals.js';
@@ -27,6 +30,8 @@ export const REWARDS = [
   { key: 'shab', kind: 'finish', name: 'شب‌پر', about: 'پوسته‌ی ظاهر اپ', goal: { type: 'fullDays', of: 40 }, since: '2026-11-17' },
   // PACKABUNCHAS by Mattia Fortunati (MIT), in Persian: games/tangatang/ (released 2026-11-18 at 23:49)
   { key: 'tangatang', kind: 'game', name: 'تنگاتنگ', about: 'بازی پازل', goal: { type: 'vegDays', of: 10 }, since: '2026-11-19' },
+  // the little chef (PFEFFERDINGER.md): pictures img/pfeffer/, voice audio/pfeffer/
+  { key: 'pfeffer', kind: 'buddy', name: 'پِفِردینگر', about: 'همراه تازه', goal: { type: 'recipeDays', of: 10 }, since: '2026-11-20' },
 ];
 export const rewardOf = key => REWARDS.find(r => r.key === key) || null;
 
@@ -35,6 +40,7 @@ export function goalText(r, fa = String) {
   if (r.goal.type === 'fullRun') return `${fa(r.goal.of)} روز پشت‌سرهم ثبت کامل`;
   if (r.goal.type === 'fullDays') return `${fa(r.goal.of)} روز ثبت کامل`;
   if (r.goal.type === 'vegDays') return `${fa(r.goal.of)} روز ${fa(VEG_FRUIT_GOAL)} سهم سبزی و میوه`;
+  if (r.goal.type === 'recipeDays') return `${fa(r.goal.of)} روز غذا از دستور پخت خودت`;
   return '';
 }
 
@@ -72,6 +78,19 @@ export function fullRuns(entries, notes, day) {
 export const vegDays = (entries, foods, day) =>
   [...vegByDay(entries, foods)].filter(([d, n]) => d <= day && n >= VEG_FRUIT_GOAL).length;
 
+// Days up to `day` with something logged from one of their own recipes (ai_notes of kind 'recipe').
+export function recipeDays(entries, notes, day) {
+  const recs = (notes || []).filter(n => n.kind === 'recipe' && n.data);
+  const ids = new Set(recs.map(n => n.data.food_id).filter(Boolean));
+  const names = new Set(recs.map(n => String(n.data.name || '').trim()).filter(Boolean));
+  const days = new Set();
+  for (const e of entries) {
+    if (e.day > day) continue;
+    if (e.food_id ? ids.has(e.food_id) : names.has(String(e.name || '').trim())) days.add(e.day);
+  }
+  return days.size;
+}
+
 export function progress({ entries = [], notes = [], foods = [], earned = {} }, day, rewards = REWARDS) {
   return rewards.map(r => {
     const of = r.goal.of;
@@ -79,9 +98,11 @@ export function progress({ entries = [], notes = [], foods = [], earned = {} }, 
     const mine = r.since ? entries.filter(e => e.day >= r.since) : entries;
     const runs = r.goal.type === 'fullRun' || r.goal.type === 'fullDays' ? fullRuns(mine, notes, day) : null;
     const veg = r.goal.type === 'vegDays' ? vegDays(mine, foods, day) : 0;
+    const cooked = r.goal.type === 'recipeDays' ? recipeDays(mine, notes, day) : 0;
     const [now, met] = r.goal.type === 'fullRun' ? [runs.now, runs.best >= of]
       : r.goal.type === 'fullDays' ? [runs.total, runs.total >= of]
       : r.goal.type === 'vegDays' ? [veg, veg >= of]
+      : r.goal.type === 'recipeDays' ? [cooked, cooked >= of]
       : [0, false];
     return { reward: r, earned: !!earned[r.key] || met, now: Math.min(now, of), of };
   });

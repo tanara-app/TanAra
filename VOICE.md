@@ -1,6 +1,6 @@
 # صدای هایمردینگر: متن‌ها برای الون‌لبز
 
-این فایل همه‌ی جمله‌هایی را دارد که هایمردینگر می‌گوید ([js/ui/mascot.js](js/ui/mascot.js)). هر جمله یک فایل صوتی جدا می‌شود. **اسم فایل را دقیقاً همان که در ستون اول آمده بگذار**، چون اپ با همین اسم پیدایش می‌کند. اگر جمله‌ای در کد عوض شد، همین‌جا هم عوض شود.
+این فایل همه‌ی جمله‌هایی را دارد که هایمردینگر می‌گوید ([js/ui/buddies.js](js/ui/buddies.js)؛ جمله‌های پِفِردینگر در [PFEFFERDINGER.md](PFEFFERDINGER.md)). هر جمله یک فایل صوتی جدا می‌شود. **اسم فایل را دقیقاً همان که در ستون اول آمده بگذار**، چون اپ با همین اسم پیدایش می‌کند. اگر جمله‌ای در کد عوض شد، همین‌جا هم عوض شود.
 
 **برای دستیار الون‌لبز:** همین متن‌ها به انگلیسی، به‌صورت یک دستورالعمل کامل، در [ELEVENLABS.md](ELEVENLABS.md) هست. کل آن را به دستیار بده. اگر اینجا جمله‌ای عوض شد، آن فایل هم باید عوض شود.
 
@@ -92,7 +92,7 @@
 | `sfx-pop.mp3` | 0.5s | Cute soft cartoon pop with a tiny magical sparkle, light and playful, for a small character popping onto the screen | وقتی هایمردینگر ظاهر می‌شود |
 | `sfx-cheer.mp3` | 1.5s | Short cheerful cartoon victory jingle, tiny toy trumpet and glockenspiel, bright and happy, no voice | لحظه‌های مهم: سه وعده، روزهای پشت‌سرهم، مرور هفته |
 | `sfx-gadget.mp3` | 1s | Small whimsical steampunk gadget whirring and clicking, ending in a cheerful little ding | ثبت هدف هفته |
-| `sfx-bubble.mp3` | 1.5s | Soft gentle bubbling of small glass lab beakers, curious and calm, quiet, loopable | وقتی هوشواره در چت فکر می‌کند |
+| ~~`sfx-bubble.mp3`~~ | | برداشته شد (۲۰۲۶-۱۱-۲۰): چت دیگر شخصیت و صدای قل‌قل ندارد | |
 | `sfx-chime.mp3` | 1s | Soft warm gentle wind chime, calm and soothing, very quiet | حالت مراقبتی، به جای pop و cheer |
 
 همه‌ی فایل‌ها را یک‌جا بفرست تا وصلشان کنم.

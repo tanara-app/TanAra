@@ -91,7 +91,8 @@ exist side by side. When a new decision replaces an old one, change or mark the 
 - ElevenLabs (the mascot's voice): always the newest model, and ask the user before generating anything
   (voice, model, which lines). The voice is the user's own «Heimerdinger»; never pick an older model on your own.
 - No emoji anywhere in the app's UI (no 🏆, ✓ as emoji, etc.): draw icons as inline SVG like the existing ones
-  in `js/ui/dom.js`. The mascot appears only where it already is; don't add him to new screens unasked.
+  in `js/ui/dom.js`. The mascot appears only where it already is; don't add him to new screens unasked. Since 2026-11-20
+  the chat (Hooshvareh) has no character at all, no face and no persona (the user's decision): keep it that way.
 - Keep text in the app to a minimum: no hint lines or explanations under things unless the user asks
   (on 2026-11-09 they were annoyed by a «نگه دار و بکش» hint under the tools grid).
   On 2026-11-10 they said again that we keep adding too much text and that it distracts: a number goes
@@ -147,7 +148,8 @@ exist side by side. When a new decision replaces an old one, change or mark the 
 - `PFEFFERDINGER.md`: the second mascot «پِفِردینگر», a little chef girl earned as a reward (from 2026-11-20), and the chat losing
   its character: the user's decisions and where the work stands. Read it before touching `js/ui/mascot.js` or the chat's face.
 - `VOICE.md` / `ELEVENLABS.md`: the mascot Heimerdinger's lines and the brief for recording them
-  (files in `audio/mascot/`). If a line changes in `js/ui/mascot.js`, update both.
+  (files in `audio/mascot/`). The lines are in `js/ui/buddies.js` (both companions); if one of Heimerdinger's changes, update
+  both docs, and if one of Pfefferdinger's changes, update PFEFFERDINGER.md.
 
 ## Sensitive data never goes in git
 

@@ -3,7 +3,8 @@
   same way — a live showcase, its name, a few words on what it is, the goal, and the progress bar, or
   once earned a mark that says so. A finish is then worn from «ظاهر» (profile.js), not from here.
   A game (kind 'game') is a card that opens its own page (promo, below); once earned it is a tile in
-  «بیشتر» (tools.js) that opens the game in a tall sheet (openGame).
+  «بیشتر» (tools.js) that opens the game in a tall sheet (openGame). A companion (kind 'buddy') is
+  picked in «تنظیمات» ← «همراه» once earned (profile.js, mascot.js).
   Earned rewards are written down in profile.data.rewards the first time they are seen.
 */
 import * as store from '../data/store.js';
@@ -62,6 +63,9 @@ const SHOWCASE = {
 
 // «تنگاتنگ»: the poster's picture (ttArt.js), cropped to the card
 SHOWCASE.tangatang = () => ttArt('ttc');
+// «پِفِردینگر»: herself, waving
+SHOWCASE.pfeffer = () => '<img class="rw-buddy" src="img/pfeffer/wave.webp" alt="" width="210" height="210">';
+const WHERE = { game: 'در «بیشتر»', finish: 'در «ظاهر»', buddy: 'در «تنظیمات»' };
 
 const PLAY = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z" fill="currentColor"/></svg>';
 
@@ -73,7 +77,7 @@ function card({ reward: r, earned, now, of }) {
       <div class="rw-title"><h3>${r.name}</h3><small>${r.about}</small></div>
       <p class="rw-goal">${goalText(r, fa)}</p>
       ${earned
-        ? `<p class="rw-got">${icon.check}<span>${game ? 'در «بیشتر»' : 'در «ظاهر»'}</span></p>`
+        ? `<p class="rw-got">${icon.check}<span>${WHERE[r.kind]}</span></p>`
         : `<div class="rw-bar" role="progressbar" aria-valuemin="0" aria-valuemax="${of}" aria-valuenow="${now}"><i style="width:${now / of * 100}%"></i></div>
            <p class="rw-count"><b>${fa(now)}</b> از ${fa(of)}</p>`}
     </div>
