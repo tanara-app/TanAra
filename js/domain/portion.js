@@ -110,6 +110,22 @@ export function usualHelping(f, role, usual = null) {
 }
 
 /*
+  A food's place on a plate: its role, its step, its usual helping (`base`) and the least and most it
+  may be (inside RANGE of its usual helping and inside its role's absolute limits), in its own unit.
+  fitMeal works inside these; the scorer of SAHM.md phase 2 (tests/golden/score.js) judges with them.
+*/
+export function foodBounds(f, usual = null) {
+  const role = roleOf(f);
+  const lim = limits(f, role);
+  const base = usualHelping(f, role, usual);
+  const [lo, hi] = RANGE[role];
+  // the least is from its usual helping (8 dates are not «at least 80 grams of fruit»), never under a step
+  const min = Math.max(lim.step, Math.min(lim.max, roundTo(base * lo, lim.step) || lim.step));
+  const max = Math.max(min, Math.min(lim.max, Math.floor(base * hi / lim.step) * lim.step));
+  return { role, step: lim.step, min, max, base };
+}
+
+/*
   Their usual amount of each food they have logged at least twice in the last `days`: the middle one
   of their amounts, in the food's own unit (an amount in grams or in its second unit is turned back).
   food id → amount.
@@ -157,20 +173,14 @@ export function usualAmounts(entries, foods, day, { days = 120 } = {}) {
 export function fitMeal(foods, kcal, locked = {}, { proteinMax = null, proteinMin = null, usual = null, carbMax = null, carbsOf = null } = {}) {
   const budget = Math.max(0, Number(kcal) || 0);
   const info = foods.map((f, i) => {
-    const role = roleOf(f);
     const per = Number(f.kcal) || 0;
-    const lim = limits(f, role);
     const isLocked = locked[i] != null;
     const free = per <= 0;
-    const base = usualHelping(f, role, usual);
-    const [lo, hi] = RANGE[role];
     // the food's own range, from its usual helping, inside the absolute limits
-    // the least is from its usual helping (8 dates are not «at least 80 grams of fruit»), never under a step
-    const min = Math.max(lim.step, Math.min(lim.max, roundTo(base * lo, lim.step) || lim.step));
-    const max = Math.max(min, Math.min(lim.max, Math.floor(base * hi / lim.step) * lim.step));
+    const { role, step, min, max, base } = foodBounds(f, usual);
     const fixed = isLocked || free || role === 'drink';
     const qty = isLocked ? Number(locked[i]) : free || role === 'drink' ? base : 0;
-    return { f, role, per, step: lim.step, min, max, base, e: STRETCH[role], eDown: SHRINK[role], fixed, free, isLocked, qty };
+    return { f, role, per, step, min, max, base, e: STRETCH[role], eDown: SHRINK[role], fixed, free, isLocked, qty };
   });
   // beside a food that carries the meal, a vegetable keeps its usual helping (it never fills the
   // calories left: that gave two bowls of salad or three tomatoes); a meal of vegetables only scales them
