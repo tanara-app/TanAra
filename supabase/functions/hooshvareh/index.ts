@@ -225,13 +225,15 @@ const articleText = (a: any) => `${a.day} | ${a.title}\n<article>\n${a.body}${a.
 // Everything the app knows, as compact text, one function per section so each mode can take
 // only what it needs. Add new data types here when the app grows.
 // The signs of drifting the app noticed (js/domain/drift.js), in words.
+// The signs come from the member's own app: only numbers and day strings go into the prompt.
+const isDay = (x: unknown) => /^\d{4}-\d{2}-\d{2}$/.test(String(x));
 function signText(s: any) {
   if (!s || typeof s !== "object") return "nothing (they opened it themselves)";
   const out: string[] = [];
   if (s.weight) out.push(`2-week mean weight ${r1(s.weight.from)} → ${r1(s.weight.to)} kg (+${r1(s.weight.gain)}) while losing`);
-  if (s.waist) out.push(`waist ${r1(s.waist.from)} → ${r1(s.waist.to)} cm since ${s.waist.since}`);
+  if (s.waist) out.push(`waist ${r1(s.waist.from)} → ${r1(s.waist.to)} cm since ${isDay(s.waist.since) ? s.waist.since : "-"}`);
   if (s.logging) out.push(`logged ${s.logging.now} days last week, usually ~${r1(s.logging.before)}`);
-  if (s.scale) out.push(`no weigh-in for ${s.scale.days} days (last ${s.scale.last}), after weighing regularly`);
+  if (s.scale) out.push(`no weigh-in for ${Math.round(Number(s.scale.days)) || 0} days (last ${isDay(s.scale.last) ? s.scale.last : "-"}), after weighing regularly`);
   if (s.over) out.push(`${s.over.days} well-logged days last week ~${s.over.by} kcal over target`);
   if (s.plan) out.push(`diet plan followed ${s.plan.now}% of occasions last week, ${s.plan.before}% before`);
   return out.join("; ") || "nothing (they opened it themselves)";
