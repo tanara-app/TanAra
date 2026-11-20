@@ -1649,6 +1649,12 @@ body.kb .toast, body.chat-mode .toast { bottom: calc(var(--nav-h) + var(--safe-b
 .promo-got { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 16px; border-radius: 20px; background: var(--surface-2);
   color: var(--accent); font-size: .95rem; font-weight: 800; }
 .promo-got svg { width: 20px; height: 20px; }
+/* one reward at a time (2026-11-20): the picked one is ringed and tagged; a line on top while none is picked */
+.rw-card.on { box-shadow: 0 0 0 2px var(--accent); }
+.rw-on { display: inline-flex; align-items: center; height: 22px; padding: 0 9px; margin-inline-start: 8px; border-radius: 999px; vertical-align: middle;
+  font-size: .72rem; font-weight: 800; color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.promo-goal > .rw-on { margin: 0 0 10px; }
+.rw-hint { text-align: center; font-size: .88rem; color: var(--muted); }
 /* trying a reward before it is earned (2026-11-20): two minutes of a finish or the game, or a companion's voice */
 .promo-try { height: 52px; border-radius: 18px; display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer;
   font: inherit; font-size: 1rem; font-weight: 800; color: var(--accent);

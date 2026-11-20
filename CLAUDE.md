@@ -115,6 +115,10 @@ exist side by side. When a new decision replaces an old one, change or mark the 
 - **Rewards count only from the day they are added (the user's rule, 2026-11-19):** a reward's goal never counts days from before
   the reward existed. Every entry of `REWARDS` in `js/domain/rewards.js` has `since` (the day it ships; one released late at night
   starts the next day), and `progress` only looks at days from `since` on. Give every new reward its `since`.
+- **One reward at a time (the user's rule, 2026-11-20):** a member picks the reward they want on its page, and only that one
+  counts; the others don't fill. They can switch any time; a reward they leave keeps its days and goes on from there when picked
+  again (only the days it was the chosen one count). Every reward counts from the day it is chosen, not from before (the progress
+  members had made while all rewards counted together was dropped). The choices are `profile.data.rewardPlan`.
 - Build only what the user agreed to. When a reply could mean more than one of the options you offered,
   ask which ones before building (on 2026-11-08 a shared «team goal» was built that the user hadn't asked for).
 

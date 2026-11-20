@@ -12,8 +12,8 @@
 import * as store from '../data/store.js';
 import { sheet, icon, toast } from './dom.js';
 import { fa } from '../lib/fa.js';
-import { today, faDM } from '../lib/dates.js';
-import { progress, goalText, goalRules, rewardOf } from '../domain/rewards.js';
+import { today } from '../lib/dates.js';
+import { progress, goalText, goalRules, rewardOf, pick, activeKey } from '../domain/rewards.js';
 import { getFinish, setFinish } from './theme.js';
 import { ttArt } from './ttArt.js';
 import { tasteLines, sayAloud, hush } from './mascot.js';
@@ -79,7 +79,8 @@ export function guardFinish() {
 
 const listNow = () => {
   const s = store.get();
-  return progress({ entries: s.entries, notes: s.ai_notes, foods: s.foods, earned: store.profile()?.rewards }, today());
+  const p = store.profile();
+  return progress({ entries: s.entries, notes: s.ai_notes, foods: s.foods, earned: p?.rewards, plan: p?.rewardPlan }, today());
 };
 
 // Whether a reward is theirs: written down, or its goal met now (written down when they next open «جوایز» or the game).
@@ -91,9 +92,24 @@ function settle(list) {
   const got = p.rewards || {};
   const fresh = list.filter(x => x.earned && !got[x.reward.key]);
   if (!fresh.length) return [];
-  store.saveProfile({ ...p, rewards: { ...got, ...Object.fromEntries(fresh.map(x => [x.reward.key, today()])) } });
+  // the reward being worked on is won: its turn ends today, and nothing counts until they pick the next
+  const plan = fresh.some(x => x.reward.key === activeKey(p.rewardPlan)) ? pick(p.rewardPlan, null, today()) : p.rewardPlan;
+  store.saveProfile({ ...p, rewards: { ...got, ...Object.fromEntries(fresh.map(x => [x.reward.key, today()])) }, rewardPlan: plan });
   return fresh.map(x => x.reward.name);
 }
+
+/*
+  One reward at a time (the owner's rule, 2026-11-20, domain/rewards.js): picking one on its page starts
+  its count today; the one picked before keeps its days for when they come back to it.
+*/
+let redrawList = null;
+function choose(key) {
+  const p = store.profile();
+  store.saveProfile({ ...p, rewardPlan: pick(p.rewardPlan, key, today()) });
+  toast(`${rewardOf(key).name} انتخاب شد`);
+  redrawList?.();
+}
+const ON = '<span class="rw-on">در حال انجام</span>';
 
 // each reward's showcase, drawn live in the colours they use now
 const SHOWCASE = {
@@ -122,8 +138,8 @@ const WHERE = { game: 'در «بیشتر»', finish: 'در «ظاهر»', buddy:
 const PLAY = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z" fill="currentColor"/></svg>';
 const SPEAK = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9.5h3.5L12 6v12l-4.5-3.5H4z"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/></svg>';
 
-function card({ reward: r, earned, now, of }) {
-  return `<article class="rw-card tap${earned ? ' got' : ''}" role="button" tabindex="0" data-promo="${r.key}">
+function card({ reward: r, earned, now, of, active }) {
+  return `<article class="rw-card tap${earned ? ' got' : ''}${active ? ' on' : ''}" role="button" tabindex="0" data-promo="${r.key}">
     <div class="rw-show rw-${r.key}">${SHOWCASE[r.key]?.() || ''}${earned ? '' : `<span class="rw-lock">${LOCK}</span>`}</div>
     <div class="rw-info">
       <div class="rw-title"><h3>${r.name}</h3><small>${r.about}</small></div>
@@ -131,7 +147,7 @@ function card({ reward: r, earned, now, of }) {
       ${earned
         ? `<p class="rw-got">${icon.check}<span>${WHERE[r.kind]}</span></p>`
         : `<div class="rw-bar" role="progressbar" aria-valuemin="0" aria-valuemax="${of}" aria-valuenow="${now}"><i style="width:${now / of * 100}%"></i></div>
-           <p class="rw-count"><b>${fa(now)}</b> از ${fa(of)}</p>`}
+           <p class="rw-count"><b>${fa(now)}</b> از ${fa(of)}${active ? ON : ''}</p>`}
     </div>
   </article>`;
 }
@@ -167,6 +183,7 @@ function openPromo(key) {
   if (!r) return;
   const game = r.kind === 'game';
   sheet.open(body => {
+    const draw = () => {
     const x = listNow().find(y => y.reward.key === key);
     const art = p.art ? p.art() : `<div class="rw-show rw-${key}">${SHOWCASE[key]?.() || ''}</div>`;
     body.innerHTML = `
@@ -183,17 +200,22 @@ function openPromo(key) {
           ? (game ? `<button class="promo-play" data-play>${PLAY}<span>بازی کن</span></button>`
             : `<p class="promo-got">${icon.check}<span>مال توست · ${WHERE[r.kind]}</span></p>`)
           : `<div class="promo-goal">
+              ${x.active ? ON : ''}
               <div class="row"><span>${goalText(r, fa)}</span><span class="left"><b>${fa(x.of - x.now)}</b> روز مانده</span></div>
               <div class="promo-days" role="progressbar" aria-valuemin="0" aria-valuemax="${x.of}" aria-valuenow="${x.now}">${Array.from({ length: x.of }, (_, i) => `<i${i < x.now ? ' class="on"' : ''}></i>`).join('')}</div>
             </div>
+            ${x.active ? '' : '<button class="btn primary block big" data-pick>انتخابش کن</button>'}
             ${tryButton(r)}`}
-        <section class="promo-rules"><h3>قانون‌ها</h3><ul>${goalRules(r, fa, faDM).map(t => `<li>${t}</li>`).join('')}</ul></section>
+        <section class="promo-rules"><h3>قانون‌ها</h3><ul>${goalRules(r, fa).map(t => `<li>${t}</li>`).join('')}</ul></section>
         ${p.feats ? `<div class="promo-feats">${p.feats.map(([k, t]) => `<div>${FEAT[k]}<span>${t}</span></div>`).join('')}</div>` : ''}
         ${p.credit ? `<p class="promo-credit">${p.credit}</p>` : ''}
       </div>`;
     body.querySelector('[data-close]').onclick = () => sheet.close();
     body.querySelector('[data-play]')?.addEventListener('click', () => openGame(key));
+    body.querySelector('[data-pick]')?.addEventListener('click', () => { choose(key); draw(); });
     bindTry(body, r);
+    };
+    draw();
   }, { tall: true, onClose: hush });
 }
 
@@ -267,16 +289,23 @@ export function openGame(key, { trial = false } = {}) {
 
 export function openRewards() {
   sheet.open(body => {
-    const list = listNow();
-    const fresh = settle(list);
-    if (fresh.length) toast(`${fresh.join('، ')} باز شد`);
-    body.innerHTML = `
-      <div class="sheet-head"><h2>جوایز</h2><button class="icon-btn" data-close aria-label="بستن">${icon.close}</button></div>
-      <div class="rw-list">${list.map(card).join('')}</div>`;
-    body.querySelector('[data-close]').onclick = () => sheet.close();
-    body.querySelectorAll('[data-promo]').forEach(el => {
-      el.addEventListener('click', () => openPromo(el.dataset.promo));
-      el.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openPromo(el.dataset.promo); } });
-    });
-  }, { tall: true });
+    const draw = () => {
+      const list = listNow();
+      const fresh = settle(list);
+      if (fresh.length) toast(`${fresh.join('، ')} باز شد`);
+      // nothing counts until one is picked: say so while one is still ahead
+      const waiting = !list.some(x => x.active) && list.some(x => !x.earned);
+      body.innerHTML = `
+        <div class="sheet-head"><h2>جوایز</h2><button class="icon-btn" data-close aria-label="بستن">${icon.close}</button></div>
+        ${waiting ? '<p class="rw-hint">یک جایزه را انتخاب کن تا روزهایش شمرده شود.</p>' : ''}
+        <div class="rw-list">${listNow().map(card).join('')}</div>`;
+      body.querySelector('[data-close]').onclick = () => sheet.close();
+      body.querySelectorAll('[data-promo]').forEach(el => {
+        el.addEventListener('click', () => openPromo(el.dataset.promo));
+        el.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openPromo(el.dataset.promo); } });
+      });
+    };
+    redrawList = draw;
+    draw();
+  }, { tall: true, onClose: () => { redrawList = null; } });
 }

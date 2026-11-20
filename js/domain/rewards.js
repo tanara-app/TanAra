@@ -10,6 +10,13 @@
   rule, 2026-11-19): a new reward is something to start on, not something already won. So every new
   reward gets `since` = the day it ships; one released late at night starts the next day.
 
+  One reward at a time (the owner's rule, 2026-11-20): the member picks a reward on its page and only
+  that one counts; the others don't fill. Their picks are `plan` (profile.data.rewardPlan), a list of
+  turns [{ key, from, to }], `to` null for the reward picked now. A reward counts the days of its own
+  turns only, from the day it was picked, never before. They can switch any time: a reward they leave
+  keeps its days and goes on from there when picked again, and a run ('fullRun') goes on across the days
+  another reward had (those are skipped, not breaking it).
+
   Kinds: 'finish' — a look laid over any colour theme (css/app.css [data-finish]), worn from «ظاهر»;
   'game' — a game (games/<key>/), a tile in «بیشتر» once earned; 'buddy' — a companion (ui/buddies.js)
   who can take Heimerdinger's place, picked in «تنظیمات» ← «همراه» once earned.
@@ -58,12 +65,13 @@ const USE = {
   game: 'کاشی‌اش در «بیشتر» می‌آید',
   buddy: 'در «تنظیمات» ← «همراه» ← «شخصیت» انتخابش کن',
 };
-export function goalRules(r, fa = String, dm = String) {
+export function goalRules(r, fa = String) {
   const of = fa(r.goal.of);
   const own = {
     fullRun: [FULL_DAY, MARK_DAY,
       `${of} روز کامل باید پشت‌سرهم باشد؛ یک روز ناقص یا خالی، شمارش را از صفر شروع می‌کند.`,
-      'امروز تا وقتی کامل نشده رشته را نمی‌شکند؛ وقتی کامل شد، یک روز اضافه می‌شود.'],
+      'امروز تا وقتی کامل نشده رشته را نمی‌شکند؛ وقتی کامل شد، یک روز اضافه می‌شود.',
+      'روزهایی که جایزه‌ی دیگری انتخاب کرده بودی، رشته را نمی‌شکنند.'],
     fullDays: [FULL_DAY, MARK_DAY,
       'لازم نیست پشت‌سرهم باشد؛ هر روز کامل یکی اضافه می‌کند و روز ناقص چیزی کم نمی‌کند.'],
     vegDays: [`روزی حساب می‌شود که دست‌کم ${fa(VEG_FRUIT_GOAL)} سهم سبزی و میوه ثبت کنی؛ همان عددی که در «امروز» کنار «سبزی و میوه» است.`,
@@ -76,8 +84,36 @@ export function goalRules(r, fa = String, dm = String) {
       'چند غذا در یک روز، یک روز حساب می‌شود؛ لازم نیست پشت‌سرهم باشد.'],
   }[r.goal.type] || [];
   return [...own,
-    `فقط روزهای از ${dm(r.since)} به بعد حساب‌اند؛ همان روزی که این جایزه آمد.`,
+    'هر بار فقط جایزه‌ای شمرده می‌شود که انتخابش کرده‌ای، از همان روز انتخاب.',
+    'اگر جایزه‌ی دیگری انتخاب کنی، روزهای این یکی می‌ماند و هر وقت برگردی از همان‌جا ادامه می‌دهد.',
     `وقتی رسیدی، برای همیشه مال توست؛ ${USE[r.kind]}.`];
+}
+
+/* ---------- one reward at a time ---------- */
+// the reward picked now (null: none)
+export const activeKey = plan => (plan || []).find(t => !t.to)?.key || null;
+/*
+  Pick `key` on `day`: the turn going on ends the day before (and goes when it had not begun yet), and
+  the new one starts that day. Picking the reward already picked changes nothing; `key` null only ends
+  the turn going on, `day` included (used when that reward has just been earned).
+*/
+export function pick(plan, key, day) {
+  const turns = (plan || []).map(t => ({ ...t }));
+  const open = turns.find(t => !t.to);
+  if (open && open.key === key) return turns;
+  if (open) open.to = key ? addDays(day, -1) : day;
+  const kept = turns.filter(t => t.to === null || t.to === undefined || t.to >= t.from);
+  return key ? [...kept, { key, from: day, to: null }] : kept;
+}
+// The days, in order, `key` was the picked reward, up to `day` and never before the reward existed.
+export function turnDays(plan, key, day, since = '') {
+  const out = [];
+  for (const t of plan || []) {
+    if (t.key !== key) continue;
+    const end = t.to && t.to < day ? t.to : day;
+    for (let d = t.from > since ? t.from : since; d <= end; d = addDays(d, 1)) out.push(d);
+  }
+  return [...new Set(out)].sort();
 }
 
 /*
@@ -105,10 +141,28 @@ export function fullRuns(entries, notes, day) {
   return { best, now, total: full.size };
 }
 
+// The same, over a reward's own days only (turnDays): days in between are skipped, not breaking a run.
+export function runsOver(entries, notes, days, day) {
+  const on = new Set(days);
+  const meals = new Map();
+  for (const e of entries) {
+    if (!on.has(e.day)) continue;
+    (meals.get(e.day) || meals.set(e.day, new Set()).get(e.day)).add(baseMeal(e.meal));
+  }
+  const marks = logMarks(notes);
+  const full = new Set([...meals].filter(([d, m]) => fullDay(d, m.size, marks)).map(([d]) => d));
+  let best = 0, run = 0;
+  const runs = days.map(d => (run = full.has(d) ? run + 1 : 0, best = Math.max(best, run), run));
+  // the run going on: up to today once today is full, else up to the day before it
+  const last = days.length - 1;
+  const now = last < 0 ? 0 : days[last] === day && !full.has(day) ? runs[last - 1] || 0 : runs[last];
+  return { best, now, total: full.size };
+}
+
 /*
-  Where a member stands with each reward: [{ reward, earned, now, of }]. `earned` (from the profile)
-  keeps a reward earned; otherwise it is earned once its goal was ever met. `now`/`of`: the progress
-  shown while it is still ahead.
+  Where a member stands with each reward: [{ reward, earned, now, of, active }]. `earned` (from the
+  profile) keeps a reward earned; otherwise it is earned once its goal was met on its own days. `now`/`of`:
+  the progress shown while it is still ahead; `active`: it is the one picked now.
 */
 // Days up to `day` (today counts once reached) with the vegetables and fruit goal met.
 export const vegDays = (entries, foods, day) =>
@@ -127,12 +181,15 @@ export function recipeDays(entries, notes, day) {
   return days.size;
 }
 
-export function progress({ entries = [], notes = [], foods = [], earned = {} }, day, rewards = REWARDS) {
+export function progress({ entries = [], notes = [], foods = [], earned = {}, plan = [] }, day, rewards = REWARDS) {
+  const picked = activeKey(plan);
   return rewards.map(r => {
     const of = r.goal.of;
-    // only the days since the reward was added
-    const mine = r.since ? entries.filter(e => e.day >= r.since) : entries;
-    const runs = r.goal.type === 'fullRun' || r.goal.type === 'fullDays' ? fullRuns(mine, notes, day) : null;
+    // only the days it was the picked reward
+    const days = turnDays(plan, r.key, day, r.since || '');
+    const on = new Set(days);
+    const mine = entries.filter(e => on.has(e.day));
+    const runs = r.goal.type === 'fullRun' || r.goal.type === 'fullDays' ? runsOver(mine, notes, days, day) : null;
     const veg = r.goal.type === 'vegDays' ? vegDays(mine, foods, day) : 0;
     const cooked = r.goal.type === 'recipeDays' ? recipeDays(mine, notes, day) : 0;
     const [now, met] = r.goal.type === 'fullRun' ? [runs.now, runs.best >= of]
@@ -140,7 +197,7 @@ export function progress({ entries = [], notes = [], foods = [], earned = {} }, 
       : r.goal.type === 'vegDays' ? [veg, veg >= of]
       : r.goal.type === 'recipeDays' ? [cooked, cooked >= of]
       : [0, false];
-    return { reward: r, earned: !!earned[r.key] || met, now: Math.min(now, of), of };
+    return { reward: r, earned: !!earned[r.key] || met, now: Math.min(now, of), of, active: picked === r.key };
   });
 }
 
