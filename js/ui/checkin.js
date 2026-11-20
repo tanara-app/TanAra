@@ -21,13 +21,8 @@ import { cheer } from './mascot.js';
 import { dismissed, dismiss } from './notices.js';
 import { startChat } from './chat.js';
 import { askRow, askFold } from './aiCards.js';
+import { CAUSES, offlinePlan } from '../domain/comeback.js';
 
-const CAUSES = [
-  ['حال و روان', ['استرس', 'غم یا دل‌گرفتگی', 'اضطراب و نگرانی', 'بی‌حوصلگی', 'تنهایی', 'خستگی ذهنی', 'عصبانیت']],
-  ['بدن', ['خواب کم یا بد', 'گرسنگی زیاد', 'هوس خوراکی یا شیرینی', 'بیماری یا درد', 'تغییر دارو', 'دوران قاعدگی']],
-  ['زندگی', ['کار یا درس زیاد', 'مشکل خانوادگی یا رابطه', 'مهمانی و بیرون‌خوری', 'سفر', 'نگرانی مالی', 'به هم خوردن برنامه‌ی روزانه']],
-  ['خود رژیم', ['رژیم تکراری و خسته‌کننده شده', 'انگیزه‌ام کم شده', 'نتیجه نمی‌بینم', 'ثبت کردن خسته‌ام کرده', 'غذای مناسب دم دستم نبود', 'پرخوری بی‌اختیار', 'نمی‌دانم چرا']],
-];
 const MOODS = ['خیلی بد', 'بد', 'معمولی', 'خوب', 'خیلی خوب'];
 const OUTCOMES = { good: 'خوب پیش رفت', some: 'نصفه‌نیمه', no: 'نشد' };
 
@@ -69,7 +64,6 @@ const head = (title, extra = '') => `<div class="ai-card-h"><span class="ai-mark
 /* ---------------- Today: the card ---------------- */
 
 export function checkinCard() {
-  if (!aiAvailable()) return '';
   const p = store.profile();
   const t = today();
   const last = lastCheckin(store.get().ai_notes);
@@ -94,7 +88,6 @@ export function checkinCard() {
 /* ---------------- Progress: always reachable, and the latest plan ---------------- */
 
 export function checkinRow() {
-  if (!aiAvailable()) return '';
   const last = lastCheckin(store.get().ai_notes);
   const recent = last && checkinState(last, today()) !== null ? last : null;
   if (recent?.data?.steps?.length) return askFold('data-ask-fold', 'برگشت به مسیر', `برنامه‌ی ${faDM(recent.key.slice(8))}`, `<div class="ai-text"><ol>${recent.data.steps.map(x => `<li>${esc(x)}</li>`).join('')}</ol></div>
@@ -140,7 +133,7 @@ export function openCheckin({ follow = null, onDone = () => {} } = {}) {
           .filter(c => !(c === 'دوران قاعدگی' && p?.sex === 'male'))
           .map(c => `<button type="button" class="chip-btn" data-cause="${esc(c)}">${c}</button>`).join('')}</div></div>`).join('')}
         <label class="field"><span>اگر دوست داری بیشتر بگو <small class="muted">(اختیاری)</small></span><textarea name="said" rows="3" maxlength="1500" placeholder="مثلاً: از وقتی کارم عوض شده شب‌ها خسته‌ام و…"></textarea></label>
-        <button class="btn primary block" data-go>هوشواره ببیند ریشه‌اش چیست</button>
+        <button class="btn primary block" data-go>${aiAvailable() ? 'هوشواره ببیند ریشه‌اش چیست' : 'برنامه‌ی برگشت را بچین'}</button>
         <p class="muted small">چیزهایی که این‌جا می‌گویی فقط برای هوشواره‌ی خودت است و در حساب خودت می‌ماند.</p>`;
       body.querySelector('[data-close]').onclick = () => sheet.close();
       body.querySelector('[data-mood]').onclick = e => {
@@ -161,24 +154,30 @@ export function openCheckin({ follow = null, onDone = () => {} } = {}) {
       };
     };
 
+    /*
+      Hooshvareh puts what they said next to the record; when it cannot answer (offline, no account, or the
+      service down) the plan comes from the app's own library (domain/comeback.js, BAZGASHT.md phase 3).
+    */
     const run = async answers => {
-      if (!aiOnline()) { toast('برای هوشواره به اینترنت وصل شو.'); return; }
-      body.innerHTML = `<div class="sheet-head"><h2>برگشت به مسیر</h2></div>
-        <p class="muted small ai-wait"><span class="typing"><i></i><i></i><i></i></span> دارم حرف‌هایت را کنار ثبت‌هایت می‌گذارم…</p>`;
-      try {
-        const r = await ask('checkin', {
-          ...answers, signs: signs || {},
-          follow: follow ? { day: follow.key.slice(8), outcome: follow.data?.outcome, goal: follow.data?.goal, steps: follow.data?.steps } : null,
-        });
-        const key = `checkin:${today()}`;
-        const data = { signs: signs || {}, ...answers, cause: r.cause, steps: r.steps, first_step: r.first_step, goal: r.goal, support: r.support || '', ...(follow ? { after: follow.key } : {}) };
-        store.saveNote({ key, kind: 'checkin', text: `${r.cause}\n${r.steps.map(x => `- ${x}`).join('\n')}`, data });
-        result(data);
-        onDone();
-      } catch (e) {
-        toast(e.message);
-        form();
+      let r = null;
+      if (aiOnline()) {
+        body.innerHTML = `<div class="sheet-head"><h2>برگشت به مسیر</h2></div>
+          <p class="muted small ai-wait"><span class="typing"><i></i><i></i><i></i></span> دارم حرف‌هایت را کنار ثبت‌هایت می‌گذارم…</p>`;
+        try {
+          r = await ask('checkin', {
+            ...answers, signs: signs || {},
+            follow: follow ? { day: follow.key.slice(8), outcome: follow.data?.outcome, goal: follow.data?.goal, steps: follow.data?.steps } : null,
+          });
+        } catch (e) {
+          console.warn('checkin: the plan comes from the app', e);
+        }
       }
+      if (!r?.steps?.length) r = offlinePlan(answers, { care: edCare(p), follow: !!follow });
+      const key = `checkin:${today()}`;
+      const data = { signs: signs || {}, ...answers, cause: r.cause, steps: r.steps, first_step: r.first_step, goal: r.goal, support: r.support || '', ...(r.offline ? { offline: true } : {}), ...(follow ? { after: follow.key } : {}) };
+      store.saveNote({ key, kind: 'checkin', text: `${r.cause}\n${r.steps.map(x => `- ${x}`).join('\n')}`, data });
+      result(data);
+      onDone();
     };
 
     const result = d => {
@@ -190,7 +189,7 @@ export function openCheckin({ follow = null, onDone = () => {} } = {}) {
         <div class="ai-text"><ol>${d.steps.map(x => `<li>${esc(x)}</li>`).join('')}</ol></div>
         <div class="ai-goal"><small class="muted">همین امروز</small><b>${esc(d.first_step)}</b></div>
         ${d.goal ? `<div class="ai-goal"><small class="muted">هدف این هفته</small><b>${esc(d.goal)}</b><button class="btn sm" data-goal>هدف این هفته‌ام کن</button></div>` : ''}
-        <div class="row gap"><button class="btn primary grow" data-close2>باشه، شروع می‌کنم</button><button class="btn grow" data-chat>بیشتر حرف بزنیم</button></div>
+        <div class="row gap"><button class="btn primary grow" data-close2>باشه، شروع می‌کنم</button>${aiAvailable() ? '<button class="btn grow" data-chat>بیشتر حرف بزنیم</button>' : ''}</div>
         <p class="muted small">یک هفته‌ی دیگر می‌پرسم چطور پیش رفت.</p>`;
       body.querySelector('[data-close]').onclick = () => sheet.close();
       body.querySelector('[data-close2]').onclick = () => sheet.close();
@@ -204,10 +203,10 @@ export function openCheckin({ follow = null, onDone = () => {} } = {}) {
         toast('هدف این هفته ثبت شد');
         cheer('goal');
       });
-      body.querySelector('[data-chat]').onclick = () => {
+      body.querySelector('[data-chat]')?.addEventListener('click', () => {
         startChat('درباره‌ی برنامه‌ی برگشتی که امروز چیدیم می‌خواهم بیشتر حرف بزنم: ');
         sheet.closeThen(() => { location.hash = '#/ai'; });
-      };
+      });
     };
 
     form();

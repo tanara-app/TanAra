@@ -14,6 +14,7 @@ import './shopping.test.js';
 import './barcode.test.js';
 import './drift.test.js';
 import './lapse.test.js';
+import './comeback.test.js';
 import './health.test.js';
 import './foodMatch.test.js';
 import './family.test.js';
