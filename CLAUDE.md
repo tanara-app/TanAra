@@ -76,7 +76,7 @@ exist side by side. When a new decision replaces an old one, change or mark the 
   `lateNight`, the app's day starting at 5 am); it boots (OPTIONS 200). On 2026-11-20 `m.b.a` deployed version 56 with the CLI
   (commit 6857e0a: the assistant no longer plays Heimerdinger); it boots (OPTIONS 200). The same day `m.b.a` deployed `remind`
   version 5 with the CLI (commit 3ff1fad: the new-reward notification); `verify_jwt` stayed off, as the cron call needs.
-- From 2026-11-16 04:22 UTC every `hooshvareh` call failed with 502 (still so on 2026-11-18): the Anthropic API answered «credit balance is too low». Only the
+- From 2026-11-16 04:22 UTC every `hooshvareh` call failed with 502 (still so on 2026-11-18; on 2026-11-20 `ai_usage` had no row after 2026-11-16, so no call had succeeded since): the Anthropic API answered «credit balance is too low». Only the
   user can add credit (console.anthropic.com, Plans & Billing). Check the function logs for it when the assistant stops answering.
 - On 2026-11-17 the user installed the official Meshy plugin (claude.ai directory, by Meshy) with three skills:
   `meshy-3d-generation`, `meshy-3d-printing`, `meshy-openclaw`. It belongs to the claude.ai account, not this folder
