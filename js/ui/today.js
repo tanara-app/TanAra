@@ -180,6 +180,8 @@ export function renderToday(root) {
       proteinMax: t.proteinMax && all ? Math.round(t.protein * (sh[m] || 0) / all) : null,
       // a main meal's part of the day's protein, 15–40 g (snacks have none; with a kidney limit, the limit rules)
       proteinMin: !t.proteinMax && all && MAIN_MEALS.has(m) ? Math.min(40, Math.max(15, Math.round(t.protein * (sh[m] || 0) / all))) : null,
+      // high blood pressure, heart, kidney, stones: the meal's part of the day's sodium (5 g of salt, 2000 mg; fitPlate)
+      sodiumMax: countsSalt(p.conditions) && all ? Math.round(SALT_MAX_G * 1000 / 2.5 * (sh[m] || 0) / all) : null,
     };
   };
   // the quality of the day beside its calories (quality.js): in the summary card of the rebuilt «امروز»

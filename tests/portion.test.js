@@ -244,7 +244,10 @@ suite('portion', () => {
     eq(d.qty, d.sug); // taken as it is
     eq(d.hand, false);
     eq(d.carbMax, 25);
-    ok(!('proteinMin' in d) && !('proteinMax' in d));
+    ok(!('proteinMin' in d) && !('proteinMax' in d) && !('sug1' in d) && !('sodiumMax' in d));
+    // version 2 shown, with what version 1 would have said
+    const two = fitMark({ v: 2, sug: 2, sugKcal: 220, qty: 2, budget: 400, sodiumMax: 500, sug1: 1.5 });
+    eq([two.v, two.sug1, two.sodiumMax], [2, 1.5, 500]);
   });
 });
 

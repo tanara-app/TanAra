@@ -22,6 +22,7 @@ import { mealForNow, today } from '../lib/dates.js';
 import { sheet, toast, confirmBox, choose, icon } from './dom.js';
 import { amountLabel, hasGrams, hasUnit2 } from './units.js';
 import { fitMeal, fitMark, usualCombos, roleOf, packKey, usualAmounts } from '../domain/portion.js';
+import { fitPlate, FIT_V2 } from '../domain/fit.js';
 import { mealCombos, shortName, libKey, freeFoods } from '../domain/combos.js';
 import { COMBOS } from '../data/combos.js';
 import { packs, savePack, askPackName, deletePack, hideKey, hidden } from './packs.js';
@@ -297,8 +298,9 @@ export function openEat({ day = today(), meal = null, budgetFor, start = null })
       if (!picked.length) { from = null; editing = false; return drawHome(); }
       const b = budgetFor(cur);
       const budget = Math.max(0, Math.round(b.kcal));
-      const opts = { proteinMax: b.proteinMax ?? null, proteinMin: b.proteinMin ?? null, usual: usualAmounts(store.get().entries, store.get().foods, day), carbMax: b.carbMax ?? null, carbsOf: f => foodNutr(f)?.c ?? 0 };
-      const r = fitMeal(picked, budget, Object.fromEntries(picked.map((f, i) => [i, locks.get(f)]).filter(([, q]) => q != null)), opts);
+      const opts = { proteinMax: b.proteinMax ?? null, proteinMin: b.proteinMin ?? null, usual: usualAmounts(store.get().entries, store.get().foods, day), carbMax: b.carbMax ?? null, carbsOf: f => foodNutr(f)?.c ?? 0, sodiumMax: b.sodiumMax ?? null, sodiumOf: f => foodNutr(f)?.na ?? 0 };
+      // the amounts: version 2, one search for the best plate (fit.js; SAHM.md, for everyone from 2026-11-20)
+      const r = fitPlate(picked, budget, Object.fromEntries(picked.map((f, i) => [i, locks.get(f)]).filter(([, q]) => q != null)), opts);
       const views = picked.map((f, i) => view(f, r.items[i]));
       const total = views.reduce((t, v) => t + v.kcal, 0);
       const protein = views.reduce((t, v) => t + v.protein, 0);
@@ -388,12 +390,14 @@ export function openEat({ day = today(), meal = null, budgetFor, start = null })
         x.addEventListener('change', apply);
       });
       body.querySelector('[data-save]').onclick = () => {
-        // the app's own answer for these foods, with nothing set by hand, in the unit each is logged in (SAHM.md, phase 1)
-        const app = locks.size ? fitMeal(picked, budget, {}, opts) : r;
+        // the app's own answer for these foods, with nothing set by hand, in the unit each is logged in (SAHM.md, phase 1),
+        // and version 1's beside it, to compare the two on what is really eaten
+        const app = locks.size ? fitPlate(picked, budget, {}, opts) : r;
+        const old = fitMeal(picked, budget, {}, opts);
         picked.forEach((f, i) => {
           const v = views[i];
           const s = view(f, app.items[i], v.m, false);
-          const fit = fitMark({ sug: s.q, sugKcal: s.kcal, qty: v.q, hand: locks.has(f), budget, proteinMin: b.proteinMin ?? null, proteinMax: b.proteinMax ?? null, carbMax: b.carbMax ?? null });
+          const fit = fitMark({ v: FIT_V2, sug: s.q, sugKcal: s.kcal, qty: v.q, hand: locks.has(f), budget, proteinMin: b.proteinMin ?? null, proteinMax: b.proteinMax ?? null, carbMax: b.carbMax ?? null, sodiumMax: b.sodiumMax ?? null, sug1: view(f, old.items[i], v.m, false).q });
           store.saveEntry({ day, meal: cur, food_id: f.id || null, name: f.name, unit: v.unit, qty: v.q, kcal: v.kcal, protein: v.protein, is_veg: !!f.is_veg, fit });
         });
         cheer('entry');
