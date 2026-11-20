@@ -1,5 +1,5 @@
 import { suite, test, eq, ok } from './harness.js';
-import { weightSign, waistSign, loggingSign, overSign, planSign, drift, checkinState } from '../js/domain/drift.js';
+import { weightSign, waistSign, loggingSign, scaleSign, overSign, planSign, drift, checkinState } from '../js/domain/drift.js';
 import { addDays } from '../js/lib/dates.js';
 
 const D = '2026-03-01';
@@ -24,6 +24,24 @@ suite('drift', () => {
     eq(loggingSign([...usual, e(back(2), 'lunch', 500), e(back(4), 'lunch', 500)], D), { before: 7, now: 2 });
     eq(loggingSign([...usual, ...[1, 2, 3, 4, 5].map(n => e(back(n), 'lunch', 500))], D), null);
     eq(loggingSign([e(back(2), 'lunch', 500)], D), null); // never logged much: nothing has dropped
+  });
+
+  test('logging: three days a week counts too (BAZGASHT.md phase 4)', () => {
+    const three = [8, 10, 12, 15, 17, 19, 22, 24, 26].map(n => e(back(n), 'lunch', 500)); // 3 a week
+    eq(loggingSign([...three, e(back(3), 'lunch', 500)], D), { before: 3, now: 1 });
+    eq(loggingSign([...three, e(back(3), 'lunch', 500), e(back(5), 'lunch', 500)], D), null); // 2 of 3: not a drop yet
+    const four = [8, 9, 11, 13, 15, 16, 18, 20, 22, 23, 25, 27].map(n => e(back(n), 'lunch', 500)); // 4 a week
+    eq(loggingSign([...four, e(back(2), 'lunch', 500), e(back(5), 'lunch', 500)], D), { before: 4, now: 2 });
+  });
+
+  test('scale: weighed regularly, then not for two weeks', () => {
+    const w = n => ({ day: back(n), kg: 80 });
+    eq(scaleSign([w(40), w(30), w(20)], D), { days: 20, last: back(20) });
+    eq(scaleSign([w(40), w(20)], D), null);               // was not weighing regularly
+    eq(scaleSign([w(40), w(30), w(20), w(10)], D), null); // weighed ten days ago
+    eq(Object.keys(drift({ weights: [w(40), w(30), w(20)] }, D)), ['scale']);
+    eq(drift({ weights: [w(40), w(30), w(20)], care: true }, D), null);       // never with a possible eating-disorder history
+    eq(drift({ weights: [w(40), w(30), w(20)], phase: 'maintain' }, D), null); // maintenance has its own note
   });
 
   test('over: three well-logged days well over target', () => {

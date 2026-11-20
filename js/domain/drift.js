@@ -7,7 +7,12 @@
   - weight: the mean of the last two weeks' weigh-ins WEIGHT_KG above the two to six weeks before
     (while losing only; in maintenance the band in phase.js answers for the weight);
   - waist: the latest measurement WAIST_CM above the one before it;
-  - logging: logged days fell by LOG_DROP or more from the usual (not under light logging);
+  - logging: logged days fell by LOG_DROP or more from the usual (3 days a week or more), down to
+    LOG_LOW at most (not under light logging; BAZGASHT.md phase 4: someone who logged three days a
+    week counts too, not only the very regular);
+  - scale: weighed SCALE_BEFORE times or more in the six weeks before, and not in the last SCALE_DAYS
+    (while losing, and never with a possible eating-disorder history; breaks of a month or more in
+    weighing go with regain: Helander et al. 2014);
   - over: OVER_DAYS or more well-logged days OVER_KCAL above the target;
   - plan: in the diet plan, under half the occasions eaten as planned, after keeping to it.
 */
@@ -17,7 +22,11 @@ import { fullDay } from './stats.js';
 
 export const WEIGHT_KG = 0.7;
 export const WAIST_CM = 1.5;
-export const LOG_DROP = 3;
+export const LOG_DROP = 2;
+export const LOG_USUAL = 3;
+export const LOG_LOW = 3;
+export const SCALE_DAYS = 14;
+export const SCALE_BEFORE = 3;
 export const OVER_KCAL = 250;
 export const OVER_DAYS = 3;
 export const AGAIN_DAYS = 7;      // after a check-in, quiet for a week; then: how did it go?
@@ -49,7 +58,16 @@ export function loggingSign(entries, day) {
   const days = (from, to) => new Set(entries.filter(e => e.day >= from && e.day <= to).map(e => e.day)).size;
   const now = days(addDays(day, -7), addDays(day, -1));
   const before = days(addDays(day, -28), addDays(day, -8)) / 3;
-  return before >= 4 && now <= before - LOG_DROP + 1e-9 ? { before: r1(before), now } : null;
+  return before >= LOG_USUAL - 1e-9 && now <= before - LOG_DROP + 1e-9 && now <= LOG_LOW ? { before: r1(before), now } : null;
+}
+
+// Stopped weighing: regular weigh-ins in the six weeks before (days 42 to 15 back), none in the last SCALE_DAYS.
+export function scaleSign(weights, day) {
+  const days = weights.map(w => w.day).filter(d => d <= day).sort();
+  const last = days[days.length - 1];
+  if (!last || diffDays(day, last) < SCALE_DAYS) return null;
+  const before = days.filter(d => d >= addDays(day, -42) && d <= addDays(day, -15)).length;
+  return before >= SCALE_BEFORE ? { days: diffDays(day, last), last } : null;
 }
 
 // Well-logged days (fullDay: what they said, else two meals or more) last week that went well over that day's target.
@@ -77,12 +95,14 @@ export function planSign(adherence, day) {
 /*
   Every sign showing on `day`, or null when there are none. `phase` is today's phase: no signs
   on a diet break (its first days bring water weight back), and in maintenance no weight sign.
-  `light`: light logging is in force, so fewer logged days is expected.
+  `light`: light logging is in force, so fewer logged days is expected. `care`: a possible eating-
+  disorder history, so stopping weighing is no sign.
 */
-export function drift({ entries = [], weights = [], waists = [], phase = 'loss', light = false, kcalOn, adherence = null, marks }, day) {
+export function drift({ entries = [], weights = [], waists = [], phase = 'loss', light = false, kcalOn, adherence = null, marks, care = false }, day) {
   if (phase === 'break') return null;
   const signs = {
     weight: phase === 'loss' ? weightSign(weights, day) : null,
+    scale: phase === 'loss' && !care ? scaleSign(weights, day) : null,
     waist: waistSign(waists, day),
     logging: light ? null : loggingSign(entries, day),
     over: light || !kcalOn ? null : overSign(entries, day, kcalOn, marks),

@@ -231,6 +231,7 @@ function signText(s: any) {
   if (s.weight) out.push(`2-week mean weight ${r1(s.weight.from)} → ${r1(s.weight.to)} kg (+${r1(s.weight.gain)}) while losing`);
   if (s.waist) out.push(`waist ${r1(s.waist.from)} → ${r1(s.waist.to)} cm since ${s.waist.since}`);
   if (s.logging) out.push(`logged ${s.logging.now} days last week, usually ~${r1(s.logging.before)}`);
+  if (s.scale) out.push(`no weigh-in for ${s.scale.days} days (last ${s.scale.last}), after weighing regularly`);
   if (s.over) out.push(`${s.over.days} well-logged days last week ~${s.over.by} kcal over target`);
   if (s.plan) out.push(`diet plan followed ${s.plan.now}% of occasions last week, ${s.plan.before}% before`);
   return out.join("; ") || "nothing (they opened it themselves)";

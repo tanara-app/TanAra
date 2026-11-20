@@ -39,6 +39,7 @@ export function signsNow() {
     phase: phaseOn(p, t), light: lightOn(p, sortedWeights(s.weights), t),
     kcalOn: d => effectiveTargets(p, d)?.kcal,
     marks: logMarks(s.ai_notes),
+    care: edCare(p),
     // the rebuilt «امروز» (2026-11-17) has no «رژیم» to tick, so no plan adherence
     adherence: null,
   }, t);
@@ -53,6 +54,7 @@ function signLines(signs, p) {
   if (signs.weight && !care) out.push(`میانگین وزنت در دو هفته‌ی اخیر ${fa(signs.weight.gain, 1)} کیلو بالاتر از هفته‌های قبلش بوده.`);
   if (signs.waist && !care) out.push(`دور کمرت از ${fa(signs.waist.from, 1)} به ${fa(signs.waist.to, 1)} سانت رسیده.`);
   if (signs.over && !care) out.push(`${fa(signs.over.days)} روز از هفته‌ی گذشته به‌طور میانگین ${fa(signs.over.by)} کالری بالاتر از هدف بوده.`);
+  if (signs.scale && !care) out.push(`${fa(signs.scale.days)} روز است وزن نکرده‌ای؛ قبلاً مرتب وزن می‌کردی.`);
   if (signs.logging) out.push(`هفته‌ی گذشته ${fa(signs.logging.now)} روز ثبت کرده‌ای؛ معمولاً حدود ${fa(Math.round(signs.logging.before))} روز.`);
   if (signs.plan) out.push(`هفته‌ی گذشته ${fa(signs.plan.now)}٪ وعده‌ها طبق رژیم بوده؛ قبلش ${fa(signs.plan.before)}٪.`);
   if (!out.length) out.push('این روزها روالت کمی به هم خورده.');
