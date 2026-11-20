@@ -17,7 +17,8 @@
 */
 import * as store from '../data/store.js';
 import { entriesOn, streak, baseMeal } from '../domain/stats.js';
-import { today, diffDays } from '../lib/dates.js';
+import { today } from '../lib/dates.js';
+import { awayDays, BACK_DAYS } from '../domain/lapse.js';
 import { esc, fa } from '../lib/fa.js';
 import { BUDDIES } from './buddies.js';
 
@@ -250,9 +251,9 @@ function slot(h) { return h >= 5 && h < 12 ? 'morning' : h >= 12 && h < 17 ? 'no
 export function greetCard() {
   if (!mascotOn()) return '';
   const t = today();
-  const entries = store.get().entries;
-  const last = entries.reduce((m, e) => (e.day < t && e.day > m ? e.day : m), '');
-  const away = last && diffDays(t, last) >= 3 && !entriesOn(entries, t).length;
+  // away: nothing at all recorded for three days or more (BAZGASHT.md), and nothing yet today
+  const gap = awayDays(store.get(), t);
+  const away = gap !== null && gap >= BACK_DAYS;
   const key = away ? 'back' : slot(new Date().getHours());
   const b = cur(), g = b.greet[key];
   keep();

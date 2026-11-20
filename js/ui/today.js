@@ -26,6 +26,7 @@ import { fastOn } from '../domain/plan.js';
 import { isRamadan } from '../domain/occasions.js';
 import { measureNote, bindMeasureNote } from './measure.js';
 import { checkinCard, bindCheckin } from './checkin.js';
+import { backCard, bindBack } from './back.js';
 import { weekCard, bindWeekCard } from './review.js';
 import { greetCard, bindGreet } from './mascot.js';
 import { mealBudget, mealSharesFrom, mealShares5From, mealStanding } from '../domain/portion.js';
@@ -64,6 +65,8 @@ let moreOpen = false;
 
 // Today's cards, most important first: what asks something of them, then what is there to read.
 const dayCards = () => [
+  // back after three days or more away: one small step first (BAZGASHT.md, phase 2)
+  ['بازگشت', backCard()],
   ['مرحله', phaseNotes()],
   ['برگشت به مسیر', checkinCard()],
   // one tap and it is gone, so it may stand above the week's review for that moment
@@ -338,6 +341,7 @@ export function renderToday(root) {
   bindPhase(root);
   bindMeasureNote(root);
   bindCheckin(root, redraw);
+  bindBack(root);
   // a card dismissed: draw again, so the next one moves up
   root.querySelectorAll('[data-day-cards]').forEach(el => new MutationObserver(redraw).observe(el, { childList: true }));
   const fold = root.querySelector('.today-more');

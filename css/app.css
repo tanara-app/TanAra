@@ -1681,3 +1681,7 @@ body.kb .toast, body.chat-mode .toast { bottom: calc(var(--nav-h) + var(--safe-b
 .promo-rules li::before { content: ''; position: absolute; inset-inline-start: 2px; top: .72em; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
 /* the game itself, under the sheet's head */
 .game-frame { display: block; width: 100%; height: calc(92dvh - 96px - var(--safe-b)); border: 0; border-radius: 18px; background: #FFEA7E; }
+/* back after an absence (BAZGASHT.md, phase 2): one small step */
+.back-card { display: flex; flex-direction: column; gap: 10px; }
+.back-h { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.back-h b { font-size: 1rem; }
