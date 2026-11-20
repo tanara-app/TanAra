@@ -80,7 +80,8 @@ exist side by side. When a new decision replaces an old one, change or mark the 
   version 5 with the CLI (commit 3ff1fad: the new-reward notification); `verify_jwt` stayed off, as the cron call needs. Later that
   day `m.b.a` deployed `remind` version 6 (commit 3e619e1, BAZGASHT.md phase 1: the pushes of an absence and `push_log`) with
   `npx supabase functions deploy remind --project-ref whmzjvmeyxdoqjtkukix --no-verify-jwt --yes` (without `--no-verify-jwt` the CLI
-  turns the JWT check on and the cron call fails), and `hooshvareh` version 57 (commit e8da126: the new «scale» drift sign in words).
+  turns the JWT check on and the cron call fails), and `hooshvareh` version 57 (commit e8da126: the new «scale» drift sign in words). That evening the CLI on `m.b.a`
+  answered `AccessTokenRequiredError` (its login had lapsed): run `npx supabase login` again, or deploy with the MCP tool as `ClaudeAccount` does.
   Later on 2026-11-20 `ClaudeAccount` deployed `hooshvareh` version 58 with the MCP tool (commit bbc4d56: the clinical review's potassium and
   phosphorus tags and conditions, kidney «not on dialysis», salty white cheese and دوغ; it carries fa6b235 too); it boots (OPTIONS 200).
 - From 2026-11-16 04:22 UTC every `hooshvareh` call failed with 502 (still so on 2026-11-18; on 2026-11-20 `ai_usage` had no row after 2026-11-16, so no call had succeeded since): the Anthropic API answered «credit balance is too low». Only the
