@@ -21,7 +21,7 @@ import { norm, esc, fa, qtyLabel, parseNum } from '../lib/fa.js';
 import { mealForNow, today } from '../lib/dates.js';
 import { sheet, toast, confirmBox, choose, icon } from './dom.js';
 import { amountLabel, hasGrams, hasUnit2 } from './units.js';
-import { fitMeal, usualCombos, roleOf, packKey, usualAmounts } from '../domain/portion.js';
+import { fitMeal, fitMark, usualCombos, roleOf, packKey, usualAmounts } from '../domain/portion.js';
 import { mealCombos, shortName, libKey, freeFoods } from '../domain/combos.js';
 import { COMBOS } from '../data/combos.js';
 import { packs, savePack, askPackName, deletePack, hideKey, hidden } from './packs.js';
@@ -278,12 +278,11 @@ export function openEat({ day = today(), meal = null, budgetFor, start = null })
       return ms.includes(m) ? m : 'u';
     };
     // the amount as shown, rounded to what can be measured in that unit, and in the food's own units
-    const view = (f, it) => {
-      const m = modeOf(f, it.qty);
+    // `m`, `exact`: given for the app's own suggestion in the unit shown (fitMark at «ثبت»)
+    const view = (f, it, m = modeOf(f, it.qty), exact = locks.has(f)) => {
       const g = Number(f.grams);
       let q = it.qty, units = it.qty, unit = f.unit;
       // the app's amount rounds to what can be measured; one they typed stays as they typed it
-      const exact = locks.has(f);
       if (m === 'g') { q = exact ? Math.round(it.qty * g) : Math.max(5, Math.round(it.qty * g / 5) * 5); units = q / g; unit = GRAM; }
       if (m === 'u2') { const x = it.qty * g / Number(f.grams2); q = exact ? Math.round(x * 100) / 100 : Math.max(0.5, Math.round(x * 2) / 2); units = q * Number(f.grams2) / g; unit = f.unit2; }
       const toUnits = n => (m === 'g' ? n / g : m === 'u2' ? n * Number(f.grams2) / g : n);
@@ -298,7 +297,8 @@ export function openEat({ day = today(), meal = null, budgetFor, start = null })
       if (!picked.length) { from = null; editing = false; return drawHome(); }
       const b = budgetFor(cur);
       const budget = Math.max(0, Math.round(b.kcal));
-      const r = fitMeal(picked, budget, Object.fromEntries(picked.map((f, i) => [i, locks.get(f)]).filter(([, q]) => q != null)), { proteinMax: b.proteinMax ?? null, proteinMin: b.proteinMin ?? null, usual: usualAmounts(store.get().entries, store.get().foods, day), carbMax: b.carbMax ?? null, carbsOf: f => foodNutr(f)?.c ?? 0 });
+      const opts = { proteinMax: b.proteinMax ?? null, proteinMin: b.proteinMin ?? null, usual: usualAmounts(store.get().entries, store.get().foods, day), carbMax: b.carbMax ?? null, carbsOf: f => foodNutr(f)?.c ?? 0 };
+      const r = fitMeal(picked, budget, Object.fromEntries(picked.map((f, i) => [i, locks.get(f)]).filter(([, q]) => q != null)), opts);
       const views = picked.map((f, i) => view(f, r.items[i]));
       const total = views.reduce((t, v) => t + v.kcal, 0);
       const protein = views.reduce((t, v) => t + v.protein, 0);
@@ -388,9 +388,13 @@ export function openEat({ day = today(), meal = null, budgetFor, start = null })
         x.addEventListener('change', apply);
       });
       body.querySelector('[data-save]').onclick = () => {
+        // the app's own answer for these foods, with nothing set by hand, in the unit each is logged in (SAHM.md, phase 1)
+        const app = locks.size ? fitMeal(picked, budget, {}, opts) : r;
         picked.forEach((f, i) => {
           const v = views[i];
-          store.saveEntry({ day, meal: cur, food_id: f.id || null, name: f.name, unit: v.unit, qty: v.q, kcal: v.kcal, protein: v.protein, is_veg: !!f.is_veg });
+          const s = view(f, app.items[i], v.m, false);
+          const fit = fitMark({ sug: s.q, sugKcal: s.kcal, qty: v.q, hand: locks.has(f), budget, proteinMin: b.proteinMin ?? null, proteinMax: b.proteinMax ?? null, carbMax: b.carbMax ?? null });
+          store.saveEntry({ day, meal: cur, food_id: f.id || null, name: f.name, unit: v.unit, qty: v.q, kcal: v.kcal, protein: v.protein, is_veg: !!f.is_veg, fit });
         });
         cheer('entry');
         const n = picked.length;

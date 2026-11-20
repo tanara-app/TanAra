@@ -1,5 +1,5 @@
 import { suite, test, eq, ok } from './harness.js';
-import { roleOf, fitMeal, mealBudget, mealStanding, usualCombos, mealPacks, packKey, MEAL_SHARES, usualAmounts, usualHelping } from '../js/domain/portion.js';
+import { roleOf, fitMeal, mealBudget, mealStanding, usualCombos, mealPacks, packKey, MEAL_SHARES, usualAmounts, usualHelping, fitMark, FIT_VERSION } from '../js/domain/portion.js';
 import { SEED_FOODS } from '../js/data/seedFoods.js';
 
 const seed = name => {
@@ -230,5 +230,16 @@ suite('portion', () => {
     eq(r.own.map(p => p.id), ['p1']);
     eq(r.sug.map(c => packKey(c.ids)), ['e,f']);
     eq(mealPacks([], combos, [], 'breakfast', 2).sug.length, 2);
+  });
+
+  test('fit mark: the app\'s suggestion kept beside what was logged, limits only when there are', () => {
+    const m = fitMark({ sug: 1.5, sugKcal: 269.6, qty: 2, hand: true, budget: 700.4, proteinMin: 30, proteinMax: null, carbMax: null });
+    eq(m, { v: FIT_VERSION, sug: 1.5, sugKcal: 270, qty: 2, hand: true, budget: 700, proteinMin: 30 });
+    const d = fitMark({ sug: 1 / 3, sugKcal: 60, qty: 1 / 3, budget: 250, carbMax: 25 });
+    eq(d.sug, 0.33);
+    eq(d.qty, d.sug); // taken as it is
+    eq(d.hand, false);
+    eq(d.carbMax, 25);
+    ok(!('proteinMin' in d) && !('proteinMax' in d));
   });
 });

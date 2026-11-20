@@ -314,6 +314,25 @@ export function fitMeal(foods, kcal, locked = {}, { proteinMax = null, proteinMi
   };
 }
 
+// Which fitMeal gave a suggestion (SAHM.md): raise it whenever its answers change, so the weeks of each can be compared.
+export const FIT_VERSION = 1;
+
+/*
+  What the app suggested for a food logged from the meal sheet, kept with the entry (`entries.fit`;
+  SAHM.md, phase 1): its amount and calories in the unit logged, with no amount set by hand on the
+  plate; the amount logged then (a later edit changes the entry, not this); whether this food was set
+  by hand; and the meal's calories and limits at the time, so the plate can be fitted again later by
+  another version. Taken as it is: qty equal to sug and not by hand.
+*/
+export function fitMark({ sug, sugKcal, qty, hand = false, budget, proteinMin = null, proteinMax = null, carbMax = null }) {
+  const r2 = x => Math.round((Number(x) || 0) * 100) / 100;
+  const out = { v: FIT_VERSION, sug: r2(sug), sugKcal: Math.round(Number(sugKcal) || 0), qty: r2(qty), hand: !!hand, budget: Math.round(Number(budget) || 0) };
+  if (proteinMin != null) out.proteinMin = proteinMin;
+  if (proteinMax != null) out.proteinMax = proteinMax;
+  if (carbMax != null) out.carbMax = carbMax;
+  return out;
+}
+
 // Each meal's part of the day, from the plan's occasions (both snacks are «میان‌وعده»).
 export const MEAL_SHARES = { breakfast: 0.25, lunch: 0.3, dinner: 0.25, snack: 0.2 };
 

@@ -283,6 +283,8 @@ export function saveEntry(e) {
     protein: Math.max(0, Math.round((Number(e.protein) || 0) * 10) / 10),
     is_veg: !!e.is_veg,
     created_at: e.created_at || now(),
+    // what the meal sheet suggested (portion.js fitMark); an edit that spreads the entry keeps it
+    ...(e.fit ? { fit: e.fit } : {}),
   };
   put('entries', row);
   commit({ op: 'upsert', table: 'entries', row });
