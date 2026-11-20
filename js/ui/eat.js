@@ -298,7 +298,7 @@ export function openEat({ day = today(), meal = null, budgetFor, start = null })
       if (!picked.length) { from = null; editing = false; return drawHome(); }
       const b = budgetFor(cur);
       const budget = Math.max(0, Math.round(b.kcal));
-      const opts = { proteinMax: b.proteinMax ?? null, proteinMin: b.proteinMin ?? null, usual: usualAmounts(store.get().entries, store.get().foods, day), carbMax: b.carbMax ?? null, carbsOf: f => foodNutr(f)?.c ?? 0, sodiumMax: b.sodiumMax ?? null, sodiumOf: f => foodNutr(f)?.na ?? 0 };
+      const opts = { proteinMax: b.proteinMax ?? null, proteinMin: b.proteinMin ?? null, usual: usualAmounts(store.get().entries, store.get().foods, day, { meal: cur }), carbMax: b.carbMax ?? null, carbsOf: f => foodNutr(f)?.c ?? 0, sodiumMax: b.sodiumMax ?? null, sodiumOf: f => foodNutr(f)?.na ?? 0 };
       // the amounts: version 2, one search for the best plate (fit.js; SAHM.md, for everyone from 2026-11-20)
       const r = fitPlate(picked, budget, Object.fromEntries(picked.map((f, i) => [i, locks.get(f)]).filter(([, q]) => q != null)), opts);
       const views = picked.map((f, i) => view(f, r.items[i]));

@@ -101,4 +101,20 @@ suite('clinical', () => {
     // salt: every meal has its part, with or without a condition
     ok(limitsOn(2000, 80, []).lunch.sodiumMax > 0);
   });
+
+  test('the whole day (phase 4): protein, carbohydrate and salt come from what is left of the day', () => {
+    const base = { meal: 'lunch', budget: 700, shares: MEAL_SHARES5, dayKcal: 2000, main: true };
+    // a salty breakfast (1500 mg) leaves 500 mg; lunch has 40% of what is left
+    eq(mealLimits({ ...base, protein: 90, today: { part: 0.4, protein: 30, carbs: 0, sodium: 1500 } }).sodiumMax, 200);
+    // a breakfast with little protein asks more of lunch: 40% of 85 g = 34 g (inside 15–40 and a quarter of 700 kcal)
+    eq(mealLimits({ ...base, protein: 90, today: { part: 0.4, protein: 5, carbs: 0, sodium: 0 } }).proteinMin, 34);
+    // a breakfast with a lot of protein: lunch still asks 15 g
+    eq(mealLimits({ ...base, protein: 90, today: { part: 0.4, protein: 85, carbs: 0, sodium: 0 } }).proteinMin, 15);
+    // the kidney limit: 40 of 50 g eaten leaves lunch 4 g
+    eq(mealLimits({ ...base, protein: 50, proteinIsLimit: true, today: { part: 0.4, protein: 40, carbs: 0, sodium: 0 } }).proteinMax, 4);
+    // diabetes: 120 of the day's 200 g eaten leaves lunch 32 g, under its 60 g share
+    eq(mealLimits({ ...base, protein: 90, conditions: ['diabetes'], today: { part: 0.4, protein: 30, carbs: 120, sodium: 0 } }).carbMax, 32);
+    // nothing eaten yet: the same as the meal's share of the day
+    eq(mealLimits({ ...base, protein: 90, conditions: ['diabetes'], today: { part: 0.3, protein: 0, carbs: 0, sodium: 0 } }).carbMax, 60);
+  });
 });

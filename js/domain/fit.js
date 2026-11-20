@@ -23,7 +23,10 @@
 */
 import { foodBounds, STRETCH, SHRINK, DROP_ORDER } from './portion.js';
 
-export const FIT_V2 = 2;
+// The version written beside each suggestion (entries.fit.v): 2 from the release on 2026-11-20, 3 from that evening
+// (the clinical review's weights and limits, the whole day of phase 4, habits per meal of phase 5). Raise it whenever
+// the answers change, so the weeks of each can be measured apart (SAHM.md).
+export const FIT_V2 = 3;
 const EPS = 1e-9;
 const OVER = 15;                                   // calories over the budget a plate may go (fitMeal's TOL)
 export const underBand = b => Math.max(20, 0.05 * b);

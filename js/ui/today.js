@@ -29,7 +29,7 @@ import { checkinCard, bindCheckin } from './checkin.js';
 import { backCard, bindBack } from './back.js';
 import { weekCard, bindWeekCard } from './review.js';
 import { greetCard, bindGreet } from './mascot.js';
-import { mealBudget, mealSharesFrom, mealShares5From, mealStanding } from '../domain/portion.js';
+import { mealBudget, mealSharesFrom, mealShares5From, mealStanding, openPart } from '../domain/portion.js';
 import { planAvoid, foodTags, foodNutr } from '../ai/foodTags.js';
 import { nutrTotals, countsCarbs, countsSalt, carbLimit, SALT_MAX_G, mealLimits } from '../domain/nutrients.js';
 import { dayQuality, hasVeg } from '../domain/quality.js';
@@ -174,15 +174,21 @@ export function renderToday(root) {
     return (eat ? mealShares5From : mealSharesFrom)(pat.ready ? pat.shares : null);
   };
   // the meal's calories, and its limits and goals for the amounts (mealLimits in nutrients.js: carbohydrate with
-  // diabetes, the kidney protein limit, a main meal's protein, sodium)
+  // diabetes, the kidney protein limit, a main meal's protein, sodium), from what is left of the day (SAHM.md phase 4)
   const budgetFor = m => {
     const st = store.get();
     const sh = sharesNow();
-    const kcal = mealBudget(asShown(st.entries), day, m, t.kcal, sh);
+    const es = asShown(st.entries);
+    const kcal = mealBudget(es, day, m, t.kcal, sh);
+    const eaten = es.filter(e => e.day === day);
+    const byId = new Map(st.foods.map(f => [f.id, f]));
+    const byName = new Map(st.foods.map(f => [norm(f.name), f]));
+    const n = nutrTotals(eaten, e => byId.get(e.food_id) || byName.get(norm(e.name)), foodNutr);
+    const today = { part: openPart(es, day, m, sh), protein: eaten.reduce((a, e) => a + (Number(e.protein) || 0), 0), carbs: n.carbs, sodium: n.sodium };
     return {
       kcal, label: meals[m] || mealLabel(m), meals,
       main: MAIN_MEALS.has(m),
-      ...mealLimits({ meal: m, budget: kcal, shares: sh, dayKcal: t.kcal, protein: t.protein, proteinIsLimit: !!t.proteinMax, conditions: p.conditions || [], main: MAIN_MEALS.has(m) }),
+      ...mealLimits({ meal: m, budget: kcal, shares: sh, dayKcal: t.kcal, protein: t.protein, proteinIsLimit: !!t.proteinMax, conditions: p.conditions || [], main: MAIN_MEALS.has(m), today }),
     };
   };
   // the quality of the day beside its calories (quality.js): in the summary card of the rebuilt «امروز»

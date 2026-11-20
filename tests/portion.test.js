@@ -1,5 +1,5 @@
 import { suite, test, eq, ok } from './harness.js';
-import { roleOf, fitMeal, mealBudget, mealStanding, usualCombos, mealPacks, packKey, MEAL_SHARES, usualAmounts, usualHelping, fitMark, FIT_VERSION } from '../js/domain/portion.js';
+import { roleOf, fitMeal, mealBudget, mealStanding, usualCombos, mealPacks, packKey, MEAL_SHARES, usualAmounts, usualHelping, fitMark, FIT_VERSION, openPart, MEAL_SHARES5 } from '../js/domain/portion.js';
 import { fitPlate } from '../js/domain/fit.js';
 import { SEED_FOODS } from '../js/data/seedFoods.js';
 
@@ -253,3 +253,35 @@ suite('portion', () => {
 
 suite('amounts: fitMeal (v1)', () => fitBehaviour(fitMeal));
 suite('amounts: fitPlate (v2)', () => fitBehaviour(fitPlate));
+
+// SAHM.md phases 4 and 5 (2026-11-20): what is left of the day, and the usual amounts of each meal, recent first
+suite('portion: the whole day and their habits', () => {
+  const bread = { ...BREAD };
+  const log = (day, meal, qty) => ({ day, meal, food_id: bread.id, unit: bread.unit, qty });
+
+  test('usual amounts per meal: bread at breakfast is not bread at dinner', () => {
+    const es = [log('2026-11-10', 'breakfast', 1), log('2026-11-11', 'breakfast', 1), log('2026-11-10', 'dinner', 3), log('2026-11-11', 'dinner', 3)];
+    eq(usualAmounts(es, [bread], '2026-11-12', { meal: 'breakfast' }).get(bread.id), 1);
+    eq(usualAmounts(es, [bread], '2026-11-12', { meal: 'dinner' }).get(bread.id), 3);
+    // logged once in a meal: all its logs
+    eq(usualAmounts([...es.slice(0, 2), log('2026-11-11', 'lunch', 3)], [bread], '2026-11-12', { meal: 'lunch' }).get(bread.id), 1);
+    // a snack is a snack, whichever of the two
+    eq(usualAmounts([log('2026-11-10', 'snack1', 0.5), log('2026-11-11', 'snack2', 0.5)], [bread], '2026-11-12', { meal: 'snack2' }).get(bread.id), 0.5);
+  });
+
+  test('usual amounts: recent logs count more, so a changed habit moves the amount', () => {
+    const old = ['2026-08-10', '2026-08-11', '2026-08-12'].map(d => log(d, 'breakfast', 2));
+    const recent = ['2026-11-06', '2026-11-07'].map(d => log(d, 'breakfast', 3));
+    // three old twos against two recent threes: the plain middle would say 2
+    eq(usualAmounts([...old, ...recent], [bread], '2026-11-12').get(bread.id), 3);
+  });
+
+  test('a meal\'s part of what is left of the day: its share among the meals not eaten yet', () => {
+    const day = '2026-11-12';
+    ok(Math.abs(openPart([], day, 'lunch', MEAL_SHARES5) - 0.3) < 1e-9);
+    const ate = [{ day, meal: 'breakfast', kcal: 400 }];
+    ok(Math.abs(openPart(ate, day, 'lunch', MEAL_SHARES5) - 0.3 / 0.75) < 1e-9);
+    // a meal eaten from counts itself
+    ok(Math.abs(openPart(ate, day, 'breakfast', MEAL_SHARES5) - 1 / 4) < 1e-9);
+  });
+});

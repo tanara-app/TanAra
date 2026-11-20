@@ -78,18 +78,28 @@ export function nutrTotals(entries, foodOf, nutr) {
   - sodiumMax: the meal's part of 2000 mg (WHO: for every adult; KDIGO). For everyone since the
     clinical review of 2026-11-20; only with high blood pressure, heart or kidney disease or stones
     does the today card show the day's salt (countsSalt). fitPlate keeps it as a soft limit.
+  `today` (SAHM.md phase 4, the whole day): { part, protein, carbs, sodium }, this meal's part of what is
+  left of the day (openPart) and what was eaten today. The day's protein (goal or kidney limit),
+  carbohydrate and sodium then come from what is left, shared like the calories: a salty breakfast leaves
+  less salt for lunch and dinner, a breakfast with little protein asks more of lunch (still 15–40 g), and
+  carbohydrate never more than what is left of the day's.
 */
 export const PROTEIN_PART = 0.25;
-export function mealLimits({ meal, budget, shares, dayKcal = null, protein, proteinIsLimit = false, conditions = [], main = false }) {
+export function mealLimits({ meal, budget, shares, dayKcal = null, protein, proteinIsLimit = false, conditions = [], main = false, today = null }) {
   const all = Object.values(shares).reduce((a, b) => a + b, 0);
   const part = all ? (shares[meal] || 0) / all : 0;
   const kcal = Math.max(0, Number(budget) || 0);
   const carbKcal = Number(dayKcal) > 0 ? Math.min(kcal, dayKcal * part) : kcal;
-  const goal = !proteinIsLimit && all && main ? Math.min(Math.min(40, Math.max(15, Math.round(protein * part))), Math.floor(PROTEIN_PART * kcal / 4)) : null;
+  // the meal's part of a day's amount: of what is left of it when what was eaten today is known
+  const left = (dayAmount, eaten) => (today ? Math.max(0, dayAmount - (Number(eaten) || 0)) * today.part : dayAmount * part);
+  const mealProtein = left(protein, today?.protein);
+  const goal = !proteinIsLimit && all && main ? Math.min(Math.min(40, Math.max(15, Math.round(mealProtein))), Math.floor(PROTEIN_PART * kcal / 4)) : null;
+  let carbMax = countsCarbs(conditions) ? carbLimit(carbKcal) : null;
+  if (carbMax != null && today && Number(dayKcal) > 0) carbMax = Math.min(carbMax, Math.round(left(carbLimit(dayKcal), today.carbs)));
   return {
-    carbMax: countsCarbs(conditions) ? carbLimit(carbKcal) : null,
-    proteinMax: proteinIsLimit && all ? Math.round(protein * part) : null,
+    carbMax,
+    proteinMax: proteinIsLimit && all ? Math.round(mealProtein) : null,
     proteinMin: goal != null && goal >= 5 ? goal : null,
-    sodiumMax: all ? Math.round(SALT_MAX_G * 1000 / 2.5 * part) : null,
+    sodiumMax: all ? Math.round(left(SALT_MAX_G * 1000 / 2.5, today?.sodium)) : null,
   };
 }

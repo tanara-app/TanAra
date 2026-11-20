@@ -12,6 +12,7 @@
 import { addDays } from '../lib/dates.js';
 import { GRAM } from '../data/seedFoods.js';
 import { USUAL } from '../data/usual.js';
+import { baseMeal } from './meals.js';
 
 // g: [least, most] grams in one meal, whatever the usual helping. units: the same when a unit's
 // weight is unknown. (w: the old share of the meal, no longer used by fitMeal.)
@@ -129,8 +130,13 @@ export function foodBounds(f, usual = null) {
   Their usual amount of each food they have logged at least twice in the last `days`: the middle one
   of their amounts, in the food's own unit (an amount in grams or in its second unit is turned back).
   food id → amount.
+  SAHM.md phase 5 (2026-11-20): the middle is weighed by how recent each log is (a log HALF_LIFE days
+  old counts half), so a habit that changed moves the amount; and with `meal`, the amounts of that meal
+  when they have logged the food there at least twice (bread at breakfast is not bread at dinner),
+  else all of its logs. No pull towards the app's own amounts: two logs of theirs already win.
 */
-export function usualAmounts(entries, foods, day, { days = 120 } = {}) {
+export const HALF_LIFE = 45;
+export function usualAmounts(entries, foods, day, { days = 120, meal = null } = {}) {
   const from = addDays(day, -days);
   const byId = new Map(foods.map(f => [f.id, f]));
   const seen = new Map();
@@ -143,15 +149,33 @@ export function usualAmounts(entries, foods, day, { days = 120 } = {}) {
     if (e.unit === f.unit) u = q;
     else if (e.unit === GRAM && g > 0) u = q / g;
     else if (f.unit2 && e.unit === f.unit2 && g > 0) u = q * Number(f.grams2) / g;
-    if (u > 0) (seen.get(f.id) || seen.set(f.id, []).get(f.id)).push(u);
+    const age = Math.max(0, (Date.parse(day) - Date.parse(e.day)) / 864e5);
+    if (u > 0) (seen.get(f.id) || seen.set(f.id, []).get(f.id)).push({ u, w: 0.5 ** (age / HALF_LIFE), meal: e.meal && baseMeal(e.meal) });
   }
+  const middle = logs => {
+    const sorted = [...logs].sort((a, b) => a.u - b.u);
+    const half = sorted.reduce((t, x) => t + x.w, 0) / 2;
+    let acc = 0;
+    for (const x of sorted) { acc += x.w; if (acc >= half - 1e-9) return x.u; }
+    return sorted.at(-1).u;
+  };
+  const here = meal && baseMeal(meal);
   const out = new Map();
-  for (const [id, qs] of seen) {
-    if (qs.length < 2) continue;
-    qs.sort((a, b) => a - b);
-    out.set(id, qs[Math.floor((qs.length - 1) / 2)]);
+  for (const [id, logs] of seen) {
+    const inMeal = here ? logs.filter(x => x.meal === here) : [];
+    const use = inMeal.length >= 2 ? inMeal : logs;
+    if (use.length < 2) continue;
+    out.set(id, middle(use));
   }
   return out;
+}
+
+// This meal's part of what is left of the day: its share among the meals not eaten from yet (itself
+// counted), as mealBudget shares the calories (SAHM.md phase 4).
+export function openPart(entries, day, meal, shares) {
+  const had = new Set(entries.filter(e => e.day === day).map(e => e.meal));
+  const sum = Object.keys(shares).filter(m => m === meal || !had.has(m)).reduce((t, m) => t + shares[m], 0);
+  return sum ? (shares[meal] || 0) / sum : 0;
 }
 
 /*
