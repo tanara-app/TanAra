@@ -1,5 +1,5 @@
 import { suite, test, eq, ok } from './harness.js';
-import { fullRuns, progress, earnedFinishes, rewardOf, REWARDS, recipeDays, goalText } from '../js/domain/rewards.js';
+import { fullRuns, progress, earnedFinishes, rewardOf, REWARDS, recipeDays, goalText, goalRules } from '../js/domain/rewards.js';
 import { addDays } from '../js/lib/dates.js';
 
 // after every reward's `since`, so the goals below count all their days
@@ -65,7 +65,7 @@ suite('rewards', () => {
   test('«پِفِردینگر»: days with something from their own recipes, in a row or not', () => {
     const r = rewardOf('pfeffer');
     eq([r.kind, r.goal.type], ['buddy', 'recipeDays']);
-    eq(goalText(r), `${r.goal.of} روز غذا از دستور پخت خودت`);
+    eq(goalText(r), `${r.goal.of} روز غذا از رسپی‌های خودت`);
     // one recipe in the bank (food 'ash'), one only as a recipe (logged by its name)
     const notes = [
       { key: 'recipe:1', kind: 'recipe', data: { name: 'آش رشته', food_id: 'ash', items: [{}] } },
@@ -97,6 +97,21 @@ suite('rewards', () => {
     eq(progress({ entries: run(addDays(pn.since, -10), 15) }, addDays(pn.since, 5)).find(x => x.reward.key === 'parniyan').now, 5);
     // earned before, stays earned
     ok(progress({ entries: [], earned: { shab: '2026-11-17' } }, DAY).find(x => x.reward.key === 'shab').earned);
+  });
+
+  test('every reward explains its goal: what counts, from which day, and where it is used', () => {
+    for (const r of REWARDS) {
+      const rules = goalRules(r, String, d => `<${d}>`);
+      ok(rules.length >= 3, `${r.key}: too few rules`);
+      ok(rules.some(t => t.includes(`<${r.since}>`)), `${r.key}: no start day`);
+      ok(rules.every(t => t && !t.includes('undefined')), `${r.key}: an empty line`);
+    }
+    // what a full day is, for both kinds of full-day goal; a run says it must be in a row, the total says not
+    const run = goalRules(rewardOf('parniyan')).join(' '), all = goalRules(rewardOf('shab')).join(' ');
+    ok(run.includes('دو وعده') && all.includes('دو وعده'));
+    ok(run.includes('پشت‌سرهم باشد') && all.includes('لازم نیست پشت‌سرهم'));
+    ok(goalRules(rewardOf('tangatang')).join(' ').includes('80 گرم'));
+    ok(goalRules(rewardOf('pfeffer')).join(' ').includes('«رسپی‌ها»'));
   });
 
   test('only earned finishes can be worn', () => {

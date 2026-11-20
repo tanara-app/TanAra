@@ -2,16 +2,18 @@
   «جوایز» (a tile in «بیشتر», for everyone): every reward of js/domain/rewards.js as one card the
   same way — a live showcase, its name, a few words on what it is, the goal, and the progress bar, or
   once earned a mark that says so. A finish is then worn from «ظاهر» (profile.js), not from here.
-  A game (kind 'game') is a card that opens its own page (promo, below); once earned it is a tile in
-  «بیشتر» (tools.js) that opens the game in a tall sheet (openGame). A companion (kind 'buddy') is
-  picked in «تنظیمات» ← «همراه» once earned (profile.js, mascot.js).
+  Every card opens the reward's own page (openPromo, below): a poster, the goal day by day, and its
+  rules in plain words (goalRules in domain/rewards.js), so everyone knows what counts (the owner's
+  request, 2026-11-20). A game (kind 'game') is, once earned, a tile in «بیشتر» (tools.js) that opens
+  the game in a tall sheet (openGame). A companion (kind 'buddy') is picked in «تنظیمات» ← «همراه»
+  once earned (profile.js, mascot.js).
   Earned rewards are written down in profile.data.rewards the first time they are seen.
 */
 import * as store from '../data/store.js';
 import { sheet, icon, toast } from './dom.js';
 import { fa } from '../lib/fa.js';
-import { today } from '../lib/dates.js';
-import { progress, goalText, rewardOf } from '../domain/rewards.js';
+import { today, faDM } from '../lib/dates.js';
+import { progress, goalText, goalRules, rewardOf } from '../domain/rewards.js';
 import { getFinish, setFinish } from './theme.js';
 import { ttArt } from './ttArt.js';
 
@@ -70,8 +72,7 @@ const WHERE = { game: 'در «بیشتر»', finish: 'در «ظاهر»', buddy:
 const PLAY = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z" fill="currentColor"/></svg>';
 
 function card({ reward: r, earned, now, of }) {
-  const game = r.kind === 'game';
-  return `<article class="rw-card${earned ? ' got' : ''}${game ? ' tap' : ''}"${game ? ` role="button" tabindex="0" data-promo="${r.key}"` : ''}>
+  return `<article class="rw-card tap${earned ? ' got' : ''}" role="button" tabindex="0" data-promo="${r.key}">
     <div class="rw-show rw-${r.key}">${SHOWCASE[r.key]?.() || ''}${earned ? '' : `<span class="rw-lock">${LOCK}</span>`}</div>
     <div class="rw-info">
       <div class="rw-title"><h3>${r.name}</h3><small>${r.about}</small></div>
@@ -88,6 +89,8 @@ function card({ reward: r, earned, now, of }) {
   A game's own page in «جوایز»: a poster (picture, a badge, the name, two lines), then while locked the goal as
   one cell per day with how many are left, or once earned «بازی کن»; three things about the game; who made it.
   Design 1 «سفر به خانه» of art/promo/tangatang.html, chosen by the owner on 2026-11-18.
+  Since 2026-11-20 every reward has this page: the others show their card's showcase as the poster,
+  their `about` as the kicker and one line under the name; all of them end with «قانون‌ها».
 */
 const SPARK = '<svg viewBox="-10 -10 20 20" width="12" height="12" aria-hidden="true"><path d="M0-10C1-3 3-1 10 0C3 1 1 3 0 10C-1 3-3 1-10 0C-3-1-1-3 0-10Z" fill="currentColor"/></svg>';
 const FEAT = {
@@ -103,29 +106,37 @@ const PROMO = {
     feats: [['modes', '۵ حالت بازی'], ['endless', 'بی‌پایان'], ['calm', 'بدون عجله']],
     credit: '<bdi>Mattia Fortunati</bdi> · <bdi>js13kGames 2021</bdi>',
   },
+  parniyan: { lines: ['یک لباس تازه برای همه‌ی رنگ‌های اپ.'] },
+  shab: { lines: ['آسمان شب و ماه و ستاره، روی هر رنگی.'] },
+  pfeffer: { lines: ['آشپز کوچولوی زبان‌دراز، به جای هایمردینگر.'] },
 };
 
 function openPromo(key) {
-  const r = rewardOf(key), p = PROMO[key];
+  const r = rewardOf(key), p = PROMO[key] || {};
+  if (!r) return;
+  const game = r.kind === 'game';
   sheet.open(body => {
     const x = listNow().find(y => y.reward.key === key);
+    const art = p.art ? p.art() : `<div class="rw-show rw-${key}">${SHOWCASE[key]?.() || ''}</div>`;
     body.innerHTML = `
       <div class="sheet-head"><span></span><h2 class="sr-only">${r.name}</h2><button class="icon-btn" data-close aria-label="بستن">${icon.close}</button></div>
       <div class="promo">
-        <div class="promo-poster">
-          ${p.art()}
+        <div class="promo-poster${p.art ? '' : ' show'}">
+          ${art}
           ${x.earned ? '' : `<span class="promo-lock">${LOCK}<span>قفل</span></span>`}
-          <span class="promo-kicker">${SPARK}${p.kicker}</span>
-          <div class="promo-titles"><div class="promo-title">${r.name}</div><p>${p.lines.join('<br>')}</p></div>
+          <span class="promo-kicker">${SPARK}${p.kicker || r.about}</span>
+          <div class="promo-titles"><div class="promo-title">${r.name}</div>${p.lines ? `<p>${p.lines.join('<br>')}</p>` : ''}</div>
         </div>
         ${x.earned
-          ? `<button class="promo-play" data-play>${PLAY}<span>بازی کن</span></button>`
+          ? (game ? `<button class="promo-play" data-play>${PLAY}<span>بازی کن</span></button>`
+            : `<p class="promo-got">${icon.check}<span>مال توست · ${WHERE[r.kind]}</span></p>`)
           : `<div class="promo-goal">
               <div class="row"><span>${goalText(r, fa)}</span><span class="left"><b>${fa(x.of - x.now)}</b> روز مانده</span></div>
               <div class="promo-days" role="progressbar" aria-valuemin="0" aria-valuemax="${x.of}" aria-valuenow="${x.now}">${Array.from({ length: x.of }, (_, i) => `<i${i < x.now ? ' class="on"' : ''}></i>`).join('')}</div>
             </div>`}
-        <div class="promo-feats">${p.feats.map(([k, t]) => `<div>${FEAT[k]}<span>${t}</span></div>`).join('')}</div>
-        <p class="promo-credit">${p.credit}</p>
+        <section class="promo-rules"><h3>قانون‌ها</h3><ul>${goalRules(r, fa, faDM).map(t => `<li>${t}</li>`).join('')}</ul></section>
+        ${p.feats ? `<div class="promo-feats">${p.feats.map(([k, t]) => `<div>${FEAT[k]}<span>${t}</span></div>`).join('')}</div>` : ''}
+        ${p.credit ? `<p class="promo-credit">${p.credit}</p>` : ''}
       </div>`;
     body.querySelector('[data-close]').onclick = () => sheet.close();
     body.querySelector('[data-play]')?.addEventListener('click', () => openGame(key));

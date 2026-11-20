@@ -17,11 +17,13 @@
   meals or more); 'fullDays' — `of` full days in all, in a row or not; 'vegDays' — `of` days, in a row
   or not, with the day's vegetables and fruit at VEG_FRUIT_GOAL servings or more (quality.js);
   'recipeDays' — `of` days, in a row or not, with something logged from one of their own recipes
-  («دستور پخت», ui/recipes.js): its bank food, or for a recipe not in the bank its name.
+  («رسپی‌ها» in «بیشتر», ui/recipes.js): its bank food, or for a recipe not in the bank its name.
+
+  Each reward's page (ui/rewards.js) explains its goal in plain words: goalRules.
 */
 import { addDays } from '../lib/dates.js';
 import { baseMeal } from './meals.js';
-import { logMarks, fullDay } from './stats.js';
+import { logMarks, fullDay, VEG_SERVING_G } from './stats.js';
 import { vegByDay, VEG_FRUIT_GOAL } from './quality.js';
 
 export const REWARDS = [
@@ -40,8 +42,42 @@ export function goalText(r, fa = String) {
   if (r.goal.type === 'fullRun') return `${fa(r.goal.of)} روز پشت‌سرهم ثبت کامل`;
   if (r.goal.type === 'fullDays') return `${fa(r.goal.of)} روز ثبت کامل`;
   if (r.goal.type === 'vegDays') return `${fa(r.goal.of)} روز ${fa(VEG_FRUIT_GOAL)} سهم سبزی و میوه`;
-  if (r.goal.type === 'recipeDays') return `${fa(r.goal.of)} روز غذا از دستور پخت خودت`;
+  if (r.goal.type === 'recipeDays') return `${fa(r.goal.of)} روز غذا از رسپی‌های خودت`;
   return '';
+}
+
+/*
+  The goal's rules in plain words, one short line each, for the reward's own page: what counts as a
+  day, what breaks a run, the day counting starts (`dm`: a day in Persian), and where the reward is
+  used once earned. They follow progress() exactly; change both together.
+*/
+const FULL_DAY = 'هر روزی که دست‌کم دو وعده‌اش را ثبت کنی، یک «روز کامل» است.';
+const MARK_DAY = 'اگر روزی کمتر خوردی و همه‌اش را ثبت کردی، در «امروز» روی «ثبت ناقص» بزن تا «ثبت کامل» شود.';
+const USE = {
+  finish: 'در «تنظیمات» ← «ظاهر» ← «پوسته» روشنش کن',
+  game: 'کاشی‌اش در «بیشتر» می‌آید',
+  buddy: 'در «تنظیمات» ← «همراه» ← «شخصیت» انتخابش کن',
+};
+export function goalRules(r, fa = String, dm = String) {
+  const of = fa(r.goal.of);
+  const own = {
+    fullRun: [FULL_DAY, MARK_DAY,
+      `${of} روز کامل باید پشت‌سرهم باشد؛ یک روز ناقص یا خالی، شمارش را از صفر شروع می‌کند.`,
+      'امروز تا وقتی کامل نشده رشته را نمی‌شکند؛ وقتی کامل شد، یک روز اضافه می‌شود.'],
+    fullDays: [FULL_DAY, MARK_DAY,
+      'لازم نیست پشت‌سرهم باشد؛ هر روز کامل یکی اضافه می‌کند و روز ناقص چیزی کم نمی‌کند.'],
+    vegDays: [`روزی حساب می‌شود که دست‌کم ${fa(VEG_FRUIT_GOAL)} سهم سبزی و میوه ثبت کنی؛ همان عددی که در «امروز» کنار «سبزی و میوه» است.`,
+      `هر واحد سبزی یا میوه یک سهم است؛ اگر با گرم ثبت کنی، هر ${fa(VEG_SERVING_G)} گرم یک سهم.`,
+      'خرما و کشمش حساب نیستند؛ جزو «آجیل و خرما» هستند.',
+      'لازم نیست پشت‌سرهم باشد.'],
+    recipeDays: ['روزی حساب می‌شود که دست‌کم یک غذا از رسپی‌های خودت ثبت کنی.',
+      'رسپی را در «بیشتر» ← «رسپی‌ها» بساز یا ذخیره کن؛ بعد در همان رسپی «پختم» را بزن و سهمت را ثبت کن.',
+      'رسپی‌ای که در بانک غذا هم گذاشته‌ای، از جست‌وجوی غذا هم ثبت کنی حساب است.',
+      'چند غذا در یک روز، یک روز حساب می‌شود؛ لازم نیست پشت‌سرهم باشد.'],
+  }[r.goal.type] || [];
+  return [...own,
+    `فقط روزهای از ${dm(r.since)} به بعد حساب‌اند؛ همان روزی که این جایزه آمد.`,
+    `وقتی رسیدی، برای همیشه مال توست؛ ${USE[r.kind]}.`];
 }
 
 /*
