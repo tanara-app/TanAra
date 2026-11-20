@@ -75,7 +75,10 @@ exist side by side. When a new decision replaces an old one, change or mark the 
   the tip mode gone, the chat sees today's tip from TIPS.md); it boots (OPTIONS 200). Later that day it deployed version 55 the same way (commit 863b7cb:
   `lateNight`, the app's day starting at 5 am); it boots (OPTIONS 200). On 2026-11-20 `m.b.a` deployed version 56 with the CLI
   (commit 6857e0a: the assistant no longer plays Heimerdinger); it boots (OPTIONS 200). The same day `m.b.a` deployed `remind`
-  version 5 with the CLI (commit 3ff1fad: the new-reward notification); `verify_jwt` stayed off, as the cron call needs.
+  version 5 with the CLI (commit 3ff1fad: the new-reward notification); `verify_jwt` stayed off, as the cron call needs. Later that
+  day `m.b.a` deployed `remind` version 6 (commit 3e619e1, BAZGASHT.md phase 1: the pushes of an absence and `push_log`) with
+  `npx supabase functions deploy remind --project-ref whmzjvmeyxdoqjtkukix --no-verify-jwt --yes` (without `--no-verify-jwt` the CLI
+  turns the JWT check on and the cron call fails), and `hooshvareh` version 57 (commit e8da126: the new «scale» drift sign in words).
 - From 2026-11-16 04:22 UTC every `hooshvareh` call failed with 502 (still so on 2026-11-18; on 2026-11-20 `ai_usage` had no row after 2026-11-16, so no call had succeeded since): the Anthropic API answered «credit balance is too low». Only the
   user can add credit (console.anthropic.com, Plans & Billing). Check the function logs for it when the assistant stops answering.
 - On 2026-11-17 the user installed the official Meshy plugin (claude.ai directory, by Meshy) with three skills:
@@ -137,6 +140,9 @@ exist side by side. When a new decision replaces an old one, change or mark the 
 - `art/STYLE.md`: how the app's own pictures (the «بیشتر» icons) are made.
 - `REDESIGN.md`: the rebuild of «امروز» and «رژیم» into one part, step by step: what the user decided so far. Read it before
   touching the today screen, «سهم وعده» or «رژیم».
+- `BAZGASHT.md`: the road map for members who slacken or leave the app (from 2026-11-20): what Duolingo, Apple, Finch, Noom/WW,
+  games and the research do, member states by days away, ten phases, and the user's decisions. Read it before touching `remind`,
+  `drift.js`, «برگشت به مسیر» or anything said to members who are away. Phases 0 to 4 are built; 5 to 7 wait for the user.
 - `SAHM.md`: the road map to a professional «سهم وعده» algorithm (from 2026-11-20): the current algorithm's weak points,
   eight phases with exit gates, and the user's decisions on it. Read it before touching `fitMeal` or `mealBudget`.
   `node tools/sahm-eval.mjs` scores `fitPlate` (v2, `js/domain/fit.js`; `--v1` for `fitMeal`) on the golden plates
