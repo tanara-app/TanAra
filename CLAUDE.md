@@ -89,6 +89,9 @@ exist side by side. When a new decision replaces an old one, change or mark the 
   The same day it deployed `remind` version 8 the same way (commit 376c440: «به یادتم», phase 6); GET 200, a POST without sign-in 401.
   Then version 9 (commit 75fdf9e: «به یادتم» for members with no plot too); GET 200, POST without sign-in 401.
   Then version 10 (commit 96f71be: «چه شد؟», phase 7, and the month of quiet `quietUntil`); GET 200, POST without sign-in 401.
+  Then version 11 (commit fd1a3f8: phase 8, the evening reminder at the member's usual hour); GET 200, POST without sign-in 401.
+  The cron call to `remind` (pg_net) waits 5 s: an empty `status_code` with `timed_out` in `net._http_response` is that wait,
+  not an error; the function goes on and sends (on 2026-11-21 the 18:00 UTC run timed out and its pushes are in `push_log` at 18:00:07).
 - From 2026-11-16 04:22 UTC every `hooshvareh` call failed with 502 (still so on 2026-11-18; on 2026-11-20 `ai_usage` had no row after 2026-11-16, so no call had succeeded since): the Anthropic API answered «credit balance is too low». Only the
   user can add credit (console.anthropic.com, Plans & Billing). Check the function logs for it when the assistant stops answering.
 - On 2026-11-17 the user installed the official Meshy plugin (claude.ai directory, by Meshy) with three skills:
@@ -155,7 +158,7 @@ exist side by side. When a new decision replaces an old one, change or mark the 
   touching the today screen, «سهم وعده» or «رژیم».
 - `BAZGASHT.md`: the road map for members who slacken or leave the app (from 2026-11-20): what Duolingo, Apple, Finch, Noom/WW,
   games and the research do, member states by days away, ten phases, and the user's decisions. Read it before touching `remind`,
-  `drift.js`, «برگشت به مسیر» or anything said to members who are away. Phases 0 to 7 are built (5 to 7 on 2026-11-21); 8 to 10 are «later». Whether the owner sees the «چه شد؟» answers is still open (now: no).
+  `drift.js`, «برگشت به مسیر» or anything said to members who are away. Phases 0 to 8 are built (5 to 8 on 2026-11-21); 9 and 10 are «later». Whether the owner sees the «چه شد؟» answers is still open (now: no).
 - `SAHM.md`: the road map to a professional «سهم وعده» algorithm (from 2026-11-20): the current algorithm's weak points,
   eight phases with exit gates, and the user's decisions on it. Read it before touching `fitMeal` or `mealBudget`.
   `node tools/sahm-eval.mjs` scores `fitPlate` (v2, `js/domain/fit.js`; `--v1` for `fitMeal`) on the golden plates
