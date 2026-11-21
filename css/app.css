@@ -1696,3 +1696,6 @@ body.kb .toast, body.chat-mode .toast { bottom: calc(var(--nav-h) + var(--safe-b
 .promo-mercy b { color: var(--text); }
 .promo-mercy.fire svg { color: #f08a3c; }
 .rw-pill.fire svg { color: #f08a3c; }
+/* «به یادتم» on a zoomed plot (BAZGASHT.md, phase 6) */
+.nudge-btn { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 4px; }
+.nudge-btn svg { color: var(--accent); flex: none; }

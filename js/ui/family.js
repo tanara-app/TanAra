@@ -9,6 +9,10 @@
   added to «امروز»: a small dot shows on the «پیشرفت» tab when this member's plot has new pieces,
   and those pieces pop in the next time the land is seen.
 
+  «به یادتم» (BAZGASHT.md, phase 6): zoomed in on the plot of someone who has been away three days or more, a
+  button sends them one push with this member's name. Who can get one now comes from the `remind` function
+  ({ family: true }: only ids, nothing else about anyone), and it sends ({ nudge: id }), once a day each.
+
   This device sends its own weekly rows (this week and last, which late logging can still change) a
   few seconds after anything changes, and only when they changed. «من را نشان نده» takes them back
   from the server and stops sending.
@@ -19,6 +23,8 @@ import { LAND_W, LAND_H, SCALE, WIDTH, SPOT, PLOT_BOX, TAG, PLOT_NAME, pieceOrde
 import { fa, esc } from '../lib/fa.js';
 import { today, addDays, weekStart } from '../lib/dates.js';
 import { toast, sheet, icon, confirmBox } from './dom.js';
+import { SUPABASE_URL, SUPABASE_KEY } from '../config.js';
+import { authToken } from '../ai/hooshvareh.js';
 
 const SINCE = '2026-01-01'; // every week of the family land
 let rows = null;       // everyone's weekly rows, or null until read
@@ -28,6 +34,7 @@ let reading = null;
 let lastRead = 0;
 let sendTimer = 0;
 let zoom = null;       // the plot zoomed in on, or null for the whole land
+let away = null;       // { away: [user ids], sent: [user ids] }: who can get «به یادتم» now, and who got mine today
 let from = undefined;  // while zooming: the view it starts from (a plot, or null), so it can glide
 
 const weeks = (t = today()) => { const ws = weekStart(t); return { ws, prev: addDays(ws, -7) }; };
@@ -71,6 +78,7 @@ export function read(force = false) {
   if (!store.canPush()) return Promise.resolve();
   if (reading) return reading;
   if (!force && Date.now() - lastRead < 60000) return Promise.resolve();
+  readAway();
   reading = Promise.all([store.familyBoard(SINCE), store.familyPlots()]).then(([data, ps]) => {
     lastRead = Date.now();
     failed = !data || !ps;
@@ -81,6 +89,39 @@ export function read(force = false) {
     if (location.hash === '#/progress') redraw?.();
   });
   return reading;
+}
+
+/* ---------------- «به یادتم» ---------------- */
+
+const REMIND = `${SUPABASE_URL}/functions/v1/remind`;
+async function remindCall(body) {
+  const token = await authToken();
+  if (!token) return null;
+  const res = await fetch(REMIND, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, apikey: SUPABASE_KEY }, body: JSON.stringify(body) });
+  return { status: res.status, data: await res.json().catch(() => ({})) };
+}
+async function readAway() {
+  try {
+    const r = await remindCall({ family: true });
+    if (r?.status === 200 && Array.isArray(r.data.away)) away = { away: r.data.away, sent: r.data.sent || [] };
+    if (zoom && location.hash === '#/progress') redraw?.();
+  } catch { /* offline: no button */ }
+}
+async function sendNudge(id, btn) {
+  btn.disabled = true;
+  try {
+    const r = await remindCall({ nudge: id });
+    if (r?.status === 200) { away?.sent.push(id); toast('فرستاده شد'); redraw?.(); return; }
+    toast(r?.data?.error === 'night' ? 'الان دیروقت است؛ فردا بفرست' : 'الان نشد');
+    if (r?.data?.error === 'gone') readAway();
+  } catch { toast('الان نشد'); }
+  btn.disabled = false;
+}
+const HEART = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/></svg>';
+function nudgeButton(m) {
+  if (m.me || !away?.away.includes(m.user_id)) return '';
+  const done = away.sent.includes(m.user_id);
+  return `<button class="btn block nudge-btn" data-nudge="${esc(m.user_id)}"${done ? ' disabled' : ''}>${HEART}<span>${done ? 'فرستاده شد' : 'به یادتم'}</span></button>`;
 }
 
 // Called once the app has a signed-in member: read now, send after every change, read again on return.
@@ -173,7 +214,8 @@ export function familyView() {
       <div><small class="muted">این هفته</small><b class="num">${fa(z.week)}٪</b></div>
       <div><small class="muted">تکه‌ها</small><b class="num">${fa(z.open)}<small> از ${fa(PIECES)}</small></b></div>
     </section>
-    ${z.next ? `<p class="land-next">${fa(z.next)} امتیاز تا تکه‌ی بعد</p>` : ''}` : ''}
+    ${z.next ? `<p class="land-next">${fa(z.next)} امتیاز تا تکه‌ی بعد</p>` : ''}
+    ${nudgeButton(z)}` : ''}
     <button class="link small fam-how-link" data-fam-how>سرزمین چطور رشد می‌کند؟</button>`;
 }
 
@@ -228,6 +270,7 @@ async function choose(plot) {
 export function bindFamily(root, rerender) {
   redraw = rerender;
   root.querySelector('[data-fam-how]')?.addEventListener('click', openHow);
+  root.querySelector('[data-nudge]')?.addEventListener('click', e => sendNudge(e.currentTarget.dataset.nudge, e.currentTarget));
   root.querySelector('[data-unzoom]')?.addEventListener('click', e => { e.stopPropagation(); from = zoom; zoom = null; rerender(); });
   // glide from where the view was to where it is going
   if (from !== undefined) {

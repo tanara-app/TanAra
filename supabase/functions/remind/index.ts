@@ -5,6 +5,8 @@
     POST + x-cron-key      the database calls this every 10 minutes (pg_cron, see the
                            migration); whoever is due gets a notification
     POST + user JWT        { test: true } sends a test notification to that person's devices
+                           { family: true } lists who in the family land can get «به یادتم» now,
+                           { nudge: id } sends it (BAZGASHT.md, phase 6)
 
   What is due comes from the profile (profile.data.reminders, set in «نمایه» ← «تنظیمات» ← «یادآورها»):
     log    at a chosen evening time, if fewer than two meals were logged that day — but not
@@ -387,6 +389,66 @@ async function runDue(k: Keys) {
   return { users: byUser.size, sent };
 }
 
+/* ---------------- «به یادتم» (BAZGASHT.md, phase 6) ---------------- */
+/*
+  A member of the family land («سرزمین خانواده») can send «به یادتم» to another member who has been away three
+  days or more: one push with the sender's name, once a day per sender and recipient, in the recipient's day
+  (9:00 to 22:00). Who can get one: has a plot, is not hidden from the land (familyHidden), is not on a «مکث», has
+  a device that takes pushes, and has recorded nothing for BACK_DAYS or more (counted from the end of a pause).
+  The app asks { family: true } for those ids (and which of them it already reminded today), and sends with
+  { nudge: id }. Nothing else about anyone goes back: only who can be reminded now (social support keeps people
+  going: Wing & Jeffery 1999).
+*/
+async function nudgeable(caller: string) {
+  const { data: plots } = await admin.from("family_plot").select("user_id");
+  const ids = (plots || []).map(p => String(p.user_id));
+  if (!ids.includes(caller)) return [];
+  const out: { id: string; day: string; min: number }[] = [];
+  for (const id of ids) {
+    if (id === caller) continue;
+    const { count } = await admin.from("push_subs").select("endpoint", { count: "exact", head: true }).eq("user_id", id);
+    if (!count) continue;
+    const { data: prof } = await admin.from("profile").select("data").eq("user_id", id).maybeSingle();
+    const data = prof?.data as any;
+    if (data?.familyHidden) continue;
+    const now = localNow(String(data?.reminders?.tz || "Asia/Tehran"));
+    if (pausedOn(data, now.day)) continue;
+    const away = await awayDays(id, now.day, lastPauseEnd(data, now.day));
+    if (away && away.gap >= BACK_DAYS) out.push({ id, day: now.day, min: now.min });
+  }
+  return out;
+}
+const nudgeMark = (from: string, day: string) => `${from}:${day}`;
+async function nudgedToday(from: string, to: string, day: string) {
+  const { count } = await admin.from("push_log").select("id", { count: "exact", head: true })
+    .eq("user_id", to).eq("kind", "nudge").eq("mark", nudgeMark(from, day));
+  return !!count;
+}
+async function family(caller: string) {
+  const list = await nudgeable(caller);
+  const sent: string[] = [];
+  for (const x of list) if (await nudgedToday(caller, x.id, x.day)) sent.push(x.id);
+  return { away: list.map(x => x.id), sent };
+}
+async function nudge(caller: string, to: string, k: Keys) {
+  const x = (await nudgeable(caller)).find(y => y.id === to);
+  if (!x) return json({ error: "gone" }, 409);
+  if (await nudgedToday(caller, to, x.day)) return json({ ok: true });
+  if (x.min < 9 * 60 || x.min >= 22 * 60) return json({ error: "night" }, 409);
+  const { data: me } = await admin.from("usage_members").select("name").eq("user_id", caller).maybeSingle();
+  const name = String(me?.name || "").trim().slice(0, 40) || "یکی از خانواده";
+  const note = { tag: "nudge", url: "./#/today", title: "تن‌آرا", body: `${name} به یادت است. هر وقت آماده بودی، یک وعده‌ی امروز کافی است.` };
+  const { data: subs } = await admin.from("push_subs").select("*").eq("user_id", to);
+  let took = false;
+  for (const sub of (subs || []) as Sub[]) {
+    const status = await push(sub, note, k);
+    if (status >= 200 && status < 300) took = true;
+  }
+  if (!took) return json({ error: "push" }, 502);
+  await admin.from("push_log").insert({ user_id: to, kind: "nudge", mark: nudgeMark(caller, x.day) });
+  return json({ ok: true });
+}
+
 /* ---------------- handler ---------------- */
 
 Deno.serve(async (req) => {
@@ -406,6 +468,8 @@ Deno.serve(async (req) => {
     const { data: { user } } = await admin.auth.getUser(token);
     if (!user) return json({ error: "دوباره وارد شو." }, 401);
     const body = await req.json().catch(() => ({}));
+    if (body?.family) return json(await family(user.id));
+    if (typeof body?.nudge === "string") return await nudge(user.id, body.nudge, k);
     if (!body?.test) return json({ error: "bad request" }, 400);
     const { data: subs } = await admin.from("push_subs").select("*").eq("user_id", user.id);
     const results: number[] = [];
