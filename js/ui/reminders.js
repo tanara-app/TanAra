@@ -10,7 +10,8 @@ import { authToken } from '../ai/hooshvareh.js';
 import { fa, faDigits } from '../lib/fa.js';
 import { sheet, toast, icon } from './dom.js';
 import { quietOn } from '../domain/why.js';
-import { today, faDM } from '../lib/dates.js';
+import { today, faDM, iso } from '../lib/dates.js';
+import { dayEnds, logTimeFor, autoTime } from '../domain/timing.js';
 
 const URL_ = `${SUPABASE_URL}/functions/v1/remind`;
 const DEFAULTS = { log: { on: true, at: '21:00' }, weigh: { on: true, at: '08:00', every: 7 } };
@@ -76,6 +77,13 @@ function save(patch) {
   store.saveProfile({ ...store.profile(), reminders: { log: cur.log, weigh: cur.weigh, ...patch, tz: tz() } });
 }
 
+/* ---------------- the evening reminder's time (BAZGASHT.md phase 8, domain/timing.js) ---------------- */
+
+// the moment of an entry in this device's zone: its calendar day and minute
+const localAt = s => { const d = new Date(s); return { day: iso(d), min: d.getHours() * 60 + d.getMinutes() }; };
+// the time the evening reminder goes: their habit's (if they never set one) or their own
+const logTime = log => logTimeFor(log, dayEnds(store.get().entries, localAt));
+
 /* ---------------- «نمایه»: the row and its sheet ---------------- */
 
 // One line for the settings list: what is on, and when.
@@ -84,7 +92,7 @@ export function remindersLine() {
   if (!s.on) return 'خاموش';
   // «فعلاً نمی‌خواهم» (domain/why.js): a month with nothing sent
   if (quietOn(store.profile(), today())) return `ساکت تا ${faDM(store.profile().quietUntil)}`;
-  return [s.log.on ? `ثبت غذا ${faDigits(s.log.at)}` : null, s.weigh.on ? `اندازه‌گیری ${EVERY.find(e => e[0] === Number(s.weigh.every))?.[1] || 'هر هفته'}، ${faDigits(s.weigh.at)}` : null].filter(Boolean).join(' · ') || 'هر دو خاموش';
+  return [s.log.on ? `ثبت غذا ${autoTime(s.log) ? 'خودکار، ' : ''}${faDigits(logTime(s.log))}` : null, s.weigh.on ? `اندازه‌گیری ${EVERY.find(e => e[0] === Number(s.weigh.every))?.[1] || 'هر هفته'}، ${faDigits(s.weigh.at)}` : null].filter(Boolean).join(' · ') || 'هر دو خاموش';
 }
 
 export function bindReminders(root) {
@@ -116,7 +124,7 @@ export function openReminders() {
           </div>
 
           <label class="check"><input type="checkbox" name="log" ${s.log.on ? 'checked' : ''}><span>یادآور ثبت غذا <small class="muted">فقط اگر تا آن ساعت کمتر از دو وعده ثبت شده باشد</small></span></label>
-          <label class="field"><span>ساعت</span><select name="logAt" aria-label="ساعت یادآور ثبت غذا">${times(LOG_TIMES, s.log.at)}</select></label>
+          <label class="field"><span>ساعت</span><select name="logAt" aria-label="ساعت یادآور ثبت غذا"><option value="auto" ${autoTime(s.log) ? 'selected' : ''}>خودکار (${faDigits(logTime({ auto: true }))})</option>${autoTime(s.log) ? LOG_TIMES.map(t => `<option value="${t}">${faDigits(t)}</option>`).join('') : times(LOG_TIMES, s.log.at)}</select></label>
 
           <label class="check"><input type="checkbox" name="weigh" ${s.weigh.on ? 'checked' : ''}><span>یادآور اندازه‌گیری (وزن و دور کمر) <small class="muted">فقط اگر در این فاصله وزنی ثبت نشده باشد</small></span></label>
           <div class="row gap">
@@ -140,7 +148,8 @@ export function openReminders() {
       q('[data-off]')?.addEventListener('click', () => run(disable, 'روی این دستگاه خاموش شد'));
       q('[data-test]')?.addEventListener('click', () => run(test, r => (r.ok ? 'فرستاده شد؛ باید تا چند لحظه‌ی دیگر برسد' : 'سرویس اعلان این دستگاه آن را قبول نکرد')));
       const change = () => save({
-        log: { on: q('[name=log]').checked, at: q('[name=logAt]').value },
+        // «خودکار»: the time follows their habit (domain/timing.js); a time picked here is theirs from then on
+        log: { on: q('[name=log]').checked, at: q('[name=logAt]').value === 'auto' ? s.log.at : q('[name=logAt]').value, auto: q('[name=logAt]').value === 'auto' },
         weigh: { on: q('[name=weigh]').checked, at: q('[name=weighAt]').value, every: Number(q('[name=every]').value) },
       });
       body.querySelectorAll('input[type=checkbox], select').forEach(el => el.addEventListener('change', change));

@@ -17,6 +17,7 @@ import './lapse.test.js';
 import './comeback.test.js';
 import './pause.test.js';
 import './why.test.js';
+import './timing.test.js';
 import './health.test.js';
 import './foodMatch.test.js';
 import './family.test.js';

@@ -9,7 +9,8 @@
                            { nudge: id } sends it (BAZGASHT.md, phase 6)
 
   What is due comes from the profile (profile.data.reminders, set in «نمایه» ← «تنظیمات» ← «یادآورها»):
-    log    at a chosen evening time, if fewer than two meals were logged that day — but not
+    log    at a chosen evening time (or, for one who never set it, half an hour after they usually
+           finish logging: BAZGASHT.md phase 8), if fewer than two meals were logged that day — but not
            in maintenance with light logging on while the weight is in its band (the same
            rule as js/domain/phase.js → lightOn). The text changes every night. Someone with
            nothing recorded for 3 days or more gets the pushes of an absence instead
@@ -205,6 +206,51 @@ const LOG_SOME = [
   "چیزی نمانده: فقط بقیه‌ی وعده‌های امروز را اضافه کن.",
 ];
 
+/* ---------------- the evening reminder's time (BAZGASHT.md, phase 8) ---------------- */
+
+// A copy of dayEnds, usualLogTime and autoTime in js/domain/timing.js (tested there): change both together.
+// For one who never set the time themselves, the reminder goes half an hour after they usually finish logging.
+const DEFAULT_AT = "21:00", USUAL_DAYS = 28, USUAL_MIN = 7, AFTER_MIN = 30, EARLIEST = 19 * 60, LATEST = 23 * 60, STEP = 15;
+const hhmm = (m: number) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+function dayEnds(entries: { day: string; created_at: string }[], local: (iso: string) => { day: string; min: number }) {
+  const last = new Map<string, number>();
+  for (const e of entries) {
+    if (!e.created_at || !e.day) continue;
+    const t = local(e.created_at);
+    const m = daysBetween(t.day, e.day) * 1440 + t.min;
+    if (m < 5 * 60 || m > 29 * 60) continue;
+    if (!last.has(e.day) || m > last.get(e.day)!) last.set(e.day, m);
+  }
+  return [...last].sort((a, b) => (a[0] < b[0] ? -1 : 1)).map(([, m]) => m);
+}
+function usualLogTime(ends: number[]) {
+  const xs = ends.slice(-USUAL_DAYS).sort((a, b) => a - b);
+  if (xs.length < USUAL_MIN) return null;
+  const mid = xs.length % 2 ? xs[(xs.length - 1) / 2] : (xs[xs.length / 2 - 1] + xs[xs.length / 2]) / 2;
+  const at = Math.round((mid + AFTER_MIN) / STEP) * STEP;
+  return hhmm(Math.min(LATEST, Math.max(EARLIEST, at)));
+}
+const autoTime = (log: any) => log?.auto === true || (log?.auto === undefined && (!log?.at || log.at === DEFAULT_AT));
+// the moment of an entry in the member's zone: its calendar day and minute
+function localAt(tz: string) {
+  let f: Intl.DateTimeFormat;
+  const opts = { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" } as const;
+  try { f = new Intl.DateTimeFormat("en-CA", { timeZone: tz, ...opts }); } catch { f = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tehran", ...opts }); }
+  return (iso: string) => {
+    const p = Object.fromEntries(f.formatToParts(new Date(iso)).map(x => [x.type, x.value]));
+    return { day: `${p.year}-${p.month}-${p.day}`, min: Number(p.hour) * 60 + Number(p.minute) };
+  };
+}
+// The time tonight's log reminder goes: their own, or (never set) half an hour after they usually finish logging.
+// Before EARLIEST no such time can be due yet, so their entries are not read then (every run counts: the cron
+// call waits 5 s, and the function goes on after it, but runs should stay short).
+async function logAtFor(user: string, r: any, nowMin: number) {
+  if (!autoTime(r?.log)) return String(r?.log?.at || DEFAULT_AT);
+  if (nowMin < EARLIEST) return DEFAULT_AT;
+  const { data } = await admin.from("entries").select("day,created_at").eq("user_id", user).order("day", { ascending: false }).limit(1500);
+  return usualLogTime(dayEnds((data || []) as any[], localAt(String(r?.tz || "Asia/Tehran")))) || DEFAULT_AT;
+}
+
 /* ---------------- an absence (BAZGASHT.md, phase 1) ---------------- */
 
 // A copy of lapsePush and its constants in js/domain/lapse.js (tested there): change both together.
@@ -338,7 +384,8 @@ async function runDue(k: Keys) {
     const reward = now.min >= 9 * 60 && now.min < 22 * 60 ? newRewards(data, now.day) : null;
     if (reward) notes.reward = reward;
 
-    const logWindow = inWindow(now.min, minutes(r?.log?.at, 21 * 60)), weighWindow = inWindow(now.min, minutes(r?.weigh?.at, 8 * 60));
+    const logAt = r?.log?.on ? await logAtFor(user, r, now.min) : r?.log?.at;
+    const logWindow = inWindow(now.min, minutes(logAt, 21 * 60)), weighWindow = inWindow(now.min, minutes(r?.weigh?.at, 8 * 60));
     // the log reminder speaks for an absence too (BAZGASHT.md); light logging turns both off
     const paused = pausedOn(data, now.day), pauseEnd = lastPauseEnd(data, now.day);
     const lapseOn = !paused && !!r?.log?.on && (logWindow || (!!r?.weigh?.on && weighWindow)) && !(await lightOn(data, user, now.day));
