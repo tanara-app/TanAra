@@ -1,4 +1,5 @@
 // Entry point: auth → store → router.
+import { openWhy } from './ui/why.js';
 import { SUPABASE_URL, SUPABASE_KEY } from './config.js';
 import * as store from './data/store.js';
 import { createSupabaseRemote } from './data/supabaseRemote.js';
@@ -44,6 +45,9 @@ if (location.hash === '#/review') history.replaceState(history.state, '', '#/pro
 // The new-reward notification links to «#/rewards»: «بیشتر», with «جوایز» open over it.
 const takeRewardsLink = () => location.hash === '#/rewards' && (history.replaceState(history.state, '', '#/tools'), true);
 let openRewardsNext = takeRewardsLink();
+// The last push of an absence links to «#/why»: «امروز», with «چه شد؟» open over it (BAZGASHT.md phase 7).
+const takeWhyLink = () => location.hash === '#/why' && (history.replaceState(history.state, '', '#/today'), true);
+let openWhyNext = takeWhyLink();
 
 // While history.back() is still on its way to امروز, the hash says the old tab.
 let going = null;
@@ -122,6 +126,7 @@ function render() {
   shown = r;
   ROUTES[r].render(view);
   if (openRewardsNext) { openRewardsNext = false; openRewards(); }
+  if (openWhyNext) { openWhyNext = false; openWhy(); }
   maybeCelebrate();
 }
 
@@ -143,6 +148,7 @@ function show() { sheet.closeAll({ history: false }); resetProgress(); render();
 window.addEventListener('hashchange', () => {
   going = null;
   if (takeRewardsLink()) { openRewardsNext = true; if (route() === shown) render(); }
+  if (takeWhyLink()) { openWhyNext = true; if (route() === shown) render(); }
   if (route() !== shown) show();
 });
 store.subscribe(requestRender);

@@ -122,10 +122,11 @@ export function bindCheckin(root, refresh) {
 /* ---------------- The check-in itself ---------------- */
 
 // `follow`: the earlier check-in whose plan did not fully work, so this one builds on it.
-export function openCheckin({ follow = null, onDone = () => {} } = {}) {
+// `causes`: ticked already (from «چه شد؟», ui/why.js).
+export function openCheckin({ follow = null, onDone = () => {}, causes = [] } = {}) {
   const p = store.profile();
   const signs = signsNow();
-  const picked = new Set();
+  const picked = new Set(causes);
   let mood = null;
   sheet.open(body => {
     const form = () => {
@@ -139,7 +140,7 @@ export function openCheckin({ follow = null, onDone = () => {} } = {}) {
         <p class="field-label">این روزها چه چیزهایی بوده؟ <small class="muted">هر چند تا که هست</small></p>
         ${CAUSES.map(([g, list]) => `<div class="checkin-group"><small class="muted">${g}</small><div class="chip-row">${list
           .filter(c => !(c === 'دوران قاعدگی' && p?.sex === 'male'))
-          .map(c => `<button type="button" class="chip-btn" data-cause="${esc(c)}">${c}</button>`).join('')}</div></div>`).join('')}
+          .map(c => `<button type="button" class="chip-btn${picked.has(c) ? ' on' : ''}" data-cause="${esc(c)}">${c}</button>`).join('')}</div></div>`).join('')}
         <label class="field"><span>اگر دوست داری بیشتر بگو <small class="muted">(اختیاری)</small></span><textarea name="said" rows="3" maxlength="1500" placeholder="مثلاً: از وقتی کارم عوض شده شب‌ها خسته‌ام و…"></textarea></label>
         <button class="btn primary block" data-go>${aiAvailable() ? 'هوشواره ببیند ریشه‌اش چیست' : 'برنامه‌ی برگشت را بچین'}</button>
         <p class="muted small">چیزهایی که این‌جا می‌گویی فقط برای هوشواره‌ی خودت است و در حساب خودت می‌ماند.</p>`;

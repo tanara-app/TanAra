@@ -9,6 +9,8 @@ import { SUPABASE_URL, SUPABASE_KEY } from '../config.js';
 import { authToken } from '../ai/hooshvareh.js';
 import { fa, faDigits } from '../lib/fa.js';
 import { sheet, toast, icon } from './dom.js';
+import { quietOn } from '../domain/why.js';
+import { today, faDM } from '../lib/dates.js';
 
 const URL_ = `${SUPABASE_URL}/functions/v1/remind`;
 const DEFAULTS = { log: { on: true, at: '21:00' }, weigh: { on: true, at: '08:00', every: 7 } };
@@ -80,6 +82,8 @@ function save(patch) {
 export function remindersLine() {
   const s = settings();
   if (!s.on) return 'خاموش';
+  // «فعلاً نمی‌خواهم» (domain/why.js): a month with nothing sent
+  if (quietOn(store.profile(), today())) return `ساکت تا ${faDM(store.profile().quietUntil)}`;
   return [s.log.on ? `ثبت غذا ${faDigits(s.log.at)}` : null, s.weigh.on ? `اندازه‌گیری ${EVERY.find(e => e[0] === Number(s.weigh.every))?.[1] || 'هر هفته'}، ${faDigits(s.weigh.at)}` : null].filter(Boolean).join(' · ') || 'هر دو خاموش';
 }
 
@@ -89,7 +93,7 @@ export function bindReminders(root) {
 
 const times = (list, cur) => (list.includes(cur) ? list : [...list, cur].sort()).map(t => `<option value="${t}" ${t === cur ? 'selected' : ''}>${faDigits(t)}</option>`).join('');
 
-function openReminders() {
+export function openReminders() {
   sheet.open(body => {
     let busy = false;
     async function draw() {
@@ -100,6 +104,8 @@ function openReminders() {
       body.innerHTML = `
         <div class="sheet-head"><h2>یادآورها</h2><button class="icon-btn" data-close aria-label="بستن">${icon.close}</button></div>
         <div class="stack">
+          ${quietOn(store.profile(), today()) ? `<div class="note soft"><strong>ساکت تا ${faDM(store.profile().quietUntil)}</strong>
+            <div class="row gap"><button class="btn sm" data-unquiet>دوباره روشن کن</button></div></div>` : ''}
           <div class="note ${sub ? 'soft' : ''}">
             <strong>${sub ? 'این دستگاه اعلان می‌گیرد' : 'این دستگاه هنوز اعلان نمی‌گیرد'}</strong>
             <p>${sub ? 'یادآورها حتی وقتی تن‌آرا بسته است می‌رسند.' : denied ? 'اعلان‌های تن‌آرا در این مرورگر بسته شده. از تنظیمات مرورگر یا گوشی بازش کن و دوباره همین‌جا بیا.' : !supported() ? 'این مرورگر اعلان نمی‌فرستد. روی آیفون باید تن‌آرا را اول به صفحه‌ی اصلی اضافه کنی و از همان‌جا بازش کنی.' : 'هر گوشی یا مرورگر باید یک بار اجازه بدهد.'}</p>
@@ -121,6 +127,7 @@ function openReminders() {
         </div>`;
       const q = sel => body.querySelector(sel);
       q('[data-close]').onclick = () => sheet.close();
+      q('[data-unquiet]')?.addEventListener('click', () => { const { quietUntil, ...p } = store.profile(); store.saveProfile(p); draw(); });
       const run = async (fn, ok) => {
         if (busy) return;
         busy = true;

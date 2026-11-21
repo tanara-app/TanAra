@@ -15,7 +15,9 @@
            nothing recorded for 3 days or more gets the pushes of an absence instead
            (BAZGASHT.md, phase 1): day 3, day 5, a last one, then only the first of a Persian
            month; and no weigh-in reminder meanwhile. During a «مکث» (profile.data.pauses, phase 5)
-           neither reminder goes; the day after it, the evening one says the pause is over
+           neither reminder goes; the day after it, the evening one says the pause is over. The last
+           push opens «چه شد؟» (#/why, phase 7); one who answered «فعلاً نمی‌خواهم» gets nothing at all
+           until profile.data.quietUntil
     weigh  at a chosen morning time, if the last weigh-in is `every` days old or more
            (the text also asks for the waist when that is two weeks old, and is warmer after
            a long gap: stopping weighing is how regain usually starts)
@@ -241,6 +243,8 @@ const pauseList = (data: any): { from: string; to: string }[] =>
 const pausedOn = (data: any, day: string) => pauseList(data).some(x => x.from <= day && day <= x.to);
 const lastPauseEnd = (data: any, day: string) => pauseList(data).map(x => x.to).filter(t => t < day).sort().pop() || "";
 const RESUME = "مکثت تمام شد. از همین امروز ادامه بده؛ یک وعده کافی است.";
+// «فعلاً نمی‌خواهم» (BAZGASHT.md phase 7): a copy of quietOn in js/domain/why.js. Until quietUntil, nothing at all.
+const quietOn = (data: any, day: string) => !!data?.quietUntil && day <= String(data.quietUntil);
 
 // The last day with anything recorded (food, weight, waist or activity), or the end of the last pause when that
 // is later, and how long ago; null if never.
@@ -276,7 +280,8 @@ function lapseNote(kind: string, day: string, last: string, care: boolean): Note
       "چند روز جا انداختن، عادت را از بین نمی‌برد؛ برگشتن مهم است. اگر ثبت غذا حالا سخت است، فردا صبح فقط وزن کن.",
       "لازم نیست چیزی را جبران کنی؛ از همین امروز ادامه بده. یک وعده یا یک وزن‌کشی کافی است.",
     ], last) };
-  if (kind === "last") return { ...base, body: "انگار این یادآورها این روزها کمکی نمی‌کنند، پس فعلاً هر شب نمی‌فرستم. هر وقت خواستی، تن‌آرا همین‌جاست و از همان‌جا که هستی ادامه می‌دهیم." };
+  // it opens «چه شد؟» over «امروز» (BAZGASHT.md phase 7)
+  if (kind === "last") return { ...base, url: "./#/why", body: "انگار این یادآورها این روزها کمکی نمی‌کنند، پس فعلاً هر شب نمی‌فرستم. هر وقت خواستی، تن‌آرا همین‌جاست و از همان‌جا که هستی ادامه می‌دهیم." };
   const j = jParts(day);
   return { ...base, body: j.m === 1
     ? "سال نو مبارک. شروع سال وقت خوبی برای از سر گرفتن است: فقط امروز را ثبت کن و گذشته را کنار بگذار."
@@ -325,6 +330,7 @@ async function runDue(k: Keys) {
     const data = prof?.data as any;
     const r = data?.reminders;
     const now = localNow(String(r?.tz || "Asia/Tehran"));
+    if (quietOn(data, now.day)) continue;
     const notes: Record<string, Note> = {};
     // the week's shared magazine article, once per device, in the day (not at night)
     if (mag && now.min >= 9 * 60 && now.min < 22 * 60) notes.mag = mag;
@@ -415,7 +421,7 @@ async function nudgeable(caller: string) {
     const data = prof?.data as any;
     if (data?.familyHidden) continue;
     const now = localNow(String(data?.reminders?.tz || "Asia/Tehran"));
-    if (pausedOn(data, now.day)) continue;
+    if (pausedOn(data, now.day) || quietOn(data, now.day)) continue;
     const away = await awayDays(id, now.day, lastPauseEnd(data, now.day));
     if (away && away.gap >= BACK_DAYS) out.push({ id, day: now.day, min: now.min, name: names.get(id) || "", plot: withPlot.has(id) });
   }
