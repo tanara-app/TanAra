@@ -1702,3 +1702,6 @@ body.kb .toast, body.chat-mode .toast { bottom: calc(var(--nav-h) + var(--safe-b
 .nudge-list { display: flex; flex-direction: column; gap: 8px; padding: 10px 14px; }
 .nudge-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .nudge-row .nudge-btn { margin-top: 0; }
+/* back after a month or more (BAZGASHT.md, phase 9): the daily targets, old and new */
+.restart-nums { display: flex; flex-direction: column; gap: 4px; font-size: .92rem; color: var(--muted); }
+.restart-nums b { color: var(--text); font-variant-numeric: tabular-nums; }

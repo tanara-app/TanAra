@@ -24,6 +24,20 @@ export function awayDays({ entries = [], weights = [], waists = [], activity = [
   return last ? diffDays(day, last) : null;
 }
 
+/*
+  Back after a long time (BAZGASHT.md, phase 9): when `day` has something recorded and the active day before it
+  was GONE_DAYS or more earlier, that earlier day (it names the return); else null. Duolingo found those who come
+  back after a month are much like newcomers, so the app starts them again: today's weight, then their targets.
+*/
+export function returnedAfter({ entries = [], weights = [], waists = [], activity = [] }, day) {
+  let today = false, prev = '';
+  for (const list of [entries, weights, waists, activity]) for (const r of list) {
+    if (r.day === day) today = true;
+    else if (r.day < day && r.day > prev) prev = r.day;
+  }
+  return today && prev && diffDays(day, prev) >= GONE_DAYS ? prev : null;
+}
+
 export function stateOf(gap) {
   if (gap === null || gap === undefined) return 'new';
   return gap < BACK_DAYS ? 'current' : gap < AWAY_DAYS ? 'lapsed' : gap < GONE_DAYS ? 'away' : 'gone';

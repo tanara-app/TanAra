@@ -1,5 +1,5 @@
 import { suite, test, eq, ok } from './harness.js';
-import { awayDays, stateOf, lapsePush, freshDay, freshSoon } from '../js/domain/lapse.js';
+import { awayDays, stateOf, lapsePush, freshDay, freshSoon, returnedAfter } from '../js/domain/lapse.js';
 import { addDays } from '../js/lib/dates.js';
 
 // 2026-11-10 is 19 Aban 1405; 2026-11-22 is 1 Azar (a fresh start); 2026-12-22 is 1 Dey.
@@ -12,6 +12,13 @@ suite('lapse', () => {
     eq(awayDays({ waists: [{ day: D }] }, D), 0);
     eq(awayDays({ activity: [{ day: back(9) }], entries: [{ day: addDays(D, 1) }] }, D), 9); // the future does not count
     eq(awayDays({}, D), null);
+  });
+
+  test('back after a month or more: the day before the return', () => {
+    eq(returnedAfter({ entries: [{ day: back(40) }], weights: [{ day: D }] }, D), back(40));
+    eq(returnedAfter({ entries: [{ day: back(20) }], weights: [{ day: D }] }, D), null);  // under a month
+    eq(returnedAfter({ entries: [{ day: back(40) }] }, D), null);                         // nothing yet today
+    eq(returnedAfter({ weights: [{ day: D }] }, D), null);                                // a first day, not a return
   });
 
   test('states', () => {
