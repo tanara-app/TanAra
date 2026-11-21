@@ -391,20 +391,23 @@ async function runDue(k: Keys) {
 
 /* ---------------- «به یادتم» (BAZGASHT.md, phase 6) ---------------- */
 /*
-  A member of the family land («سرزمین خانواده») can send «به یادتم» to another member who has been away three
-  days or more: one push with the sender's name, once a day per sender and recipient, in the recipient's day
-  (9:00 to 22:00). Who can get one: has a plot, is not hidden from the land (familyHidden), is not on a «مکث», has
-  a device that takes pushes, and has recorded nothing for BACK_DAYS or more (counted from the end of a pause).
-  The app asks { family: true } for those ids (and which of them it already reminded today), and sends with
-  { nudge: id }. Nothing else about anyone goes back: only who can be reminded now (social support keeps people
-  going: Wing & Jeffery 1999).
+  A member of the family (usage_members) can send «به یادتم» to another member who has been away three days or
+  more: one push with the sender's name, once a day per sender and recipient, in the recipient's day (9:00 to
+  22:00). Who can get one: is not hidden from the family land (familyHidden), is not on a «مکث», has a device that
+  takes pushes, and has recorded nothing for BACK_DAYS or more (counted from the end of a pause). A plot in the land
+  is not needed (the owner's choice, 2026-11-21): one who has none is listed by name under the land. The app asks
+  { family: true } for those ids (which of them it already reminded today, and the names of those with no plot),
+  and sends with { nudge: id }. Nothing else about anyone goes back: only who can be reminded now (social support
+  keeps people going: Wing & Jeffery 1999).
 */
 async function nudgeable(caller: string) {
+  const { data: members } = await admin.from("usage_members").select("user_id,name");
+  const names = new Map((members || []).map(m => [String(m.user_id), String(m.name || "").trim().slice(0, 40)]));
+  if (!names.has(caller)) return [];
   const { data: plots } = await admin.from("family_plot").select("user_id");
-  const ids = (plots || []).map(p => String(p.user_id));
-  if (!ids.includes(caller)) return [];
-  const out: { id: string; day: string; min: number }[] = [];
-  for (const id of ids) {
+  const withPlot = new Set((plots || []).map(p => String(p.user_id)));
+  const out: { id: string; day: string; min: number; name: string; plot: boolean }[] = [];
+  for (const id of names.keys()) {
     if (id === caller) continue;
     const { count } = await admin.from("push_subs").select("endpoint", { count: "exact", head: true }).eq("user_id", id);
     if (!count) continue;
@@ -414,7 +417,7 @@ async function nudgeable(caller: string) {
     const now = localNow(String(data?.reminders?.tz || "Asia/Tehran"));
     if (pausedOn(data, now.day)) continue;
     const away = await awayDays(id, now.day, lastPauseEnd(data, now.day));
-    if (away && away.gap >= BACK_DAYS) out.push({ id, day: now.day, min: now.min });
+    if (away && away.gap >= BACK_DAYS) out.push({ id, day: now.day, min: now.min, name: names.get(id) || "", plot: withPlot.has(id) });
   }
   return out;
 }
@@ -428,7 +431,7 @@ async function family(caller: string) {
   const list = await nudgeable(caller);
   const sent: string[] = [];
   for (const x of list) if (await nudgedToday(caller, x.id, x.day)) sent.push(x.id);
-  return { away: list.map(x => x.id), sent };
+  return { away: list.map(x => x.id), sent, others: list.filter(x => !x.plot).map(x => ({ id: x.id, name: x.name || "عضو خانواده" })) };
 }
 async function nudge(caller: string, to: string, k: Keys) {
   const x = (await nudgeable(caller)).find(y => y.id === to);

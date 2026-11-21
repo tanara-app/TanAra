@@ -10,8 +10,10 @@
   and those pieces pop in the next time the land is seen.
 
   «به یادتم» (BAZGASHT.md, phase 6): zoomed in on the plot of someone who has been away three days or more, a
-  button sends them one push with this member's name. Who can get one now comes from the `remind` function
-  ({ family: true }: only ids, nothing else about anyone), and it sends ({ nudge: id }), once a day each.
+  button sends them one push with this member's name; one with no plot in the land is listed by name under it
+  with the same button (the owner's choice, 2026-11-21). Who can get one now comes from the `remind` function
+  ({ family: true }: ids, and the names of those with no plot; nothing else about anyone), and it sends
+  ({ nudge: id }), once a day each.
 
   This device sends its own weekly rows (this week and last, which late logging can still change) a
   few seconds after anything changes, and only when they changed. «من را نشان نده» takes them back
@@ -34,7 +36,7 @@ let reading = null;
 let lastRead = 0;
 let sendTimer = 0;
 let zoom = null;       // the plot zoomed in on, or null for the whole land
-let away = null;       // { away: [user ids], sent: [user ids] }: who can get «به یادتم» now, and who got mine today
+let away = null;       // { away: [user ids], sent: [user ids], others: [{ id, name }] }: who can get «به یادتم» now, who got mine today, and those of them with no plot
 let from = undefined;  // while zooming: the view it starts from (a plot, or null), so it can glide
 
 const weeks = (t = today()) => { const ws = weekStart(t); return { ws, prev: addDays(ws, -7) }; };
@@ -103,8 +105,8 @@ async function remindCall(body) {
 async function readAway() {
   try {
     const r = await remindCall({ family: true });
-    if (r?.status === 200 && Array.isArray(r.data.away)) away = { away: r.data.away, sent: r.data.sent || [] };
-    if (zoom && location.hash === '#/progress') redraw?.();
+    if (r?.status === 200 && Array.isArray(r.data.away)) away = { away: r.data.away, sent: r.data.sent || [], others: r.data.others || [] };
+    if (location.hash === '#/progress') redraw?.();
   } catch { /* offline: no button */ }
 }
 async function sendNudge(id, btn) {
@@ -118,10 +120,17 @@ async function sendNudge(id, btn) {
   btn.disabled = false;
 }
 const HEART = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/></svg>';
+const nudgeBtn = (id, cls) => {
+  const done = away.sent.includes(id);
+  return `<button class="btn ${cls} nudge-btn" data-nudge="${esc(id)}"${done ? ' disabled' : ''}>${HEART}<span>${done ? 'فرستاده شد' : 'به یادتم'}</span></button>`;
+};
 function nudgeButton(m) {
-  if (m.me || !away?.away.includes(m.user_id)) return '';
-  const done = away.sent.includes(m.user_id);
-  return `<button class="btn block nudge-btn" data-nudge="${esc(m.user_id)}"${done ? ' disabled' : ''}>${HEART}<span>${done ? 'فرستاده شد' : 'به یادتم'}</span></button>`;
+  return m.me || !away?.away.includes(m.user_id) ? '' : nudgeBtn(m.user_id, 'block');
+}
+// those away with no plot in the land, by name, under it
+function nudgeList() {
+  const list = away?.others || [];
+  return list.length ? `<section class="card nudge-list">${list.map(o => `<div class="nudge-row"><b>${esc(o.name)}</b>${nudgeBtn(o.id, 'sm')}</div>`).join('')}</section>` : '';
 }
 
 // Called once the app has a signed-in member: read now, send after every change, read again on return.
@@ -215,7 +224,7 @@ export function familyView() {
       <div><small class="muted">تکه‌ها</small><b class="num">${fa(z.open)}<small> از ${fa(PIECES)}</small></b></div>
     </section>
     ${z.next ? `<p class="land-next">${fa(z.next)} امتیاز تا تکه‌ی بعد</p>` : ''}
-    ${nudgeButton(z)}` : ''}
+    ${nudgeButton(z)}` : nudgeList()}
     <button class="link small fam-how-link" data-fam-how>سرزمین چطور رشد می‌کند؟</button>`;
 }
 
@@ -270,7 +279,7 @@ async function choose(plot) {
 export function bindFamily(root, rerender) {
   redraw = rerender;
   root.querySelector('[data-fam-how]')?.addEventListener('click', openHow);
-  root.querySelector('[data-nudge]')?.addEventListener('click', e => sendNudge(e.currentTarget.dataset.nudge, e.currentTarget));
+  root.querySelectorAll('[data-nudge]').forEach(b => b.addEventListener('click', e => sendNudge(e.currentTarget.dataset.nudge, e.currentTarget)));
   root.querySelector('[data-unzoom]')?.addEventListener('click', e => { e.stopPropagation(); from = zoom; zoom = null; rerender(); });
   // glide from where the view was to where it is going
   if (from !== undefined) {
