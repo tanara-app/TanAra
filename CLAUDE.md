@@ -130,6 +130,9 @@ exist side by side. When a new decision replaces an old one, change or mark the 
   counts; the others don't fill. They can switch any time; a reward they leave keeps its days and goes on from there when picked
   again (only the days it was the chosen one count). Every reward counts from the day it is chosen, not from before (the progress
   members had made while all rewards counted together was dropped). The choices are `profile.data.rewardPlan`.
+- **A run's mercies (the user's choice, 2026-11-21, BAZGASHT.md phase 5):** for a reward of full days in a row («پرنیان»), a
+  «مکث» day, an «امان» (one per 7 full days, two at most, covering a missed day) and one «ققنوس» per run (three full days right
+  after a break bring it back) keep the run going. All worked out in `runsOver` in `js/domain/rewards.js`; nothing stored but `pauses`.
 - **A new reward is announced (the user's choice, 2026-11-20):** a number on the «جوایز» tile, a dot on «بیشتر», a card on «امروز»
   and one push from `remind`, until the member has seen it (`profile.data.rewardsSeen`). So a new reward goes in `REWARDS`
   *and* in the short copy of it in `supabase/functions/remind/index.ts`, and that function is deployed again.
@@ -149,7 +152,7 @@ exist side by side. When a new decision replaces an old one, change or mark the 
   touching the today screen, «سهم وعده» or «رژیم».
 - `BAZGASHT.md`: the road map for members who slacken or leave the app (from 2026-11-20): what Duolingo, Apple, Finch, Noom/WW,
   games and the research do, member states by days away, ten phases, and the user's decisions. Read it before touching `remind`,
-  `drift.js`, «برگشت به مسیر» or anything said to members who are away. Phases 0 to 4 are built, and «مکث» of phase 5 (2026-11-21); «امان», «ققنوس», 6 and 7 wait for the user.
+  `drift.js`, «برگشت به مسیر» or anything said to members who are away. Phases 0 to 5 are built (5 on 2026-11-21: «مکث», «امان», «ققنوس»); 6 and 7 wait for the user.
 - `SAHM.md`: the road map to a professional «سهم وعده» algorithm (from 2026-11-20): the current algorithm's weak points,
   eight phases with exit gates, and the user's decisions on it. Read it before touching `fitMeal` or `mealBudget`.
   `node tools/sahm-eval.mjs` scores `fitPlate` (v2, `js/domain/fit.js`; `--v1` for `fitMeal`) on the golden plates

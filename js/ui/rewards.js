@@ -14,7 +14,7 @@ import * as store from '../data/store.js';
 import { sheet, icon, toast } from './dom.js';
 import { fa } from '../lib/fa.js';
 import { today } from '../lib/dates.js';
-import { progress, goalText, goalRules, rewardOf, pick, activeKey, REWARDS } from '../domain/rewards.js';
+import { progress, goalText, goalRules, rewardOf, pick, activeKey, REWARDS, PHOENIX_DAYS } from '../domain/rewards.js';
 import { getFinish, setFinish } from './theme.js';
 import { ttArt } from './ttArt.js';
 import { tasteLines, sayAloud, hush } from './mascot.js';
@@ -162,6 +162,8 @@ export function bindNewReward(root) {
 export function rewardPill() {
   const x = activeReward();
   if (!x) return '';
+  // while a «ققنوس» waits, the pill counts its days: that is what can be lost now
+  if (x.phoenix) return `<button type="button" class="pill rw-pill fire" data-rw-pill="${x.reward.key}">${FLAME.replace('width="18" height="18"', 'width="15" height="15"')}<span>ققنوس <b>${fa(PHOENIX_DAYS - x.phoenix.left)}</b> از ${fa(PHOENIX_DAYS)}</span></button>`;
   return `<button type="button" class="pill rw-pill" data-rw-pill="${x.reward.key}">${GIFT}<span>${x.reward.name} <b>${fa(x.now)}</b> از ${fa(x.of)}</span></button>`;
 }
 export function bindRewardPill(root) {
@@ -194,6 +196,12 @@ const WHERE = { game: 'در «بیشتر»', finish: 'در «ظاهر»', buddy:
 
 const PLAY = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z" fill="currentColor"/></svg>';
 const SPEAK = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9.5h3.5L12 6v12l-4.5-3.5H4z"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/></svg>';
+
+// a run's mercies (BAZGASHT.md phase 5): «امان» a shield, «ققنوس» a flame
+const SHIELD = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 4.6-3 8.2-7 10-4-1.8-7-5.4-7-10V6z"/><path d="M9 12l2 2 4-4"/></svg>';
+const FLAME = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3c.8 3 4.5 4.6 4.5 9.3a4.5 4.5 0 0 1-9 0c0-2.2 1.1-3.6 2.2-4.6.1 2 .9 3.3 2 3.6-.4-3 .1-5.7.3-8.3z"/></svg>';
+const mercyLines = x => `${x.phoenix ? `<p class="promo-mercy fire">${FLAME}<span>ققنوس: <b>${fa(x.phoenix.left)}</b> روز کامل دیگر، رشته‌ی ${fa(x.phoenix.run)} روزه برمی‌گردد</span></p>` : ''}${
+  x.amans ? `<p class="promo-mercy">${SHIELD}<span><b>${fa(x.amans)}</b> امان</span></p>` : ''}`;
 
 function card({ reward: r, earned, now, of, active }) {
   return `<article class="rw-card tap${earned ? ' got' : ''}${active ? ' on' : ''}" role="button" tabindex="0" data-promo="${r.key}">
@@ -260,6 +268,7 @@ function openPromo(key) {
               ${x.active ? ON : ''}
               <div class="row"><span>${goalText(r, fa)}</span><span class="left"><b>${fa(x.of - x.now)}</b> روز مانده</span></div>
               <div class="promo-days" role="progressbar" aria-valuemin="0" aria-valuemax="${x.of}" aria-valuenow="${x.now}">${Array.from({ length: x.of }, (_, i) => `<i${i < x.now ? ' class="on"' : ''}></i>`).join('')}</div>
+              ${mercyLines(x)}
             </div>
             ${x.active ? '' : '<button class="btn primary block big" data-pick>انتخابش کن</button>'}
             ${tryButton(r)}`}

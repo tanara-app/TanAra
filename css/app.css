@@ -1690,3 +1690,9 @@ body.kb .toast, body.chat-mode .toast { bottom: calc(var(--nav-h) + var(--safe-b
 .pause-pill svg { color: var(--accent); flex: none; }
 .pause-now { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 14px 0; font-size: 1.1rem; }
 .pause-now svg { color: var(--accent); }
+/* a run's mercies on a reward's page: «امان» and «ققنوس» (BAZGASHT.md phase 5) */
+.promo-mercy { display: flex; align-items: center; gap: 6px; margin-top: 10px; font-size: .85rem; color: var(--muted); }
+.promo-mercy svg { color: var(--accent); flex: none; }
+.promo-mercy b { color: var(--text); }
+.promo-mercy.fire svg { color: #f08a3c; }
+.rw-pill.fire svg { color: #f08a3c; }

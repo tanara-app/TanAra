@@ -1,5 +1,5 @@
 import { suite, test, eq, ok } from './harness.js';
-import { fullRuns, progress, earnedFinishes, rewardOf, REWARDS, recipeDays, goalText, goalRules, pick, activeKey, turnDays } from '../js/domain/rewards.js';
+import { fullRuns, runsOver, progress, earnedFinishes, rewardOf, REWARDS, recipeDays, goalText, goalRules, pick, activeKey, turnDays } from '../js/domain/rewards.js';
 import { addDays } from '../js/lib/dates.js';
 
 // after every reward's `since`, so the goals below count all their days
@@ -143,16 +143,19 @@ suite('rewards', () => {
     eq(turnDays(pick(plan, null, DAY), 'shab', DAY).includes(DAY), true);
   });
 
-  test('a run goes on across the days another reward had; a partial day of its own breaks it', () => {
+  test('a run goes on across the days another reward had; a partial day of its own takes an «امان» or breaks it', () => {
     let plan = pick([], 'parniyan', '2027-02-05');     // 5th to 9th
     plan = pick(plan, 'shab', '2027-02-10');            // 10th to 14th: not «پرنیان»'s
     plan = pick(plan, 'parniyan', '2027-02-15');        // 15th to 28th (under its goal of 21 in all)
     const e = run('2027-02-01', 28).filter(x => x.day < '2027-02-10' || x.day > '2027-02-14'); // nothing logged 10th–14th
     const at = es => progress({ entries: es, plan }, DAY).find(x => x.reward.key === 'parniyan');
     eq(at(e).now, 5 + 14);
-    // a day of one meal on the 20th (its own day) breaks it
+    // a day of one meal on the 20th (its own day) would break it, but the «امان» of its 7th full day (the 16th) covers it
     const broken = e.filter(x => !(x.day === '2027-02-20' && x.meal === 'dinner'));
-    eq(at(broken).now, 8);
+    eq([at(broken).now, at(broken).amans], [18, 1]);
+    // a second one on the 22nd: no «امان» left, so it breaks; the 23rd to 25th full bring it back («ققنوس»)
+    const twice = broken.filter(x => !(x.day === '2027-02-22' && x.meal === 'dinner'));
+    eq([at(twice).now, at(twice).phoenix], [14 + 3, null]);
     // today (1 March, its own day) not full yet: the run up to yesterday stands
     eq(progress({ entries: [...e, { day: DAY, meal: 'lunch' }], plan }, DAY).find(x => x.reward.key === 'parniyan').now, 19);
   });
@@ -161,5 +164,53 @@ suite('rewards', () => {
     eq(earnedFinishes({}).length, 0);
     eq(earnedFinishes({ parniyan: '2026-01-01' }).map(r => r.key), ['parniyan']);
     eq(earnedFinishes({ shab: '2026-01-01', parniyan: '2026-01-01' }).map(r => r.key), ['parniyan', 'shab']);
+  });
+});
+
+suite('rewards: «امان» and «ققنوس» (BAZGASHT.md phase 5)', () => {
+  const D0 = '2027-02-01';
+  // a pattern of own days from D0, one letter a day: F full, x missed, p paused; today is the day after
+  const days = pat => Array.from({ length: pat.length }, (_, i) => addDays(D0, i));
+  const go = (pat, extra = {}) => {
+    const ds = days(pat), today = addDays(D0, pat.length);
+    const entries = ds.flatMap((d, i) => (pat[i] === 'F' ? full(d) : []));
+    const paused = new Set(ds.filter((d, i) => pat[i] === 'p'));
+    return runsOver(entries, [], [...ds, today], today, paused, extra);
+  };
+
+  test('seven full days earn an «امان»; it covers a missed day', () => {
+    eq(go('FFFFFFF').amans, 1);
+    eq([go('FFFFFFFxFFF').now, go('FFFFFFFxFFF').amans], [10, 0]);
+    eq([go('FFFFFFxFFF').now, go('FFFFFFxFFF').amans], [9, 1]); // six: no «امان» yet, so it breaks; three more bring it back («ققنوس»)
+  });
+
+  test('two at most', () => {
+    eq(go('F'.repeat(28)).amans, 2);
+  });
+
+  test('«ققنوس»: three full days right after a break bring the run back', () => {
+    eq(go('FFFFxFF'), { best: 4, now: 2, total: 6, amans: 0, phoenix: { run: 4, left: 1 } });
+    eq(go('FFFFFxFFF').now, 8);
+    eq(go('FFFFFxFFF').phoenix, null);
+    eq(go('FFFFFxFxFFF').now, 3);      // a second miss while it waits ends it
+    eq(go('FFFFFxFpFF').now, 8);       // a paused day in between does not
+  });
+
+  test('«ققنوس» once in a run; a new run may have its own', () => {
+    eq(go('FFxFFFxFFF').now, 3);       // 2, back to 5 on its third day, broken again: no second one
+    eq([go('FxFFFxFFxF').now, go('FxFFFxFFxF').phoenix], [1, { run: 2, left: 2 }]); // that run ended for good, so the next has one
+  });
+
+  test('today before it is full takes nothing', () => {
+    const ds = days('FFFFFFF'), today = addDays(D0, 7);
+    const r = runsOver(ds.flatMap(full), [], [...ds, today], today);
+    eq([r.now, r.amans], [7, 1]);
+  });
+
+  test('only a run has them, and not once earned', () => {
+    const p = progress({ plan: ALL, entries: run('2027-02-22', 7) }, DAY);
+    eq(p.find(x => x.reward.key === 'parniyan').amans, 1);
+    eq(p.find(x => x.reward.key === 'shab').amans, 0);
+    eq(progress({ plan: ALL, entries: run('2027-02-22', 7), earned: { parniyan: '2027-01-01' } }, DAY).find(x => x.reward.key === 'parniyan').amans, 0);
   });
 });

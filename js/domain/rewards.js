@@ -16,7 +16,10 @@
   turns only, from the day it was picked, never before. They can switch any time: a reward they leave
   keeps its days and goes on from there when picked again, and a run ('fullRun') goes on across the days
   another reward had (those are skipped, not breaking it). Days of a «مکث» (pause.js, BAZGASHT.md phase 5)
-  never break a run either; one that is still full counts.
+  never break a run either; one that is still full counts. Two more mercies for a run (BAZGASHT.md phase 5,
+  the owner's go-ahead on 2026-11-21, after Duolingo's streak freeze and streak repair): «امان», one for every
+  AMAN_EVERY full days (AMAN_MAX held at most), covers a missed day by itself; and «ققنوس»: when a run breaks
+  all the same, PHOENIX_DAYS full days in a row right after it bring it back, once in a run.
 
   Kinds: 'finish' — a look laid over any colour theme (css/app.css [data-finish]), worn from «ظاهر»;
   'game' — a game (games/<key>/), a tile in «بیشتر» once earned; 'buddy' — a companion (ui/buddies.js)
@@ -71,7 +74,9 @@ export function goalRules(r, fa = String) {
   const of = fa(r.goal.of);
   const own = {
     fullRun: [FULL_DAY, MARK_DAY,
-      `${of} روز کامل باید پشت‌سرهم باشد؛ یک روز ناقص یا خالی، شمارش را از صفر شروع می‌کند.`,
+      `${of} روز کامل باید پشت‌سرهم باشد؛ یک روز ناقص یا خالی، اگر «امان» نداشته باشی، شمارش را از صفر شروع می‌کند.`,
+      `هر ${fa(AMAN_EVERY)} روز کامل یک «امان» می‌گیری (حداکثر ${fa(AMAN_MAX)} تا)؛ امان خودش یک روز ناقص یا خالی را می‌پوشاند.`,
+      `اگر رشته شکست، ${fa(PHOENIX_DAYS)} روز کامل پشت‌سرهم درست بعد از آن («ققنوس») رشته را برمی‌گرداند؛ در هر رشته یک بار.`,
       'امروز تا وقتی کامل نشده رشته را نمی‌شکند؛ وقتی کامل شد، یک روز اضافه می‌شود.',
       'روزهایی که جایزه‌ی دیگری انتخاب کرده بودی، رشته را نمی‌شکنند.',
       'روزهای «مکث» هم رشته را نمی‌شکنند؛ اگر در مکث هم کامل ثبت کنی، حساب است.'],
@@ -144,8 +149,17 @@ export function fullRuns(entries, notes, day) {
   return { best, now, total: full.size };
 }
 
-// The same, over a reward's own days only (turnDays): days in between are skipped, not breaking a run, and
-// so is a paused day (`paused`, a Set) that is not full; a full one counts.
+export const AMAN_EVERY = 7;
+export const AMAN_MAX = 2;
+export const PHOENIX_DAYS = 3;
+
+/*
+  The same, over a reward's own days only (turnDays): days in between are skipped, not breaking a run, and
+  so is a paused day (`paused`, a Set) that is not full (a full one counts), and today until it is full.
+  A missed day takes an «امان» if one is held; else the run breaks, and a «ققنوس» waits: the next
+  PHOENIX_DAYS own days all full put the broken run back under them. Also returns `amans` (held now) and
+  `phoenix` ({ run, left }: the run that would come back, and the full days still needed) or null.
+*/
 export function runsOver(entries, notes, days, day, paused = new Set()) {
   const on = new Set(days);
   const meals = new Map();
@@ -155,12 +169,26 @@ export function runsOver(entries, notes, days, day, paused = new Set()) {
   }
   const marks = logMarks(notes);
   const full = new Set([...meals].filter(([d, m]) => fullDay(d, m.size, marks)).map(([d]) => d));
-  let best = 0, run = 0;
-  const runs = days.map(d => (run = full.has(d) ? run + 1 : paused.has(d) ? run : 0, best = Math.max(best, run), run));
+  let best = 0, run = 0, amans = 0, toward = 0, repaired = false, phoenix = null;
+  for (const d of days) {
+    if (full.has(d)) {
+      run++;
+      if (++toward === AMAN_EVERY) { amans = Math.min(AMAN_MAX, amans + 1); toward = 0; }
+      if (phoenix && --phoenix.left === 0) { run += phoenix.run; repaired = true; phoenix = null; }
+    } else if (paused.has(d) || d === day) {
+      // skipped: a paused day, or today before it is full
+    } else if (amans > 0) {
+      amans--;
+    } else {
+      // it breaks: a «ققنوس» for this run if it has not had one (a second miss while one waits ends it)
+      phoenix = !phoenix && !repaired && run > 0 ? { run, left: PHOENIX_DAYS } : null;
+      if (!phoenix) repaired = false;
+      run = 0;
+    }
+    best = Math.max(best, run);
+  }
   // the run going on: up to today once today is full, else up to the day before it
-  const last = days.length - 1;
-  const now = last < 0 ? 0 : days[last] === day && !full.has(day) ? runs[last - 1] || 0 : runs[last];
-  return { best, now, total: full.size };
+  return { best, now: run, total: full.size, amans, phoenix: phoenix && { run: phoenix.run, left: phoenix.left } };
 }
 
 /*
@@ -201,7 +229,10 @@ export function progress({ entries = [], notes = [], foods = [], earned = {}, pl
       : r.goal.type === 'vegDays' ? [veg, veg >= of]
       : r.goal.type === 'recipeDays' ? [cooked, cooked >= of]
       : [0, false];
-    return { reward: r, earned: !!earned[r.key] || met, now: Math.min(now, of), of, active: picked === r.key };
+    const got = !!earned[r.key] || met;
+    // a run's mercies, while it is still ahead
+    const mercy = r.goal.type === 'fullRun' && !got ? { amans: runs.amans, phoenix: runs.phoenix } : { amans: 0, phoenix: null };
+    return { reward: r, earned: got, now: Math.min(now, of), of, active: picked === r.key, ...mercy };
   });
 }
 

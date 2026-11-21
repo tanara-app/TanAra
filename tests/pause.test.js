@@ -39,7 +39,8 @@ suite('pause', () => {
     eq(parniyan(new Set()).now, 6);
     const three = pausedDays([{ from: '2027-02-20', to: '2027-02-22' }], D);
     eq(parniyan(three).now, 11);
-    eq(parniyan(pausedDays([{ from: '2027-02-20', to: '2027-02-21' }], D)).now, 6); // one empty day left unpaused
+    eq(parniyan(pausedDays([{ from: '2027-02-20', to: '2027-02-21' }], D)).now, 11); // one empty day left unpaused: «ققنوس» brings it back
+    eq(parniyan(pausedDays([{ from: '2027-02-20', to: '2027-02-20' }], D)).now, 6);  // two: it breaks for good
     const inside = [...run('2027-02-15', 5), ...full('2027-02-21'), ...run('2027-02-23', 6)];
     eq(progress({ plan: ALL, entries: inside, paused: three }, D).find(x => x.reward.key === 'parniyan').now, 12);
   });
