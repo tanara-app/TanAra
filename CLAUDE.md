@@ -158,7 +158,9 @@ exist side by side. When a new decision replaces an old one, change or mark the 
   touching the today screen, «سهم وعده» or «رژیم».
 - `BAZGASHT.md`: the road map for members who slacken or leave the app (from 2026-11-20): what Duolingo, Apple, Finch, Noom/WW,
   games and the research do, member states by days away, ten phases, and the user's decisions. Read it before touching `remind`,
-  `drift.js`, «برگشت به مسیر» or anything said to members who are away. Phases 0 to 9 are built (5 to 9 on 2026-11-21); 10, the review with numbers, is from 2026-12-18. Whether the owner sees the «چه شد؟» answers is still open (now: no).
+  `drift.js`, «برگشت به مسیر» or anything said to members who are away. All ten phases are built (5 to 10 on 2026-11-21). **From 2026-12-18 on, if BAZGASHT.md's «اولین بازبینی» still says
+  «هنوز نه», remind the user first thing**: run `select * from public.bazgasht_report();` (service role, through the Supabase tool)
+  and show only the totals, as BAZGASHT.md phase 10 says. Whether the owner sees the «چه شد؟» answers is still open (now: no).
 - `SAHM.md`: the road map to a professional «سهم وعده» algorithm (from 2026-11-20): the current algorithm's weak points,
   eight phases with exit gates, and the user's decisions on it. Read it before touching `fitMeal` or `mealBudget`.
   `node tools/sahm-eval.mjs` scores `fitPlate` (v2, `js/domain/fit.js`; `--v1` for `fitMeal`) on the golden plates
