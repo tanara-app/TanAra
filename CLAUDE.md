@@ -104,7 +104,35 @@ exist side by side. When a new decision replaces an old one, change or mark the 
   short: on 2026-11-18 a `browser_run_code_unsafe` with `page.goto`/`page.reload` inside hung for 30 minutes; navigate with `browser_navigate`
   and check with `browser_evaluate`. In `?local` mode the app starts at the questionnaire: to skip it, set
   `localStorage['tanara:local:state']` to `{"profile":{"user_id":"local","data":{"onboarded":true}}}` and reload.
-- Tests: `node tests/run.js` (or open `tests/index.html` in the browser).
+- Tests: `node tests/run.js` (or open `tests/index.html` in the browser; it is also live at
+  https://tanara-app.github.io/TanAra/tests/index.html, so it runs on a phone, the speed test of `fitPlate` too).
+- **Checking the app when the Browser pane is hidden** (`ClaudeAccount`, 2026-11-20): the pane's tab can hang on «Policy check in
+  progress» and load nothing. Then run the checks in headless Chrome from the shell, with the dev server up (`tanara-static`):
+  `"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless=new --disable-gpu --user-data-dir=<scratchpad>/chrome
+  --window-size=520,1700 --virtual-time-budget=20000 --dump-dom "http://localhost:5173/.claude/check-sahm.html?local"` and read the
+  `RESULT {…}` line it writes into the page. The page must be opened with `?local` (else it is the sign-in page); after `setDay`, save
+  any note so the screen redraws. `--screenshot` comes out black in both headless modes, so this checks the DOM, not the look.
+  `.claude/check-sahm.html` (git-ignored) holds the «سهم وعده» checks (fasting OK, kidney plate, health step; `&day4` the whole day).
+- Files `ClaudeAccount` created in this folder carry an inherited ACL giving `m.b.a` full read and write (checked on 2026-11-21),
+  so they stay editable if that account is removed.
+
+### Talking with the user (moved here from `ClaudeAccount`'s own memory on 2026-11-21, before that account was to be removed)
+
+- **Every reply in Persian**: the closing message, explanations, questions, and the next-step box's question and buttons. On
+  2026-11-13 a run of replies came out in English after a usage-limit pause and the user snapped «فارسی بگو». Check the language
+  of every closing message, most of all after a session resumes. Code, commits and docs for the other Claude stay in English.
+- **No question box** (AskUserQuestion) with this user (2026-11-12: it came out in English and they couldn't answer it well):
+  ask in Persian in the message, as a short numbered list; they answer in chat. In the desktop app's next-step box keep the
+  question and button labels Persian, and write labels without a zero-width non-joiner (as in «کم‌پروتئین»): the app drops a
+  label that has one.
+- **A new screen: mockups first.** On 2026-11-12 a screen merging «شمارش کالری»، «سهم وعده» and «رژیم» (built from Claude's own
+  design, `js/ui/meal.js`) was rejected: «اصلا خوب نشده»; the user found visual bugs that reading the DOM had missed. Show 2–3
+  static mockups and let them choose before writing app code; build in small steps; after each, look at a phone-width screenshot
+  by eye for alignment, clutter and wrapping, with data like theirs (long names, big numbers). If a plugin or skill helps with
+  design (the «Design» plugin, «design-skills»), use its critique and accessibility checks (the user asked on 2026-11-13). Measure
+  icon centering and clipped text with a script (`.claude/shot.html?local&scene=centersall`), not only by eye.
+- **Text to paste elsewhere** (ChatGPT instructions, image prompts): give the whole final text in one block, never «replace X with
+  Y» (2026-11-11: they asked for the full text).
 - The user speaks Persian; answer in Persian.
 - ElevenLabs (the mascot's voice): always the newest model, and ask the user before generating anything
   (voice, model, which lines). The voice is the user's own «Heimerdinger»; never pick an older model on your own.
@@ -167,7 +195,8 @@ exist side by side. When a new decision replaces an old one, change or mark the 
   (`tests/golden/`); `tests/golden.test.js` fails if any
   measure drops below its floor, so run it after every change to the amounts. **From 2026-12-04 on, if SAHM.md's «اولین عددهای
   دو هفته» still says «هنوز نه», remind the user first thing** (they asked on 2026-11-20 to be reminded in two weeks; what to run
-  and show is in SAHM.md «وضعیت و کارهای مانده»).
+  and show is in SAHM.md «وضعیت و کارهای مانده»). The scheduled task for it lived on `ClaudeAccount`, which the user said on
+  2026-11-21 would be removed; its full prompt, to set it up again from `m.b.a`, is in `research/sahm-two-week-check.md`.
 - `TIPS.md`: the fixed list of daily tips («نکته‌ی امروز»), about 365, written once by Claude from established science only
   (the user decided on 2026-11-18 to replace the tips Hooshvareh writes every day). Each tip has tags saying who sees it. In the
   app since 2026-11-19: `js/ui/tip.js`, picked in `js/domain/tips.js`; after editing TIPS.md run `node tools/tips.mjs`, which
