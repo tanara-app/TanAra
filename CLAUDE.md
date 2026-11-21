@@ -92,7 +92,7 @@ exist side by side. When a new decision replaces an old one, change or mark the 
   Then version 11 (commit fd1a3f8: phase 8, the evening reminder at the member's usual hour); GET 200, POST without sign-in 401.
   The cron call to `remind` (pg_net) waits 5 s: an empty `status_code` with `timed_out` in `net._http_response` is that wait,
   not an error; the function goes on and sends (on 2026-11-21 the 18:00 UTC run timed out and its pushes are in `push_log` at 18:00:07).
-- From 2026-11-16 04:22 UTC every `hooshvareh` call failed with 502 (still so on 2026-11-18; on 2026-11-20 `ai_usage` had no row after 2026-11-16, so no call had succeeded since): the Anthropic API answered «credit balance is too low». Only the
+- From 2026-11-16 04:22 UTC every `hooshvareh` call failed with 502 (still so on 2026-11-18; on 2026-11-20 `ai_usage` had no row after 2026-11-16, so no call had succeeded since): the Anthropic API answered «credit balance is too low». **It works again:** `ai_usage` has successful calls from 2026-11-20 13:48 UTC on (chat, review, lab, magazine…; checked on 2026-11-21). Only the
   user can add credit (console.anthropic.com, Plans & Billing). Check the function logs for it when the assistant stops answering.
 - On 2026-11-17 the user installed the official Meshy plugin (claude.ai directory, by Meshy) with three skills:
   `meshy-3d-generation`, `meshy-3d-printing`, `meshy-openclaw`. It belongs to the claude.ai account, not this folder
