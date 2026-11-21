@@ -12,7 +12,8 @@
            rule as js/domain/phase.js → lightOn). The text changes every night. Someone with
            nothing recorded for 3 days or more gets the pushes of an absence instead
            (BAZGASHT.md, phase 1): day 3, day 5, a last one, then only the first of a Persian
-           month; and no weigh-in reminder meanwhile
+           month; and no weigh-in reminder meanwhile. During a «مکث» (profile.data.pauses, phase 5)
+           neither reminder goes; the day after it, the evening one says the pause is over
     weigh  at a chosen morning time, if the last weigh-in is `every` days old or more
            (the text also asks for the waist when that is two weeks old, and is warmer after
            a long gap: stopping weighing is how regain usually starts)
@@ -228,9 +229,21 @@ function lapsePush(gap: number | null, sent: { kind: string; day: string }[], da
   return sent.length ? null : "back3";
 }
 
-// The last day with anything recorded (food, weight, waist or activity) and how long ago, or null if never.
-async function awayDays(user: string, day: string) {
-  let last = "";
+/*
+  «مکث» (BAZGASHT.md, phase 5): a copy of pauseOn and lastPauseEnd in js/domain/pause.js. While paused, no log
+  or weigh-in reminder and no push of an absence; after it, an absence counts from its last day, and the day
+  after it the evening reminder says the pause is over.
+*/
+const pauseList = (data: any): { from: string; to: string }[] =>
+  (Array.isArray(data?.pauses) ? data.pauses : []).filter((x: any) => x && x.from && x.to && x.to >= x.from);
+const pausedOn = (data: any, day: string) => pauseList(data).some(x => x.from <= day && day <= x.to);
+const lastPauseEnd = (data: any, day: string) => pauseList(data).map(x => x.to).filter(t => t < day).sort().pop() || "";
+const RESUME = "مکثت تمام شد. از همین امروز ادامه بده؛ یک وعده کافی است.";
+
+// The last day with anything recorded (food, weight, waist or activity), or the end of the last pause when that
+// is later, and how long ago; null if never.
+async function awayDays(user: string, day: string, floor = "") {
+  let last = floor;
   for (const table of ["entries", "weights", "waists", "activity"]) {
     const { data } = await admin.from(table).select("day").eq("user_id", user).lte("day", day).order("day", { ascending: false }).limit(1);
     const d = data?.[0]?.day as string | undefined;
@@ -319,8 +332,9 @@ async function runDue(k: Keys) {
 
     const logWindow = inWindow(now.min, minutes(r?.log?.at, 21 * 60)), weighWindow = inWindow(now.min, minutes(r?.weigh?.at, 8 * 60));
     // the log reminder speaks for an absence too (BAZGASHT.md); light logging turns both off
-    const lapseOn = !!r?.log?.on && (logWindow || (!!r?.weigh?.on && weighWindow)) && !(await lightOn(data, user, now.day));
-    const away = lapseOn ? await awayDays(user, now.day) : null;
+    const paused = pausedOn(data, now.day), pauseEnd = lastPauseEnd(data, now.day);
+    const lapseOn = !paused && !!r?.log?.on && (logWindow || (!!r?.weigh?.on && weighWindow)) && !(await lightOn(data, user, now.day));
+    const away = lapseOn ? await awayDays(user, now.day, pauseEnd) : null;
     const isAway = !!away && away.gap >= BACK_DAYS;
 
     if (lapseOn && logWindow) {
@@ -330,11 +344,13 @@ async function runDue(k: Keys) {
       } else {
         const { data: rows } = await admin.from("entries").select("meal").eq("user_id", user).eq("day", now.day);
         const meals = new Set((rows || []).map(x => x.meal)).size;
-        if (meals < 2) notes.log = { tag: "log", url: "./#/today", title: "تن‌آرا", body: pick(meals ? LOG_SOME : LOG_NONE, now.day) };
+        // the day after a pause: say it is over (once), in place of the usual text
+        const resumed = !!pauseEnd && daysBetween(now.day, pauseEnd) === 1;
+        if (meals < 2) notes[resumed ? "resume" : "log"] = { tag: "log", url: "./#/today", title: "تن‌آرا", body: resumed ? RESUME : pick(meals ? LOG_SOME : LOG_NONE, now.day) };
       }
     }
     // while they are away, the evening's push of the absence is the only one (one push a day)
-    if (r?.weigh?.on && weighWindow && !isAway) {
+    if (r?.weigh?.on && weighWindow && !isAway && !paused) {
       const every = Math.max(1, Number(r.weigh.every) || 7);
       const lastW = await latest("weights", user);
       if (!lastW || daysBetween(now.day, lastW) >= every) {

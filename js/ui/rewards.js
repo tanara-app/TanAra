@@ -9,6 +9,7 @@
   once earned (profile.js, mascot.js).
   Earned rewards are written down in profile.data.rewards the first time they are seen.
 */
+import { pausedDays } from '../domain/pause.js';
 import * as store from '../data/store.js';
 import { sheet, icon, toast } from './dom.js';
 import { fa } from '../lib/fa.js';
@@ -80,7 +81,7 @@ export function guardFinish() {
 const listNow = () => {
   const s = store.get();
   const p = store.profile();
-  return progress({ entries: s.entries, notes: s.ai_notes, foods: s.foods, earned: p?.rewards, plan: p?.rewardPlan }, today());
+  return progress({ entries: s.entries, notes: s.ai_notes, foods: s.foods, earned: p?.rewards, plan: p?.rewardPlan, paused: pausedDays(p?.pauses, today()) }, today());
 };
 
 // Whether a reward is theirs: written down, or its goal met now (written down when they next open «جوایز» or the game).

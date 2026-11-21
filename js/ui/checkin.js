@@ -22,6 +22,11 @@ import { dismissed, dismiss } from './notices.js';
 import { startChat } from './chat.js';
 import { askRow, askFold } from './aiCards.js';
 import { CAUSES, offlinePlan, withCrisis } from '../domain/comeback.js';
+import { pausedDays } from '../domain/pause.js';
+import { openPause, currentPause } from './pause.js';
+
+// causes that usually mean a few days away: the plan offers a «مکث» (BAZGASHT.md phase 5)
+const AWAY_CAUSES = ['سفر', 'بیماری یا درد', 'مهمانی و بیرون‌خوری'];
 
 const MOODS = ['خیلی بد', 'بد', 'معمولی', 'خوب', 'خیلی خوب'];
 const OUTCOMES = { good: 'خوب پیش رفت', some: 'نصفه‌نیمه', no: 'نشد' };
@@ -40,6 +45,7 @@ export function signsNow() {
     kcalOn: d => effectiveTargets(p, d)?.kcal,
     marks: logMarks(s.ai_notes),
     care: edCare(p),
+    paused: pausedDays(p.pauses, t),
     // the rebuilt «امروز» (2026-11-17) has no «رژیم» to tick, so no plan adherence
     adherence: null,
   }, t);
@@ -191,10 +197,12 @@ export function openCheckin({ follow = null, onDone = () => {} } = {}) {
         <div class="ai-text"><ol>${d.steps.map(x => `<li>${esc(x)}</li>`).join('')}</ol></div>
         <div class="ai-goal"><small class="muted">همین امروز</small><b>${esc(d.first_step)}</b></div>
         ${d.goal ? `<div class="ai-goal"><small class="muted">هدف این هفته</small><b>${esc(d.goal)}</b><button class="btn sm" data-goal>هدف این هفته‌ام کن</button></div>` : ''}
+        ${AWAY_CAUSES.some(c => d.causes?.includes(c)) && !currentPause() ? '<button class="link small" data-pause-open>چند روز مکث</button>' : ''}
         <div class="row gap"><button class="btn primary grow" data-close2>باشه، شروع می‌کنم</button>${aiAvailable() ? '<button class="btn grow" data-chat>بیشتر حرف بزنیم</button>' : ''}</div>
         <p class="muted small">یک هفته‌ی دیگر می‌پرسم چطور پیش رفت.</p>`;
       body.querySelector('[data-close]').onclick = () => sheet.close();
       body.querySelector('[data-close2]').onclick = () => sheet.close();
+      body.querySelector('[data-pause-open]')?.addEventListener('click', () => sheet.closeThen(() => openPause({ onDone })));
       body.querySelector('[data-goal]')?.addEventListener('click', async e => {
         // this week's goal is the one last week's review set
         const ws = addDays(weekStart(today()), -7);

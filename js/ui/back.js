@@ -11,12 +11,14 @@ import { today, addDays } from '../lib/dates.js';
 import { icon } from './dom.js';
 import { dismissed, dismiss } from './notices.js';
 import { openMeasure } from './measure.js';
+import { pauseOn } from '../domain/pause.js';
 
 const edCare = p => ['yes', 'unsure'].includes(p?.edHistory);
 
 // The day the absence began after (its last active day), or null when they are not away.
 function absence() {
   const t = today();
+  if (pauseOn(store.profile()?.pauses, t)) return null; // they said they would be away
   const gap = awayDays(store.get(), t);
   return gap !== null && gap >= BACK_DAYS ? addDays(t, -gap) : null;
 }

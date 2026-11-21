@@ -15,7 +15,8 @@
   turns [{ key, from, to }], `to` null for the reward picked now. A reward counts the days of its own
   turns only, from the day it was picked, never before. They can switch any time: a reward they leave
   keeps its days and goes on from there when picked again, and a run ('fullRun') goes on across the days
-  another reward had (those are skipped, not breaking it).
+  another reward had (those are skipped, not breaking it). Days of a «مکث» (pause.js, BAZGASHT.md phase 5)
+  never break a run either; one that is still full counts.
 
   Kinds: 'finish' — a look laid over any colour theme (css/app.css [data-finish]), worn from «ظاهر»;
   'game' — a game (games/<key>/), a tile in «بیشتر» once earned; 'buddy' — a companion (ui/buddies.js)
@@ -72,7 +73,8 @@ export function goalRules(r, fa = String) {
     fullRun: [FULL_DAY, MARK_DAY,
       `${of} روز کامل باید پشت‌سرهم باشد؛ یک روز ناقص یا خالی، شمارش را از صفر شروع می‌کند.`,
       'امروز تا وقتی کامل نشده رشته را نمی‌شکند؛ وقتی کامل شد، یک روز اضافه می‌شود.',
-      'روزهایی که جایزه‌ی دیگری انتخاب کرده بودی، رشته را نمی‌شکنند.'],
+      'روزهایی که جایزه‌ی دیگری انتخاب کرده بودی، رشته را نمی‌شکنند.',
+      'روزهای «مکث» هم رشته را نمی‌شکنند؛ اگر در مکث هم کامل ثبت کنی، حساب است.'],
     fullDays: [FULL_DAY, MARK_DAY,
       'لازم نیست پشت‌سرهم باشد؛ هر روز کامل یکی اضافه می‌کند و روز ناقص چیزی کم نمی‌کند.'],
     vegDays: [`روزی حساب می‌شود که دست‌کم ${fa(VEG_FRUIT_GOAL)} سهم سبزی و میوه ثبت کنی؛ همان عددی که در «امروز» کنار «سبزی و میوه» است.`,
@@ -142,8 +144,9 @@ export function fullRuns(entries, notes, day) {
   return { best, now, total: full.size };
 }
 
-// The same, over a reward's own days only (turnDays): days in between are skipped, not breaking a run.
-export function runsOver(entries, notes, days, day) {
+// The same, over a reward's own days only (turnDays): days in between are skipped, not breaking a run, and
+// so is a paused day (`paused`, a Set) that is not full; a full one counts.
+export function runsOver(entries, notes, days, day, paused = new Set()) {
   const on = new Set(days);
   const meals = new Map();
   for (const e of entries) {
@@ -153,7 +156,7 @@ export function runsOver(entries, notes, days, day) {
   const marks = logMarks(notes);
   const full = new Set([...meals].filter(([d, m]) => fullDay(d, m.size, marks)).map(([d]) => d));
   let best = 0, run = 0;
-  const runs = days.map(d => (run = full.has(d) ? run + 1 : 0, best = Math.max(best, run), run));
+  const runs = days.map(d => (run = full.has(d) ? run + 1 : paused.has(d) ? run : 0, best = Math.max(best, run), run));
   // the run going on: up to today once today is full, else up to the day before it
   const last = days.length - 1;
   const now = last < 0 ? 0 : days[last] === day && !full.has(day) ? runs[last - 1] || 0 : runs[last];
@@ -182,7 +185,7 @@ export function recipeDays(entries, notes, day) {
   return days.size;
 }
 
-export function progress({ entries = [], notes = [], foods = [], earned = {}, plan = [] }, day, rewards = REWARDS) {
+export function progress({ entries = [], notes = [], foods = [], earned = {}, plan = [], paused = new Set() }, day, rewards = REWARDS) {
   const picked = activeKey(plan);
   return rewards.map(r => {
     const of = r.goal.of;
@@ -190,7 +193,7 @@ export function progress({ entries = [], notes = [], foods = [], earned = {}, pl
     const days = turnDays(plan, r.key, day, r.since || '');
     const on = new Set(days);
     const mine = entries.filter(e => on.has(e.day));
-    const runs = r.goal.type === 'fullRun' || r.goal.type === 'fullDays' ? runsOver(mine, notes, days, day) : null;
+    const runs = r.goal.type === 'fullRun' || r.goal.type === 'fullDays' ? runsOver(mine, notes, days, day, paused) : null;
     const veg = r.goal.type === 'vegDays' ? vegDays(mine, foods, day) : 0;
     const cooked = r.goal.type === 'recipeDays' ? recipeDays(mine, notes, day) : 0;
     const [now, met] = r.goal.type === 'fullRun' ? [runs.now, runs.best >= of]

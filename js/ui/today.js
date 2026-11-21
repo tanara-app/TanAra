@@ -27,6 +27,7 @@ import { isRamadan } from '../domain/occasions.js';
 import { measureNote, bindMeasureNote } from './measure.js';
 import { checkinCard, bindCheckin } from './checkin.js';
 import { backCard, bindBack } from './back.js';
+import { pausePill, bindPausePill } from './pause.js';
 import { weekCard, bindWeekCard } from './review.js';
 import { greetCard, bindGreet } from './mascot.js';
 import { mealBudget, mealSharesFrom, mealShares5From, mealStanding, openPart } from '../domain/portion.js';
@@ -268,6 +269,7 @@ export function renderToday(root) {
       ${gapPill}
       ${q ? '' : `<div class="pill">${icon.leaf}<span>سبزی ${isToday ? 'امروز' : ''}: <b>${qtyLabel(Math.round(tot.veg * 2) / 2)}</b> وعده</span></div>`}
       <div class="pill"><span>این هفته <b>${fa(logged)}</b> روز ثبت کرده‌اید${lightOn(p, sortedWeights(s.weights), today()) ? ' · ثبت سبک' : ''}</span></div>
+      ${isToday ? pausePill() : ''}
       ${isToday ? rewardPill() : ''}
       ${t.phase !== 'loss' ? `<div class="pill"><span>مرحله: <b>${phaseLabel(p, day)}</b></span></div>` : ''}
     </div>
@@ -357,6 +359,7 @@ export function renderToday(root) {
   bindMeasureNote(root);
   bindCheckin(root, redraw);
   bindBack(root);
+  bindPausePill(root, redraw);
   // a card dismissed: draw again, so the next one moves up
   root.querySelectorAll('[data-day-cards]').forEach(el => new MutationObserver(redraw).observe(el, { childList: true }));
   const fold = root.querySelector('.today-more');

@@ -1685,3 +1685,8 @@ body.kb .toast, body.chat-mode .toast { bottom: calc(var(--nav-h) + var(--safe-b
 .back-card { display: flex; flex-direction: column; gap: 10px; }
 .back-h { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .back-h b { font-size: 1rem; }
+/* «مکث» (BAZGASHT.md, phase 5) */
+.pause-pill { gap: 6px; border: 0; font: inherit; cursor: pointer; }
+.pause-pill svg { color: var(--accent); flex: none; }
+.pause-now { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 14px 0; font-size: 1.1rem; }
+.pause-now svg { color: var(--accent); }

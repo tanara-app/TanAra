@@ -1,6 +1,7 @@
 // Profile, as tiles: the two daily targets (a tap opens recalculating and setting them by hand), the
 // phase, then two square tiles for the person's own details and their motivations. App settings (reminders, appearance, today's tip, the companion, support,
 // data, account) live apart in «تنظیمات», a tall sheet opened by the gear in the header.
+import { openPause, pauseLine } from './pause.js';
 import * as store from '../data/store.js';
 import { effectiveTargets, clampKcal, floorFor, hasMedicalFlag, ACTIVITY, CONDITIONS, correcting, rampKcal } from '../domain/targets.js';
 import { sortedWeights, logMarks } from '../domain/stats.js';
@@ -51,6 +52,7 @@ const ICON = {
   palette: svg('<path d="M12 3.5a8.5 8.5 0 0 0 0 17c1.3 0 1.8-.9 1.4-1.9-.5-1.2.3-2.3 1.6-2.3h1.8a3.7 3.7 0 0 0 3.7-3.7c0-5-3.8-9.1-8.5-9.1z"/><circle cx="8" cy="11" r="1.1" fill="currentColor"/><circle cx="11" cy="7.5" r="1.1" fill="currentColor"/><circle cx="15.5" cy="8.5" r="1.1" fill="currentColor"/>'),
   data: svg('<ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/>'),
   report: svg('<path d="M5 21V4"/><path d="M5 4h12l-2.5 4.5L17 13H5"/>'),
+  pause: svg('<rect x="6.5" y="5" width="3.5" height="14" rx="1.2"/><rect x="14" y="5" width="3.5" height="14" rx="1.2"/>'),
   account: svg('<circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M17 6l3 3M15 8l2 2"/>'),
   // the companions' kind: a round face with big pointed ears
   buddy: svg('<circle cx="12" cy="13" r="6"/><path d="M6.6 11 2.5 7.5l5 1M17.4 11l4.1-3.5-5 1"/><circle cx="10" cy="12.5" r=".9" fill="currentColor"/><circle cx="14" cy="12.5" r=".9" fill="currentColor"/><path d="M10.6 15.4c.8.6 2 .6 2.8 0"/>'),
@@ -101,6 +103,7 @@ function openSettings() {
         <div class="sheet-head"><h2>تنظیمات</h2><button class="icon-btn" data-close aria-label="بستن">${icon.close}</button></div>
         ${group('عمومی', `
           ${row('data-reminders', 'bell', 'یادآورها', remindersLine())}
+          ${row('data-pause', 'pause', 'مکث', pauseLine())}
           ${row('data-look', 'palette', 'ظاهر', appearanceLine())}
           ${row('data-tip', 'tip', 'نکته‌ی روز', tipOn() ? 'روشن' : 'خاموش')}`)}
         ${group('همراه', `
@@ -115,6 +118,7 @@ function openSettings() {
         <p class="muted small center">تن‌آرا · نسخه‌ی ۱</p>`;
       body.querySelector('[data-close]').onclick = () => sheet.close();
       bindReminders(body);
+      body.querySelector('[data-pause]').onclick = () => openPause();
       body.querySelector('[data-look]').onclick = openAppearance;
       body.querySelector('[data-tip]').onclick = async () => {
         const v = await choose('نکته‌ی روز', [{ value: 'on', label: 'روشن' }, { value: 'off', label: 'خاموش' }], tipOn() ? 'on' : 'off');

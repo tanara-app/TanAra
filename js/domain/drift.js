@@ -96,10 +96,12 @@ export function planSign(adherence, day) {
   Every sign showing on `day`, or null when there are none. `phase` is today's phase: no signs
   on a diet break (its first days bring water weight back), and in maintenance no weight sign.
   `light`: light logging is in force, so fewer logged days is expected. `care`: a possible eating-
-  disorder history, so stopping weighing is no sign.
+  disorder history, so stopping weighing is no sign. `paused`: the days of a «مکث» (pause.js); no signs during
+  one or in the week after it, since that week's record is the pause.
 */
-export function drift({ entries = [], weights = [], waists = [], phase = 'loss', light = false, kcalOn, adherence = null, marks, care = false }, day) {
+export function drift({ entries = [], weights = [], waists = [], phase = 'loss', light = false, kcalOn, adherence = null, marks, care = false, paused = new Set() }, day) {
   if (phase === 'break') return null;
+  for (let k = 0; k <= 7; k++) if (paused.has(addDays(day, -k))) return null;
   const signs = {
     weight: phase === 'loss' ? weightSign(weights, day) : null,
     scale: phase === 'loss' && !care ? scaleSign(weights, day) : null,
