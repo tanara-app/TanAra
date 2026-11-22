@@ -228,7 +228,9 @@
 - هر اشتراک اعلانی که حذف شود (سرویس اعلان دیگر نمی‌شناسدش، یا عضو یادآور را روی دستگاهی خاموش کرده) با یک trigger یک ردیف `unsub` در
   `push_log` می‌گذارد. پیش از این، حذف شدن بی‌نشان بود.
   (همان روز، از بازبینی امنیتی خودکار: هر عضو روزی حداکثر یک `unsub`، و وقتی خود حساب پاک می‌شود چیزی نوشته نمی‌شود تا پاک شدن
-  حساب نشکند؛ [supabase/migrations/20261121_bazgasht_report_fix.sql](supabase/migrations/20261121_bazgasht_report_fix.sql).)
+  حساب نشکند؛ [supabase/migrations/20261121_bazgasht_report_fix.sql](supabase/migrations/20261121_bazgasht_report_fix.sql). بعد،
+  باز از همان بازبینی: migration دوباره‌اجراشدنی شد و نوشتنِ `unsub` هیچ‌وقت چیزی را متوقف نمی‌کند، حتی اگر پاک شدن حساب هم‌زمان باشد؛
+  [supabase/migrations/20261121_bazgasht_report_fix2.sql](supabase/migrations/20261121_bazgasht_report_fix2.sql).)
 - تابع `public.bazgasht_report(since date default '2026-11-20')` فقط شمار می‌دهد، هیچ‌وقت اسم: `push` (هر نوع اعلان: چند بار، و چند بار
   عضو ظرف ۴۸ ساعت هر چیزی ثبت کرد؛ این علیت نیست، شاید بی‌اعلان هم ثبت می‌کرد)، `state` (برای هر هفته از شنبه، شمار اعضا در هر وضعیت در
   آخر هفته: new، current، lapsed، away، gone)، و `unsub` (حذف اشتراک‌ها در هر هفته). جواب‌های «چه شد؟» در آن نیست (فاز ۷: خصوصی). فقط
