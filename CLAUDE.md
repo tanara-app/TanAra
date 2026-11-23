@@ -84,6 +84,7 @@ exist side by side. When a new decision replaces an old one, change or mark the 
   answered `AccessTokenRequiredError` (its login had lapsed): run `npx supabase login` again, or deploy with the MCP tool as `ClaudeAccount` does.
   Later on 2026-11-20 `ClaudeAccount` deployed `hooshvareh` version 58 with the MCP tool (commit bbc4d56: the clinical review's potassium and
   phosphorus tags and conditions, kidney «not on dialysis», salty white cheese and دوغ; it carries fa6b235 too); it boots (OPTIONS 200).
+  On 2026-11-23 `m.b.a` deployed `hooshvareh` version 59 with the MCP tool (commit befc2ca: the measured energy use's ±); it boots (OPTIONS 200).
   On 2026-11-21 the CLI on `m.b.a` still had no login, so `m.b.a` deployed `remind` version 7 with the MCP tool the way `ClaudeAccount`
   does (one-line `index.ts` importing the raw file at commit 73934f0, `verify_jwt` false: BAZGASHT.md phase 5, «مکث»); it boots (GET 200).
   The same day it deployed `remind` version 8 the same way (commit 376c440: «به یادتم», phase 6); GET 200, a POST without sign-in 401.
