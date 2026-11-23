@@ -54,7 +54,7 @@ suite('energy', () => {
     const m = measuredTdee(eat(10, 2000), weigh(100, 0.5), { day: DAY });
     eq([m.ready, m.needDays, m.needWeighs], [false, 4, 0]);
     const w = measuredTdee(eat(28, 2000), weigh(100, 0.5).slice(0, 3), { day: DAY });
-    eq([w.ready, w.needWeighs], [false, 3]);
+    eq([w.ready, w.needWeighs], [false, 2]); // three in four weeks: it looks six weeks back, where five are enough
   });
 
   test('weigh-ins bunched into a few days are not a trend', () => {
@@ -84,9 +84,31 @@ suite('energy', () => {
     eq(m.days, 42);
   });
 
-  test('a missed week: weekly weighing says how many are still missing', () => {
-    const m = measuredTdee(eat(42, 2000), weekly(5), { day: DAY });
-    eq([m.ready, m.needWeighs, m.weighs], [false, 1, 5]);
+  test('a missed week in six is fine; two missed say how many are still missing', () => {
+    ok(measuredTdee(eat(42, 2000), weekly(5), { day: DAY }).ready);
+    const m = measuredTdee(eat(42, 2000), weekly(4), { day: DAY });
+    eq([m.ready, m.needWeighs, m.weighs], [false, 1, 4]);
+  });
+
+  test('a weigh-in made today counts at once (food still stops at yesterday)', () => {
+    const four = weekly(4).map(w => ({ ...w, day: addDays(w.day, -6) })); // the last one a week ago
+    const before = measuredTdee(eat(42, 2000), four, { day: DAY });
+    eq([before.ready, before.needWeighs], [false, 1]);
+    const after = measuredTdee(eat(42, 2000), [...four, { day: DAY, kg: 89.5 }], { day: DAY });
+    ok(after.ready);
+    eq(after.weighs, 5);
+  });
+
+  test('weighing every 7 to 9 days stays ready as the window slides', () => {
+    // weigh-ins 7, 7, 9, 7, 8 and 8 days apart (the gaps of the case reported on 2026-11-23)
+    const start = '2026-02-01';
+    const gaps = [0, 7, 14, 23, 30, 38, 46];
+    const ws = gaps.map((g, i) => ({ day: addDays(start, g), kg: 90 - 0.4 * i + (i % 2 ? 0.3 : 0) }));
+    for (let i = 0; i < 8; i++) {
+      const day = addDays(start, 46 + i);
+      const food = Array.from({ length: 40 }, (_, j) => addDays(day, -1 - j)).flatMap(d => [{ day: d, meal: 'lunch', kcal: 1300 }, { day: d, meal: 'dinner', kcal: 1000 }]);
+      ok(measuredTdee(food, ws, { day, startDate: start }).ready, day);
+    }
   });
 
   test('enough weigh-ins in four weeks: older food and weights are left out', () => {
@@ -97,7 +119,7 @@ suite('energy', () => {
 
   test('the first week after starting stays skipped in the six-week look-back too', () => {
     const m = measuredTdee(eat(42, 2000), weekly(6), { day: DAY, startDate: addDays(DAY, -40) });
-    eq([m.ready, m.from, m.weighs], [false, addDays(DAY, -33), 5]);
+    eq([m.from, m.weighs], [addDays(DAY, -33), 5]); // the one 36 days ago is in the skipped week
   });
 
   test('a result far from the formula is held within 25% of it', () => {

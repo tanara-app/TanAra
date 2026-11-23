@@ -42,7 +42,7 @@ function energyCard(s, p, latestKg) {
   if (!m.ready) {
     const need = [m.needDays ? `${fa(m.needDays)} روز ثبت کامل` : null, m.needWeighs ? `${fa(m.needWeighs)} وزن‌کشی` : null].filter(Boolean);
     return fold(need.length ? `هنوز لازم است: ${need.join(' و ')}` : 'وزن‌کشی‌ها باید دست‌کم دو هفته را پوشش بدهند', `
-      <div class="bar"><i style="width:${Math.round(Math.min(1, (m.days / ENERGY.MIN_DAYS + m.weighs / ENERGY.MIN_WEIGHS) / 2) * 100)}%"></i></div>
+      <div class="bar"><i style="width:${Math.round(Math.min(1, (m.days / ENERGY.MIN_DAYS + m.weighs / m.minWeighs) / 2) * 100)}%"></i></div>
       <p class="muted small mt">فرمول فقط یک حدس است و برای یک نفر می‌تواند چند صد کالری خطا داشته باشد. بعد از چهار تا شش هفته، تن‌آرا مصرف واقعی بدنت را از روی چیزی که خورده‌ای (روزهایی با دست‌کم دو وعده‌ی ثبت‌شده) و روند وزنت حساب می‌کند. هفته‌ای یک وزن‌کشی برایش کافی است.</p>`);
   }
   const loss = phaseOn(p, t) === 'loss';

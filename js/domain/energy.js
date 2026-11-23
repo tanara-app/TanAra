@@ -11,6 +11,11 @@
   mostly water and would make the body look hungrier than it is. Four weeks are looked at, or
   six for someone weighing once a week (the reminder's default): the wider span steadies the
   trend as much as more weigh-ins would, so nobody is asked to step on the scale more often.
+  Food counts up to yesterday (today isn't over), but weigh-ins count up to today: a weigh-in
+  the card asked for must count the moment it is saved (2026-11-23: it didn't, and the card kept
+  asking for «one more»). Six weeks need five weigh-ins, not six: people weighing «once a week»
+  weigh every 7 to 9 days, and with six the card went back to asking each time the oldest one
+  slid out of the window.
   A steady habit of logging a
   little less than was eaten moves the result by the same amount, and the target with it, so
   the target stays right in the person's own way of logging.
@@ -27,6 +32,7 @@ export const ENERGY = {
   MIN_SPAN: 21,    // the window must be at least this long
   MIN_DAYS: 14,    // fully logged days needed in it
   MIN_WEIGHS: 6,   // weigh-ins needed in it …
+  MIN_WEIGHS_LONG: 5, // … or in the six weeks
   MIN_WEIGH_SPAN: 14, // … spread over at least this many days
   KCAL_PER_KG: 7700,
   MAX_OFF: 0.25,   // further than this from the formula is more likely a logging gap than a metabolism
@@ -50,13 +56,15 @@ function slope(w) {
 */
 export function measuredTdee(entries, weights, { day, startDate, formula, marks } = {}) {
   const E = ENERGY;
-  const to = addDays(day, -1);
+  const to = addDays(day, -1); // the last day of food; weigh-ins go up to `day` itself
   const since = n => {
     const d = addDays(day, -n), first = startDate ? addDays(startDate, E.SKIP_START) : d;
     return first > d ? first : d;
   };
-  const weighed = from => sortedWeights(weights).filter(x => x.day >= from && x.day <= to);
-  const from = since(weighed(since(E.WINDOW)).length >= E.MIN_WEIGHS ? E.WINDOW : E.LONG_WINDOW);
+  const weighed = from => sortedWeights(weights).filter(x => x.day >= from && x.day <= day);
+  const short = weighed(since(E.WINDOW)).length >= E.MIN_WEIGHS;
+  const from = since(short ? E.WINDOW : E.LONG_WINDOW);
+  const minWeighs = short ? E.MIN_WEIGHS : E.MIN_WEIGHS_LONG;
 
   const byDay = new Map();
   for (const e of entries) {
@@ -72,9 +80,9 @@ export function measuredTdee(entries, weights, { day, startDate, formula, marks 
   const span = diffDays(to, from) + 1;
 
   const needDays = Math.max(0, E.MIN_DAYS - full.length);
-  const needWeighs = Math.max(0, E.MIN_WEIGHS - w.length);
+  const needWeighs = Math.max(0, minWeighs - w.length);
   const needSpan = span < E.MIN_SPAN || wSpan < E.MIN_WEIGH_SPAN;
-  if (needDays || needWeighs || needSpan) return { ready: false, days: full.length, weighs: w.length, needDays, needWeighs, needSpan, from, to };
+  if (needDays || needWeighs || needSpan) return { ready: false, days: full.length, weighs: w.length, minWeighs, needDays, needWeighs, needSpan, from, to };
 
   const intake = full.reduce((s, d) => s + d.kcal, 0) / full.length;
   const perDay = slope(w);
