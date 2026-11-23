@@ -203,6 +203,9 @@ exist side by side. When a new decision replaces an old one, change or mark the 
   rewrites `js/data/tips.js`.
 - `research/clinical-review.md`: the clinical review of «سهم وعده» (SAHM.md phase 7, from 2026-11-20): every numeric health
   rule, its sources, and what was changed. `tests/clinical.test.js` holds the numbers to the guidelines.
+- `research/energy-review.md`: the scientific review of «مصرف واقعی بدن» (`js/domain/energy.js`, 2026-11-23): the
+  sources, what changed, and the simulation; `node tools/energy-eval.mjs` scores it on simulated people, and
+  `tests/energy.test.js` fails if it falls behind the old way or its ± stops holding the truth.
 - `LABS.md`: the lab-results tool («آزمایش خون» in «بیشتر», from 2026-11-17): PDF upload, the original kept for download,
   trends per test, condition suggestions. The user's decisions and where the work stands.
 - `IDEAS.md`: ideas for daily "hooks" that bring members back, with the ones the user picked. When one gets built,

@@ -9,7 +9,7 @@ import { eatingPattern } from '../domain/pattern.js';
 import * as store from '../data/store.js';
 import { SEED_FOODS } from '../data/seedFoods.js';
 import { SUPABASE_URL, SUPABASE_KEY } from '../config.js';
-import { effectiveTargets, computeTargets, phaseOn, maintenanceKcal, rampKcal, correcting } from '../domain/targets.js';
+import { effectiveTargets, computeTargets, phaseOn, maintenanceKcal, rampKcal, correcting, ageOn } from '../domain/targets.js';
 import { measuredTdee } from '../domain/energy.js';
 import { lossStart, zone, maintainWeeks, lightOn } from '../domain/phase.js';
 import { sortedWeights, rate4w, measureDue, activityWeek, weekStart, ACTIVITY_GOAL, logMarks } from '../domain/stats.js';
@@ -101,7 +101,7 @@ function energyContext(s, p, t) {
   if (!p?.startDate) return null;
   const w = sortedWeights(s.weights);
   const formula = computeTargets({ ...p, weightKg: w.length ? Number(w[w.length - 1].kg) : p.targets?.baseWeight }).tdee;
-  const m = measuredTdee(s.entries, s.weights, { day: t, startDate: p.startDate, formula, marks: logMarks(s.ai_notes) });
+  const m = measuredTdee(s.entries, s.weights, { day: t, startDate: p.startDate, formula, marks: logMarks(s.ai_notes), body: { sex: p.sex, age: ageOn(p, t), heightCm: p.heightCm } });
   return { ...m, formula: Number.isFinite(formula) ? formula : null, source: p.targets?.manualKcal ? 'manual' : p.targets?.source || 'formula' };
 }
 

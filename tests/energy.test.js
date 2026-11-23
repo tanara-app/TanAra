@@ -1,5 +1,6 @@
 import { suite, test, eq, ok, near } from './harness.js';
-import { measuredTdee, nextTargets, ENERGY } from '../js/domain/energy.js';
+import { measuredTdee, nextTargets, ENERGY, kcalPerKg, bodyFatPct } from '../js/domain/energy.js';
+import { evaluate } from './energy-sim.js';
 import { addDays } from '../js/lib/dates.js';
 
 const DAY = '2026-03-01';
@@ -122,17 +123,54 @@ suite('energy', () => {
     eq([m.from, m.weighs], [addDays(DAY, -33), 5]); // the one 36 days ago is in the skipped week
   });
 
-  test('a result far from the formula is held within 25% of it', () => {
+  test('a result far from the formula is held within 30% of it, then weighed against it', () => {
     const m = measuredTdee(eat(28, 1000), weigh(100, 0), { day: DAY, formula: 2400 });
-    eq([m.tdee, m.clamped], [1800, true]);
-    const fine = measuredTdee(eat(28, 2000), weigh(100, 0.5), { day: DAY, formula: 2400 });
-    eq([fine.tdee, fine.clamped], [2550, false]);
+    eq([m.raw, m.clamped], [1700, true]); // 1680
+    ok(m.tdee > m.raw && m.tdee < 2400);
+  });
+
+  test('the measurement and the formula are weighed by how sure each is', () => {
+    const steady = measuredTdee(eat(28, 2000), weigh(100, 0.5), { day: DAY, formula: 2300 });
+    eq(steady.raw, 2550);
+    ok(steady.tdee >= 2450 && steady.tdee < 2550, steady.tdee); // good data: mostly the measurement
+    // the same eating with weigh-ins that jump about: less sure, so nearer the formula, and a wider ±
+    const jumpy = weigh(100, 0.5).map((w, i) => ({ ...w, kg: w.kg + (i % 2 ? 1.5 : -1.5) }));
+    const noisy = measuredTdee(eat(28, 2000), jumpy, { day: DAY, formula: 2300 });
+    ok(noisy.tdee < steady.tdee && noisy.range > steady.range, `${noisy.tdee} ±${noisy.range}`);
+    // no formula: the measurement alone
+    eq(measuredTdee(eat(28, 2000), weigh(100, 0.5), { day: DAY }).tdee, 2550);
+  });
+
+  test('the ± is never below the day-to-day swing of a body\'s weight', () => {
+    const m = measuredTdee(eat(28, 2000), weigh(100, 0.5), { day: DAY }); // weigh-ins on a perfect line
+    ok(m.range >= 150, m.range); // 0.5% of 100 kg over ten weigh-ins in four weeks: about ±270 alone
+  });
+
+  test('a kg of weight is worth more with more body fat (Hall 2008, Forbes)', () => {
+    const lean = kcalPerKg({ sex: 'male', age: 30, heightCm: 180, weightKg: 70 });
+    const heavy = kcalPerKg({ sex: 'male', age: 30, heightCm: 180, weightKg: 130 });
+    ok(lean > 5500 && lean < 7000, lean);
+    ok(heavy > 7700 && heavy < 8500, heavy);
+    eq(kcalPerKg(null), 7700);
+    eq(kcalPerKg({ sex: 'male', heightCm: 180, weightKg: 80 }), 7700); // no age: the old figure
+    near(bodyFatPct({ sex: 'female', age: 40, heightCm: 165, weightKg: 70 }), 1.2 * 70 / 1.65 ** 2 + 0.23 * 40 - 5.4, 1e-9);
+  });
+
+  test('simulated people: closer to the truth than the formula and than the old way, with an honest ±', () => {
+    const s = evaluate(400);
+    ok(s.ready > 0.95, `ready ${s.ready}`);
+    ok(s.now.median < s.formula.median * 0.6, `median ${s.now.median} vs formula ${s.formula.median}`);
+    ok(s.now.median <= s.old.median && s.now.p90 <= s.old.p90 + 10, `now ${s.now.median}/${s.now.p90}, old ${s.old.median}/${s.old.p90}`);
+    ok(s.coverage > 0.88 && s.coverage < 0.99, `the truth inside the ± ${s.coverage}`);
+    const gaps = evaluate(400, { partial: 0.2 }); // missed meals still counted as full days
+    ok(Math.abs(gaps.now.bias) < Math.abs(gaps.old.bias), `bias ${gaps.now.bias} vs ${gaps.old.bias}`);
   });
 
   test('nextTargets uses the measurement when there is one, the formula otherwise', () => {
     const p = { sex: 'male', age: 35, heightCm: 180, activity: 'sedentary', startDate: addDays(DAY, -60) };
     const a = nextTargets(p, eat(28, 2000), weigh(100, 0.5), 98, DAY);
-    eq([a.m.ready, a.t.measured, a.t.tdee, a.t.kcal], [true, true, 2550, 2050]);
+    // a kg of this body (98 kg at 180 cm, 35) is worth about 7500 kcal, so a little under 2550; weighed with the formula's 2300
+    eq([a.m.ready, a.t.measured, a.t.tdee, a.t.kcal], [true, true, 2500, 2000]);
     const b = nextTargets(p, [], [], 98, DAY);
     eq([b.m.ready, b.t.measured, b.t.kcal], [false, false, 1800]); // bmr 1935 × 1.2 = 2322 → 2300 − 500
   });

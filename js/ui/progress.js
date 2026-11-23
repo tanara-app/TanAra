@@ -47,15 +47,17 @@ function energyCard(s, p, latestKg) {
   }
   const loss = phaseOn(p, t) === 'loss';
   const lossTarget = Number(p.targets?.manualKcal) || p.targets?.kcal;
-  const differs = Math.abs(next.kcal - lossTarget) >= 100 || Math.abs(next.tdee - maintenanceKcal(p)) >= 100;
+  // a new target only when the change is bigger than the measurement's own error (one SD) and 100
+  const step = Math.max(100, m.range / 2);
+  const differs = Math.abs(next.kcal - lossTarget) >= step || Math.abs(next.tdee - maintenanceKcal(p)) >= step;
   const moving = Math.abs(m.perWeek) < 0.05 ? 'وزنت تقریباً ثابت مانده' : `هفته‌ای ${fa(Math.abs(m.perWeek), 2)} کیلو ${m.perWeek < 0 ? 'کم' : 'اضافه'} کرده‌ای`;
   return fold(`${kcal50(m.tdee)} کالری در روز${differs ? ' · هدف تازه پیشنهاد شده' : ''}`, `
     <section class="tiles">
-      <div class="tile"><span>اندازه‌گیری‌شده</span><b>${kcal50(m.tdee)}</b><small>کالری در روز</small></div>
+      <div class="tile"><span>اندازه‌گیری‌شده</span><b>${kcal50(m.tdee)}</b><small>± ${kcal50(m.range)} کالری</small></div>
       <div class="tile"><span>حدس فرمول</span><b>${kcal50(next.formulaTdee)}</b><small>کالری در روز</small></div>
     </section>
     <p class="small">در ${fa(m.days)} روزِ کامل ثبت‌شده‌ی ${fa(Math.round((diffDays(m.to, m.from) + 1) / 7))} هفته‌ی اخیر، میانگین ${kcal50(m.intake)} کالری خورده‌ای و ${moving}.</p>
-    ${m.clamped ? '<p class="muted small">عدد خام خیلی از فرمول دور بود (معمولاً یعنی بعضی خوراکی‌ها ثبت نشده)، برای همین حداکثر ۲۵٪ فاصله از فرمول در نظر گرفته شد.</p>' : ''}
+    ${m.clamped ? '<p class="muted small">عدد خام خیلی از فرمول دور بود (معمولاً یعنی بعضی خوراکی‌ها ثبت نشده)، برای همین حداکثر ۳۰٪ فاصله از فرمول در نظر گرفته شد.</p>' : ''}
     ${differs ? `<div class="ai-goal"><small class="muted">${loss ? 'هدف پیشنهادی (مصرف واقعی منهای ۵۰۰)' : 'سطح نگهداری پیشنهادی'}</small><b>${kcal50(loss ? next.kcal : next.tdee)} کالری${loss && next.hitFloor ? ' (حداقل ایمن)' : ''}</b>
         <button class="btn sm" data-energy-apply>همین را هدف کن</button></div>
         ${p.targets?.manualKcal ? '<p class="muted small">هدف دستی‌ات با این کار پاک می‌شود.</p>' : ''}`
