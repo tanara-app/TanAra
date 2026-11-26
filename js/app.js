@@ -15,7 +15,7 @@ import { renderChat } from './ui/chat.js';
 import { renderMagazine } from './ui/magazine.js';
 import { renderTools } from './ui/tools.js';
 import { configureAI, sparkle } from './ai/hooshvareh.js';
-import { disable as disableReminders } from './ui/reminders.js';
+import { disable as disableReminders, resyncPush } from './ui/reminders.js';
 import { applyTheme } from './ui/theme.js';
 import { guardFinish, unseenRewards, openRewards } from './ui/rewards.js';
 import { maybeCelebrate } from './ui/celebrate.js';
@@ -166,7 +166,7 @@ async function start(ns, remote) {
   started = true;
   render();
   if (remote) {
-    store.pull();
+    store.pull().then(resyncPush, () => {});
     startFamily();
     shop.refresh();
     window.addEventListener('online', () => { store.pull(); shop.refresh(); });

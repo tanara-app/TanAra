@@ -51,6 +51,30 @@ async function enable() {
   }
   const { error } = await store.savePush({ endpoint: sub.endpoint, p256dh: b64u(sub.getKey('p256dh')), auth: b64u(sub.getKey('auth')) });
   if (error) throw new Error('اشتراک این دستگاه ذخیره نشد؛ دوباره امتحان کن.');
+  try { localStorage.removeItem(OFF()); } catch { /* private mode */ }
+}
+
+/*
+  Each time the app opens: this device's subscription goes to the server again, so one the push
+  service renewed, or one the server dropped after a refusal, is current again (a «به یادتم» that
+  the push service took but never showed, owner's report 2026-11-22). If the browser lost it but still
+  allows notifications, and reminders are on and were not switched off on this device, a new one is
+  made without asking. Silent: nothing is shown if any of it fails.
+*/
+const OFF = () => store.localKey('push-off');
+export async function resyncPush() {
+  try {
+    if (!supported() || !store.canPush() || !settings().on || Notification.permission !== 'granted') return;
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) {
+      if (localStorage.getItem(OFF()) === '1') return;
+      const res = await fetch(URL_, { headers: { apikey: SUPABASE_KEY } }).then(r => r.json());
+      if (!res?.key) return;
+      sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: unb64u(res.key) });
+    }
+    await store.savePush({ endpoint: sub.endpoint, p256dh: b64u(sub.getKey('p256dh')), auth: b64u(sub.getKey('auth')) });
+  } catch { /* offline, or the browser said no: the reminders sheet still shows the way */ }
 }
 
 // Also run on sign-out, so this device stops getting the reminders of whoever signed out.
@@ -92,6 +116,7 @@ export function remindersLine() {
   if (!s.on) return 'خاموش';
   // «فعلاً نمی‌خواهم» (domain/why.js): a month with nothing sent
   if (quietOn(store.profile(), today())) return `ساکت تا ${faDM(store.profile().quietUntil)}`;
+  if (supported() && Notification.permission !== 'granted') return 'روی این دستگاه بسته است';
   return [s.log.on ? `ثبت غذا ${autoTime(s.log) ? 'خودکار، ' : ''}${faDigits(logTime(s.log))}` : null, s.weigh.on ? `اندازه‌گیری ${EVERY.find(e => e[0] === Number(s.weigh.every))?.[1] || 'هر هفته'}، ${faDigits(s.weigh.at)}` : null].filter(Boolean).join(' · ') || 'هر دو خاموش';
 }
 
@@ -145,7 +170,10 @@ export function openReminders() {
         draw();
       };
       q('[data-on]')?.addEventListener('click', () => run(async () => { await enable(); if (!settings().on) save({}); }, 'یادآورها روی این دستگاه روشن شد'));
-      q('[data-off]')?.addEventListener('click', () => run(disable, 'روی این دستگاه خاموش شد'));
+      q('[data-off]')?.addEventListener('click', () => run(async () => {
+        await disable();
+        try { localStorage.setItem(OFF(), '1'); } catch { /* private mode */ }
+      }, 'روی این دستگاه خاموش شد'));
       q('[data-test]')?.addEventListener('click', () => run(test, r => (r.ok ? 'فرستاده شد؛ باید تا چند لحظه‌ی دیگر برسد' : 'سرویس اعلان این دستگاه آن را قبول نکرد')));
       const change = () => save({
         // «خودکار»: the time follows their habit (domain/timing.js); a time picked here is theirs from then on

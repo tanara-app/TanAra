@@ -1,4 +1,4 @@
-// «گزارش خرابی و انتقاد» (نمایه): a bug, a complaint or an idea, with up to 4 photos, straight to
+// «گزارش خرابی و انتقاد» (a tile in «بیشتر» since 2026-11-27; was in «نمایه» ← «تنظیمات»): a bug, a complaint or an idea, with up to 4 photos, straight to
 // the server (table `feedback`). The Claudes working on the app read them and show the new ones to
 // the person who decides what changes (FEEDBACK.md); the status and any answer come back here.
 import * as store from '../data/store.js';
@@ -16,7 +16,8 @@ const KINDS = {
 };
 const STATUS = { new: 'رسید', seen: 'دیده شد', planned: 'در برنامه', done: 'انجام شد', declined: 'فعلاً نه' };
 
-export const feedbackLine = () => 'خرابی، انتقاد یا پیشنهاد، با عکس';
+// its tile in «بیشتر»: a speech bubble with a red «!», in the colours of the lab tile
+export const FEEDBACK_ICON = '<svg viewBox="0 0 64 64" aria-hidden="true"><path d="M14 10h36a8 8 0 0 1 8 8v20a8 8 0 0 1-8 8H30l-11 9v-9h-5a8 8 0 0 1-8-8V18a8 8 0 0 1 8-8z" fill="#f7efe2"/><rect x="28.5" y="16" width="7" height="17" rx="3.5" fill="#c9363a"/><circle cx="32" cy="39" r="3.8" fill="#c9363a"/></svg>';
 
 export function openFeedback() {
   const d = { kind: 'bug', body: '' };

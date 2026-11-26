@@ -71,6 +71,11 @@ export function groupSimilar(list) {
   return groups.sort((a, b) => first(a) - first(b));
 }
 
-// Every other member already has a food like this one: there is nothing to send.
+/*
+  Every other member already has this very food (same barcode or the same words): there is nothing
+  to send. Only «like» is not enough: a branded «کره بادام‌زمینی <مارک> (دایت)» is a food of its own
+  for those who have the plain «کره بادام‌زمینی» (owner's report, 2026-11-24): listed with «… دارد».
+*/
+const same = (a, b) => (a.barcode && b.barcode && a.barcode === b.barcode) || foodKey(a.name) === foodKey(b.name);
 export const everyoneHas = (food, all, memberIds) => memberIds.filter(id => id !== food.user_id)
-  .every(id => similarIn(food, all.filter(f => f.user_id === id)).length > 0);
+  .every(id => all.some(f => f.user_id === id && f.id !== food.id && same(food, f)));

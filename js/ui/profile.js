@@ -18,7 +18,6 @@ import { aiAvailable } from '../ai/hooshvareh.js';
 import { THEMES, PALETTES, getTheme, setTheme, getPalette, setPalette, shownMode, getFinish, setFinish } from './theme.js';
 import { earnedFinishes } from '../domain/rewards.js';
 import { MODES, buddyMode, setBuddyMode, BUDDY_CHOICES, buddyKey, setBuddy, buddyName, canPick } from './mascot.js';
-import { openFeedback, feedbackLine } from './feedback.js';
 import { tipOn, setTipOn } from './tip.js';
 
 let session = { email: null, signOut: null, local: true };
@@ -110,8 +109,6 @@ function openSettings() {
           ${canPick() ? row('data-buddy', 'buddy', 'شخصیت', buddyName()) : ''}
           ${row('data-mascot', 'voice', 'جمله‌ها و صدا', MODES.find(m => m.value === buddyMode()).label)}`)}
         ${aiAvailable() ? group('هوشواره', row('data-usage', 'usage', 'مصرف هوشواره', 'هزینه‌ی ۳۰ روز اخیر')) : ''}
-        ${group('پشتیبانی', `
-          ${row('data-feedback', 'report', 'گزارش خرابی و انتقاد', feedbackLine())}`)}
         ${group('حساب و داده‌ها', `
           ${row('data-data', 'data', 'داده‌ها و پشتیبان', 'خروجی و برگرداندن')}
           ${row('data-account', 'account', 'حساب', session.local ? 'حالت آزمایشی محلی' : `${esc(session.email || '')}${st.pending ? ` · ${fa(st.pending)} تغییر در صف` : ''}`)}`)}
@@ -134,7 +131,6 @@ function openSettings() {
         if (v) setBuddy(v);
       });
       body.querySelector('[data-usage]')?.addEventListener('click', openUsage);
-      body.querySelector('[data-feedback]').onclick = openFeedback;
       body.querySelector('[data-data]').onclick = openData;
       body.querySelector('[data-account]').onclick = openAccount;
     };

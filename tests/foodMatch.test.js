@@ -66,6 +66,17 @@ suite('food match', () => {
     eq(everyoneHas(all[3], all, ['me', 'mom', 'dad']), false);
   });
 
+  test('a branded food is not hidden because the others have the plain one', () => {
+    const all = [
+      { ...f('کره بادام‌زمینی فلان (دایت)'), id: '1', user_id: 'me' }, { ...f('کره بادام‌زمینی'), id: '2', user_id: 'mom' },
+      { ...f('کره بادام زمینی'), id: '3', user_id: 'dad' },
+    ];
+    eq(similarIn(all[0], [all[1]]).length, 1);
+    eq(everyoneHas(all[0], all, ['me', 'mom', 'dad']), false);
+    eq(everyoneHas(all[1], all, ['me', 'mom', 'dad']), false);
+    eq(everyoneHas(all[1], all, ['mom', 'dad']), true);
+  });
+
   test('the same food added by several members shows once, under the first one added', () => {
     const list = [
       { ...f('نان جو'), id: 'mom', created_at: '2026-11-03' },
