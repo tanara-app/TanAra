@@ -108,7 +108,7 @@ function openSettings() {
         ${group('همراه', `
           ${canPick() ? row('data-buddy', 'buddy', 'شخصیت', buddyName()) : ''}
           ${row('data-mascot', 'voice', 'جمله‌ها و صدا', MODES.find(m => m.value === buddyMode()).label)}`)}
-        ${aiAvailable() ? group('هوشواره', row('data-usage', 'usage', 'مصرف هوشواره', 'هزینه‌ی ۳۰ روز اخیر')) : ''}
+        ${aiAvailable() ? group('هوشواره', row('data-usage', 'usage', 'مصرف هوشواره', 'هزینه‌ی هر ماه')) : ''}
         ${group('حساب و داده‌ها', `
           ${row('data-data', 'data', 'داده‌ها و پشتیبان', 'خروجی و برگرداندن')}
           ${row('data-account', 'account', 'حساب', session.local ? 'حالت آزمایشی محلی' : `${esc(session.email || '')}${st.pending ? ` · ${fa(st.pending)} تغییر در صف` : ''}`)}`)}

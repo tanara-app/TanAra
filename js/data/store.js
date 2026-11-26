@@ -567,13 +567,20 @@ export async function myFeedback() {
 export const savePush = sub => (remote ? remote.savePush(sub) : Promise.resolve({ error: { message: 'local' } }));
 export const removePush = endpoint => (remote ? remote.removePush(endpoint) : Promise.resolve({}));
 // Rows of ai_usage since an ISO time, or null when they can't be read.
-export async function aiUsage(since) {
-  if (!remote) return null;
+export const aiUsage = since => (remote ? pages(remote.usage, since) : null);
+// Every page of rows (1000 at a time, oldest first), or null when one can't be read.
+async function pages(read, since) {
+  const out = [];
   // a Supabase query is awaitable but is not a real Promise (it has no .catch)
   try {
-    const res = await remote.usage(since);
-    return res && !res.error ? res.data : null;
+    for (let from = 0; from < 100000; from += 1000) {
+      const res = await read(since, from, from + 999);
+      if (!res || res.error) return null;
+      out.push(...res.data);
+      if (res.data.length < 1000) return out;
+    }
   } catch { return null; }
+  return out;
 }
 // The owner's view: true when this account may read everyone's usage;
 // null when it can't be asked now (offline), so the caller can ask again later.
@@ -633,13 +640,7 @@ export async function shareUndo(food, members = null) {
   } catch (e) { return { error: { message: String(e) } }; }
 }
 // Every member's rows (with user_id and name) since an ISO time, or null.
-export async function aiUsageAll(since) {
-  if (!remote) return null;
-  try {
-    const res = await remote.usageAll(since);
-    return res && !res.error ? res.data : null;
-  } catch { return null; }
-}
+export const aiUsageAll = since => (remote ? pages(remote.usageAll, since) : null);
 // «خانواده»: send this member's weekly rows ({ ok } or { error }), take them all back, and read
 // everyone's rows from a week on (null when they can't be read: offline, or no server).
 export async function familySave(rows) {

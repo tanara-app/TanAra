@@ -150,17 +150,18 @@ export function createSupabaseRemote(sb) {
       return sb.from('feedback').select('id,kind,body,images,status,answer,created_at').order('created_at', { ascending: false }).limit(30);
     },
 
-    // What Hooshvareh's calls used since an ISO time (rows written by the Edge Function).
-    usage(since) {
-      return sb.from('ai_usage').select('at,mode,input,cache_read,cache_write,output,searches').gte('at', since).order('at').limit(5000);
+    // What Hooshvareh's calls used since an ISO time (rows written by the Edge Function), one page
+    // of rows [from, to] (the server gives at most 1000 at a time).
+    usage(since, from, to) {
+      return sb.from('ai_usage').select('at,mode,input,cache_read,cache_write,output,searches').gte('at', since).order('at').range(from, to);
     },
     // The app owner only: is this account allowed to see everyone's usage, and everyone's rows
     // with the member's name (security-definer functions in 20261108_usage_admin.sql).
     usageAdmin() {
       return sb.rpc('is_usage_admin');
     },
-    usageAll(since) {
-      return sb.rpc('ai_usage_all', { since });
+    usageAll(since, from, to) {
+      return sb.rpc('ai_usage_all', { since }).range(from, to);
     },
     // «غذاهای تازه‌ی خانواده», the owner only (20261108_food_share.sql): every member's foods,
     // and one decision: send a food (with the owner's corrections) to these members, or keep it out.
