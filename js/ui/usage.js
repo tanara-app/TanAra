@@ -105,7 +105,7 @@ function modes(rows) {
     byMode.set(r.mode, m);
   }
   return `<div class="wlist usage-list">${[...byMode].sort((a, b) => b[1].cost - a[1].cost).map(([mode, m]) => `
-        <div class="wrow"><span>${MODES[mode] || mode} <small class="muted">${fa(m.n)} بار · هر بار ${usd(m.cost / m.n)}</small></span><b>${usd(m.cost)}</b></div>
+        <div class="wrow"><span>${esc(MODES[mode] || mode)} <small class="muted">${fa(m.n)} بار · هر بار ${usd(m.cost / m.n)}</small></span><b>${usd(m.cost)}</b></div>
         <div class="bar usage-bar"><i style="width:${Math.max(2, Math.round(m.cost / total * 100))}%"></i></div>`).join('')}</div>`;
 }
 

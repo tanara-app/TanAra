@@ -153,7 +153,7 @@ export function createSupabaseRemote(sb) {
     // What Hooshvareh's calls used since an ISO time (rows written by the Edge Function), one page
     // of rows [from, to] (the server gives at most 1000 at a time).
     usage(since, from, to) {
-      return sb.from('ai_usage').select('at,mode,input,cache_read,cache_write,output,searches').gte('at', since).order('at').range(from, to);
+      return sb.from('ai_usage').select('at,mode,input,cache_read,cache_write,output,searches').gte('at', since).order('at').order('id').range(from, to);
     },
     // The app owner only: is this account allowed to see everyone's usage, and everyone's rows
     // with the member's name (security-definer functions in 20261108_usage_admin.sql).
