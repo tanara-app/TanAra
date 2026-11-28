@@ -187,6 +187,8 @@ p { margin: .3rem 0; }
 .row { display: flex; align-items: flex-end; }
 .gap { gap: 10px; }
 .grow { flex: 1; min-width: 0; }
+/* «مرحله» (ui/phase.js): its two buttons side by side stay the same height when one label wraps */
+.phase-acts { align-items: stretch; }
 .stack { display: flex; flex-direction: column; gap: 14px; }
 
 .card {
@@ -203,9 +205,11 @@ p { margin: .3rem 0; }
 /* buttons */
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-  min-height: 48px; padding: 0 16px;
+  min-height: 48px; padding: 6px 16px;
   border: 0; border-radius: 14px;
   background: var(--surface-2);
+  /* a label that wraps to two lines (a narrow half-row button) keeps room above and below */
+  line-height: 1.35; text-wrap: balance;
   font-weight: 600; cursor: pointer;
   text-decoration: none;
 }
@@ -214,7 +218,7 @@ p { margin: .3rem 0; }
 .btn.ghost { background: transparent; color: var(--muted); }
 .btn.block { display: flex; width: 100%; }
 .btn.big { min-height: 56px; font-size: 1.08rem; }
-.btn.sm { min-height: 38px; padding: 0 14px; font-size: .9rem; }
+.btn.sm { min-height: 38px; padding: 4px 14px; font-size: .9rem; }
 .btn.danger-ghost { background: transparent; color: var(--muted); margin-top: 6px; }
 .btn:disabled { opacity: .55; }
 .file-btn { cursor: pointer; }

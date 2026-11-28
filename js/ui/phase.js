@@ -169,7 +169,7 @@ export function phaseCard() {
     ${phase === 'maintain' ? maintainBlock(p, t) : ''}
     ${g && phase !== 'maintain' ? `<div class="kv"><span>وزن هدف</span><b>${fa(p.goalKg, 1)} <small>کیلو${g.left > 0 ? ` · ${fa(g.left, 1)} کیلو مانده` : ' · رسیده‌ای'}</small></b></div>
       <div class="bar goal-bar"><i style="width:${Math.round(g.done * 100)}%"></i></div>` : ''}
-    <div class="row gap mt">
+    <div class="row gap mt phase-acts">
       ${phase !== 'maintain' ? `<button class="btn grow" data-phase-act="goal">${p.goalKg ? 'تغییر وزن هدف' : 'تعیین وزن هدف'}</button>` : ''}
       ${phase === 'loss' ? '<button class="btn grow" data-phase-act="break">استراحت دوهفته‌ای</button>' : ''}
       ${phase === 'break' ? '<button class="btn grow" data-phase-act="endBreak">پایان استراحت</button>' : ''}
