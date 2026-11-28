@@ -75,10 +75,17 @@ export const get = () => state;
 export const profile = () => state.profile?.data || null;
 
 /* ---------------- sync ---------------- */
-function enqueue(op) {
-  if (!remote) return;
+// Every change made on this device goes into the queue here; `writes` counts them, so a pull can
+// tell that one came in while it was fetching.
+let writes = 0;
+function push(op) {
+  writes++;
   queue.push(op);
   persist();
+}
+function enqueue(op) {
+  if (!remote) return;
+  push(op);
   clearTimeout(flushTimer);
   flushTimer = setTimeout(() => flush(), 250);
 }
@@ -125,13 +132,21 @@ export async function flush() {
   }
 }
 
-export async function pull() {
+export async function pull(again = true) {
   if (!remote) return;
   const ok = await flush();
   if (!ok || queue.length) return;
+  const seen = writes;
   const res = await remote.fetchAll();
   if (res.error) { syncStatus.error = 'دریافت داده از سرور انجام نشد.'; emit(); return; }
-  if (queue.length) return; // a write slipped in while fetching — keep local, pull later
+  /*
+    Something was done on this device while fetching (they log as soon as they open the app): the
+    answer may be from before it, even once it has been sent. Put on, it took a meal just logged off
+    the screen (logged twice, it then counted twice), brought back a deleted one, and turned a setting
+    back, which the next setting then took off the server too (the profile is sent whole). Until
+    2026-11-28 only a change not yet sent was noticed. Keep this device's copy; fetch once more.
+  */
+  if (writes !== seen) { if (again) await pull(false); return; }
   state = { ...empty(), ...res.data };
   syncStatus.lastPull = now();
   syncStatus.error = null;
@@ -198,7 +213,7 @@ export function addFoods(list) {
   }));
   rows.forEach(r => state.foods.push(r));
   persist(); emit();
-  if (remote) { queue.push({ op: 'upsert', table: 'foods', row: rows }); persist(); flush(); }
+  if (remote) { push({ op: 'upsert', table: 'foods', row: rows }); flush(); }
   return rows;
 }
 
@@ -226,7 +241,7 @@ function fillFoodGrams() {
   }
   if (!rows.length) return;
   persist(); emit();
-  if (remote) { queue.push({ op: 'upsert', table: 'foods', row: rows.map(r => ({ ...r })) }); persist(); flush(); }
+  if (remote) { push({ op: 'upsert', table: 'foods', row: rows.map(r => ({ ...r })) }); flush(); }
 }
 
 /*
@@ -247,7 +262,7 @@ function fillFoodUnit2() {
   }
   if (!rows.length) return;
   persist(); emit();
-  if (remote) { queue.push({ op: 'upsert', table: 'foods', row: rows.map(r => ({ ...r })) }); persist(); flush(); }
+  if (remote) { push({ op: 'upsert', table: 'foods', row: rows.map(r => ({ ...r })) }); flush(); }
 }
 
 /*
@@ -540,7 +555,7 @@ export function importData(obj) {
   // a full replace supersedes anything still waiting to be sent
   queue = [];
   persist(); emit();
-  if (remote) { queue.push({ op: 'replaceAll', data }); persist(); flush(); }
+  if (remote) { push({ op: 'replaceAll', data }); flush(); }
 }
 
 /* ---------------- this device's push subscription, and the AI's token use ---------------- */
