@@ -1347,9 +1347,50 @@ body.kb .toast, body.chat-mode .toast { bottom: calc(var(--nav-h) + var(--safe-b
   background: linear-gradient(160deg, var(--pn-accent-hi), var(--accent));
   box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 35%, transparent), inset 0 -6px 14px color-mix(in srgb, #000 18%, transparent), 0 8px 20px var(--shadow);
 }
-:root[data-finish="parniyan"] .nav {
+:root[data-finish="parniyan"] .nav,
+:root[data-finish="parniyan"] .chat-bar {
   background: color-mix(in srgb, var(--pn-deep) 92%, transparent);
   border-top-color: color-mix(in srgb, var(--accent) 22%, var(--line));
+}
+/* the mascot's line on «امروز» is a card too */
+:root[data-finish="parniyan"] .greet {
+  background-color: var(--pn-card);
+  background-image: var(--grain), linear-gradient(150deg, var(--pn-card-hi), var(--pn-card) 70%);
+  background-size: 160px 160px, auto; background-blend-mode: overlay, normal;
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 9%, transparent), inset 0 -10px 22px color-mix(in srgb, #000 18%, transparent), 0 6px 16px var(--shadow);
+}
+:root[data-finish="parniyan"][data-theme="light"] .greet {
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.7), inset 0 -10px 22px color-mix(in srgb, var(--accent) 7%, transparent), 0 6px 16px var(--shadow);
+}
+/* fields, toggles and tiles sit pressed into the fabric; plain buttons stand up from it, plush */
+:root[data-finish="parniyan"] .seg,
+:root[data-finish="parniyan"] .card .tile,
+:root[data-finish="parniyan"] input:not([type=checkbox]):not([type=file]),
+:root[data-finish="parniyan"] textarea {
+  box-shadow: inset 0 2px 6px color-mix(in srgb, #000 22%, transparent), inset 0 -1px 0 color-mix(in srgb, #fff 6%, transparent);
+}
+:root[data-finish="parniyan"] .btn:not(.primary):not(.ghost):not(.danger-ghost) {
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 10%, transparent), inset 0 -4px 10px color-mix(in srgb, #000 16%, transparent), 0 3px 8px var(--shadow);
+}
+:root[data-finish="parniyan"][data-theme="light"] .seg,
+:root[data-finish="parniyan"][data-theme="light"] .card .tile,
+:root[data-finish="parniyan"][data-theme="light"] input:not([type=checkbox]):not([type=file]),
+:root[data-finish="parniyan"][data-theme="light"] textarea {
+  box-shadow: inset 0 2px 5px color-mix(in srgb, var(--accent) 14%, transparent), inset 0 -1px 0 rgba(255,255,255,.8);
+}
+:root[data-finish="parniyan"][data-theme="light"] .btn:not(.primary):not(.ghost):not(.danger-ghost) {
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.8), inset 0 -4px 10px color-mix(in srgb, var(--accent) 8%, transparent), 0 3px 8px var(--shadow);
+}
+
+/* A finish reaches every part of the app, not only cards (2026-11-28): the palette's own surfaces and
+   lines are tinted under <body>, so every tile, field, chip, plain button, pill and sheet follows. A
+   property can't be mixed from itself on one element, so :root keeps copies of the palette's values
+   and body mixes from those. */
+:root[data-finish] { --_surface: var(--surface); --_surface-2: var(--surface-2); --_line: var(--line); }
+:root[data-finish="parniyan"] body {
+  --surface: var(--pn-card);
+  --surface-2: color-mix(in srgb, var(--accent) 15%, var(--_surface-2));
+  --line: color-mix(in srgb, var(--accent) 22%, var(--_line));
 }
 
 /* «آزمایش خون» (js/ui/labs.js, LABS.md): tiles by group, the confirm sheet, a test's trend. Out of range is the amber of «over». */
@@ -1492,7 +1533,7 @@ body.kb .toast, body.chat-mode .toast { bottom: calc(var(--nav-h) + var(--safe-b
    palette's own variables plus the night colour, so it works with نعنا, انار and کاشی. */
 :root[data-finish="shab"] {
   --sb-night: color-mix(in srgb, #10154a 45%, var(--bg));
-  --sb-card: color-mix(in srgb, #1a2266 20%, var(--surface));
+  --sb-card: color-mix(in srgb, #1a2266 32%, var(--surface));
   --sb-moon: color-mix(in srgb, var(--accent) 22%, #f1efff);
   --sb-stars: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cg fill='%23fff'%3E%3Ccircle cx='71' cy='33' r='0.7' fill-opacity='0.38'/%3E%3Ccircle cx='118' cy='80' r='0.4' fill-opacity='0.58'/%3E%3Ccircle cx='8' cy='95' r='0.4' fill-opacity='0.39'/%3E%3Ccircle cx='93' cy='182' r='0.5' fill-opacity='0.45'/%3E%3Ccircle cx='138' cy='208' r='0.7' fill-opacity='0.53'/%3E%3Ccircle cx='215' cy='10' r='0.8' fill-opacity='0.48'/%3E%3Ccircle cx='32' cy='26' r='0.6' fill-opacity='0.72'/%3E%3Ccircle cx='40' cy='128' r='0.7' fill-opacity='0.52'/%3E%3Ccircle cx='121' cy='14' r='0.4' fill-opacity='0.44'/%3E%3Ccircle cx='150' cy='94' r='0.6' fill-opacity='0.61'/%3E%3Ccircle cx='100' cy='66' r='0.8' fill-opacity='0.66'/%3E%3Ccircle cx='54' cy='126' r='0.7' fill-opacity='0.74'/%3E%3Ccircle cx='160' cy='63' r='0.9' fill-opacity='0.40'/%3E%3Ccircle cx='92' cy='167' r='0.5' fill-opacity='0.57'/%3E%3Ccircle cx='9' cy='147' r='0.8' fill-opacity='0.61'/%3E%3Ccircle cx='193' cy='69' r='0.7' fill-opacity='0.62'/%3E%3Ccircle cx='128' cy='100' r='0.8' fill-opacity='0.78'/%3E%3Ccircle cx='104' cy='146' r='0.4' fill-opacity='0.67'/%3E%3Ccircle cx='142' cy='218' r='0.8' fill-opacity='0.48'/%3E%3Ccircle cx='85' cy='147' r='0.4' fill-opacity='0.56'/%3E%3Ccircle cx='37' cy='26' r='0.4' fill-opacity='0.70'/%3E%3Ccircle cx='28' cy='54' r='0.6' fill-opacity='0.74'/%3E%3C/g%3E%3C/svg%3E");
   --sb-stars-2: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='340' height='340'%3E%3Cg fill='%23fff'%3E%3Ccircle cx='154' cy='190' r='1.5' fill-opacity='0.79'/%3E%3Ccircle cx='173' cy='200' r='1.0' fill-opacity='0.80'/%3E%3Ccircle cx='214' cy='270' r='1.0' fill-opacity='0.72'/%3E%3Ccircle cx='31' cy='275' r='1.3' fill-opacity='0.62'/%3E%3Ccircle cx='334' cy='328' r='1.3' fill-opacity='0.85'/%3E%3Ccircle cx='54' cy='5' r='1.2' fill-opacity='0.62'/%3E%3Ccircle cx='65' cy='82' r='0.9' fill-opacity='0.79'/%3E%3Ccircle cx='150' cy='286' r='1.2' fill-opacity='0.86'/%3E%3Ccircle cx='170' cy='225' r='1.2' fill-opacity='0.71'/%3E%3C/g%3E%3C/svg%3E");
@@ -1530,9 +1571,34 @@ body.kb .toast, body.chat-mode .toast { bottom: calc(var(--nav-h) + var(--safe-b
   background: linear-gradient(170deg, color-mix(in srgb, var(--accent) 70%, #fff), var(--accent));
   box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 40%, transparent), 0 0 22px color-mix(in srgb, var(--accent) 45%, transparent), 0 8px 18px var(--shadow);
 }
-:root[data-finish="shab"] .nav {
+:root[data-finish="shab"] .nav,
+:root[data-finish="shab"] .chat-bar {
   background: color-mix(in srgb, var(--sb-night) 92%, transparent);
   border-top-color: color-mix(in srgb, var(--sb-moon) 14%, var(--line));
+}
+/* every part in the night's colours (see «A finish reaches every part» above) */
+:root[data-finish="shab"] body {
+  --surface: var(--sb-card);
+  --surface-2: color-mix(in srgb, #3d4aa8 34%, var(--_surface-2));
+  --line: color-mix(in srgb, #7c84d6 22%, var(--_line));
+}
+:root[data-finish="shab"][data-theme="light"] body {
+  --surface-2: color-mix(in srgb, #dfe2fa 70%, var(--_surface-2));
+  --line: color-mix(in srgb, #c3c9f3 50%, var(--_line));
+}
+/* the mascot's line on «امروز» is moonlit like a card; a sheet carries the stars too */
+:root[data-finish="shab"] .greet {
+  background-image: radial-gradient(110% 80% at 0% 0%, color-mix(in srgb, var(--sb-moon) 9%, transparent), transparent 60%);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--sb-moon) 30%, transparent), 0 0 0 1px color-mix(in srgb, var(--sb-moon) 6%, transparent), 0 10px 24px var(--shadow);
+}
+:root[data-finish="shab"][data-theme="light"] .greet {
+  box-shadow: inset 0 1px 0 #fff, 0 0 0 1px color-mix(in srgb, #3a3f8f 6%, transparent), 0 6px 16px var(--shadow);
+}
+:root[data-finish="shab"] .sheet {
+  background-image:
+    var(--sb-stars),
+    radial-gradient(110% 80% at 0% 0%, color-mix(in srgb, var(--sb-moon) 9%, transparent), transparent 60%),
+    linear-gradient(180deg, color-mix(in srgb, var(--sb-moon) 4%, var(--sb-card)), var(--sb-card));
 }
 :root[data-finish="shab"][data-theme="light"] .card,
 :root[data-finish="shab"][data-theme="light"] .sheet {
